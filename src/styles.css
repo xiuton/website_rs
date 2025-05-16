@@ -1,0 +1,207 @@
+/* 基础变量 */
+:root {
+  --bg-color: #f7f7f7;
+  --text-color: #222;
+  --card-bg: #fff;
+  --navbar-bg: #fff;
+  --main-content-bg: #f7f7f7;
+  --secondary-bg: #f7f7f7;
+  --link-color: #007aff;
+  --link-hover: #005bb5;
+  --border-color: #e5e5e5;
+  --shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.dark {
+  --bg-color: #18181c;
+  --text-color: #f7f7f7;
+  --card-bg: #1a1a20;
+  --navbar-bg: #23232a;
+  --main-content-bg: #18181c;
+  --secondary-bg: #1a1a20;
+  --link-color: #4ea1ff;
+  --link-hover: #90c8ff;
+  --border-color: #33343a;
+  --shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+
+body {
+  background: var(--bg-color);
+  color: var(--text-color);
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+  transition: background 0.3s, color 0.3s;
+  margin: 0;
+  padding: 0;
+}
+
+.navbar {
+  background: var(--navbar-bg);
+  color: var(--text-color);
+  box-shadow: var(--shadow);
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.3s, color 0.3s;
+  padding: 1rem 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  position: fixed;
+  top: 0;
+  z-index: 1000;
+}
+
+.nav-content {
+  width: 100%;
+  max-width: 1100px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 2rem;
+  box-sizing: border-box;
+}
+
+.nav-left {
+  display: flex;
+  align-items: center;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+}
+
+.navbar a {
+  color: var(--text-color);
+  text-decoration: none;
+  margin: 0 1rem;
+  transition: color 0.2s;
+  font-weight: 500;
+}
+
+.navbar a:hover {
+  color: var(--link-hover);
+}
+
+.main-content {
+  background: var(--main-content-bg);
+  min-height: 80vh;
+  transition: background 0.3s, color 0.3s;
+  padding-top: 4rem;
+}
+
+.container {
+  background: var(--card-bg);
+  color: var(--text-color);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 2rem;
+  margin: 2rem auto;
+  max-width: 900px;
+  border: 1px solid var(--border-color);
+  transition: background 0.3s, color 0.3s;
+}
+
+.project-card, .project-item, .post-item {
+  background: var(--secondary-bg);
+  color: var(--text-color);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border-color);
+  padding: 1.2rem 1.5rem;
+  margin-bottom: 1.5rem;
+  transition: background 0.3s, color 0.3s;
+}
+
+a {
+  color: var(--link-color);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+a:hover {
+  color: var(--link-hover);
+}
+
+.theme-toggle {
+  background: none;
+  border: none;
+  color: var(--text-color);
+  font-size: 1.5rem;
+  cursor: pointer;
+  margin-left: 1rem;
+  transition: color 0.3s;
+}
+
+/* 其他常用样式适配 */
+.skill-tags span, .project-tags span, .post-meta span {
+  background: var(--secondary-bg);
+  color: var(--text-color);
+  border-radius: 6px;
+  padding: 0.2em 0.7em;
+  margin-right: 0.5em;
+  font-size: 0.95em;
+  border: 1px solid var(--border-color);
+  transition: background 0.3s, color 0.3s;
+}
+
+.social-links a, .contact-methods a {
+  background: var(--secondary-bg);
+  color: var(--link-color);
+  border-radius: 6px;
+  padding: 0.3em 1em;
+  margin-right: 0.7em;
+  border: 1px solid var(--border-color);
+  transition: background 0.3s, color 0.3s;
+}
+
+/* 响应式适配 */
+@media (max-width: 600px) {
+  .container {
+    padding: 1rem;
+    margin: 1rem;
+  }
+  .main-content {
+    min-height: 60vh;
+  }
+}
+
+/* 主题切换动画 */
+::view-transition-old(*) {
+  animation: none;
+}
+
+::view-transition-new(*) {
+  animation: clip 0.5s ease-in;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
+}
+
+html.dark::view-transition-old(*) {
+  animation: clip 0.5s ease-in reverse;
+}
+
+html.dark::view-transition-new(*) {
+  animation: none;
+}
+
+html.dark::view-transition-old(root) {
+  z-index: 9999;
+}
+
+html.dark::view-transition-new(root) {
+  z-index: 1;
+}
+
+@keyframes clip {
+  from {
+    clip-path: circle(0% at var(--x) var(--y));
+  }
+  to {
+    clip-path: circle(var(--r) at var(--x) var(--y));
+  }
+} 
