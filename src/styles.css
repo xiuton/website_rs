@@ -17,6 +17,8 @@
   --navbar-link-hover: #292929;
   --navbar-border: #e5e5e5;
   --navbar-glow: #eaff7b;
+  --hole-bg-color: #ffffff;
+  --hole-border-color: #141414;
 }
 
 .dark {
@@ -37,14 +39,49 @@
   --navbar-link-hover: #ffffff;
   --navbar-border: #595959;
   --navbar-glow: #eaff7b;
+  --hole-bg-color: #141414;
+  --hole-border-color: #ffffff;
+}
+
+@font-face {
+  font-display: swap;
+  font-family: Neue Machina;
+  font-feature-settings: "liga" 0;
+  font-style: normal;
+  font-weight: 600;
+  src: url(./public/fonts/NeueMachina-Bold.woff2) format("woff2")
+}
+
+@font-face {
+  font-display: swap;
+  font-family: IBM Plex Sans SC Subset;
+  font-style: normal;
+  font-weight: 600;
+  src: url(./public/fonts/IBMPlexSansSC-Medium.woff2) format("woff2")
+}
+
+@font-face {
+  font-family: SmileySans;
+  src: url(./public/fonts/SmileySans-Oblique.otf)
+}
+
+@font-face {
+  font-family: MiSans;
+  src: url(./public/fonts/MiSans-Regular.otf)
+}
+
+@font-face {
+  font-family: JetBrains Mono;
+  src: url(./public/fonts/JetBrainsMonoNLNerdFont-Regular.ttf)
 }
 
 html, body {
   width: 100%;
+  min-width: 320px;
+  font-family: MiSans, JetBrains Mono, sans-serif, serif;
   overflow-x: hidden;
   background: var(--bg-color);
   color: var(--text-color);
-  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
   margin: 0;
   padding: 0;
   min-height: 100vh;
@@ -55,6 +92,9 @@ html, body {
   margin: 0;
   padding: 0;
   box-sizing: inherit;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
 }
 
 #main {
@@ -70,7 +110,6 @@ html, body {
 
 .main-bg {
   width: 100%;
-  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -80,10 +119,73 @@ html, body {
 .main-center {
   width: 100%;
   margin: 0 auto;
-  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   margin-top: 40px;
+}
+
+.main-center.about-center div + div{
+  margin-top: 1rem;
+}
+
+.main-center.about-center p.call-content {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: .75rem;
+}
+
+.main-center.about-center p.call-content a {
+  border-bottom-width: 2px;
+  border-bottom-style: solid;
+  border-color: var(--link-color);
+}
+
+html.dark .main-center.about-center p.call-content a:hover {
+  border-color: #fff;
+}
+
+.tags-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+  grid-auto-rows: 70px;
+  gap: 10px;
+  justify-content: start;
+  width: 100%;
+}
+
+.tag-block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: bold;
+  box-shadow: 0 2px 12px #0002;
+  transition: transform 0.18s, box-shadow 0.18s, font-size 0.18s;
+  cursor: pointer;
+  user-select: none;
+  letter-spacing: 0.01em;
+}
+
+.tag-block:hover {
+  transform: translateY(-4px) scale(1.08);
+  box-shadow: 0 6px 24px #0003;
+  font-size: 1.2rem;
+}
+
+@media (max-width: 700px) {
+  .tags-grid {
+    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+    grid-auto-rows: 60px;
+    gap: 8px;
+  }
+  .tag-block {
+    font-size: 0.9rem;
+    border-radius: 8px;
+  }
+  .tag-block:hover {
+    font-size: 1.1rem;
+  }
 }
 
 .hero-glow {
@@ -177,7 +279,7 @@ html, body {
 .code-block, pre {
   background: #222;
   color: #cceeff;
-  font-family: 'Fira Mono', 'JetBrains Mono', 'Consolas', monospace;
+  font-family: JetBrains Mono, 'Consolas', monospace;
   font-size: 1rem;
   border-radius: 6px;
   padding: 10px 12px;
@@ -189,22 +291,16 @@ html, body {
   white-space: pre-wrap;
 }
 
-.code-block .kw { color: #ffb86c; }
-.code-block .fn { color: #8be9fd; }
-.code-block .str { color: #f1fa8c; }
-.code-block .ty { color: #bd93f9; }
+.code-block .kw { color: #c76738; }
+.code-block .fn { color: #2a6fde; }
+.code-block .ty { color: #ffa75f; }
+.code-block .str { color: #5baa5b; }
 
 .footer {
-  color: var(--text-color);
+  color: rgb(107 114 128);
   font-size: 1rem;
   width: 100%;
-  padding: 1.25rem 0;
-}
-
-@media (max-width: 800px) {
-  .main-center { max-width: 98vw; }
-  .code-card { padding: 10px 6px 6px 10px; }
-  .hero-title { font-size: 2.1rem; }
+  padding-bottom: 1.25rem;
 }
 
 .navbar {
@@ -258,7 +354,7 @@ html, body {
 .main-content {
   background: var(--main-content-bg);
   transition: background 0.3s, color 0.3s;
-  margin-top: 1em;
+  margin: 1.25em 0;
 }
 
 .container {
@@ -338,17 +434,6 @@ a:hover {
   margin-right: 0.7em;
   border: 1px solid var(--border-color);
   transition: background 0.3s, color 0.3s;
-}
-
-/* 响应式适配 */
-@media (max-width: 600px) {
-  .container {
-    padding: 1rem;
-    margin: 1rem;
-  }
-  .main-content {
-    min-height: 60vh;
-  }
 }
 
 /* 主题切换动画 */
@@ -450,7 +535,7 @@ html.dark::view-transition-new(root) {
 .nav-link {
   color: var(--navbar-link);
   text-decoration: none;
-  font-size: 1rem;
+  font-size: 1.15rem;
   font-weight: 500;
   border: none;
   background: none;
@@ -492,8 +577,138 @@ html.dark::view-transition-new(root) {
   z-index: 2;
 }
 
-@media (max-width: 600px) {
-  .center-container, .main-center { max-width: 98vw; }
-  .navbar-title { font-size: 2.1rem; }
-  .navbar-links { gap: 0.7em; }
-} 
+/* 铭牌样式 */
+.identification {
+  margin-bottom: 1.5rem;
+}
+
+.identification .content {
+  font-size: 25px;
+  text-shadow: 4px 2px 2px rgba(0, 0, 0, .2);
+  transition: all .3s cubic-bezier(.4,2,.6,1);
+  transform: perspective(500px) rotateY(-15deg) rotateX(15deg);
+  color: #fff;
+  box-shadow: 10px 10px 10px #757575;
+  border: 4px solid #e0e0e0;
+  border-radius: .75rem;
+  padding: 1rem;
+  font-family: SmileySans, JetBrains Mono, MiSans, sans-serif;
+  font-weight: 900;
+  width: fit-content;
+  margin: 0 auto;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.identification .content::before {
+  content: "";
+  display: inline-block;
+  width: 200%;
+  height: 200%;
+  background-image: linear-gradient(135deg, #747e8c, #747e8c, #c2c6d8, #747e8c, #747e8c);
+  position: absolute;
+  right: -5px;
+  bottom: 50%;
+  /* transition: all .3s cubic-bezier(.4,2,.6,1); */
+  transition: all .3s;
+  transform: translateY(50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.identification .content:hover::before {
+  right: calc(-100% + 5px);
+}
+
+.identification .hole {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--hole-bg-color);
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  border: 1px solid var(--hole-border-color);
+  z-index: 9;
+}
+
+.identification .content .default {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1em;
+}
+
+.identification .content .before,
+.identification .content .middle,
+.identification .content .after {
+  z-index: 50;
+  position: relative;
+}
+
+.identification .content .middle {
+  color: #ff0000;
+  font-size: 1.1em;
+}
+
+.identification .content .header,
+.identification .content .foot {
+  position: relative;
+  z-index: 99;
+  font-size: 12px;
+}
+
+.identification .content:hover {
+  text-shadow: -4px -2px 2px rgba(0, 0, 0, .2);
+  box-shadow: 0 0 10px #757575;
+  transform: perspective(500px) rotateY(0) rotateX(0);
+}
+
+/* 图片容器和按钮 */
+.dev-img-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+.dev-img {
+  width: 100%;
+  max-height: 600px;
+  object-fit: contain;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  border-radius: 14px;
+  box-shadow: 0 4px 24px #0006;
+}
+.img-switch-btn {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  padding: 0.35em 1.2em;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: none;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 2px 8px #0002;
+  transition: opacity 0.22s, transform 0.22s, background 0.2s, color 0.2s;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-16px);
+  border: 2px solid #fff;
+}
+.dev-img-wrapper:hover .img-switch-btn {
+  opacity: 0.92;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.img-switch-btn:hover {
+  background: rgb(255, 255, 255, 0.5);
+  color: #000000;
+  opacity: 1;
+  border: 2px solid #000;
+}

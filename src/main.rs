@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 use dioxus_router::prelude::*;
 use web_sys::window;
+use wasm_bindgen_futures::spawn_local;
 
 fn main() {
     // 初始化 panic hook
@@ -14,9 +15,10 @@ fn main() {
 fn Navbar<'a>(cx: Scope<'a>, is_dark: &'a UseState<bool>) -> Element<'a> {
     const NAV_ITEMS: &[(&str, &str)] = &[
         ("/", "首页"),
-        ("/blog", "博客"),
+        ("/about", "关于"),
         ("/tags", "书签"),
         ("/dev", "开发"),
+        ("/blog", "博客"),
     ];
 
     let onclick = {
@@ -56,11 +58,11 @@ fn Navbar<'a>(cx: Scope<'a>, is_dark: &'a UseState<bool>) -> Element<'a> {
     let current_path = location.pathname().unwrap_or_else(|_| "/".to_string());
     
     // 调试输出当前路径
-    web_sys::console::log_1(&format!("current_path: {}", current_path).into());
+    // web_sys::console::log_1(&format!("current_path: {}", current_path).into());
     
     let is_active = |href: &str| {
         // 调试输出每个href和比较结果
-        web_sys::console::log_1(&format!("comparing: current_path={} href={}", current_path, href).into());
+        // web_sys::console::log_1(&format!("comparing: current_path={} href={}", current_path, href).into());
         match href {
             "/" => current_path == "/",
             _ => current_path.starts_with(href)
@@ -79,7 +81,7 @@ fn Navbar<'a>(cx: Scope<'a>, is_dark: &'a UseState<bool>) -> Element<'a> {
                     NAV_ITEMS.iter().map(|(href, label)| {
                         let active = is_active(href);
                         // 调试输出每个链接的激活状态
-                        web_sys::console::log_1(&format!("link: {} active: {}", href, active).into());
+                        // web_sys::console::log_1(&format!("link: {} active: {}", href, active).into());
                         rsx! {
                             a {
                                 href: *href,
@@ -175,15 +177,19 @@ fn App(cx: Scope) -> Element {
 enum Route {
     #[route("/")]
     Home,
-    #[route("/blog")]
-    Blog,
+    #[route("/about")]
+    About,
     #[route("/tags")]
     Tags,
     #[route("/dev")]
     Dev,
+    #[route("/blog")]
+    Blog,
 }
 
 fn Home(cx: Scope) -> Element {
+    let str_l_br = "{";
+    let str_r_br = "}";
     cx.render(rsx! {
         div { class: "main-bg",
             div { class: "center-container",
@@ -191,16 +197,226 @@ fn Home(cx: Scope) -> Element {
                     div { class: "code-cards",
                         div { class: "code-card",
                             div { class: "code-card-title", "TypeScript" }
-                            pre { class: "code-block ts", { "const str: string = \"Hello TS\";\nconsole.log(str);" } }
+                            pre { class: "code-block ts",
+                                code {
+                                    span { class: "kw", "const" },
+                                    " str",
+                                    ": ",
+                                    span { class: "kw", "string" },
+                                    span { class: "ty", " = " },
+                                    span { class: "str", "\"Hello, TypeScript!\"" },
+                                    ";",
+                                    br {},
+                                    span { class: "fn", "console" },
+                                    ".",
+                                    span { class: "ty", "log" },
+                                    "(str);",
+                                }
+                            }
                         }
                         div { class: "code-card",
                             div { class: "code-card-title", "Golang" }
-                            pre { class: "code-block go", { "package main\n\nimport \"fmt\"\n\nfunc main() {\n    var str string = \"Hello Golang\"\n    fmt.Println(str)\n}" } }
+                            pre { class: "code-block go",
+                                code {
+                                    span { class: "kw", "package" },
+                                    " main",
+                                    br {},
+                                    br {},
+                                    span { class: "kw", "import" },
+                                    " ",
+                                    span { class: "str", "\"fmt\"" },
+                                    br {},
+                                    br {},
+                                    span { class: "kw", "func" },
+                                    span { class: "fn", " main" },
+                                    "() ",
+                                    str_l_br,
+                                    br {},
+                                    "    ",
+                                    span { class: "kw", "var" },
+                                    " str ",
+                                    span { class: "ty", "string" },
+                                    " = ",
+                                    span { class: "str", "\"Hello, Golang!\"" },
+                                    ";",
+                                    br {},
+                                    "    ",
+                                    span { class: "fn", "fmt" },
+                                    ".",
+                                    span { class: "fn", "Println" },
+                                    "(str)",
+                                    br {},
+                                    str_r_br,
+                                }
+                            }
                         }
                         div { class: "code-card",
                             div { class: "code-card-title", "Rust" }
-                            pre { class: "code-block rust", { "fn main() {\n    let str = \"Hello Rust\";\n    print!(\"{}\", str);\n}" } }
+                            pre { class: "code-block rust",
+                                code {
+                                    span { class: "kw", "fn" },
+                                    " ",
+                                    span { class: "fn", "main" },
+                                    "() ",
+                                    str_l_br,
+                                    br {},
+                                    "    ",
+                                    span { class: "kw", "let" },
+                                    " str: String = String::",
+                                    span { class: "fn", "from" },
+                                    "(",
+                                    span { class: "str", "\"Hello, Rust!\"" },
+                                    ");",
+                                    br {},
+                                    span { class: "ty", "    println!" },
+                                    "(",
+                                    span { class: "str", "\"" },
+                                    span { class: "ty", str_l_br, str_r_br },
+                                    span { class: "str", "\"" },
+                                    ", str);",
+                                    br {},
+                                    str_r_br,
+                                }
+                            }
                         }
+                    }
+                }
+            }
+        }
+    })
+}
+
+fn About(cx: Scope) -> Element {
+    cx.render(rsx! {
+        div { class: "main-bg",
+            div { class: "center-container",
+                div { class: "main-center about-center",
+                    div { "你好！我是一名开发爱好者" },
+                    div { "常用技术栈：Rust、Golang、JavaScript、TypeScript、React、Vue" },
+                    div { class: "call-container",
+                        p { "你可以在此处找到我：" },
+                        p { class: "call-content",
+                            a { href: "https://github.com/gantoho", "GitHub@gantoho" },
+                            a { href: "https://gitee.com/ganto", "Gitee@ganto" },
+                            a { href: "https://space.bilibili.com/1112912961", "BiliBBili@干徒" },
+                            a { href: "https://cnblogs.com/ganto", "博客园@干徒" },
+                            a { href: "mailto:i@ganto.me?cc=i@ganto.icu&amp;body=你好，干徒！我有一些想法要与你分享：", "i@ganto.me" },
+                        }
+                    },
+                }
+            }
+        }
+    })
+}
+
+fn Tags(cx: Scope) -> Element {
+    let tags = vec![
+        ("JS", "#ffe033", "#222"),
+        ("Vue", "#4dbd8b", "#222"),
+        ("React", "#5edfff", "#222"),
+        ("Angular", "#f44336", "#fff"),
+        ("Svelte", "#ff6f3d", "#fff"),
+        ("Solid", "#6c93be", "#fff"),
+        ("TS", "#3b82f6", "#fff"),
+        ("Vite", "#8b8cf7", "#fff"),
+        ("Nuxt", "#19e28c", "#222"),
+        ("Next", "#1e90ff", "#fff"),
+        ("Remix", "#4fc3f7", "#fff"),
+        ("Go", "#6ad6f7", "#fff"),
+        ("Rust", "#fff", "#222"),
+        ("Java", "#4b7ca8", "#fff"),
+    ];
+    cx.render(rsx! {
+        div { class: "main-bg",
+            div { class: "center-container",
+                div { class: "main-center tags-center",
+                    div { class: "tags-grid",
+                        tags.iter().map(|(name, bg, color)| {
+                            let style_str = format!("background:{};color:{};", bg, color);
+                            rsx! {
+                                div {
+                                    class: "tag-block",
+                                    style: Box::leak(style_str.into_boxed_str()) as &str,
+                                    b { name }
+                                }
+                            }
+                        })
+                    }
+                }
+            }
+        }
+    })
+}
+
+#[component]
+fn Dev(cx: Scope) -> Element {
+    let img_url = use_state(&cx, || None);
+
+    // 图片加载逻辑，供初始化和按钮复用
+    let load_img = {
+        let img_url = img_url.clone();
+        move || {
+            let img_url = img_url.clone();
+            spawn_local(async move {
+                let resp = gloo_net::http::Request::get("https://yun.ganto.cn/bgimg")
+                    .send()
+                    .await;
+
+                if let Ok(response) = resp {
+                    if let Ok(filename) = response.text().await {
+                        let url = format!("https://files.ganto.cn/files/{}", filename.trim());
+                        img_url.set(Some(url));
+                    }
+                }
+            });
+        }
+    };
+
+    // 按钮点击事件
+    let fetch_random_img = {
+        let load_img = load_img.clone();
+        move |_evt: Event<MouseData>| {
+            load_img();
+        }
+    };
+
+    // 首次加载自动获取
+    use_effect(&cx, (), {
+        let load_img = load_img.clone();
+        move |_| {
+            load_img();
+            async move {}
+        }
+    });
+
+    cx.render(rsx! {
+        div { class: "main-bg",
+            div { class: "center-container main-center dev-center",
+                div { class: "identification",
+                    div { class: "content",
+                        span { class: "hole"}
+                        div { class: "header" }
+                        div { class: "default",
+                            div { class: "before", "Ganto" }
+                            div { class: "middle", "." }
+                            div { class: "after", "Me" }
+                        }
+                        div { class: "foot" }
+                    }
+                }
+                div { class: "dev-img-wrapper",
+                    if let Some(url) = &*img_url.get() {
+                        rsx! {
+                            img {
+                                src: "{url}",
+                                class: "dev-img"
+                            }
+                        }
+                    }
+                    button {
+                        class: "img-switch-btn",
+                        onclick: fetch_random_img,
+                        "Regain"
                     }
                 }
             }
@@ -229,64 +445,6 @@ fn Blog(cx: Scope) -> Element {
                                 span { "2024-05-15" }
                                 span { "WebAssembly" }
                             }
-                        }
-                    }
-                }
-            }
-        }
-    })
-}
-
-fn Tags(cx: Scope) -> Element {
-    cx.render(rsx! {
-        div { class: "main-bg",
-            div { class: "center-container",
-                div { class: "main-center tags-center",
-                    div { class: "tags-list",
-                        div { class: "tag-group",
-                            h2 { "开发工具" }
-                            ul {
-                                li { a { href: "https://github.com/", target: "_blank", "GitHub" } }
-                                li { a { href: "https://gitee.com/", target: "_blank", "Gitee" } }
-                                li { a { href: "https://code.visualstudio.com/", target: "_blank", "VS Code" } }
-                                li { a { href: "https://rust-lang.org/", target: "_blank", "Rust 官网" } }
-                                li { a { href: "https://crates.io/", target: "_blank", "Crates.io" } }
-                            }
-                        }
-                        div { class: "tag-group",
-                            h2 { "学习资源" }
-                            ul {
-                                li { a { href: "https://zh.javascript.info/", target: "_blank", "JavaScript 教程" } }
-                                li { a { href: "https://doc.rust-lang.org/book/", target: "_blank", "Rust Book" } }
-                                li { a { href: "https://react.dev/", target: "_blank", "React 官方文档" } }
-                                li { a { href: "https://dioxuslabs.com/", target: "_blank", "Dioxus 文档" } }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    })
-}
-
-fn Dev(cx: Scope) -> Element {
-    cx.render(rsx! {
-        div { class: "main-bg",
-            div { class: "center-container",
-                div { class: "main-center dev-center",
-                    p { "这里是开发相关内容与工具集合。" }
-                    ul {
-                        li { a { href: "https://github.com/ganto", target: "_blank", "GitHub 主页" } }
-                        li { a { href: "https://ganto.me/blog", target: "_blank", "个人博客" } }
-                        li { a { href: "https://ganto.me/projects", target: "_blank", "项目展示" } }
-                        li { a { href: "https://ganto.me/contact", target: "_blank", "联系我" } }
-                    }
-                    div { class: "dev-note",
-                        h2 { "开发笔记" }
-                        ul {
-                            li { "Rust + Dioxus 构建现代 Web 应用" }
-                            li { "WASM 技术栈实践与优化" }
-                            li { "持续集成与自动化部署" }
                         }
                     }
                 }
