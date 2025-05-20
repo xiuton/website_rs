@@ -98,7 +98,7 @@ html, body {
 }
 
 #main {
-  margin: 0 1.4em;
+  margin: 0 1.2em;
 }
 
 .app {
@@ -264,7 +264,7 @@ html.dark .main-center.about-center p.call-content a:hover {
 .code-card {
   background: #888a;
   border-radius: 12px;
-  padding: 12px 18px 8px 18px;
+  padding: 5px;
   box-shadow: 0 2px 12px #0003;
   width: 100%;
 }
@@ -273,22 +273,22 @@ html.dark .main-center.about-center p.call-content a:hover {
   font-weight: bold;
   margin-bottom: 6px;
   color: #fff;
-  font-size: 1.08rem;
+  font-size: .8rem;
 }
 
 .code-block, pre {
   background: #222;
   color: #cceeff;
   font-family: JetBrains Mono, 'Consolas', monospace;
-  font-size: 1rem;
-  border-radius: 6px;
-  padding: 10px 12px;
+  font-size: .8rem;
+  border-radius: 8px;
+  padding: 4px 6px;
   overflow-x: auto;
   margin: 0;
-  line-height: 1.7;
+  line-height: 1.5;
   max-width: 100%;
-  word-break: break-all;
-  white-space: pre-wrap;
+  /* word-break: break-all; */
+  /* white-space: pre-wrap; */
 }
 
 .code-block .kw { color: #c76738; }
