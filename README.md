@@ -115,6 +115,11 @@ docker run -p 8080:80 ganto-website
 
 本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
 
+sass
+```sh
+npm install -g sass
+```
+
 清空缓存并打包运行
 ```bash
 $ cargo clean ; trunk clean ; trunk build ; trunk serve

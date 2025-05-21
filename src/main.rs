@@ -1,6 +1,5 @@
 use dioxus::prelude::*;
 use dioxus_router::prelude::*;
-use web_sys::window;
 use wasm_bindgen_futures::spawn_local;
 
 fn main() {
@@ -8,11 +7,11 @@ fn main() {
     console_error_panic_hook::set_once();
     
     // 启动应用
-    dioxus_web::launch(App);
+    launch(app);
 }
 
 #[component]
-fn Navbar<'a>(cx: Scope<'a>, is_dark: &'a UseState<bool>) -> Element<'a> {
+fn Navbar(is_dark: Signal<bool>) -> Element {
     const NAV_ITEMS: &[(&str, &str)] = &[
         ("/", "首页"),
         ("/about", "关于"),
@@ -21,9 +20,7 @@ fn Navbar<'a>(cx: Scope<'a>, is_dark: &'a UseState<bool>) -> Element<'a> {
         ("/blog", "博客"),
     ];
 
-    let onclick = {
-        let is_dark = is_dark.clone();
-        move |e: Event<MouseData>| {
+    let onclick = move |e: Event<MouseData>| {
             let window = web_sys::window().unwrap();
             let document = window.document().unwrap();
             let html = document.document_element().unwrap();
@@ -45,32 +42,27 @@ fn Navbar<'a>(cx: Scope<'a>, is_dark: &'a UseState<bool>) -> Element<'a> {
                     html.set_attribute("class", "dark").unwrap();
                 }
             }
-            is_dark.set(!*is_dark.get());
-            if let Some(local_storage) = window.local_storage().ok().flatten() {
-                let _ = local_storage.set_item("theme", if !is_dark.get() { "dark" } else { "light" });
+        is_dark.set(!is_dark());
+        if let Some(window) = web_sys::window() {
+            if let Some(storage) = window.local_storage().ok().flatten() {
+                let _ = storage.set_item("theme", if is_dark() { "dark" } else { "light" });
             }
         }
     };
 
-    let route = use_route::<Route>(&cx);
     let window = web_sys::window().unwrap();
     let location = window.location();
     let current_path = location.pathname().unwrap_or_else(|_| "/".to_string());
     
-    // 调试输出当前路径
-    // web_sys::console::log_1(&format!("current_path: {}", current_path).into());
-    
     let is_active = |href: &str| {
-        // 调试输出每个href和比较结果
-        // web_sys::console::log_1(&format!("comparing: current_path={} href={}", current_path, href).into());
         match href {
             "/" => current_path == "/",
             _ => current_path.starts_with(href)
         }
     };
 
-    cx.render(rsx! {
-        div { class: "navbar-container",
+    rsx! {
+        div { class: "navbar-content",
             div { class: "navbar-ui",
                 div { class: "navbar-title-wrapper",
                     h1 { class: "navbar-title", "干徒" }
@@ -78,23 +70,21 @@ fn Navbar<'a>(cx: Scope<'a>, is_dark: &'a UseState<bool>) -> Element<'a> {
                 }
                 div { class: "navbar-subtitle", "这很酷" }
                 div { class: "navbar-links",
-                    NAV_ITEMS.iter().map(|(href, label)| {
+                    {NAV_ITEMS.iter().map(|(href, label)| {
                         let active = is_active(href);
-                        // 调试输出每个链接的激活状态
-                        // web_sys::console::log_1(&format!("link: {} active: {}", href, active).into());
                         rsx! {
                             a {
                                 href: *href,
                                 class: if active { "nav-link nav-active" } else { "nav-link" },
-                                label
+                                { label }
                             }
                         }
-                    })
+                    })}
                     button {
                         class: "theme-toggle",
                         onclick: onclick,
-                        if *is_dark.get() {
-                            rsx! {
+                        match is_dark() {
+                            true => rsx! {
                                 svg {
                                     xmlns: "http://www.w3.org/2000/svg",
                                     view_box: "0 0 1024 1024",
@@ -103,9 +93,8 @@ fn Navbar<'a>(cx: Scope<'a>, is_dark: &'a UseState<bool>) -> Element<'a> {
                                         d: "M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"
                                     }
                                 }
-                            }
-                        } else {
-                            rsx! {
+                            },
+                            false => rsx! {
                                 svg {
                                     xmlns: "http://www.w3.org/2000/svg",
                                     view_box: "0 0 1024 1024",
@@ -114,33 +103,34 @@ fn Navbar<'a>(cx: Scope<'a>, is_dark: &'a UseState<bool>) -> Element<'a> {
                                         d: "M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"
                                     }
                                 }
-                            }
+                            },
                         }
                     }
                 }
             }
         }
-    })
+    }
 }
 
 #[component]
-fn Footer(cx: Scope) -> Element {
-    cx.render(rsx! {
-        div { class: "footer",
+fn Footer() -> Element {
+    rsx! {
+        div { class: "footer-content",
             span { "2019-2025 " }
             span { style: "color: rgb(161, 98, 7);", "©" }
             span { " 干徒 / Ganto" }
         }
-    })
+    }
 }
 
-fn App(cx: Scope) -> Element {
-    let is_dark = use_state(&cx, || {
-        if let Some(window) = window() {
+#[component]
+fn app() -> Element {
+    let is_dark = use_signal(|| {
+        if let Some(window) = web_sys::window() {
             if let Some(document) = window.document() {
                 if let Some(html) = document.document_element() {
-                    if let Some(local_storage) = window.local_storage().ok().flatten() {
-                        if let Ok(Some(theme)) = local_storage.get_item("theme") {
+                    if let Some(storage) = window.local_storage().ok().flatten() {
+                        if let Ok(Some(theme)) = storage.get_item("theme") {
                             if theme == "dark" {
                                 html.set_attribute("class", "dark").unwrap();
                                 return true;
@@ -162,15 +152,16 @@ fn App(cx: Scope) -> Element {
         }
         false
     });
-    cx.render(rsx! {
+
+    rsx! {
         div { class: "app",
-            Navbar { is_dark: &is_dark }
+            Navbar { is_dark: is_dark }
             div { class: "main-content",
                 Router::<Route> {}
             }
             Footer {}
         }
-    })
+    }
 }
 
 #[derive(Routable, Clone)]
@@ -187,129 +178,124 @@ enum Route {
     Blog,
 }
 
-fn Home(cx: Scope) -> Element {
+#[component]
+fn Home() -> Element {
     let str_l_br = "{";
     let str_r_br = "}";
-    cx.render(rsx! {
-        div { class: "main-bg",
-            div { class: "center-container",
-                div { class: "main-center",
+    rsx! {
+        div { class: "main-container",
                     div { class: "code-cards",
                         div { class: "code-card",
                             div { class: "code-card-title", "TypeScript" }
-                            pre { class: "code-block ts",
-                                code {
-                                    span { class: "kw", "const" },
-                                    " str",
-                                    ": ",
-                                    span { class: "kw", "string" },
-                                    span { class: "ty", " = " },
-                                    span { class: "str", "\"Hello, TypeScript!\"" },
-                                    ";",
-                                    br {},
-                                    span { class: "fn", "console" },
-                                    ".",
-                                    span { class: "ty", "log" },
-                                    "(str);",
-                                }
-                            }
+                    pre { class: "code-block ts",
+                        code {
+                            span { class: "kw", "const" },
+                            " str",
+                            ": ",
+                            span { class: "kw", "string" },
+                            span { class: "ty", " = " },
+                            span { class: "str", "\"Hello, TypeScript!\"" },
+                            ";",
+                            br {},
+                            span { class: "fn", "console" },
+                            ".",
+                            span { class: "ty", "log" },
+                            "(str);",
+                        }
+                    }
                         }
                         div { class: "code-card",
                             div { class: "code-card-title", "Golang" }
-                            pre { class: "code-block go",
-                                code {
-                                    span { class: "kw", "package" },
-                                    " main",
-                                    br {},
-                                    br {},
-                                    span { class: "kw", "import" },
-                                    " ",
-                                    span { class: "str", "\"fmt\"" },
-                                    br {},
-                                    br {},
-                                    span { class: "kw", "func" },
-                                    span { class: "fn", " main" },
-                                    "() ",
-                                    str_l_br,
-                                    br {},
-                                    "    ",
-                                    span { class: "kw", "var" },
-                                    " str ",
-                                    span { class: "ty", "string" },
-                                    " = ",
-                                    span { class: "str", "\"Hello, Golang!\"" },
-                                    ";",
-                                    br {},
-                                    "    ",
-                                    span { class: "fn", "fmt" },
-                                    ".",
-                                    span { class: "fn", "Println" },
-                                    "(str)",
-                                    br {},
-                                    str_r_br,
-                                }
-                            }
+                    pre { class: "code-block go",
+                        code {
+                            span { class: "kw", "package" },
+                            " main",
+                            br {},
+                            br {},
+                            span { class: "kw", "import" },
+                            " ",
+                            span { class: "str", "\"fmt\"" },
+                            br {},
+                            br {},
+                            span { class: "kw", "func" },
+                            span { class: "fn", " main" },
+                            "() ",
+                            {str_l_br},
+                            br {},
+                            "    ",
+                            span { class: "kw", "var" },
+                            " str ",
+                            span { class: "ty", "string" },
+                            " = ",
+                            span { class: "str", "\"Hello, Golang!\"" },
+                            ";",
+                            br {},
+                            "    ",
+                            span { class: "fn", "fmt" },
+                            ".",
+                            span { class: "fn", "Println" },
+                            "(str)",
+                            br {},
+                            {str_r_br},
+                        }
+                    }
                         }
                         div { class: "code-card",
                             div { class: "code-card-title", "Rust" }
-                            pre { class: "code-block rust",
-                                code {
-                                    span { class: "kw", "fn" },
-                                    " ",
-                                    span { class: "fn", "main" },
-                                    "() ",
-                                    str_l_br,
-                                    br {},
-                                    "    ",
-                                    span { class: "kw", "let" },
-                                    " str: String = String::",
-                                    span { class: "fn", "from" },
-                                    "(",
-                                    span { class: "str", "\"Hello, Rust!\"" },
-                                    ");",
-                                    br {},
-                                    span { class: "ty", "    println!" },
-                                    "(",
-                                    span { class: "str", "\"" },
-                                    span { class: "ty", str_l_br, str_r_br },
-                                    span { class: "str", "\"" },
-                                    ", str);",
-                                    br {},
-                                    str_r_br,
-                                }
-                            }
+                    pre { class: "code-block rust",
+                        code {
+                            span { class: "kw", "fn" },
+                            " ",
+                            span { class: "fn", "main" },
+                            "() ",
+                            {str_l_br},
+                            br {},
+                            "    ",
+                            span { class: "kw", "let" },
+                            " str: String = String::",
+                            span { class: "fn", "from" },
+                            "(",
+                            span { class: "str", "\"Hello, Rust!\"" },
+                            ");",
+                            br {},
+                            span { class: "ty", "    println!" },
+                            "(",
+                            span { class: "str", "\"" },
+                            span { class: "ty", {str_l_br}, {str_r_br} },
+                            span { class: "str", "\"" },
+                            ", str);",
+                            br {},
+                            {str_r_br},
                         }
                     }
                 }
             }
         }
-    })
+    }
 }
 
-fn About(cx: Scope) -> Element {
-    cx.render(rsx! {
-        div { class: "main-bg",
-            div { class: "center-container",
-                div { class: "main-center about-center",
-                    div { "你好！我是一名开发爱好者" },
-                    div { "常用技术栈：Rust、Golang、JavaScript、TypeScript、React、Vue" },
-                    div { class: "call-container",
-                        p { "你可以在此处找到我：" },
-                        p { class: "call-content",
-                            a { href: "https://github.com/gantoho", "GitHub@gantoho" },
-                            a { href: "https://gitee.com/ganto", "Gitee@ganto" },
-                            a { href: "https://space.bilibili.com/1112912961", "BiliBBili@干徒" },
-                            a { href: "https://cnblogs.com/ganto", "博客园@干徒" },
-                            a { href: "mailto:i@ganto.me?cc=i@ganto.icu&amp;body=你好，干徒！我有一些想法要与你分享：", "i@ganto.me" },
-                        }
-                    },
+#[component]
+fn About() -> Element {
+    rsx! {
+        div { class: "about-container",
+            div { "你好！我是一名开发爱好者" },
+            div { "常用技术栈：Rust、Golang、JavaScript、TypeScript、React、Vue" },
+            div { class: "call-container",
+                p { "你可以在此处找到我：" },
+                p { class: "call-content",
+                    a { href: "https://github.com/gantoho", "GitHub@gantoho" },
+                    a { href: "https://gitee.com/ganto", "Gitee@ganto" },
+                    a { href: "https://space.bilibili.com/1112912961", "BiliBBili@干徒" },
+                    a { href: "https://cnblogs.com/ganto", "博客园@干徒" },
+                    a { href: "mailto:i@ganto.me?cc=i@ganto.icu&amp;body=你好，干徒！我有一些想法要与你分享：", "i@ganto.me" },
                 }
-            }
+            },
         }
-    })
+    }
 }
 
-fn Tags(cx: Scope) -> Element {
+#[component]
+fn Tags() -> Element {
     let tags = vec![
         ("JS", "#ffe033", "#222"),
         ("Vue", "#4dbd8b", "#222"),
@@ -326,37 +312,33 @@ fn Tags(cx: Scope) -> Element {
         ("Rust", "#fff", "#222"),
         ("Java", "#4b7ca8", "#fff"),
     ];
-    cx.render(rsx! {
-        div { class: "main-bg",
-            div { class: "center-container",
-                div { class: "main-center tags-center",
-                    div { class: "tags-grid",
-                        tags.iter().map(|(name, bg, color)| {
-                            let style_str = format!("background:{};color:{};", bg, color);
-                            rsx! {
-                                div {
-                                    class: "tag-block",
-                                    style: Box::leak(style_str.into_boxed_str()) as &str,
-                                    b { name }
-                                }
-                            }
-                        })
+    rsx! {
+        div { class: "tags-container",
+            div { class: "tags-grid",
+                {tags.iter().map(|(name, bg, color)| {
+                    let style_str = format!("background:{};color:{};", bg, color);
+                    rsx! {
+                        div {
+                            class: "tag-block",
+                            style: Box::leak(style_str.into_boxed_str()) as &str,
+                            b { {name} }
+                        }
                     }
-                }
+                })}
             }
         }
-    })
+    }
 }
 
 #[component]
-fn Dev(cx: Scope) -> Element {
-    let img_url = use_state(&cx, || None);
+fn Dev() -> Element {
+    let img_url = use_signal(|| None::<String>);
 
     // 图片加载逻辑，供初始化和按钮复用
     let load_img = {
         let img_url = img_url.clone();
         move || {
-            let img_url = img_url.clone();
+            let mut img_url = img_url.clone();
             spawn_local(async move {
                 let resp = gloo_net::http::Request::get("https://yun.ganto.cn/bgimg")
                     .send()
@@ -381,74 +363,47 @@ fn Dev(cx: Scope) -> Element {
     };
 
     // 首次加载自动获取
-    use_effect(&cx, (), {
-        let load_img = load_img.clone();
-        move |_| {
-            load_img();
-            async move {}
-        }
+    use_effect(move || {
+        load_img();
+        ()
     });
 
-    cx.render(rsx! {
-        div { class: "main-bg",
-            div { class: "center-container main-center dev-center",
-                div { class: "identification",
-                    div { class: "content",
-                        span { class: "hole"}
-                        div { class: "header" }
-                        div { class: "default",
-                            div { class: "before", "Ganto" }
-                            div { class: "middle", "." }
-                            div { class: "after", "Me" }
-                        }
-                        div { class: "foot" }
+    rsx! {
+        div { class: "dev-container",
+            div { class: "identification",
+                div { class: "content",
+                    span { class: "hole"}
+                    div { class: "header" }
+                    div { class: "default",
+                        div { class: "before", "Ganto" }
+                        div { class: "middle", "." }
+                        div { class: "after", "Me" }
+                    }
+                    div { class: "foot" }
+                }
+            }
+            div { class: "dev-img-wrapper",
+                if let Some(url) = img_url() {
+                    img {
+                        src: url,
+                        class: "dev-img"
                     }
                 }
-                div { class: "dev-img-wrapper",
-                    if let Some(url) = &*img_url.get() {
-                        rsx! {
-                            img {
-                                src: "{url}",
-                                class: "dev-img"
-                            }
-                        }
-                    }
-                    button {
-                        class: "img-switch-btn",
-                        onclick: fetch_random_img,
-                        "Regain"
-                    }
+                button {
+                    class: "img-switch-btn",
+                    onclick: fetch_random_img,
+                    "Regain"
                 }
             }
         }
-    })
+    }
 }
 
-fn Blog(cx: Scope) -> Element {
-    cx.render(rsx! {
-        div { class: "main-bg",
-            div { class: "center-container",
-                div { class: "main-center blog-center",
-                    div { class: "post-list",
-                        div { class: "post-item",
-                            h2 { "Rust 中的内存安全" }
-                            p { "深入探讨 Rust 的所有权系统和内存安全机制，以及如何在实际项目中应用这些概念。" }
-                            div { class: "post-meta",
-                                span { "2024-05-16" }
-                                span { "Rust" }
-                            }
-                        }
-                        div { class: "post-item",
-                            h2 { "WebAssembly 入门指南" }
-                            p { "介绍 WebAssembly 的基础知识，以及如何使用 Rust 开发 WebAssembly 应用。" }
-                            div { class: "post-meta",
-                                span { "2024-05-15" }
-                                span { "WebAssembly" }
-                            }
-                        }
-                    }
-                }
-            }
+#[component]
+fn Blog() -> Element {
+    rsx! {
+        div { class: "blog-container",
+            p { "这里是我的博客文章。" }
         }
-    })
+    }
 }
