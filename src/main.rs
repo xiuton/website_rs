@@ -178,6 +178,15 @@ enum Route {
     Blog,
 }
 
+#[derive(Clone, PartialEq)]
+struct BlogPost {
+    title: String,
+    date: String,
+    author: String,
+    tags: Vec<String>,
+    content: String,
+}
+
 #[component]
 fn Home() -> Element {
     let str_l_br = "{";
@@ -230,7 +239,6 @@ fn Home() -> Element {
                             span { class: "str", "\"Hello, Golang!\"" },
                             ";",
                             br {},
-                            "    ",
                             span { class: "fn", "fmt" },
                             ".",
                             span { class: "fn", "Println" },
@@ -401,9 +409,157 @@ fn Dev() -> Element {
 
 #[component]
 fn Blog() -> Element {
+    let posts = use_signal(Vec::new);
+    let mut current_post = use_signal(|| None::<BlogPost>);
+
+    // 加载博客文章列表
+    use_effect(move || {
+        let mut posts = posts.clone();
+        spawn_local(async move {
+            // 文章列表
+            let post_files = vec!["hello-world.md", "Rust学习笔记.md"];
+            let mut loaded_posts = Vec::new();
+
+            for file in post_files {
+                match gloo_net::http::Request::get(&format!("/public/posts/{}", file)).send().await {
+                    Ok(response) => {
+                        if let Ok(content) = response.text().await {
+                            let mut lines = content.lines();
+                            let mut front_matter = String::new();
+                            let mut in_front_matter = false;
+                            let mut post_content = String::new();
+
+                            // 解析 front matter
+                            while let Some(line) = lines.next() {
+                                if line == "---" {
+                                    if !in_front_matter {
+                                        in_front_matter = true;
+                                        continue;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                if in_front_matter {
+                                    front_matter.push_str(line);
+                                    front_matter.push('\n');
+                                }
+                            }
+
+                            // 解析内容
+                            for line in lines {
+                                post_content.push_str(line);
+                                post_content.push('\n');
+                            }
+
+                            // 解析 front matter
+                            let title = front_matter
+                                .lines()
+                                .find(|l| l.starts_with("title:"))
+                                .map(|l| l.replace("title:", "").trim().trim_matches('"').to_string())
+                                .unwrap_or_default();
+
+                            let date = front_matter
+                                .lines()
+                                .find(|l| l.starts_with("date:"))
+                                .map(|l| l.replace("date:", "").trim().trim_matches('"').to_string())
+                                .unwrap_or_default();
+
+                            let author = front_matter
+                                .lines()
+                                .find(|l| l.starts_with("author:"))
+                                .map(|l| l.replace("author:", "").trim().trim_matches('"').to_string())
+                                .unwrap_or_default();
+
+                            let tags = front_matter
+                                .lines()
+                                .find(|l| l.starts_with("tags:"))
+                                .map(|l| {
+                                    l.replace("tags:", "")
+                                        .trim()
+                                        .trim_matches(|c| c == '[' || c == ']')
+                                        .split(',')
+                                        .map(|s| s.trim().trim_matches('"').to_string())
+                                        .collect::<Vec<_>>()
+                                })
+                                .unwrap_or_default();
+
+                            let post = BlogPost {
+                                title,
+                                date,
+                                author,
+                                tags,
+                                content: post_content,
+                            };
+
+                            loaded_posts.push(post);
+                        }
+                    }
+                    Err(e) => {
+                        web_sys::console::error_1(&format!("Failed to fetch post {}: {:?}", file, e).into());
+                    }
+                }
+            }
+
+            // 按日期排序（最新的在前）
+            loaded_posts.sort_by(|a, b| b.date.cmp(&a.date));
+            posts.set(loaded_posts);
+        });
+    });
+
     rsx! {
         div { class: "blog-container",
-            p { "这里是我的博客文章。" }
+            if let Some(post) = current_post() {
+                div { class: "blog-post",
+                    div { class: "blog-nav",
+                        button {
+                            class: "back-button",
+                            onclick: move |_| current_post.set(None),
+                            "← 返回文章列表"
+                        }
+                    }
+                    h1 { class: "blog-title", {post.title.clone()} }
+                    div { class: "blog-meta",
+                        span { class: "blog-date", {post.date.clone()} }
+                        span { class: "blog-author", {post.author.clone()} }
+                    }
+                    div { class: "blog-tags",
+                        {post.tags.iter().map(|tag| rsx! {
+                            span { class: "blog-tag", {tag.clone()} }
+                        })}
+                    }
+                    div { class: "blog-content",
+                        dangerous_inner_html: markdown::to_html(&post.content)
+                    }
+                }
+            } else {
+                div { class: "blog-list",
+                    if posts().is_empty() {
+                        div { class: "loading", "加载中..." }
+                    } else {
+                        {posts().iter().map(|post| {
+                            let post = post.clone();
+                            rsx! {
+                                div {
+                                    class: "blog-preview",
+                                    onclick: move |_| {
+                                        current_post.set(Some(post.clone()));
+                                    },
+                                    h2 { class: "preview-title", {post.title.clone()} }
+                                    div { class: "preview-meta",
+                                        span { class: "preview-date", {post.date.clone()} }
+                                        span { class: "preview-author", {post.author.clone()} }
+                                    }
+                                    div { class: "preview-tags",
+                                        {post.tags.iter().map(|tag| rsx! {
+                                            span { class: "preview-tag", {tag.clone()} }
+                                        })}
+                                    }
+                                }
+                            }
+                        })}
+                    }
+                }
+            }
         }
     }
 }
