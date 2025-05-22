@@ -125,7 +125,13 @@ npm install -g sass
 $ cargo clean ; trunk clean ; trunk build ; trunk serve
 ```
 
-更新博客数据
+新建博客文章
 ```bash
-$ cargo run --bin generate_blog_index
+$ cargo run --bin cp my-post
 ```
+
+新建博客帮助
+```bash
+$ cargo run --bin cp
+```
+

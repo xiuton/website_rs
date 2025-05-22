@@ -34,6 +34,13 @@ $font-families: (
   --navbar-glow: #eaff7b;
   --hole-bg-color: #ffffff;
   --hole-border-color: #141414;
+  
+  // 博客组件变量
+  --bg-primary: #ffffff;
+  --bg-secondary: #f7f7f7;
+  --text-primary: #222222;
+  --text-secondary: #666666;
+  --accent-color: #007aff;
 }
 
 .dark {
@@ -56,6 +63,13 @@ $font-families: (
   --navbar-glow: #eaff7b;
   --hole-bg-color: #141414;
   --hole-border-color: #ffffff;
+  
+  // 博客组件变量
+  --bg-primary: #18181c;
+  --bg-secondary: #111111;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --accent-color: #eaff7b;
 }
 
 // 字体定义
@@ -514,9 +528,6 @@ html, body {
       }
 
       .blog-container {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 2rem;
 
         .blog-nav {
           margin-bottom: 2rem;
@@ -541,13 +552,10 @@ html, body {
         .blog-list {
           display: flex;
           flex-direction: column;
-          gap: 2rem;
+          row-gap: 1rem;
         }
 
         .blog-preview {
-          background: var(--bg-secondary);
-          border-radius: 8px;
-          padding: 1.5rem;
           cursor: pointer;
           transition: transform 0.2s ease;
         }
@@ -558,7 +566,7 @@ html, body {
 
         .preview-title {
           font-size: 1.5rem;
-          margin: 0 0 1rem 0;
+          margin: 0 0 .5rem 0;
           color: var(--text-primary);
         }
 
@@ -567,7 +575,7 @@ html, body {
           gap: 1rem;
           font-size: 0.9rem;
           color: var(--text-secondary);
-          margin-bottom: 1rem;
+          margin-bottom: .5rem;
         }
 
         .preview-tags {
@@ -586,8 +594,6 @@ html, body {
 
         .blog-post {
           background: var(--bg-secondary);
-          border-radius: 8px;
-          padding: 2rem;
         }
 
         .blog-title {

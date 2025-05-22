@@ -416,8 +416,21 @@ fn Blog() -> Element {
     use_effect(move || {
         let mut posts = posts.clone();
         spawn_local(async move {
-            // 文章列表
-            let post_files = vec!["hello-world.md", "Rust学习笔记.md"];
+            // 获取所有 .md 文件
+            let post_files = match gloo_net::http::Request::get("/public/posts").send().await {
+                Ok(response) => {
+                    if let Ok(text) = response.text().await {
+                        text.lines()
+                            .filter(|line| line.ends_with(".md"))
+                            .map(|s| s.to_string())
+                            .collect::<Vec<String>>()
+                    } else {
+                        Vec::new()
+                    }
+                }
+                Err(_) => Vec::new(),
+            };
+
             let mut loaded_posts = Vec::new();
 
             for file in post_files {
@@ -517,7 +530,9 @@ fn Blog() -> Element {
                             "← 返回文章列表"
                         }
                     }
-                    h1 { class: "blog-title", {post.title.clone()} }
+                    div { class: "blog-content",
+                        dangerous_inner_html: markdown::to_html(&post.content)
+                    }
                     div { class: "blog-meta",
                         span { class: "blog-date", {post.date.clone()} }
                         span { class: "blog-author", {post.author.clone()} }
@@ -526,9 +541,6 @@ fn Blog() -> Element {
                         {post.tags.iter().map(|tag| rsx! {
                             span { class: "blog-tag", {tag.clone()} }
                         })}
-                    }
-                    div { class: "blog-content",
-                        dangerous_inner_html: markdown::to_html(&post.content)
                     }
                 }
             } else {
