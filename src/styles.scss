@@ -8,7 +8,9 @@ $font-families: (
   'ibm-plex-sans-sc-subset': 'IBM Plex Sans SC Subset',
   'smiley-sans': 'SmileySans',
   'sans': 'sans-serif',
-  'serif': 'serif'
+  'serif': 'serif',
+  'consolas': 'Consolas',
+  'monospace': 'monospace'
 );
 
 // 主题变量
@@ -115,6 +117,16 @@ html, body {
 // 布局
 #main {
   margin: 0 1.2em;
+
+  a {
+    color: var(--link-color);
+    text-decoration: none;
+    transition: color 0.2s;
+
+    &:hover {
+      color: var(--link-hover);
+    }
+  }
 
   .app {
     width: 100%;
@@ -281,7 +293,7 @@ html, body {
             .code-block, pre {
               background: #222;
               color: #cceeff;
-              font-family: JetBrains Mono, 'Consolas', monospace;
+              font-family: map.get($font-families, 'jetbrains'), map.get($font-families, 'consolas'), map.get($font-families, 'monospace');
               font-size: .8rem;
               border-radius: 8px;
               padding: 4px 6px;
@@ -377,7 +389,7 @@ html, body {
             border: 4px solid #e0e0e0;
             border-radius: .75rem;
             padding: 1rem;
-            font-family: SmileySans, JetBrains Mono, MiSans, sans-serif;
+            font-family: map.get($font-families, 'smiley-sans'), map.get($font-families, 'jetbrains'), map.get($font-families, 'mi-sans'), map.get($font-families, 'sans');
             font-weight: 900;
             width: fit-content;
             margin: 0 auto;
@@ -515,17 +527,22 @@ html, body {
   }
 }
 
-html.dark #main .app .main-content .about-container .call-container .call-content a:hover {
-  border-color: #fff;
-}
-
-a {
-  color: var(--link-color);
-  text-decoration: none;
-  transition: color 0.2s;
-}
-a:hover {
-  color: var(--link-hover);
+html.dark {
+  #main {
+    .app {
+      .main-content {
+        .about-container {
+          .call-container {
+            .call-content {
+              a:hover {
+                border-color: #fff;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 /* 主题切换动画 */
