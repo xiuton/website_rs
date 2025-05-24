@@ -180,12 +180,25 @@ enum Route {
 
 #[derive(Clone, PartialEq)]
 struct BlogPost {
+    title: &'static str,
+    date: &'static str,
+    author: &'static str,
+    tags: &'static [&'static str],
+    content: &'static str,
+}
+
+// 运行时使用的BlogPost结构体
+#[derive(Clone, PartialEq)]
+struct RuntimeBlogPost {
     title: String,
     date: String,
     author: String,
     tags: Vec<String>,
     content: String,
 }
+
+// 引入构建脚本生成的文章列表
+include!(concat!(env!("OUT_DIR"), "/blog_posts.rs"));
 
 #[component]
 fn Home() -> Element {
@@ -410,111 +423,20 @@ fn Dev() -> Element {
 #[component]
 fn Blog() -> Element {
     let posts = use_signal(Vec::new);
-    let mut current_post = use_signal(|| None::<BlogPost>);
+    let mut current_post = use_signal(|| None::<RuntimeBlogPost>);
 
     // 加载博客文章列表
     use_effect(move || {
         let mut posts = posts.clone();
         spawn_local(async move {
-            // 获取所有 .md 文件
-            let post_files = match gloo_net::http::Request::get("/public/posts").send().await {
-                Ok(response) => {
-                    if let Ok(text) = response.text().await {
-                        text.lines()
-                            .filter(|line| line.ends_with(".md"))
-                            .map(|s| s.to_string())
-                            .collect::<Vec<String>>()
-                    } else {
-                        Vec::new()
-                    }
-                }
-                Err(_) => Vec::new(),
-            };
-
-            let mut loaded_posts = Vec::new();
-
-            for file in post_files {
-                match gloo_net::http::Request::get(&format!("/public/posts/{}", file)).send().await {
-                    Ok(response) => {
-                        if let Ok(content) = response.text().await {
-                            let mut lines = content.lines();
-                            let mut front_matter = String::new();
-                            let mut in_front_matter = false;
-                            let mut post_content = String::new();
-
-                            // 解析 front matter
-                            while let Some(line) = lines.next() {
-                                if line == "---" {
-                                    if !in_front_matter {
-                                        in_front_matter = true;
-                                        continue;
-                                    } else {
-                                        break;
-                                    }
-                                }
-                                if in_front_matter {
-                                    front_matter.push_str(line);
-                                    front_matter.push('\n');
-                                }
-                            }
-
-                            // 解析内容
-                            for line in lines {
-                                post_content.push_str(line);
-                                post_content.push('\n');
-                            }
-
-                            // 解析 front matter
-                            let title = front_matter
-                                .lines()
-                                .find(|l| l.starts_with("title:"))
-                                .map(|l| l.replace("title:", "").trim().trim_matches('"').to_string())
-                                .unwrap_or_default();
-
-                            let date = front_matter
-                                .lines()
-                                .find(|l| l.starts_with("date:"))
-                                .map(|l| l.replace("date:", "").trim().trim_matches('"').to_string())
-                                .unwrap_or_default();
-
-                            let author = front_matter
-                                .lines()
-                                .find(|l| l.starts_with("author:"))
-                                .map(|l| l.replace("author:", "").trim().trim_matches('"').to_string())
-                                .unwrap_or_default();
-
-                            let tags = front_matter
-                                .lines()
-                                .find(|l| l.starts_with("tags:"))
-                                .map(|l| {
-                                    l.replace("tags:", "")
-                                        .trim()
-                                        .trim_matches(|c| c == '[' || c == ']')
-                                        .split(',')
-                                        .map(|s| s.trim().trim_matches('"').to_string())
-                                        .collect::<Vec<_>>()
-                                })
-                                .unwrap_or_default();
-
-                            let post = BlogPost {
-                                title,
-                                date,
-                                author,
-                                tags,
-                                content: post_content,
-                            };
-
-                            loaded_posts.push(post);
-                        }
-                    }
-                    Err(e) => {
-                        web_sys::console::error_1(&format!("Failed to fetch post {}: {:?}", file, e).into());
-                    }
-                }
-            }
-
-            // 按日期排序（最新的在前）
-            loaded_posts.sort_by(|a, b| b.date.cmp(&a.date));
+            // 使用构建脚本生成的文章列表
+            let loaded_posts = BLOG_POSTS.iter().map(|post| RuntimeBlogPost {
+                title: post.title.to_string(),
+                date: post.date.to_string(),
+                author: post.author.to_string(),
+                tags: post.tags.iter().map(|&s| s.to_string()).collect(),
+                content: post.content.to_string(),
+            }).collect();
             posts.set(loaded_posts);
         });
     });
