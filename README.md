@@ -117,12 +117,17 @@ docker run -p 8080:80 ganto-website
 
 安装Rust
 
+安装Trunk包 0.22.x
+```sh
+$ cargo install trunk --force
+```
+
 安装CMake
 
 安装dioxus-cli
 
 安装wasm-opt
-先创建目录 `C:\Users\{UserName}\.cargo\trunk\wasm-apt`
+先创建目录 `C:\Users\{UserName}\.cargo\trunk\wasm-opt`
 在该目录下执行命令
 ```sh
 $ Invoke-WebRequest -Uri "https://github.com/WebAssembly/binaryen/releases/download/version_123/binaryen-version_123-x86_64-windows.tar.gz" -OutFile "binaryen-version_123-x86_64-windows.tar.gz"
@@ -132,7 +137,42 @@ $ Invoke-WebRequest -Uri "https://github.com/WebAssembly/binaryen/releases/downl
 $ tar binaryen-version_123-x86_64-windows.tar.gz
 ```
 
-将解压出的`binaryen-version_123\bin\wasm-opt.exe`文件移动到 `C:\Users\{UserName}\.cargo\trunk\wasm-apt`目录
+将解压出的`binaryen-version_123\bin\wasm-opt.exe`文件移动到 `C:\Users\{UserName}\.cargo\trunk\wasm-opt`目录
+
+
+或者 直接以脚本的形式安装并配置 wasm-opt
+```sh
+$ powershell -ExecutionPolicy Bypass -File setup-wasm-opt.ps1
+```
+setup-wasm-opt.ps1
+```ps1
+# Create target directory
+$targetDir = "$env:USERPROFILE\.cargo\trunk\wasm-opt"
+New-Item -ItemType Directory -Force -Path $targetDir
+
+# Download wasm-opt
+$url = "https://github.com/WebAssembly/binaryen/releases/download/version_123/binaryen-version_123-x86_64-windows.tar.gz"
+$outputFile = "$targetDir\binaryen-version_123-x86_64-windows.tar.gz"
+
+Write-Host "Downloading wasm-opt..."
+Invoke-WebRequest -Uri $url -OutFile $outputFile
+
+# Extract files
+Write-Host "Extracting files..."
+tar -xf $outputFile -C $targetDir
+
+# Move wasm-opt.exe to correct location
+$sourceFile = "$targetDir\binaryen-version_123\bin\wasm-opt.exe"
+$destFile = "$targetDir\wasm-opt.exe"
+Move-Item -Path $sourceFile -Destination $destFile -Force
+
+# Clean up temporary files
+Write-Host "Cleaning up temporary files..."
+Remove-Item -Path "$targetDir\binaryen-version_123" -Recurse -Force
+Remove-Item -Path $outputFile -Force
+
+Write-Host "wasm-opt setup completed!" 
+```
 
 
 
