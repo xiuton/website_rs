@@ -115,7 +115,28 @@ docker run -p 8080:80 ganto-website
 
 本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
 
-sass
+安装Rust
+
+安装CMake
+
+安装dioxus-cli
+
+安装wasm-opt
+先创建目录 `C:\Users\{UserName}\.cargo\trunk\wasm-apt`
+在该目录下执行命令
+```sh
+$ Invoke-WebRequest -Uri "https://github.com/WebAssembly/binaryen/releases/download/version_123/binaryen-version_123-x86_64-windows.tar.gz" -OutFile "binaryen-version_123-x86_64-windows.tar.gz"
+```
+解压文件
+```sh
+$ tar binaryen-version_123-x86_64-windows.tar.gz
+```
+
+将解压出的`binaryen-version_123\bin\wasm-opt.exe`文件移动到 `C:\Users\{UserName}\.cargo\trunk\wasm-apt`目录
+
+
+
+安装sass
 ```sh
 npm install -g sass
 ```

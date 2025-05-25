@@ -252,7 +252,7 @@ fn Home() -> Element {
                             span { class: "str", "\"Hello, Golang!\"" },
                             ";",
                             br {},
-                            span { class: "fn", "fmt" },
+                            span { class: "fn", "    fmt" },
                             ".",
                             span { class: "fn", "Println" },
                             "(str)",
@@ -306,11 +306,13 @@ fn About() -> Element {
                 p { class: "call-content",
                     a { href: "https://github.com/gantoho", "GitHub@gantoho" },
                     a { href: "https://gitee.com/ganto", "Gitee@ganto" },
-                    a { href: "https://space.bilibili.com/1112912961", "BiliBBili@干徒" },
+                    a { href: "https://space.bilibili.com/1112912961", "哔哩哔哩@干徒" },
                     a { href: "https://cnblogs.com/ganto", "博客园@干徒" },
-                    a { href: "mailto:i@ganto.me?cc=i@ganto.icu&amp;body=你好，干徒！我有一些想法要与你分享：", "i@ganto.me" },
+                    a { href: "mailto:i@ganto.me?cc=i@ganto.icu&amp;body=你好，干徒！我有一些想法要与你分享：", "i#ganto.me（#替换成@）" },
                 }
             },
+            div { "本站使用Rust语言开发，由Dioxus框架构建WEB服务，采用SCSS对样式进行管理，博客内容使用Markdown格式编写并由Dioxus渲染。" },
+            div { "本站部署在Netlify。" },
         }
     }
 }
@@ -449,20 +451,25 @@ fn Blog() -> Element {
                         button {
                             class: "back-button",
                             onclick: move |_| current_post.set(None),
-                            "← 返回文章列表"
+                            "←"
+                        }
+                    }
+                    div { class: "blog-title-wrapper",
+                        div { class: "blog-title",
+                            h2 { {post.title.clone()} }
+                        }
+                        div { class: "blog-meta",
+                            span { class: "blog-date", {post.date.clone()} }
+                            span { class: "blog-author", {post.author.clone()} }
+                        }
+                        div { class: "blog-tags",
+                            {post.tags.iter().map(|tag| rsx! {
+                                span { class: "blog-tag", {tag.clone()} }
+                            })}
                         }
                     }
                     div { class: "blog-content",
                         dangerous_inner_html: markdown::to_html(&post.content)
-                    }
-                    div { class: "blog-meta",
-                        span { class: "blog-date", {post.date.clone()} }
-                        span { class: "blog-author", {post.author.clone()} }
-                    }
-                    div { class: "blog-tags",
-                        {post.tags.iter().map(|tag| rsx! {
-                            span { class: "blog-tag", {tag.clone()} }
-                        })}
                     }
                 }
             } else {

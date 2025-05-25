@@ -1,6 +1,2 @@
 /target
 /dist
-# 忽略 posts 目录下的所有文件
-public/posts/*
-# 但不忽略 hello-world.md
-!public/posts/hello-world.md

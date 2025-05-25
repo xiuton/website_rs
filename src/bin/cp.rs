@@ -58,32 +58,17 @@ Text Example
         title, date
     );
 
-    // 确保 posts 目录存在
-    let posts_dir = Path::new("public/posts");
-    if !posts_dir.exists() {
-        fs::create_dir_all(posts_dir).expect("无法创建 posts 目录");
-    }
+    // 确保目标目录存在
+    let posts_dir = Path::new("posts");
+    fs::create_dir_all(posts_dir).expect("无法创建posts目录");
 
-    // 生成唯一的文件名
-    let mut final_filename = filename.clone();
-    let mut counter = 1;
-    let mut is_renamed = false;
-    while posts_dir.join(&final_filename).exists() {
-        let name_without_ext = filename.trim_end_matches(".md");
-        final_filename = format!("{}-{}.md", name_without_ext, counter);
-        counter += 1;
-        is_renamed = true;
-    }
+    // 生成最终文件名
+    let final_filename = format!("{}.md", title);
+    let display_path = format!("posts/{}", final_filename);
 
     // 写入文件
     let file_path = posts_dir.join(&final_filename);
     fs::write(&file_path, content).expect("无法写入文件");
 
-    // 统一使用正斜杠显示路径
-    let display_path = format!("public/posts/{}", final_filename);
-    if is_renamed {
-        println!("文件已重命名为: {}", display_path);
-    } else {
-        println!("已创建: {}", display_path);
-    }
+    println!("已创建: {}", display_path);
 } 

@@ -37,7 +37,9 @@ $font-families: (
   
   // 博客组件变量
   --bg-primary: #ffffff;
+  --bg-primary-rgb: 255, 255, 255;
   --bg-secondary: #f7f7f7;
+  --bg-secondary-rgb: 247, 247, 247;
   --text-primary: #222222;
   --text-secondary: #666666;
   --accent-color: #007aff;
@@ -66,10 +68,29 @@ $font-families: (
   
   // 博客组件变量
   --bg-primary: #18181c;
+  --bg-primary-rgb: 24, 24, 28;
   --bg-secondary: #111111;
+  --bg-secondary-rgb: 17, 17, 17;
   --text-primary: #ffffff;
   --text-secondary: #a0a0a0;
   --accent-color: #eaff7b;
+}
+
+// 字体预加载
+@font-face {
+    font-family: 'MiSans';
+    src: url('/static/fonts/MiSans-Regular.otf') format('opentype');
+    font-display: swap;
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'JetBrainsMono';
+    src: url('/static/fonts/JetBrainsMonoNLNerdFont-Regular.ttf') format('truetype');
+    font-display: swap;
+    font-weight: normal;
+    font-style: normal;
 }
 
 // 字体定义
@@ -79,7 +100,7 @@ $font-families: (
   font-feature-settings: "liga" 0;
   font-style: normal;
   font-weight: 600;
-  src: url(./public/fonts/NeueMachina-Bold.woff2) format("woff2")
+  src: url(./static/fonts/NeueMachina-Bold.woff2) format("woff2")
 }
 
 @font-face {
@@ -87,22 +108,22 @@ $font-families: (
   font-family: IBM Plex Sans SC Subset;
   font-style: normal;
   font-weight: 600;
-  src: url(./public/fonts/IBMPlexSansSC-Medium.woff2) format("woff2")
+  src: url(./static/fonts/IBMPlexSansSC-Medium.woff2) format("woff2")
 }
 
 @font-face {
   font-family: SmileySans;
-  src: url(./public/fonts/SmileySans-Oblique.otf)
+  src: url(./static/fonts/SmileySans-Oblique.otf)
 }
 
 @font-face {
   font-family: MiSans;
-  src: url(./public/fonts/MiSans-Regular.otf)
+  src: url(./static/fonts/MiSans-Regular.otf)
 }
 
 @font-face {
   font-family: JetBrains Mono;
-  src: url(./public/fonts/JetBrainsMonoNLNerdFont-Regular.ttf)
+  src: url(./static/fonts/JetBrainsMonoNLNerdFont-Regular.ttf)
 }
 
 // 基础样式
@@ -530,21 +551,72 @@ html, body {
       .blog-container {
 
         .blog-nav {
-          margin-bottom: 2rem;
+          position: fixed;
+          left: 2rem;
+          top: 50%;
+          transform: translateY(-50%);
+          z-index: 100;
+          writing-mode: vertical-lr;
+          text-orientation: upright;
+          letter-spacing: 0.2em;
 
           .back-button {
             background: var(--bg-primary);
             color: var(--text-primary);
             border: 1px solid var(--border-color);
-            padding: 0.5rem 1rem;
+            padding: 0.2rem 0.5rem;
             border-radius: 4px;
             cursor: pointer;
             font-size: 0.9rem;
             transition: all 0.2s ease;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 120px;
 
             &:hover {
               background: var(--bg-secondary);
               border-color: var(--accent-color);
+              transform: translateX(5px);
+            }
+          }
+        }
+
+        @media screen and (max-width: 768px) {
+          .blog-nav {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 1em;
+            top: auto;
+            transform: none;
+            writing-mode: horizontal-tb;
+            text-orientation: mixed;
+            letter-spacing: normal;
+            background: transparent;
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            padding: 0;
+
+            .back-button {
+              width: 120px;
+              height: auto;
+              padding: 0.5rem 0.2rem;
+              border-radius: 4px;
+              font-size: 0.9rem;
+              justify-content: center;
+              border: 1px solid var(--border-color);
+              box-shadow: var(--shadow);
+              background: rgba(var(--bg-primary-rgb), 0.8);
+              backdrop-filter: blur(8px);
+
+              &:hover {
+                transform: translateY(-5px);
+                background: rgba(var(--bg-secondary-rgb), 0.9);
+                border-color: var(--accent-color);
+              }
             }
           }
         }
@@ -594,35 +666,36 @@ html, body {
 
         .blog-post {
           background: var(--bg-secondary);
-        }
 
-        .blog-title {
-          font-size: 2rem;
-          margin: 0 0 1.5rem 0;
-          color: var(--text-primary);
-        }
+          .blog-title-wrapper {
+            .blog-title {
+              font-size: 2rem;
+              margin: 0 0 1rem 0;
+              color: var(--text-primary);
+            }
+    
+            .blog-meta {
+              display: flex;
+              gap: 1rem;
+              font-size: 0.9rem;
+              color: var(--text-secondary);
+              margin-bottom: 1rem;
+            }
+    
+            .blog-tags {
+              display: flex;
+              gap: 0.5rem;
+              flex-wrap: wrap;
 
-        .blog-meta {
-          display: flex;
-          gap: 1rem;
-          font-size: 0.9rem;
-          color: var(--text-secondary);
-          margin-bottom: 1rem;
-        }
-
-        .blog-tags {
-          display: flex;
-          gap: 0.5rem;
-          flex-wrap: wrap;
-          margin-bottom: 2rem;
-        }
-
-        .blog-tag {
-          background: var(--accent-color);
-          color: var(--bg-primary);
-          padding: 0.25rem 0.75rem;
-          border-radius: 999px;
-          font-size: 0.8rem;
+              .blog-tag {
+                background: var(--accent-color);
+                color: var(--bg-primary);
+                padding: 0.25rem 0.75rem;
+                border-radius: 999px;
+                font-size: 0.8rem;
+              }
+            }
+          }
         }
 
         .blog-content {
@@ -705,16 +778,6 @@ html, body {
         .dark .blog-content code,
         .dark .blog-content pre {
           background: var(--bg-primary);
-        }
-
-        @media (max-width: 768px) {
-          .blog-post {
-            padding: 1.5rem;
-          }
-
-          .blog-title {
-            font-size: 1.75rem;
-          }
         }
       }
     }
