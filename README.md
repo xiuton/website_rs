@@ -127,7 +127,7 @@ $ cargo install trunk --force
 安装dioxus-cli
 
 安装wasm-opt
-先创建目录 `C:\Users\{UserName}\.cargo\trunk\wasm-opt`
+先创建目录 `C:\Users\{UserName}\.cache\trunk\bin`
 在该目录下执行命令
 ```sh
 $ Invoke-WebRequest -Uri "https://github.com/WebAssembly/binaryen/releases/download/version_123/binaryen-version_123-x86_64-windows.tar.gz" -OutFile "binaryen-version_123-x86_64-windows.tar.gz"
@@ -137,7 +137,7 @@ $ Invoke-WebRequest -Uri "https://github.com/WebAssembly/binaryen/releases/downl
 $ tar binaryen-version_123-x86_64-windows.tar.gz
 ```
 
-将解压出的`binaryen-version_123\bin\wasm-opt.exe`文件移动到 `C:\Users\{UserName}\.cargo\trunk\wasm-opt`目录
+将解压出的`binaryen-version_123\bin\wasm-opt.exe`文件移动到 `C:\Users\{UserName}\.cache\trunk\bin`目录
 
 
 或者 直接以脚本的形式安装并配置 wasm-opt
@@ -147,7 +147,7 @@ $ powershell -ExecutionPolicy Bypass -File setup-wasm-opt.ps1
 setup-wasm-opt.ps1
 ```ps1
 # Create target directory
-$targetDir = "$env:USERPROFILE\.cargo\trunk\wasm-opt"
+$targetDir = "$env:USERPROFILE\.cache\trunk\bin"
 New-Item -ItemType Directory -Force -Path $targetDir
 
 # Download wasm-opt

@@ -47,7 +47,7 @@ npm info @tarojs/cli
 taro init myApp
 ```
 
-![taro init myApp command screenshot](./Taro快速入门.assets/ecb98df1436cd3d5.jpg)
+![taro init myApp command screenshot](/static/blog-images/Taro快速入门.assets/ecb98df1436cd3d5.jpg)
 
 进入到项目根目录，安装依赖
 

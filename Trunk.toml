@@ -1,0 +1,7 @@
+[wasm]
+opt = true  # 禁用 / 启用 wasm-opt
+
+[[hooks]]
+stage = "pre_build"
+command = "cargo"
+command_arguments = ["clean"]
