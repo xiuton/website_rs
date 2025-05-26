@@ -701,6 +701,35 @@ html, body {
         .blog-content {
           color: var(--text-primary);
           line-height: 1.6;
+
+          pre {
+            background: #0d1117;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 16px 0;
+            overflow-x: auto;
+            position: relative;
+
+            &::before {
+              content: attr(data-lang);
+              position: absolute;
+              top: 0;
+              right: 0;
+              color: #8b949e;
+              font-size: 12px;
+              padding: 4px 8px;
+              text-transform: uppercase;
+              background: rgba(255, 255, 255, 0.1);
+              border-radius: 0 0 0 6px;
+            }
+
+            code {
+              font-family: map.get($font-families, 'jetbrains'), map.get($font-families, 'mi-sans'), map.get($font-families, 'sans'), map.get($font-families, 'consolas'), map.get($font-families, 'monospace');
+              font-size: 14px;
+              line-height: 1.5;
+              color: #c9d1d9;
+            }
+          }
         }
 
         .blog-content h1,

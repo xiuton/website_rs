@@ -176,6 +176,8 @@ enum Route {
     Dev,
     #[route("/blog")]
     Blog,
+    #[route("/blog/:slug")]
+    BlogPostView { slug: String },
 }
 
 #[derive(Clone, PartialEq)]
@@ -185,6 +187,7 @@ struct BlogPost {
     author: &'static str,
     tags: &'static [&'static str],
     content: &'static str,
+    slug: &'static str,
 }
 
 // 运行时使用的BlogPost结构体
@@ -195,6 +198,7 @@ struct RuntimeBlogPost {
     author: String,
     tags: Vec<String>,
     content: String,
+    slug: String,
 }
 
 // 引入构建脚本生成的文章列表
@@ -425,7 +429,6 @@ fn Dev() -> Element {
 #[component]
 fn Blog() -> Element {
     let posts = use_signal(Vec::new);
-    let mut current_post = use_signal(|| None::<RuntimeBlogPost>);
 
     // 加载博客文章列表
     use_effect(move || {
@@ -438,6 +441,7 @@ fn Blog() -> Element {
                 author: post.author.to_string(),
                 tags: post.tags.iter().map(|&s| s.to_string()).collect(),
                 content: post.content.to_string(),
+                slug: post.slug.to_string(),
             }).collect();
             posts.set(loaded_posts);
         });
@@ -445,14 +449,197 @@ fn Blog() -> Element {
 
     rsx! {
         div { class: "blog-container",
+            div { class: "blog-list",
+                if posts().is_empty() {
+                    div { class: "loading", "加载中..." }
+                } else {
+                    {posts().iter().map(|post| {
+                        let post = post.clone();
+                        rsx! {
+                            div {
+                                class: "blog-preview",
+                                Link { to: Route::BlogPostView { slug: post.slug.clone() },
+                                    h2 { class: "preview-title", {post.title.clone()} }
+                                    div { class: "preview-meta",
+                                        span { class: "preview-date", {post.date.clone()} }
+                                        span { class: "preview-author", {post.author.clone()} }
+                                    }
+                                    div { class: "preview-tags",
+                                        {post.tags.iter().map(|tag| rsx! {
+                                            span { class: "preview-tag", {tag.clone()} }
+                                        })}
+                                    }
+                                }
+                            }
+                        }
+                    })}
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn BlogPostView(slug: String) -> Element {
+    let posts = use_signal(Vec::new);
+    let current_post = use_signal(|| None::<RuntimeBlogPost>);
+
+    // 加载博客文章列表
+    use_effect(move || {
+        let mut posts = posts.clone();
+        spawn_local(async move {
+            // 使用构建脚本生成的文章列表
+            let loaded_posts = BLOG_POSTS.iter().map(|post| RuntimeBlogPost {
+                title: post.title.to_string(),
+                date: post.date.to_string(),
+                author: post.author.to_string(),
+                tags: post.tags.iter().map(|&s| s.to_string()).collect(),
+                content: post.content.to_string(),
+                slug: post.slug.to_string(),
+            }).collect();
+            posts.set(loaded_posts);
+        });
+    });
+
+    // 根据标题查找文章
+    use_effect(move || {
+        let slug = slug.clone();
+        let mut current_post = current_post.clone();
+        let posts = posts();
+        
+        if let Some(post) = posts.iter().find(|p| p.slug == slug) {
+            current_post.set(Some(post.clone()));
+        }
+    });
+
+    // 初始化代码高亮
+    use_effect(move || {
+        let window = web_sys::window().unwrap();
+        let document = window.document().unwrap();
+        
+        // 添加 highlight.js CSS
+        let link = document.create_element("link").unwrap();
+        link.set_attribute("rel", "stylesheet").unwrap();
+        link.set_attribute("href", "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css").unwrap();
+        document.head().unwrap().append_child(&link).unwrap();
+        
+        // 添加 highlight.js 脚本
+        let script = document.create_element("script").unwrap();
+        script.set_attribute("src", "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js").unwrap();
+        script.set_attribute("async", "false").unwrap();
+        document.head().unwrap().append_child(&script).unwrap();
+        
+        // 等待主脚本加载完成后再加载语言模块
+        let init_script = document.create_element("script").unwrap();
+        let _ = init_script.set_text_content(Some(r#"
+            function loadLanguages() {
+                if (typeof hljs !== 'undefined') {
+                    const languages = [
+                        { name: "rust", file: "rust.min.js" },
+                        { name: "javascript", file: "javascript.min.js" },
+                        { name: "typescript", file: "typescript.min.js" },
+                        { name: "python", file: "python.min.js" },
+                        { name: "go", file: "go.min.js" },
+                        { name: "java", file: "java.min.js" },
+                        { name: "cpp", file: "cpp.min.js" },
+                        { name: "csharp", file: "csharp.min.js" },
+                        { name: "php", file: "php.min.js" },
+                        { name: "ruby", file: "ruby.min.js" },
+                        { name: "swift", file: "swift.min.js" },
+                        { name: "kotlin", file: "kotlin.min.js" },
+                        { name: "scala", file: "scala.min.js" },
+                        { name: "bash", file: "bash.min.js" },
+                        { name: "shell", file: "shell.min.js" },
+                        { name: "sql", file: "sql.min.js" },
+                        { name: "xml", file: "xml.min.js" },
+                        { name: "yaml", file: "yaml.min.js" },
+                        { name: "json", file: "json.min.js" },
+                        { name: "markdown", file: "markdown.min.js" }
+                    ];
+                    languages.forEach(lang => {
+                        const script = document.createElement('script');
+                        script.src = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/${lang.file}`;
+                        script.async = true;
+                        document.head.appendChild(script);
+                    });
+                    hljs.highlightAll();
+                } else {
+                    setTimeout(loadLanguages, 100);
+                }
+            }
+            loadLanguages();
+        "#));
+        let _ = document.body().unwrap().append_child(&init_script);
+    });
+
+    // 监听文章内容变化，重新应用代码高亮
+    use_effect(move || {
+        let current_post = current_post();
+        if current_post.is_some() {
+            let window = web_sys::window().unwrap();
+            let document = window.document().unwrap();
+            
+            // 等待 DOM 更新后应用高亮
+            let init_script = document.create_element("script").unwrap();
+            let _ = init_script.set_text_content(Some(r#"
+                function applyHighlight() {
+                    if (typeof hljs !== 'undefined') {
+                        // 为每个代码块添加语言标识
+                        document.querySelectorAll('pre code').forEach((block) => {
+                            // 从代码块的类名中获取语言
+                            const language = block.className.split(' ').find(cls => cls.startsWith('language-'))?.replace('language-', '');
+                            if (language) {
+                                block.parentElement.setAttribute('data-lang', language);
+                            } else {
+                                // 如果没有指定语言，尝试从代码内容推断
+                                const content = block.textContent || '';
+                                if (content.includes('function') || content.includes('const') || content.includes('let')) {
+                                    block.parentElement.setAttribute('data-lang', 'javascript');
+                                } else if (content.includes('fn') || content.includes('let mut')) {
+                                    block.parentElement.setAttribute('data-lang', 'rust');
+                                } else if (content.includes('package') || content.includes('import')) {
+                                    block.parentElement.setAttribute('data-lang', 'go');
+                                } else if (content.includes('class') || content.includes('public')) {
+                                    block.parentElement.setAttribute('data-lang', 'java');
+                                } else if (content.includes('def') || content.includes('import')) {
+                                    block.parentElement.setAttribute('data-lang', 'python');
+                                }
+                            }
+                        });
+                        hljs.highlightAll();
+                    } else {
+                        setTimeout(applyHighlight, 100);
+                    }
+                }
+
+                // 使用 MutationObserver 监听 DOM 变化
+                const observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        if (mutation.type === 'childList' || mutation.type === 'subtree') {
+                            applyHighlight();
+                        }
+                    });
+                });
+
+                // 开始观察整个文档
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+
+                // 初始应用高亮
+                applyHighlight();
+            "#));
+            let _ = document.body().unwrap().append_child(&init_script);
+        }
+    });
+
+    rsx! {
+        div { class: "blog-container",
             if let Some(post) = current_post() {
                 div { class: "blog-post",
                     div { class: "blog-nav",
-                        button {
-                            class: "back-button",
-                            onclick: move |_| current_post.set(None),
-                            "←"
-                        }
+                        Link { to: Route::Blog {}, class: "back-button", "←" }
                     }
                     div { class: "blog-title-wrapper",
                         div { class: "blog-title",
@@ -468,7 +655,8 @@ fn Blog() -> Element {
                             })}
                         }
                     }
-                    div { class: "blog-content",
+                    div { 
+                        class: "blog-content",
                         dangerous_inner_html: markdown::to_html(&post.content)
                     }
                 }
@@ -482,18 +670,17 @@ fn Blog() -> Element {
                             rsx! {
                                 div {
                                     class: "blog-preview",
-                                    onclick: move |_| {
-                                        current_post.set(Some(post.clone()));
-                                    },
-                                    h2 { class: "preview-title", {post.title.clone()} }
-                                    div { class: "preview-meta",
-                                        span { class: "preview-date", {post.date.clone()} }
-                                        span { class: "preview-author", {post.author.clone()} }
-                                    }
-                                    div { class: "preview-tags",
-                                        {post.tags.iter().map(|tag| rsx! {
-                                            span { class: "preview-tag", {tag.clone()} }
-                                        })}
+                                    Link { to: Route::BlogPostView { slug: post.slug.clone() },
+                                        h2 { class: "preview-title", {post.title.clone()} }
+                                        div { class: "preview-meta",
+                                            span { class: "preview-date", {post.date.clone()} }
+                                            span { class: "preview-author", {post.author.clone()} }
+                                        }
+                                        div { class: "preview-tags",
+                                            {post.tags.iter().map(|tag| rsx! {
+                                                span { class: "preview-tag", {tag.clone()} }
+                                            })}
+                                        }
                                     }
                                 }
                             }

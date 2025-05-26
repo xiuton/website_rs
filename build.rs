@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
 use std::path::Path;
+use std::collections::HashMap;
 
 fn main() {
     println!("cargo:rerun-if-changed=posts");
@@ -15,6 +16,7 @@ fn main() {
     }
     
     let mut posts = Vec::new();
+    let mut date_count = HashMap::new();
     
     if let Ok(entries) = fs::read_dir(posts_dir) {
         for entry in entries.flatten() {
@@ -81,8 +83,25 @@ fn main() {
                                             .collect::<Vec<_>>()
                                     })
                                     .unwrap_or_default();
+
+                                // 生成 slug
+                                let date_parts: Vec<&str> = date.split(' ').collect();
+                                let date_str = if date_parts.len() >= 1 {
+                                    date_parts[0].replace('-', "")
+                                } else {
+                                    "00000000".to_string()
+                                };
+
+                                // 处理相同日期的文章
+                                let count = date_count.entry(date_str.clone()).or_insert(0);
+                                *count += 1;
+                                let slug = if *count > 1 {
+                                    format!("{}-{}", date_str, *count)
+                                } else {
+                                    date_str
+                                };
                                 
-                                posts.push((title, date, author, tags, post_content));
+                                posts.push((title, date, author, tags, post_content, slug));
                             }
                         }
                     }
@@ -96,9 +115,9 @@ fn main() {
     
     let mut output = String::from("pub const BLOG_POSTS: &[BlogPost] = &[\n");
     
-    for (title, date, author, tags, content) in posts {
+    for (title, date, author, tags, content, slug) in posts {
         output.push_str(&format!(
-            "    BlogPost {{\n        title: \"{}\",\n        date: \"{}\",\n        author: \"{}\",\n        tags: &[{}],\n        content: r#\"{}\"#,\n    }},\n",
+            "    BlogPost {{\n        title: \"{}\",\n        date: \"{}\",\n        author: \"{}\",\n        tags: &[{}],\n        content: r#\"{}\"#,\n        slug: \"{}\",\n    }},\n",
             title,
             date,
             author,
@@ -106,7 +125,8 @@ fn main() {
                 .map(|t| format!("\"{}\"", t))
                 .collect::<Vec<_>>()
                 .join(", "),
-            content
+            content,
+            slug
         ));
     }
     
