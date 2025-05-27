@@ -640,6 +640,30 @@ fn BlogPostView(slug: String) -> Element {
                 div { class: "blog-post",
                     div { class: "blog-nav",
                         Link { to: Route::Blog {}, class: "back-button", "←" }
+                        div { class: "function-buttons",
+                            button { 
+                                class: "function-button",
+                                onclick: move |_| {
+                                    let window = web_sys::window().unwrap();
+                                    let _ = window.scroll_to_with_x_and_y(0.0, 0.0);
+                                },
+                                "↑"
+                            }
+                            button { 
+                                class: "function-button",
+                                onclick: move |_| {
+                                    let document = web_sys::window().unwrap().document().unwrap();
+                                    let blog_post = document.query_selector(".blog-post").unwrap().unwrap();
+                                    let class_name = blog_post.get_attribute("class").unwrap_or_default();
+                                    if class_name.contains("wide-mode") {
+                                        blog_post.set_attribute("class", class_name.replace("wide-mode", "").trim()).unwrap();
+                                    } else {
+                                        blog_post.set_attribute("class", format!("{} wide-mode", class_name).trim()).unwrap();
+                                    }
+                                },
+                                "↔"
+                            }
+                        }
                     }
                     div { class: "blog-title-wrapper",
                         div { class: "blog-title",
