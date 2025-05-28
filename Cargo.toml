@@ -38,7 +38,7 @@ wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
 console_error_panic_hook = "0.1"
 gloo-net = "0.6.0"
-markdown = "0.3"
+comrak = "0.16.0"
 chrono = "0.4"
 trunk = "0.21.14"
 

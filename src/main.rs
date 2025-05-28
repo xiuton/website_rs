@@ -520,7 +520,37 @@ fn BlogPostView(slug: String) -> Element {
         // 添加 highlight.js CSS
         let link = document.create_element("link").unwrap();
         link.set_attribute("rel", "stylesheet").unwrap();
-        link.set_attribute("href", "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css").unwrap();
+
+        // 浅色主题：
+        // github.min.css - GitHub 风格
+        // atom-one-light.min.css - Atom 编辑器浅色主题
+        // vs.min.css - Visual Studio 风格
+        // solarized-light.min.css - Solarized 浅色主题
+        // xcode.min.css - Xcode 风格
+        // stackoverflow-light.min.css - Stack Overflow 浅色主题
+        // default.min.css - 默认浅色主题
+
+        // 深色主题：
+        // atom-one-dark.min.css - Atom 编辑器深色主题
+        // vs2015.min.css - Visual Studio 2015 风格
+        // monokai.min.css - Monokai 风格
+        // dracula.min.css - Dracula 主题
+        // solarized-dark.min.css - Solarized 深色主题
+        // night-owl.min.css - Night Owl 主题
+        // tokyo-night-dark.min.css - Tokyo Night 深色主题
+        // github-dark.min.css - GitHub 深色主题
+        // stackoverflow-dark.min.css - Stack Overflow 深色主题
+
+        // 其他特色主题：
+        // gradient-dark.min.css - 渐变深色主题
+        // gradient-light.min.css - 渐变浅色主题
+        // rainbow.min.css - 彩虹主题
+        // brown-paper.min.css - 牛皮纸风格
+        // docco.min.css - Docco 风格
+        // far.min.css - Far 主题
+        // kimbie.dark.min.css - Kimbie 深色主题
+        // kimbie.light.min.css - Kimbie 浅色主题
+        link.set_attribute("href", "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/stackoverflow-dark.min.css").unwrap();
         document.head().unwrap().append_child(&link).unwrap();
         
         // 添加 highlight.js 脚本
@@ -681,7 +711,39 @@ fn BlogPostView(slug: String) -> Element {
                     }
                     div { 
                         class: "blog-content",
-                        dangerous_inner_html: markdown::to_html(&post.content)
+                        dangerous_inner_html: {
+                            let options = comrak::ComrakOptions {
+                                extension: comrak::ComrakExtensionOptions {
+                                    table: true,
+                                    strikethrough: true,
+                                    autolink: true,
+                                    tagfilter: false,
+                                    tasklist: true,
+                                    superscript: true,
+                                    header_ids: Some("".to_string()),
+                                    footnotes: true,
+                                    description_lists: true,
+                                    front_matter_delimiter: None,
+                                },
+                                parse: comrak::ComrakParseOptions {
+                                    smart: true,
+                                    default_info_string: None,
+                                    relaxed_tasklist_matching: false,
+                                },
+                                render: comrak::ComrakRenderOptions {
+                                    hardbreaks: true,
+                                    github_pre_lang: true,
+                                    width: 0,
+                                    list_style: comrak::ListStyleType::Dash,
+                                    unsafe_: true,
+                                    escape: false,
+                                },
+                            };
+                            let html = comrak::markdown_to_html(&post.content, &options);
+                            web_sys::console::log_1(&format!("Markdown content: {}", &post.content).into());
+                            web_sys::console::log_1(&format!("Rendered HTML: {}", &html).into());
+                            html
+                        }
                     }
                 }
             } else {
