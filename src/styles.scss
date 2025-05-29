@@ -689,8 +689,8 @@ html, body {
           margin: 0 auto;
 
           &:hover {
-            .img-switch-btn {
-              opacity: 0.92;
+            .dev-btns {
+              opacity: 1;
               pointer-events: auto;
               transform: translateY(0);
             }
@@ -707,10 +707,20 @@ html, body {
             box-shadow: 0 4px 24px #0006;
           }
 
-          .img-switch-btn {
+          .dev-btns {
             position: absolute;
             right: 16px;
             bottom: 16px;
+            transition: opacity 0.22s, transform 0.22s, background 0.2s, color 0.2s;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-16px);
+            display: flex;
+            gap: 0.75rem;
+          }
+
+          .img-switch-btn,
+          .background-mode-btn {
             padding: 0.35em 1.2em;
             font-size: 1rem;
             border-radius: 8px;
@@ -720,10 +730,6 @@ html, body {
             font-weight: bold;
             cursor: pointer;
             box-shadow: 0 2px 8px #0002;
-            transition: opacity 0.22s, transform 0.22s, background 0.2s, color 0.2s;
-            opacity: 0;
-            pointer-events: none;
-            transform: translateY(-16px);
             border: 2px solid #fff;
 
             &:hover {
@@ -732,6 +738,10 @@ html, body {
               opacity: 1;
               border: 2px solid #000;
             }
+          }
+
+          .background-mode-btn{
+            bottom: 32px;
           }
         }
       }
@@ -1214,4 +1224,51 @@ html.dark::view-transition-new(root) {
   to {
     clip-path: circle(var(--r) at var(--x) var(--y));
   }
+}
+
+.background-wall {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.8);
+    opacity: 1;
+    transition: opacity 0.3s ease;
+
+    .background-wall-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .exit-background-btn {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        padding: 0.5em 1em;
+        font-size: 1rem;
+        border-radius: 8px;
+        border: none;
+        background: rgba(255, 255, 255, 0.5);
+        color: #000;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background 0.2s;
+        opacity: 0;
+        pointer-events: none;
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.8);
+        }
+    }
+
+    &:hover .exit-background-btn {
+        opacity: 1;
+        pointer-events: auto;
+    }
 }

@@ -31,7 +31,8 @@ web-sys = { version = "0.3", features = [
     "StorageManager",
     "StorageType",
     "StorageEvent",
-    "StorageEventInit"
+    "StorageEventInit",
+    "HtmlImageElement"
 ]}
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"

@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 use dioxus_router::prelude::*;
 use wasm_bindgen_futures::spawn_local;
+use wasm_bindgen::JsCast;
 
 fn main() {
     // 初始化 panic hook
@@ -418,17 +419,20 @@ fn Tags() -> Element {
 #[component]
 fn Dev() -> Element {
     let img_url = use_signal(|| None::<String>);
+    let mut is_background_mode = use_signal(|| false);
+    let mut background_images = use_signal(Vec::new);
+    let mut current_bg_index = use_signal(|| 0);
+    let mut bg_timer_handle = use_signal(|| None::<i32>);
+    let mut show_exit_button = use_signal(|| false);
+    let mut hide_btn_timer = use_signal(|| None::<i32>);
 
-    // 图片加载逻辑，供初始化和按钮复用
-    let load_img = {
+    // 小图片区域：点击换一张
+    let fetch_random_img = {
         let img_url = img_url.clone();
-        move || {
+        move |_evt: Event<MouseData>| {
             let mut img_url = img_url.clone();
             spawn_local(async move {
-                let resp = gloo_net::http::Request::get("https://yun.ganto.cn/bgimg")
-                    .send()
-                    .await;
-
+                let resp = gloo_net::http::Request::get("https://yun.ganto.cn/bgimg").send().await;
                 if let Ok(response) = resp {
                     if let Ok(filename) = response.text().await {
                         let url = format!("https://files.ganto.cn/files/{}", filename.trim());
@@ -439,18 +443,110 @@ fn Dev() -> Element {
         }
     };
 
-    // 按钮点击事件
-    let fetch_random_img = {
-        let load_img = load_img.clone();
-        move |_evt: Event<MouseData>| {
-            load_img();
+    // 进入背景墙时预加载多张图片
+    let mut enter_background_mode = {
+        let mut is_background_mode = is_background_mode.clone();
+        let background_images = background_images.clone();
+        let current_bg_index = current_bg_index.clone();
+        let bg_timer_handle = bg_timer_handle.clone();
+        move || {
+            is_background_mode.set(true);
+            let mut background_images = background_images.clone();
+            let mut current_bg_index = current_bg_index.clone();
+            let mut bg_timer_handle = bg_timer_handle.clone();
+            
+            // 如果已经有加载好的图片，直接启动轮播
+            if !background_images().is_empty() {
+                let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+                    let len = background_images().len();
+                    if len > 0 {
+                        current_bg_index.set((current_bg_index() + 1) % len);
+                    }
+                }) as Box<dyn FnMut()>);
+                let handle = web_sys::window().unwrap().set_interval_with_callback_and_timeout_and_arguments_0(
+                    closure.as_ref().unchecked_ref(),
+                    5000
+                ).unwrap();
+                *bg_timer_handle.write() = Some(handle);
+                closure.forget();
+                return;
+            }
+
+            // 如果没有加载好的图片，则加载新图片
+            spawn_local(async move {
+                for _ in 0..5 {
+                    let resp = gloo_net::http::Request::get("https://yun.ganto.cn/bgimg").send().await;
+                    if let Ok(response) = resp {
+                        if let Ok(filename) = response.text().await {
+                            let url = format!("https://files.ganto.cn/files/{}", filename.trim());
+                            let mut background_images = background_images.clone();
+                            let img = web_sys::HtmlImageElement::new().unwrap();
+                            let url_clone = url.clone();
+                            let onload = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+                                let mut imgs = background_images();
+                                imgs.push(url_clone.clone());
+                                background_images.set(imgs);
+                            }) as Box<dyn FnMut()>);
+                            img.set_onload(Some(onload.as_ref().unchecked_ref()));
+                            onload.forget();
+                            img.set_src(&url);
+                        }
+                    }
+                }
+                // 启动定时器（只要有图片就轮播）
+                let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+                    let len = background_images().len();
+                    if len > 0 {
+                        current_bg_index.set((current_bg_index() + 1) % len);
+                    }
+                }) as Box<dyn FnMut()>);
+                let handle = web_sys::window().unwrap().set_interval_with_callback_and_timeout_and_arguments_0(
+                    closure.as_ref().unchecked_ref(),
+                    5000
+                ).unwrap();
+                *bg_timer_handle.write() = Some(handle);
+                closure.forget();
+            });
         }
     };
 
-    // 首次加载自动获取
+    // 退出背景墙时停止轮播
+    let mut exit_background_mode = {
+        let mut bg_timer_handle = bg_timer_handle.clone();
+        move || {
+            is_background_mode.set(false);
+            let handle_opt = bg_timer_handle.read().clone();
+            if let Some(handle) = handle_opt {
+                web_sys::window().unwrap().clear_interval_with_handle(handle);
+                *bg_timer_handle.write() = None;
+            }
+            // 不再清空图片列表
+        }
+    };
+
+    // 首次加载小图片
     use_effect(move || {
-        load_img();
+        if img_url().is_none() {
+            let mut img_url = img_url.clone();
+            spawn_local(async move {
+                let resp = gloo_net::http::Request::get("https://yun.ganto.cn/bgimg").send().await;
+                if let Ok(response) = resp {
+                    if let Ok(filename) = response.text().await {
+                        let url = format!("https://files.ganto.cn/files/{}", filename.trim());
+                        img_url.set(Some(url));
+                    }
+                }
+            });
+        }
         ()
+    });
+
+    // 预加载背景墙图片
+    use_effect(move || {
+        for url in background_images().iter() {
+            let img = web_sys::HtmlImageElement::new().unwrap();
+            img.set_src(url);
+        }
     });
 
     rsx! {
@@ -474,10 +570,81 @@ fn Dev() -> Element {
                         class: "dev-img"
                     }
                 }
+                div {
+                    class: "dev-btns",
                 button {
                     class: "img-switch-btn",
                     onclick: fetch_random_img,
-                    "Regain"
+                        "换一张"
+                    }
+                    button {
+                        class: "background-mode-btn",
+                        onclick: move |_| {
+                            enter_background_mode();
+                        },
+                        "进入背景墙"
+                    }
+                }
+            }
+            // 最上层的背景墙元素
+            if is_background_mode() {
+                div { class: "background-wall",
+                    onmousemove: move |_| {
+                        show_exit_button.set(true);
+                        // 清除旧的定时器
+                        if let Some(handle) = hide_btn_timer() {
+                            web_sys::window().unwrap().clear_timeout_with_handle(handle);
+                        }
+                        // 新建定时器
+                        let mut show_exit_button = show_exit_button.clone();
+                        let mut hide_btn_timer = hide_btn_timer.clone();
+                        let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+                            show_exit_button.set(false);
+                            hide_btn_timer.set(None);
+                        }) as Box<dyn FnMut()>);
+                        let handle = web_sys::window().unwrap()
+                            .set_timeout_with_callback_and_timeout_and_arguments_0(closure.as_ref().unchecked_ref(), 3000)
+                            .unwrap();
+                        hide_btn_timer.set(Some(handle));
+                        closure.forget();
+                    },
+                    if let Some(url) = background_images().get(current_bg_index()) {
+                        img {
+                            src: url.clone(),
+                            class: "background-wall-img"
+                        }
+                    }
+                    div { 
+                        class: "exit-button-container",
+                        style: "position: fixed; top: 20px; right: 20px; z-index: 1000;",
+                        onmouseenter: move |_| {
+                            show_exit_button.set(true);
+                            if let Some(handle) = hide_btn_timer() {
+                                web_sys::window().unwrap().clear_timeout_with_handle(handle);
+                                hide_btn_timer.set(None);
+                            }
+                        },
+                        onmouseleave: move |_| {
+                            let mut show_exit_button = show_exit_button.clone();
+                            let mut hide_btn_timer = hide_btn_timer.clone();
+                            let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+                                show_exit_button.set(false);
+                                hide_btn_timer.set(None);
+                            }) as Box<dyn FnMut()>);
+                            let handle = web_sys::window().unwrap()
+                                .set_timeout_with_callback_and_timeout_and_arguments_0(closure.as_ref().unchecked_ref(), 1000)
+                                .unwrap();
+                            hide_btn_timer.set(Some(handle));
+                            closure.forget();
+                        },
+                        button {
+                            class: "exit-background-btn",
+                            onclick: move |_| {
+                                exit_background_mode();
+                            },
+                            "退出背景墙"
+                        }
+                    }
                 }
             }
         }
