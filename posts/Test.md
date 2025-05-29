@@ -5,8 +5,9 @@ author: "干徒"
 tags: ["tag"]
 ---
 
-| Title | Name |
-| - | - |
-| 喜喜 | 哈哈 |
-| 喜喜 | 哈哈 |
-| 喜喜 | 哈哈 |
+```css
+* {
+    padding: 0;
+    margin: 0;
+}
+```

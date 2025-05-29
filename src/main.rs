@@ -206,91 +206,149 @@ include!(concat!(env!("OUT_DIR"), "/blog_posts.rs"));
 
 #[component]
 fn Home() -> Element {
-    let str_l_br = "{";
-    let str_r_br = "}";
+    let posts = use_signal(|| Vec::new());
+
+    // 加载最新的3篇博客文章
+    use_effect(move || {
+        let mut posts = posts.clone();
+        spawn_local(async move {
+            let loaded_posts = BLOG_POSTS.iter()
+                .take(3)
+                .map(|post| RuntimeBlogPost {
+                    title: post.title.to_string(),
+                    date: post.date.to_string(),
+                    author: post.author.to_string(),
+                    tags: post.tags.iter().map(|&s| s.to_string()).collect(),
+                    content: post.content.to_string(),
+                    slug: post.slug.to_string(),
+                }).collect();
+            posts.set(loaded_posts);
+        });
+    });
+
     rsx! {
         div { class: "main-container",
-                    div { class: "code-cards",
-                        div { class: "code-card",
-                            div { class: "code-card-title", "TypeScript" }
-                    pre { class: "code-block ts",
-                        code {
-                            span { class: "kw", "const" },
-                            " str",
-                            ": ",
-                            span { class: "kw", "string" },
-                            span { class: "ty", " = " },
-                            span { class: "str", "\"Hello, TypeScript!\"" },
-                            ";",
-                            br {},
-                            span { class: "fn", "console" },
-                            ".",
-                            span { class: "ty", "log" },
-                            "(str);",
+            // 个人简介卡片
+            div { class: "profile-card",
+                div { class: "profile-header",
+                    h1 { "干徒" }
+                    p { class: "profile-subtitle", "开发爱好者" }
+                }
+                div { class: "profile-content",
+                    p { "你好！我是一名热爱技术的开发者，专注于Web开发和系统编程。" }
+                    p { "目前主要使用Rust、Golang、JavaScript/TypeScript等技术栈。" }
+                }
+                div { class: "profile-stats",
+                    div { class: "stat-item",
+                        span { class: "stat-value", "5+" }
+                        span { class: "stat-label", "年开发经验" }
+                    }
+                    div { class: "stat-item",
+                        span { class: "stat-value", "20+" }
+                        span { class: "stat-label", "开源项目" }
+                    }
+                    div { class: "stat-item",
+                        span { class: "stat-value", "100+" }
+                        span { class: "stat-label", "技术文章" }
                         }
                     }
                         }
-                        div { class: "code-card",
-                            div { class: "code-card-title", "Golang" }
-                    pre { class: "code-block go",
-                        code {
-                            span { class: "kw", "package" },
-                            " main",
-                            br {},
-                            br {},
-                            span { class: "kw", "import" },
-                            " ",
-                            span { class: "str", "\"fmt\"" },
-                            br {},
-                            br {},
-                            span { class: "kw", "func" },
-                            span { class: "fn", " main" },
-                            "() ",
-                            {str_l_br},
-                            br {},
-                            "    ",
-                            span { class: "kw", "var" },
-                            " str ",
-                            span { class: "ty", "string" },
-                            " = ",
-                            span { class: "str", "\"Hello, Golang!\"" },
-                            ";",
-                            br {},
-                            span { class: "fn", "    fmt" },
-                            ".",
-                            span { class: "fn", "Println" },
-                            "(str)",
-                            br {},
-                            {str_r_br},
+
+            // 最新博客文章
+            div { class: "latest-posts",
+                h2 { "最新文章" }
+                div { class: "posts-grid",
+                    if posts.is_empty() {
+                        div { class: "loading", "加载中..." }
+                    } else {
+                        {posts.iter().map(|post| {
+                            let post = post.clone();
+                            rsx! {
+                                div { class: "post-card",
+                                    Link { to: Route::BlogPostView { slug: post.slug.clone() },
+                                        h3 { class: "post-title", {post.title.clone()} }
+                                        div { class: "post-meta",
+                                            span { class: "post-date", {post.date.clone()} }
+                                        }
+                                        div { class: "post-tags",
+                                            {post.tags.iter().map(|tag| rsx! {
+                                                span { class: "post-tag", {tag.clone()} }
+                                            })}
+                                        }
+                                    }
+                                }
+                            }
+                        })}
+                    }
+                }
+            }
+
+            // 技术栈展示
+            div { class: "tech-stack",
+                h2 { "技术栈" }
+                div { class: "tech-grid",
+                    div { class: "tech-category",
+                        h3 { "前端" }
+                        div { class: "tech-items",
+                            span { class: "tech-item", "React" }
+                            span { class: "tech-item", "Vue" }
+                            span { class: "tech-item", "TypeScript" }
+                            span { class: "tech-item", "Next.js" }
                         }
                     }
+                    div { class: "tech-category",
+                        h3 { "后端" }
+                        div { class: "tech-items",
+                            span { class: "tech-item", "Rust" }
+                            span { class: "tech-item", "Golang" }
+                            span { class: "tech-item", "Node.js" }
+                            span { class: "tech-item", "PostgreSQL" }
+                    }
                         }
-                        div { class: "code-card",
-                            div { class: "code-card-title", "Rust" }
-                    pre { class: "code-block rust",
-                        code {
-                            span { class: "kw", "fn" },
-                            " ",
-                            span { class: "fn", "main" },
-                            "() ",
-                            {str_l_br},
-                            br {},
-                            "    ",
-                            span { class: "kw", "let" },
-                            " str: String = String::",
-                            span { class: "fn", "from" },
-                            "(",
-                            span { class: "str", "\"Hello, Rust!\"" },
-                            ");",
-                            br {},
-                            span { class: "ty", "    println!" },
-                            "(",
-                            span { class: "str", "\"" },
-                            span { class: "ty", {str_l_br}, {str_r_br} },
-                            span { class: "str", "\"" },
-                            ", str);",
-                            br {},
-                            {str_r_br},
+                    div { class: "tech-category",
+                        h3 { "工具" }
+                        div { class: "tech-items",
+                            span { class: "tech-item", "Git" }
+                            span { class: "tech-item", "Docker" }
+                            span { class: "tech-item", "Linux" }
+                            span { class: "tech-item", "VSCode" }
+                        }
+                    }
+                }
+            }
+
+            // 项目展示
+            div { class: "featured-projects",
+                h2 { "精选项目" }
+                div { class: "projects-grid",
+                    div { class: "project-card",
+                        h3 { "个人博客" }
+                        p { "使用Rust + Dioxus构建的现代化博客系统" }
+                        div { class: "project-tags",
+                            span { class: "project-tag", "Rust" }
+                            span { class: "project-tag", "Dioxus" }
+                            span { class: "project-tag", "Web" }
+                        }
+                        a { 
+                            href: "https://github.com/gantoho/blog",
+                            target: "_blank",
+                            class: "project-link",
+                            "查看源码 →"
+                        }
+                    }
+                    div { class: "project-card",
+                        h3 { "在线工具集" }
+                        p { "集成多种实用工具的Web应用" }
+                        div { class: "project-tags",
+                            span { class: "project-tag", "Vue" }
+                            span { class: "project-tag", "TypeScript" }
+                            span { class: "project-tag", "Vite" }
+                        }
+                        a { 
+                            href: "https://github.com/gantoho/tools",
+                            target: "_blank",
+                            class: "project-link",
+                            "查看源码 →"
                         }
                     }
                 }
@@ -520,36 +578,6 @@ fn BlogPostView(slug: String) -> Element {
         // 添加 highlight.js CSS
         let link = document.create_element("link").unwrap();
         link.set_attribute("rel", "stylesheet").unwrap();
-
-        // 浅色主题：
-        // github.min.css - GitHub 风格
-        // atom-one-light.min.css - Atom 编辑器浅色主题
-        // vs.min.css - Visual Studio 风格
-        // solarized-light.min.css - Solarized 浅色主题
-        // xcode.min.css - Xcode 风格
-        // stackoverflow-light.min.css - Stack Overflow 浅色主题
-        // default.min.css - 默认浅色主题
-
-        // 深色主题：
-        // atom-one-dark.min.css - Atom 编辑器深色主题
-        // vs2015.min.css - Visual Studio 2015 风格
-        // monokai.min.css - Monokai 风格
-        // dracula.min.css - Dracula 主题
-        // solarized-dark.min.css - Solarized 深色主题
-        // night-owl.min.css - Night Owl 主题
-        // tokyo-night-dark.min.css - Tokyo Night 深色主题
-        // github-dark.min.css - GitHub 深色主题
-        // stackoverflow-dark.min.css - Stack Overflow 深色主题
-
-        // 其他特色主题：
-        // gradient-dark.min.css - 渐变深色主题
-        // gradient-light.min.css - 渐变浅色主题
-        // rainbow.min.css - 彩虹主题
-        // brown-paper.min.css - 牛皮纸风格
-        // docco.min.css - Docco 风格
-        // far.min.css - Far 主题
-        // kimbie.dark.min.css - Kimbie 深色主题
-        // kimbie.light.min.css - Kimbie 浅色主题
         link.set_attribute("href", "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/stackoverflow-dark.min.css").unwrap();
         document.head().unwrap().append_child(&link).unwrap();
         
@@ -584,19 +612,40 @@ fn BlogPostView(slug: String) -> Element {
                         { name: "xml", file: "xml.min.js" },
                         { name: "yaml", file: "yaml.min.js" },
                         { name: "json", file: "json.min.js" },
-                        { name: "markdown", file: "markdown.min.js" }
+                        { name: "markdown", file: "markdown.min.js" },
+                        { name: "html", file: "xml.min.js" }
                     ];
-                    languages.forEach(lang => {
+                    
+                    // 创建一个 Promise 来跟踪所有语言模块的加载
+                    const loadPromises = languages.map(lang => {
+                        return new Promise((resolve) => {
                         const script = document.createElement('script');
                         script.src = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/${lang.file}`;
                         script.async = true;
+                            script.onload = () => resolve();
                         document.head.appendChild(script);
                     });
+                    });
+
+                    // 等待所有语言模块加载完成后再应用高亮
+                    Promise.all(loadPromises).then(() => {
+                        // 确保代码块有正确的语言类名
+                        document.querySelectorAll('pre code').forEach((block) => {
+                            const languageClass = block.className.split(' ').find(cls => cls.startsWith('language-'));
+                            if (languageClass) {
+                                const language = languageClass.replace('language-', '');
+                                block.parentElement.setAttribute('data-lang', language);
+                            }
+                        });
+                        // 应用高亮
                     hljs.highlightAll();
+                    });
                 } else {
                     setTimeout(loadLanguages, 100);
                 }
             }
+
+            // 初始加载语言模块
             loadLanguages();
         "#));
         let _ = document.body().unwrap().append_child(&init_script);
@@ -614,54 +663,43 @@ fn BlogPostView(slug: String) -> Element {
             let _ = init_script.set_text_content(Some(r#"
                 function applyHighlight() {
                     if (typeof hljs !== 'undefined') {
-                        // 为每个代码块添加语言标识
+                        // 确保代码块有正确的语言类名
                         document.querySelectorAll('pre code').forEach((block) => {
-                            // 从代码块的类名中获取语言
-                            const language = block.className.split(' ').find(cls => cls.startsWith('language-'))?.replace('language-', '');
-                            if (language) {
+                            const languageClass = block.className.split(' ').find(cls => cls.startsWith('language-'));
+                            if (languageClass) {
+                                const language = languageClass.replace('language-', '');
                                 block.parentElement.setAttribute('data-lang', language);
-                            } else {
-                                // 如果没有指定语言，尝试从代码内容推断
-                                const content = block.textContent || '';
-                                if (content.includes('function') || content.includes('const') || content.includes('let')) {
-                                    block.parentElement.setAttribute('data-lang', 'javascript');
-                                } else if (content.includes('fn') || content.includes('let mut')) {
-                                    block.parentElement.setAttribute('data-lang', 'rust');
-                                } else if (content.includes('package') || content.includes('import')) {
-                                    block.parentElement.setAttribute('data-lang', 'go');
-                                } else if (content.includes('class') || content.includes('public')) {
-                                    block.parentElement.setAttribute('data-lang', 'java');
-                                } else if (content.includes('def') || content.includes('import')) {
-                                    block.parentElement.setAttribute('data-lang', 'python');
-                                }
                             }
                         });
+                        // 应用高亮
                         hljs.highlightAll();
                     } else {
                         setTimeout(applyHighlight, 100);
                     }
                 }
 
-                // 使用 MutationObserver 监听 DOM 变化
-                const observer = new MutationObserver((mutations) => {
-                    mutations.forEach((mutation) => {
-                        if (mutation.type === 'childList' || mutation.type === 'subtree') {
-                            applyHighlight();
-                        }
-                    });
-                });
-
-                // 开始观察整个文档
-                observer.observe(document.body, {
-                    childList: true,
-                    subtree: true
-                });
-
                 // 初始应用高亮
                 applyHighlight();
             "#));
             let _ = document.body().unwrap().append_child(&init_script);
         }
+    });
+
+    // 在页面加载时，读取 localStorage 恢复宽屏状态
+    use_effect(move || {
+        if current_post().is_some() {
+            let document = web_sys::window().unwrap().document().unwrap();
+            if let Some(blog_post) = document.query_selector(".blog-post").ok().flatten() {
+                let wide_mode = web_sys::window().unwrap().local_storage().unwrap().unwrap().get_item("blog_wide_mode").unwrap().unwrap_or("false".to_string());
+                if wide_mode == "true" {
+                    let class_name = blog_post.get_attribute("class").unwrap_or_default();
+                    if !class_name.contains("wide-mode") {
+                        blog_post.set_attribute("class", format!("{} wide-mode", class_name).trim()).unwrap();
+                    }
+                }
+            }
+        }
+        ()
     });
 
     rsx! {
@@ -685,11 +723,14 @@ fn BlogPostView(slug: String) -> Element {
                                     let document = web_sys::window().unwrap().document().unwrap();
                                     let blog_post = document.query_selector(".blog-post").unwrap().unwrap();
                                     let class_name = blog_post.get_attribute("class").unwrap_or_default();
-                                    if class_name.contains("wide-mode") {
-                                        blog_post.set_attribute("class", class_name.replace("wide-mode", "").trim()).unwrap();
-                                    } else {
+                                    let new_mode = !class_name.contains("wide-mode");
+                                    if new_mode {
                                         blog_post.set_attribute("class", format!("{} wide-mode", class_name).trim()).unwrap();
+                                    } else {
+                                        blog_post.set_attribute("class", class_name.replace("wide-mode", "").trim()).unwrap();
                                     }
+                                    // 存储宽屏状态
+                                    web_sys::window().unwrap().local_storage().unwrap().unwrap().set_item("blog_wide_mode", if new_mode { "true" } else { "false" }).unwrap();
                                 },
                                 "↔"
                             }
@@ -740,8 +781,9 @@ fn BlogPostView(slug: String) -> Element {
                                 },
                             };
                             let html = comrak::markdown_to_html(&post.content, &options);
-                            web_sys::console::log_1(&format!("Markdown content: {}", &post.content).into());
-                            web_sys::console::log_1(&format!("Rendered HTML: {}", &html).into());
+                            // 确保代码块的语言标识被正确保留
+                            let html = html.replace("<pre><code>", "<pre><code class=\"language-plaintext\">");
+                            let html = html.replace("<pre><code class=\"", "<pre><code class=\"language-");
                             html
                         }
                     }

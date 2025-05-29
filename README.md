@@ -196,3 +196,33 @@ $ cargo run --bin cp my-post
 $ cargo run --bin cp
 ```
 
+
+// 浅色主题：
+// github.min.css - GitHub 风格
+// atom-one-light.min.css - Atom 编辑器浅色主题
+// vs.min.css - Visual Studio 风格
+// solarized-light.min.css - Solarized 浅色主题
+// xcode.min.css - Xcode 风格
+// stackoverflow-light.min.css - Stack Overflow 浅色主题
+// default.min.css - 默认浅色主题
+
+// 深色主题：
+// atom-one-dark.min.css - Atom 编辑器深色主题
+// vs2015.min.css - Visual Studio 2015 风格
+// monokai.min.css - Monokai 风格
+// dracula.min.css - Dracula 主题
+// solarized-dark.min.css - Solarized 深色主题
+// night-owl.min.css - Night Owl 主题
+// tokyo-night-dark.min.css - Tokyo Night 深色主题
+// github-dark.min.css - GitHub 深色主题
+// stackoverflow-dark.min.css - Stack Overflow 深色主题
+
+// 其他特色主题：
+// gradient-dark.min.css - 渐变深色主题
+// gradient-light.min.css - 渐变浅色主题
+// rainbow.min.css - 彩虹主题
+// brown-paper.min.css - 牛皮纸风格
+// docco.min.css - Docco 风格
+// far.min.css - Far 主题
+// kimbie.dark.min.css - Kimbie 深色主题
+// kimbie.light.min.css - Kimbie 浅色主题
