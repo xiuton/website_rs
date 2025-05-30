@@ -5246,6 +5246,7 @@ dependencies = [
  "dioxus",
  "dioxus-router",
  "dioxus-web",
+ "futures",
  "gloo-net",
  "js-sys",
  "serde",

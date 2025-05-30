@@ -231,12 +231,7 @@ fn Home() -> Element {
         div { class: "main-container",
             // 个人简介卡片
             div { class: "profile-card",
-                div { class: "profile-header",
-                    h1 { "干徒" }
-                    p { class: "profile-subtitle", "开发爱好者" }
-                }
                 div { class: "profile-content",
-                    p { "你好！我是一名热爱技术的开发者，专注于Web开发和系统编程。" }
                     p { "目前主要使用Rust、Golang、JavaScript/TypeScript等技术栈。" }
                 }
                 div { class: "profile-stats",
@@ -331,7 +326,7 @@ fn Home() -> Element {
                             span { class: "project-tag", "Web" }
                         }
                         a { 
-                            href: "https://github.com/gantoho/blog",
+                            href: "https://github.com/xiuton/website_rs",
                             target: "_blank",
                             class: "project-link",
                             "查看源码 →"
@@ -346,8 +341,7 @@ fn Home() -> Element {
                             span { class: "project-tag", "Vite" }
                         }
                         a { 
-                            href: "https://github.com/gantoho/tools",
-                            target: "_blank",
+                            href: "#",
                             class: "project-link",
                             "查看源码 →"
                         }
@@ -420,11 +414,13 @@ fn Tags() -> Element {
 fn Dev() -> Element {
     let img_url = use_signal(|| None::<String>);
     let mut is_background_mode = use_signal(|| false);
-    let mut background_images = use_signal(Vec::new);
-    let mut current_bg_index = use_signal(|| 0);
-    let mut bg_timer_handle = use_signal(|| None::<i32>);
+    let background_images = use_signal(Vec::new);
+    let current_bg_index = use_signal(|| 0);
+    let bg_timer_handle = use_signal(|| None::<i32>);
     let mut show_exit_button = use_signal(|| false);
     let mut hide_btn_timer = use_signal(|| None::<i32>);
+    let mut hide_cursor = use_signal(|| false);
+    let default_bg_image = "https://files.ganto.cn/files/default-bg.jpg";  // 添加默认背景图片URL
 
     // 小图片区域：点击换一张
     let fetch_random_img = {
@@ -455,8 +451,13 @@ fn Dev() -> Element {
             let mut current_bg_index = current_bg_index.clone();
             let mut bg_timer_handle = bg_timer_handle.clone();
             
-            // 如果已经有加载好的图片，直接启动轮播
-            if !background_images().is_empty() {
+            // 初始化背景图片列表，添加默认图片
+            let mut initial_images = Vec::new();
+            initial_images.push(default_bg_image.to_string());
+            background_images.set(initial_images);
+            
+            // If we already have loaded images (more than just the default one), start the carousel
+            if background_images().len() > 1 {
                 let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
                     let len = background_images().len();
                     if len > 0 {
@@ -465,47 +466,117 @@ fn Dev() -> Element {
                 }) as Box<dyn FnMut()>);
                 let handle = web_sys::window().unwrap().set_interval_with_callback_and_timeout_and_arguments_0(
                     closure.as_ref().unchecked_ref(),
-                    5000
+                    15000
                 ).unwrap();
                 *bg_timer_handle.write() = Some(handle);
                 closure.forget();
                 return;
             }
 
-            // 如果没有加载好的图片，则加载新图片
+            // If no images are loaded (except default), load new ones
             spawn_local(async move {
-                for _ in 0..5 {
+                let mut loaded_count = 0;
+                while loaded_count < 5 {
                     let resp = gloo_net::http::Request::get("https://yun.ganto.cn/bgimg").send().await;
                     if let Ok(response) = resp {
                         if let Ok(filename) = response.text().await {
                             let url = format!("https://files.ganto.cn/files/{}", filename.trim());
                             let mut background_images = background_images.clone();
-                            let img = web_sys::HtmlImageElement::new().unwrap();
-                            let url_clone = url.clone();
-                            let onload = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
-                                let mut imgs = background_images();
-                                imgs.push(url_clone.clone());
-                                background_images.set(imgs);
-                            }) as Box<dyn FnMut()>);
-                            img.set_onload(Some(onload.as_ref().unchecked_ref()));
-                            onload.forget();
-                            img.set_src(&url);
+                            
+                            // Try loading the image with retry
+                            let load_image = |url: String| -> std::pin::Pin<Box<dyn std::future::Future<Output = bool>>> {
+                                Box::pin(async move {
+                                    let img = web_sys::HtmlImageElement::new().unwrap();
+                                    let (tx, rx) = futures::channel::oneshot::channel();
+                                    
+                                    let tx_success = std::sync::Arc::new(std::sync::Mutex::new(Some(tx)));
+                                    let tx_error = tx_success.clone();
+                                    
+                                    let success_callback = wasm_bindgen::closure::Closure::wrap(
+                                        Box::new(move || {
+                                            if let Some(tx) = tx_success.lock().unwrap().take() {
+                                                let _ = tx.send(true);
+                                            }
+                                        }) as Box<dyn FnMut()>
+                                    );
+                                    
+                                    let error_callback = wasm_bindgen::closure::Closure::wrap(
+                                        Box::new(move || {
+                                            if let Some(tx) = tx_error.lock().unwrap().take() {
+                                                let _ = tx.send(false);
+                                            }
+                                        }) as Box<dyn FnMut()>
+                                    );
+                                    
+                                    img.set_onload(Some(success_callback.as_ref().unchecked_ref()));
+                                    img.set_onerror(Some(error_callback.as_ref().unchecked_ref()));
+                                    img.set_src(&url);
+                                    
+                                    success_callback.forget();
+                                    error_callback.forget();
+                                    
+                                    rx.await.unwrap_or(false)
+                                })
+                            };
+                            
+                            // Try loading twice
+                            let mut success = false;
+                            for _ in 0..2 {
+                                if load_image(url.clone()).await {
+                                    success = true;
+                                    let mut imgs = background_images();
+                                    if !imgs.contains(&url) {
+                                        // 如果这是第一张成功加载的图片（除了默认图片），移除默认图片
+                                        if imgs.len() == 1 && imgs[0] == default_bg_image {
+                                            imgs.clear();
+                                        }
+                                        imgs.push(url.clone());
+                                        background_images.set(imgs);
+                                        loaded_count += 1;
+
+                                        // 如果这是第一张成功加载的图片，启动轮播
+                                        if loaded_count == 1 {
+                                            let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+                                                let len = background_images().len();
+                                                if len > 0 {
+                                                    current_bg_index.set((current_bg_index() + 1) % len);
+                                                }
+                                            }) as Box<dyn FnMut()>);
+                                            let handle = web_sys::window().unwrap().set_interval_with_callback_and_timeout_and_arguments_0(
+                                                closure.as_ref().unchecked_ref(),
+                                                15000
+                                            ).unwrap();
+                                            *bg_timer_handle.write() = Some(handle);
+                                            closure.forget();
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                            
+                            // If both attempts failed, continue the loop to try a new image
+                            if !success {
+                                continue;
+                            }
                         }
                     }
                 }
-                // 启动定时器（只要有图片就轮播）
-                let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
-                    let len = background_images().len();
-                    if len > 0 {
-                        current_bg_index.set((current_bg_index() + 1) % len);
-                    }
-                }) as Box<dyn FnMut()>);
-                let handle = web_sys::window().unwrap().set_interval_with_callback_and_timeout_and_arguments_0(
-                    closure.as_ref().unchecked_ref(),
-                    5000
-                ).unwrap();
-                *bg_timer_handle.write() = Some(handle);
-                closure.forget();
+                
+                // 不再需要在这里处理默认图片的移除，因为已经在加载第一张图片时处理了
+                if loaded_count > 0 {
+                    let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+                        let len = background_images().len();
+                        if len > 0 {
+                            current_bg_index.set((current_bg_index() + 1) % len);
+                        }
+                    }) as Box<dyn FnMut()>);
+                    let handle = web_sys::window().unwrap().set_interval_with_callback_and_timeout_and_arguments_0(
+                        closure.as_ref().unchecked_ref(),
+                        15000
+                    ).unwrap();
+                    *bg_timer_handle.write() = Some(handle);
+                    closure.forget();
+                }
             });
         }
     };
@@ -574,23 +645,53 @@ fn Dev() -> Element {
                     class: "dev-btns",
                 button {
                     class: "img-switch-btn",
+                    style: "backdrop-filter: blur(8px); background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.3); padding: 8px; border-radius: 8px; transition: all 0.3s ease;",
                     onclick: fetch_random_img,
-                        "换一张"
+                    svg {
+                        xmlns: "http://www.w3.org/2000/svg",
+                        view_box: "0 0 24 24",
+                        width: "24",
+                        height: "24",
+                        fill: "none",
+                        stroke: "currentColor",
+                        stroke_width: "2",
+                        stroke_linecap: "round",
+                        stroke_linejoin: "round",
+                        path {
+                            d: "M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+                        }
                     }
-                    button {
-                        class: "background-mode-btn",
-                        onclick: move |_| {
-                            enter_background_mode();
-                        },
-                        "进入背景墙"
+                }
+                button {
+                    class: "background-mode-btn",
+                    style: "backdrop-filter: blur(8px); background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.3); padding: 8px; border-radius: 8px; margin-left: 8px; transition: all 0.3s ease;",
+                    onclick: move |_| {
+                        enter_background_mode();
+                    },
+                    svg {
+                        xmlns: "http://www.w3.org/2000/svg",
+                        view_box: "0 0 24 24",
+                        width: "24",
+                        height: "24",
+                        fill: "none",
+                        stroke: "currentColor",
+                        stroke_width: "2",
+                        stroke_linecap: "round",
+                        stroke_linejoin: "round",
+                        path {
+                            d: "M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v5m18 0v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5m18 0H3"
+                        }
                     }
                 }
             }
+            }
             // 最上层的背景墙元素
             if is_background_mode() {
-                div { class: "background-wall",
+                div { 
+                    class: if hide_cursor() { "background-wall hide-cursor" } else { "background-wall" },
                     onmousemove: move |_| {
                         show_exit_button.set(true);
+                        hide_cursor.set(false);
                         // 清除旧的定时器
                         if let Some(handle) = hide_btn_timer() {
                             web_sys::window().unwrap().clear_timeout_with_handle(handle);
@@ -598,8 +699,10 @@ fn Dev() -> Element {
                         // 新建定时器
                         let mut show_exit_button = show_exit_button.clone();
                         let mut hide_btn_timer = hide_btn_timer.clone();
+                        let mut hide_cursor = hide_cursor.clone();
                         let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
                             show_exit_button.set(false);
+                            hide_cursor.set(true);
                             hide_btn_timer.set(None);
                         }) as Box<dyn FnMut()>);
                         let handle = web_sys::window().unwrap()
@@ -608,12 +711,15 @@ fn Dev() -> Element {
                         hide_btn_timer.set(Some(handle));
                         closure.forget();
                     },
-                    if let Some(url) = background_images().get(current_bg_index()) {
-                        img {
-                            src: url.clone(),
-                            class: "background-wall-img"
+                    {background_images().iter().enumerate().map(|(index, url)| {
+                        rsx! {
+                            img {
+                                key: "{url}",
+                                src: url.clone(),
+                                class: format_args!("background-wall-img {}", if index == current_bg_index() { "active" } else { "" })
+                            }
                         }
-                    }
+                    })}
                     div { 
                         class: "exit-button-container",
                         style: "position: fixed; top: 20px; right: 20px; z-index: 1000;",
@@ -642,7 +748,20 @@ fn Dev() -> Element {
                             onclick: move |_| {
                                 exit_background_mode();
                             },
-                            "退出背景墙"
+                            svg {
+                                xmlns: "http://www.w3.org/2000/svg",
+                                view_box: "0 0 24 24",
+                                width: "24",
+                                height: "24",
+                                fill: "none",
+                                stroke: "currentColor",
+                                stroke_width: "2",
+                                stroke_linecap: "round",
+                                stroke_linejoin: "round",
+                                path {
+                                    d: "M6 6l12 12M6 18L18 6"
+                                }
+                            }
                         }
                     }
                 }
@@ -708,6 +827,7 @@ fn Blog() -> Element {
 fn BlogPostView(slug: String) -> Element {
     let posts = use_signal(Vec::new);
     let current_post = use_signal(|| None::<RuntimeBlogPost>);
+    let mut is_wide_mode = use_signal(|| false);
 
     // 加载博客文章列表
     use_effect(move || {
@@ -855,13 +975,10 @@ fn BlogPostView(slug: String) -> Element {
     // 在页面加载时，读取 localStorage 恢复宽屏状态
     use_effect(move || {
         if current_post().is_some() {
-            let document = web_sys::window().unwrap().document().unwrap();
-            if let Some(blog_post) = document.query_selector(".blog-post").ok().flatten() {
-                let wide_mode = web_sys::window().unwrap().local_storage().unwrap().unwrap().get_item("blog_wide_mode").unwrap().unwrap_or("false".to_string());
-                if wide_mode == "true" {
-                    let class_name = blog_post.get_attribute("class").unwrap_or_default();
-                    if !class_name.contains("wide-mode") {
-                        blog_post.set_attribute("class", format!("{} wide-mode", class_name).trim()).unwrap();
+            if let Some(window) = web_sys::window() {
+                if let Some(storage) = window.local_storage().ok().flatten() {
+                    if let Ok(Some(wide_mode)) = storage.get_item("blog_wide_mode") {
+                        is_wide_mode.set(wide_mode == "true");
                     }
                 }
             }
@@ -872,9 +989,25 @@ fn BlogPostView(slug: String) -> Element {
     rsx! {
         div { class: "blog-container",
             if let Some(post) = current_post() {
-                div { class: "blog-post",
+                div { 
+                    class: if is_wide_mode() { "blog-post wide-mode" } else { "blog-post" },
                     div { class: "blog-nav",
-                        Link { to: Route::Blog {}, class: "back-button", "←" }
+                        Link { to: Route::Blog {}, class: "back-button",
+                            svg {
+                                xmlns: "http://www.w3.org/2000/svg",
+                                view_box: "0 0 24 24",
+                                width: "24",
+                                height: "24",
+                                fill: "none",
+                                stroke: "currentColor",
+                                stroke_width: "2",
+                                stroke_linecap: "round",
+                                stroke_linejoin: "round",
+                                path {
+                                    d: "M19 12H5M12 19l-7-7 7-7"
+                                }
+                            }
+                        }
                         div { class: "function-buttons",
                             button { 
                                 class: "function-button",
@@ -882,24 +1015,70 @@ fn BlogPostView(slug: String) -> Element {
                                     let window = web_sys::window().unwrap();
                                     let _ = window.scroll_to_with_x_and_y(0.0, 0.0);
                                 },
-                                "↑"
+                                svg {
+                                    xmlns: "http://www.w3.org/2000/svg",
+                                    view_box: "0 0 24 24",
+                                    width: "24",
+                                    height: "24",
+                                    fill: "none",
+                                    stroke: "currentColor",
+                                    stroke_width: "2",
+                                    stroke_linecap: "round",
+                                    stroke_linejoin: "round",
+                                    path {
+                                        d: "M12 19V5M5 12l7-7 7 7"
+                                    }
+                                }
                             }
                             button { 
                                 class: "function-button",
                                 onclick: move |_| {
-                                    let document = web_sys::window().unwrap().document().unwrap();
-                                    let blog_post = document.query_selector(".blog-post").unwrap().unwrap();
-                                    let class_name = blog_post.get_attribute("class").unwrap_or_default();
-                                    let new_mode = !class_name.contains("wide-mode");
-                                    if new_mode {
-                                        blog_post.set_attribute("class", format!("{} wide-mode", class_name).trim()).unwrap();
-                                    } else {
-                                        blog_post.set_attribute("class", class_name.replace("wide-mode", "").trim()).unwrap();
-                                    }
+                                    let new_mode = !is_wide_mode();
+                                    is_wide_mode.set(new_mode);
                                     // 存储宽屏状态
-                                    web_sys::window().unwrap().local_storage().unwrap().unwrap().set_item("blog_wide_mode", if new_mode { "true" } else { "false" }).unwrap();
+                                    if let Some(window) = web_sys::window() {
+                                        if let Some(storage) = window.local_storage().ok().flatten() {
+                                            let _ = storage.set_item("blog_wide_mode", if new_mode { "true" } else { "false" });
+                                        }
+                                    }
                                 },
-                                "↔"
+                                {
+                                    if is_wide_mode() {
+                                        rsx! {
+                                            svg {
+                                                xmlns: "http://www.w3.org/2000/svg",
+                                                view_box: "0 0 24 24",
+                                                width: "24",
+                                                height: "24",
+                                                fill: "none",
+                                                stroke: "currentColor",
+                                                stroke_width: "2",
+                                                stroke_linecap: "round",
+                                                stroke_linejoin: "round",
+                                                path {
+                                                    d: "M8 3h8m-8 18h8M4 12h16M3 9l3 3-3 3m18-6l-3 3 3 3"
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        rsx! {
+                                            svg {
+                                                xmlns: "http://www.w3.org/2000/svg",
+                                                view_box: "0 0 24 24",
+                                                width: "24",
+                                                height: "24",
+                                                fill: "none",
+                                                stroke: "currentColor",
+                                                stroke_width: "2",
+                                                stroke_linecap: "round",
+                                                stroke_linejoin: "round",
+                                                path {
+                                                    d: "M8 3h8m-8 18h8M4 12h16M4 12l3-3m-3 3l3 3m13-3l-3-3m3 3l-3 3"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
