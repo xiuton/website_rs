@@ -6,12 +6,15 @@ use std::collections::HashMap;
 fn main() {
     println!("cargo:rerun-if-changed=posts");
     
-    let out_dir = env::var("OUT_DIR").unwrap();
+    let out_dir = env::var_os("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("blog_posts.rs");
     
     let posts_dir = Path::new("posts");
     if !posts_dir.exists() {
-        fs::write(&dest_path, "pub const BLOG_POSTS: &[BlogPost] = &[];").unwrap();
+        let blog_posts = r#"
+            const BLOG_POSTS: &[BlogPost] = &[];
+        "#;
+        fs::write(dest_path, blog_posts).unwrap();
         return;
     }
     
@@ -132,5 +135,6 @@ fn main() {
     
     output.push_str("];\n");
     
-    fs::write(&dest_path, output).unwrap();
+    fs::write(dest_path, output).unwrap();
+    println!("cargo:rerun-if-changed=build.rs");
 } 
