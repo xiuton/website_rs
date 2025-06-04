@@ -17,55 +17,85 @@ description = "Web 技术文档"
 icon = "https://developer.mozilla.org/favicon-48x48.png"
 
 [[bookmark]]
-title = "哔哩哔哩"
-url = "https://www.bilibili.com/"
-description = "弹幕网"
-icon = "https://developer.mozilla.org/favicon-48x48.png"
+title = "Rust 标准库文档"
+url = "https://doc.rust-lang.org/std/"
+description = "Rust 官方标准库文档"
+icon = "https://www.rust-lang.org/logos/rust-logo-32x32.png"
+
+[[bookmark]]
+title = "Rust Playground"
+url = "https://play.rust-lang.org/"
+description = "在线编写和运行 Rust 代码"
+icon = "https://play.rust-lang.org/favicon.ico"
+
+[[bookmark]]
+title = "crates.io"
+url = "https://crates.io/"
+description = "Rust 包管理仓库"
+icon = "https://crates.io/favicon.ico"
+
+[[bookmark]]
+title = "Go 官方文档"
+url = "https://go.dev/doc/"
+description = "Go 语言官方文档"
+icon = "https://go.dev/favicon.ico"
+
+[[bookmark]]
+title = "Go Playground"
+url = "https://go.dev/play/"
+description = "在线编写和运行 Go 代码"
+icon = "https://go.dev/favicon.ico"
+
+[[bookmark]]
+title = "Go by Example"
+url = "https://gobyexample.com/"
+description = "通过示例学习 Go 语言"
+icon = "https://gobyexample.com/favicon.ico"
+
+[[bookmark]]
+title = "pkg.go.dev"
+url = "https://pkg.go.dev/"
+description = "Go 包文档和搜索"
+icon = "https://pkg.go.dev/static/img/favicon.ico"
+
+[[bookmark]]
+title = "Rust Cookbook"
+url = "https://rust-lang-nursery.github.io/rust-cookbook/"
+description = "Rust 实用代码示例集合"
+icon = "https://www.rust-lang.org/logos/rust-logo-32x32.png"
+
+[[bookmark]]
+title = "Awesome Rust"
+url = "https://github.com/rust-unofficial/awesome-rust"
+description = "优秀的 Rust 库和资源列表"
+icon = "github"
+
+[[bookmark]]
+title = "Awesome Go"
+url = "https://github.com/avelino/awesome-go"
+description = "优秀的 Go 库和资源列表"
+icon = "github"
+
+[[bookmark]]
+title = "Rust 异步编程"
+url = "https://rust-lang.github.io/async-book/"
+description = "Rust 异步编程指南"
+icon = "https://www.rust-lang.org/logos/rust-logo-32x32.png"
+
+[[bookmark]]
+title = "Go 并发编程"
+url = "https://go.dev/doc/effective_go#concurrency"
+description = "Go 并发编程最佳实践"
+icon = "https://go.dev/favicon.ico"
+
+[[bookmark]]
+title = "Dioxus"
+url = "https://dioxuslabs.com/"
+description = "Rust UI 库"
+icon = "https://dioxuslabs.com/favicon.ico"
 
 [[bookmark]]
 title = "哔哩哔哩"
 url = "https://www.bilibili.com/"
 description = "弹幕网"
-icon = "https://developer.mozilla.org/favicon-48x48.png"
-
-[[bookmark]]
-title = "哔哩哔哩"
-url = "https://www.bilibili.com/"
-description = "弹幕网"
-icon = "https://developer.mozilla.org/favicon-48x48.png" 
-
-[[bookmark]]
-title = "哔哩哔哩"
-url = "https://www.bilibili.com/"
-description = "弹幕网"
-icon = "https://developer.mozilla.org/favicon-48x48.png" 
-
-[[bookmark]]
-title = "哔哩哔哩"
-url = "https://www.bilibili.com/"
-description = "弹幕网"
-icon = "https://developer.mozilla.org/favicon-48x48.png" 
-
-[[bookmark]]
-title = "哔哩哔哩"
-url = "https://www.bilibili.com/"
-description = "弹幕网"
-icon = "https://developer.mozilla.org/favicon-48x48.png" 
-
-[[bookmark]]
-title = "哔哩哔哩"
-url = "https://www.bilibili.com/"
-description = "弹幕网"
-icon = "https://developer.mozilla.org/favicon-48x48.png" 
-
-[[bookmark]]
-title = "哔哩哔哩"
-url = "https://www.bilibili.com/"
-description = "弹幕网"
-icon = "https://developer.mozilla.org/favicon-48x48.png" 
-
-[[bookmark]]
-title = "哔哩哔哩"
-url = "https://www.bilibili.com/"
-description = "弹幕网"
-icon = "https://developer.mozilla.org/favicon-48x48.png" 
+icon = "https://www.bilibili.com/favicon.ico"

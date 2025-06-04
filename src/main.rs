@@ -58,7 +58,7 @@ fn Navbar(is_dark: Signal<bool>) -> Element {
     
     let is_active = |href: &str| {
         match href {
-            "/" => current_path == "/",
+            "/" => current_path == "/" || current_path.starts_with("/post/"),
             _ => current_path.starts_with(href)
         }
     };
@@ -221,13 +221,13 @@ fn Home() -> Element {
         spawn_local(async move {
             // 使用构建脚本生成的文章列表
             let loaded_posts = BLOG_POSTS.iter().map(|post| RuntimeBlogPost {
-                title: post.title.to_string(),
-                date: post.date.to_string(),
-                author: post.author.to_string(),
-                tags: post.tags.iter().map(|&s| s.to_string()).collect(),
-                content: post.content.to_string(),
-                slug: post.slug.to_string(),
-            }).collect();
+                    title: post.title.to_string(),
+                    date: post.date.to_string(),
+                    author: post.author.to_string(),
+                    tags: post.tags.iter().map(|&s| s.to_string()).collect(),
+                    content: post.content.to_string(),
+                    slug: post.slug.to_string(),
+                }).collect();
             posts.set(loaded_posts);
         });
     });
@@ -365,8 +365,8 @@ fn Home() -> Element {
         div { class: "blog-container",
             div { class: "blog-list",
                 if posts().is_empty() {
-                    div { class: "loading", "加载中..." }
-                } else {
+                        div { class: "loading", "加载中..." }
+                    } else {
                     div { class: "blog-posts",
                         {posts().iter().map(|post| {
                             let post = post.clone();
@@ -494,7 +494,7 @@ fn About() -> Element {
                             view_box: "0 0 24 24",
                             fill: "currentColor",
                             path {
-                                d: "M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                                d: "M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.237 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
                             }
                         }
                         span { "GitHub" }
@@ -541,17 +541,22 @@ impl BookmarkManager {
             .unwrap_or(&Vec::new())
             .iter()
             .filter_map(|item| {
-                if let (Some(title), Some(url), Some(description), Some(icon)) = (
+                if let (Some(title), Some(url), Some(description)) = (
                     item.get("title").and_then(|v| v.as_str()),
                     item.get("url").and_then(|v| v.as_str()),
                     item.get("description").and_then(|v| v.as_str()),
-                    item.get("icon").and_then(|v| v.as_str()),
                 ) {
+                    // 如果 icon 字段不存在，使用空字符串
+                    let icon = item.get("icon")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+
                     Some(Bookmark {
                         title: title.to_string(),
                         url: url.to_string(),
                         description: description.to_string(),
-                        icon: icon.to_string(),
+                        icon,
                     })
                 } else {
                     None
@@ -637,7 +642,7 @@ fn Tags() -> Element {
             div { class: "bookmarks-list",
                 {filtered_bookmarks.read().iter().map(|(bookmark, is_match)| {
                     rsx! {
-                        div { 
+                        div {
                             class: if *is_match { "bookmark-item highlight" } else { "bookmark-item" },
                             a {
                                 href: "{bookmark.url}",
@@ -660,6 +665,20 @@ fn Tags() -> Element {
 }
 
 fn get_bookmark_icon(icon_name: &str) -> Element {
+    // 如果 icon_name 为空字符串或者没有设置 icon 字段（传入空字符串），显示默认图标
+    if icon_name.is_empty() {
+        return rsx! {
+            svg {
+                xmlns: "http://www.w3.org/2000/svg",
+                view_box: "0 0 24 24",
+                fill: "currentColor",
+                path {
+                    d: "M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"
+                }
+            }
+        };
+    }
+
     match icon_name {
         "github" => rsx! {
             svg {
@@ -667,30 +686,46 @@ fn get_bookmark_icon(icon_name: &str) -> Element {
                 view_box: "0 0 24 24",
                 fill: "currentColor",
                 path {
-                    d: "M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                    d: "M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.237 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
                 }
             }
         },
         // 如果是完整的URL（以 http:// 或 https:// 开头），则使用图片
-        url if url.starts_with("http://") || url.starts_with("https://") => rsx! {
-            img {
-                src: "{url}",
-                alt: "bookmark icon",
-                class: "bookmark-icon-img",
-                style: "object-fit: contain;"
+        url if url.starts_with("http://") || url.starts_with("https://") => {
+            let mut use_default_icon = use_signal(|| false);
+            rsx! {
+                {if *use_default_icon.read() {
+                    rsx! {
+                        svg {
+                            xmlns: "http://www.w3.org/2000/svg",
+                            view_box: "0 0 24 24",
+                            fill: "currentColor",
+                            path {
+                                d: "M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"
+                            }
+                        }
+                    }
+                } else {
+                    rsx! {
+                        img {
+                            src: "{url}",
+                            alt: "bookmark icon",
+                            class: "bookmark-icon-img",
+                            style: "object-fit: contain;",
+                            onload: move |_| use_default_icon.set(false),
+                            onerror: move |_| use_default_icon.set(true)
+                        }
+                    }
+                }}
             }
         },
         _ => rsx! {
             svg {
                 xmlns: "http://www.w3.org/2000/svg",
                 view_box: "0 0 24 24",
-                fill: "none",
-                stroke: "currentColor",
-                stroke_width: "2",
-                stroke_linecap: "round",
-                stroke_linejoin: "round",
+                fill: "currentColor",
                 path {
-                    d: "M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"
+                    d: "M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"
                 }
             }
         }
