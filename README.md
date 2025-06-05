@@ -186,6 +186,11 @@ npm install -g sass
 $ cargo clean ; trunk clean ; trunk build ; trunk serve
 ```
 
+指定端口
+```bash
+$ trunk serve --port 8081
+```
+
 新建博客文章
 ```bash
 $ cargo run --bin cp my-post

@@ -4,6 +4,7 @@ use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen::JsCast;
 use serde::{Serialize, Deserialize};
 use toml;
+use dioxus::events::FormData;
 
 fn main() {
     // 初始化 panic hook
@@ -186,7 +187,7 @@ enum Route {
 }
 
 #[derive(Clone, PartialEq)]
-struct BlogPost {
+pub struct BlogPost {
     title: &'static str,
     date: &'static str,
     author: &'static str,
@@ -214,6 +215,69 @@ fn Home() -> Element {
     let posts = use_signal(Vec::new);
     let current_post = use_signal(|| None::<RuntimeBlogPost>);
     let mut is_wide_mode = use_signal(|| false);
+    
+    // 获取当前 URL 的查询参数
+    let route: Route = use_route();
+    let location = web_sys::window()
+        .unwrap()
+        .location();
+    let search = location.search().unwrap_or_default();
+    let query_params: web_sys::UrlSearchParams = web_sys::UrlSearchParams::new_with_str(&search).unwrap();
+    
+    // 从 URL 参数中获取页码和每页数量
+    let page_from_url = query_params.get("page")
+        .and_then(|v| v.parse::<usize>().ok());
+    let size_from_url = query_params.get("size")
+        .and_then(|v| v.parse::<usize>().ok());
+
+    let mut current_page = use_signal(|| page_from_url.unwrap_or(1));
+    let mut page_size = use_signal(|| {
+        // 优先使用 URL 参数
+        if let Some(size) = size_from_url {
+            return size;
+        }
+        // 其次使用 localStorage 保存的值
+        if let Some(window) = web_sys::window() {
+            if let Some(storage) = window.local_storage().ok().flatten() {
+                if let Ok(Some(size)) = storage.get_item("blog_page_size") {
+                    if let Ok(size) = size.parse::<usize>() {
+                        return size;
+                    }
+                }
+            }
+        }
+        10  // 默认值
+    });
+
+    let total_pages = use_memo(move || {
+        let total = posts().len();
+        ((total as f64) / (page_size() as f64)).ceil() as usize
+    });
+
+    // 更新 URL 的函数
+    let update_url = move |page: usize, size: usize| {
+        if let Some(window) = web_sys::window() {
+            if let Ok(url) = web_sys::Url::new(&window.location().href().unwrap()) {
+                let search_params = url.search_params();
+                search_params.set("page", &page.to_string());
+                search_params.set("size", &size.to_string());
+                let new_url = format!("/?{}", search_params.to_string());
+                let _ = window.history().unwrap()
+                    .replace_state_with_url(
+                        &wasm_bindgen::JsValue::NULL,
+                        "",
+                        Some(&new_url),
+                    );
+            }
+        }
+    };
+
+    // 监听页码和每页数量变化，更新 URL
+    use_effect(move || {
+        update_url(current_page(), page_size());
+    });
+
+    let navigator = use_navigator();
 
     // 加载博客文章列表
     use_effect(move || {
@@ -230,6 +294,13 @@ fn Home() -> Element {
                 }).collect();
             posts.set(loaded_posts);
         });
+    });
+
+    // 获取当前页的文章
+    let current_page_posts = use_memo(move || {
+        let start = (current_page() - 1) * page_size();
+        let end = start + page_size();
+        posts()[start.min(posts().len())..end.min(posts().len())].to_vec()
     });
 
     // 初始化代码高亮
@@ -365,10 +436,10 @@ fn Home() -> Element {
         div { class: "blog-container",
             div { class: "blog-list",
                 if posts().is_empty() {
-                        div { class: "loading", "加载中..." }
-                    } else {
+                    div { class: "loading", "加载中..." }
+                } else {
                     div { class: "blog-posts",
-                        {posts().iter().map(|post| {
+                        {current_page_posts().iter().map(|post| {
                             let post = post.clone();
                             rsx! {
                                 div { class: "blog-preview",
@@ -404,6 +475,82 @@ fn Home() -> Element {
                                 }
                             }
                         })}
+                    }
+                    // 分页控制
+                    div { class: "pagination",
+                        // 上一页按钮
+                        button {
+                            class: "pagination-btn",
+                            disabled: current_page() <= 1,
+                            onclick: move |_| {
+                                if current_page() > 1 {
+                                    current_page.set(current_page() - 1);
+                                }
+                            },
+                            svg {
+                                xmlns: "http://www.w3.org/2000/svg",
+                                fill: "none",
+                                view_box: "0 0 24 24",
+                                stroke_width: "2",
+                                stroke: "currentColor",
+                                class: "size-5",
+                                path {
+                                    stroke_linecap: "round",
+                                    stroke_linejoin: "round",
+                                    d: "M15.75 19.5L8.25 12l7.5-7.5"
+                                }
+                            }
+                        }
+                        // 页码显示
+                        span { class: "pagination-info",
+                            "{current_page()}/{total_pages()}"
+                        }
+                        // 下一页按钮
+                        button {
+                            class: "pagination-btn",
+                            disabled: current_page() >= total_pages(),
+                            onclick: move |_| {
+                                if current_page() < total_pages() {
+                                    current_page.set(current_page() + 1);
+                                }
+                            },
+                            svg {
+                                xmlns: "http://www.w3.org/2000/svg",
+                                fill: "none",
+                                view_box: "0 0 24 24",
+                                stroke_width: "2",
+                                stroke: "currentColor",
+                                class: "size-5",
+                                path {
+                                    stroke_linecap: "round",
+                                    stroke_linejoin: "round",
+                                    d: "M8.25 4.5l7.5 7.5-7.5 7.5"
+                                }
+                            }
+                        }
+                        // 每页显示数量选择
+                        select {
+                            class: "page-size-select",
+                            name: "page-size-select",
+                            value: page_size.to_string(),
+                            onchange: move |evt: Event<FormData>| {
+                                let value = evt.data.value();
+                                if let Ok(new_size) = value.parse::<usize>() {
+                                    page_size.set(new_size);
+                                    current_page.set(1);  // 重置到第一页
+                                    // 保存选择到 localStorage
+                                    if let Some(window) = web_sys::window() {
+                                        if let Some(storage) = window.local_storage().ok().flatten() {
+                                            let _ = storage.set_item("blog_page_size", &new_size.to_string());
+                                        }
+                                    }
+                                }
+                            },
+                            option { value: "5", "5条/页" }
+                            option { value: "10", "10条/页" }
+                            option { value: "20", "20条/页" }
+                            option { value: "50", "50条/页" }
+                        }
                     }
                 }
             }
@@ -581,12 +728,42 @@ fn Tags() -> Element {
     // 处理搜索
     let handle_search = move |_| {
         search_query.set(search_text());
+        // 在搜索后添加滚动到第一个匹配项的逻辑
+        if !search_text().is_empty() {
+            spawn_local(async {
+                // 给DOM一点时间更新
+                gloo_timers::callback::Timeout::new(100, move || {
+                    if let Some(window) = web_sys::window() {
+                        if let Some(document) = window.document() {
+                            if let Some(element) = document.query_selector(".highlight").ok().flatten() {
+                                element.scroll_into_view_with_bool(true);
+                            }
+                        }
+                    }
+                }).forget();
+            });
+        }
     };
 
     // 处理回车键
     let handle_keydown = move |evt: Event<KeyboardData>| {
         if evt.key() == Key::Enter {
             search_query.set(search_text());
+            // 在回车搜索后也添加滚动到第一个匹配项的逻辑
+            if !search_text().is_empty() {
+                spawn_local(async {
+                    // 给DOM一点时间更新
+                    gloo_timers::callback::Timeout::new(100, move || {
+                        if let Some(window) = web_sys::window() {
+                            if let Some(document) = window.document() {
+                                if let Some(element) = document.query_selector(".highlight").ok().flatten() {
+                                    element.scroll_into_view_with_bool(true);
+                                }
+                            }
+                        }
+                    }).forget();
+                });
+            }
         }
     };
 
@@ -1246,7 +1423,7 @@ fn BlogPostView(slug: String) -> Element {
                 div { 
                     class: if is_wide_mode() { "blog-post wide-mode" } else { "blog-post" },
                     div { class: "blog-nav",
-                        Link { to: Route::Home {}, class: "back-button",
+                        Link { to: Route::Home, class: "back-button",
                             svg {
                                 xmlns: "http://www.w3.org/2000/svg",
                                 view_box: "0 0 24 24",

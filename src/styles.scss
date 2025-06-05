@@ -15,9 +15,10 @@ $font-families: (
 
 // 主题变量
 :root {
-  --bg-color: #ffffff;
+  --bg-color: #ededed;
   --bg-secondary: #f5f5f5;
   --text-color: #333333;
+  --text-color-anti: #ffffff;
   --text-secondary: #666666;
   --border-color: #e0e0e0;
   --hover-color: #f0f0f0;
@@ -39,7 +40,7 @@ $font-families: (
   --navbar-link: #222;
   --navbar-link-active: #292929;
   --navbar-link-hover: #292929;
-  --navbar-border: #e5e5e5;
+  --navbar-border: #c2c2c2;
   --navbar-glow: #60a5fa;
   --hole-bg-color: #ffffff;
   --hole-border-color: #141414;
@@ -47,7 +48,7 @@ $font-families: (
   // 博客组件变量
   --bg-primary: #ffffff;
   --bg-primary-rgb: 255, 255, 255;
-  --bg-secondary: #f7f7f7;
+  --bg-secondary: #ffffff;
   --bg-secondary-rgb: 247, 247, 247;
   --text-primary: #222222;
   --accent-color: #2563eb;
@@ -63,6 +64,7 @@ $font-families: (
   --bg-color: #1a1a1a;
   --bg-secondary: #2d2d2d;
   --text-color: #e0e0e0;
+  --text-color-anti: #000000;
   --text-secondary: #a0a0a0;
   --border-color: #404040;
   --hover-color: #333333;
@@ -90,7 +92,7 @@ $font-families: (
   --hole-border-color: #ffffff;
   
   // 博客组件变量
-  --bg-primary: #18181c;
+  --bg-primary: #21212d;
   --bg-primary-rgb: 24, 24, 28;
   --bg-secondary: #111111;
   --bg-secondary-rgb: 17, 17, 17;
@@ -307,39 +309,26 @@ html, body {
             font-size: 1.3rem;
             margin-left: auto;
             cursor: pointer;
-            color: var(--navbar-link);
             transition: color 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 0.3rem;
-            border-radius: 8px;
+            border-radius: 50%;
             backdrop-filter: blur(8px);
-            background: rgba(0, 0, 0, 0.05);
-            border: 1px solid rgba(0, 0, 0, 0.1);
+            background: rgba(var(--primary-rgb),  0.5);
+            border: 1px solid var(--primary-color);
+            color: var(--text-color-anti);
             transition: all 0.3s ease;
 
             &:hover {
-              background: rgba(0, 0, 0, 0.1);
-              border-color: rgba(0, 0, 0, 0.2);
+              background: rgba(var(--primary-rgb),  0.6);
               transform: scale(1.05);
             }
 
             svg {
               width: 1.2rem;
               height: 1.2rem;
-            }
-          }
-
-          html.dark & {
-            .theme-toggle {
-              background: rgba(255, 255, 255, 0.2);
-              border: 1px solid rgba(255, 255, 255, 0.3);
-
-              &:hover {
-                background: rgba(255, 255, 255, 0.3);
-                border-color: rgba(255, 255, 255, 0.8);
-              }
             }
           }
         }
@@ -379,14 +368,14 @@ html, body {
 
           .tech-stack {
             margin-top: 1.5rem;
-                display: flex;
+            display: flex;
             gap: 1rem;
             justify-content: center;
-                flex-wrap: wrap;
+            flex-wrap: wrap;
 
             span {
-                  background: var(--bg-secondary);
-                  padding: 0.5rem 1rem;
+              background: var(--bg-secondary);
+              padding: 0.5rem 1rem;
               border-radius: 999px;
               color: var(--text-primary);
               font-size: 1rem;
@@ -466,11 +455,11 @@ html, body {
               border: 1px solid var(--border-color);
               border-radius: 8px;
               color: var(--text-primary);
-                text-decoration: none;
+              text-decoration: none;
               transition: all 0.3s ease;
               box-shadow: var(--shadow);
 
-                &:hover {
+              &:hover {
                 transform: translateY(-2px);
                 border-color: var(--accent-color);
                 color: var(--accent-color);
@@ -735,36 +724,36 @@ html, body {
             flex-direction: column;
             row-gap: 1rem;
 
-        .blog-preview {
-          cursor: pointer;
-          transition: transform 0.2s ease;
+              .blog-preview {
+                cursor: pointer;
+                transition: transform 0.2s ease;
 
-        .preview-title {
-          font-size: 1.5rem;
-          margin: 0 0 .5rem 0;
-          color: var(--text-primary);
-        }
+              .preview-title {
+                font-size: 1.5rem;
+                margin: 0 0 .5rem 0;
+                color: var(--text-primary);
+              }
 
-        .preview-meta {
-          display: flex;
-          gap: 1rem;
-          font-size: 0.9rem;
-          color: var(--text-secondary);
-          margin-bottom: .5rem;
-        }
+              .preview-meta {
+                display: flex;
+                gap: 1rem;
+                font-size: 0.9rem;
+                color: var(--text-secondary);
+                margin-bottom: .5rem;
+              }
 
-        .preview-tags {
-          display: flex;
-          gap: 0.5rem;
-          flex-wrap: wrap;
-        }
+              .preview-tags {
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+              }
 
-        .preview-tag {
-          background: var(--accent-color);
-          color: var(--bg-primary);
-          padding: 0.25rem 0.75rem;
-          border-radius: 999px;
-          font-size: 0.8rem;
+              .preview-tag {
+                background: var(--accent-color);
+                color: var(--bg-primary);
+                padding: 0.25rem 0.75rem;
+                border-radius: 999px;
+                font-size: 0.8rem;
                 display: flex;
                 align-items: center;
                 gap: 0.25rem;
@@ -778,6 +767,74 @@ html, body {
     
             .blog-preview:hover {
               transform: translateY(-2px);
+            }
+          }
+
+          .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            padding: 1rem;
+
+            .pagination-info {
+              font-size: 0.875rem;
+              color: var(--text-color);
+              min-width: 4rem;
+              text-align: center;
+            }
+
+            .pagination-btn {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 2.5rem;
+              height: 2.5rem;
+              border: 1px solid var(--border-color);
+              border-radius: 0.5rem;
+              background: var(--bg-color);
+              color: var(--text-color);
+              cursor: pointer;
+              transition: all 0.2s ease;
+
+              &:hover:not(:disabled) {
+                background: var(--hover-color);
+              }
+
+              &:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+              }
+
+              svg {
+                width: 1.25rem;
+                height: 1.25rem;
+              }
+            }
+
+            .page-size-select {
+              padding: 0.5rem;
+              border: 1px solid var(--border-color);
+              border-radius: 0.5rem;
+              background: var(--bg-color);
+              color: var(--text-color);
+              font-size: 0.875rem;
+              cursor: pointer;
+              transition: all 0.2s ease;
+
+              &:hover {
+                background: var(--hover-color);
+              }
+
+              option {
+                background: var(--bg-color);
+                color: var(--text-color);
+
+                &:hover {
+                  background: var(--primary-color);
+                  color: var(--text-color);
+                }
+              }
             }
           }
         }
