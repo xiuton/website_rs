@@ -11,9 +11,7 @@ fn main() {
     
     let posts_dir = Path::new("posts");
     if !posts_dir.exists() {
-        let blog_posts = r#"
-            const BLOG_POSTS: &[BlogPost] = &[];
-        "#;
+        let blog_posts = "pub const BLOG_POSTS: &[BlogPost] = &[];";
         fs::write(dest_path, blog_posts).unwrap();
         return;
     }

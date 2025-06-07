@@ -1,8 +1,20 @@
 [[bookmark]]
 title = "GitHub"
-url = "https://github.com"
 description = "代码托管平台"
+url = "https://github.com"
 icon = "github"
+
+[[bookmark]]
+title = "Rust"
+description = "Rust 编程语言官网"
+url = "https://www.rust-lang.org"
+icon = "https://www.rust-lang.org/static/images/rust-logo-blk.svg"
+
+[[bookmark]]
+title = "Dioxus"
+description = "Dioxus 框架官网"
+url = "https://dioxuslabs.com"
+icon = "https://dioxuslabs.com/img/favicon.ico"
 
 [[bookmark]]
 title = "Rust 程序设计语言"
@@ -89,13 +101,13 @@ description = "Go 并发编程最佳实践"
 icon = "https://go.dev/favicon.ico"
 
 [[bookmark]]
-title = "Dioxus"
-url = "https://dioxuslabs.com/"
-description = "Rust UI 库"
-icon = "https://dioxuslabs.com/favicon.ico"
-
-[[bookmark]]
 title = "哔哩哔哩"
 url = "https://www.bilibili.com/"
 description = "弹幕网"
 icon = "https://www.bilibili.com/favicon.ico"
+
+[[bookmark]]
+title = "博客园"
+url = "https://cnblogs.com"
+description = "开发者社区"
+icon = "https://common.cnblogs.com/favicon.ico"
