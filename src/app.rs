@@ -1,6 +1,5 @@
 use dioxus::prelude::*;
-use crate::components::{Navbar, Footer};
-use crate::routes::AppRouter;
+use crate::routes::Route;
 
 pub fn use_dark_mode() -> Signal<bool> {
     use_signal(|| {
@@ -28,12 +27,6 @@ pub fn use_dark_mode() -> Signal<bool> {
 #[component]
 pub fn App() -> Element {
     rsx! {
-        div { class: "app",
-            Navbar { is_dark: use_dark_mode() }
-            div { class: "main-content",
-                AppRouter {}
-            }
-            Footer {}
-        }
+        Router::<Route> {}
     }
 }

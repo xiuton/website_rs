@@ -1,20 +1,25 @@
 use dioxus::prelude::*;
-use dioxus_router::prelude::Routable;
+use dioxus_router::prelude::{Routable, Outlet};
 
 pub mod about;
 pub mod dev;
 pub mod home;
 pub mod blog_post;
 pub mod tags;
+pub mod not_found;
 
 pub use about::About;
 pub use dev::Dev;
 pub use home::Home;
 pub use blog_post::BlogPostView;
 pub use tags::Tags;
+pub use not_found::NotFound;
+use crate::components::{Navbar, Footer};
+use crate::app::use_dark_mode;
 
 #[derive(Routable, Clone)]
 pub enum Route {
+    #[layout(Layout)]
     #[route("/")]
     Home,
     #[route("/about")]
@@ -30,18 +35,16 @@ pub enum Route {
 }
 
 #[component]
-pub fn AppRouter() -> Element {
-    rsx! {
-        Router::<Route> {}
-    }
-}
+fn Layout() -> Element {
+    let is_dark = use_dark_mode();
 
-#[component]
-pub fn NotFound(route: Vec<String>) -> Element {
     rsx! {
-        div {
-            h1 { "404 - Not Found" }
-            p { "The requested page was not found: /{route:?}" }
+        div { class: "app",
+            Navbar { is_dark: is_dark }
+            div { class: "main-content",
+                Outlet::<Route> {}
+            }
+            Footer {}
         }
     }
-} 
+}

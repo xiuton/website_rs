@@ -1,4 +1,6 @@
 use dioxus::prelude::*;
+use dioxus_router::prelude::Link;
+use crate::routes::Route;
 
 #[component]
 pub fn Navbar(is_dark: Signal<bool>) -> Element {
@@ -39,14 +41,15 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
         }
     };
 
-    let window = web_sys::window().unwrap();
-    let location = window.location();
-    let current_path = location.pathname().unwrap_or_else(|_| "/".to_string());
+    let route = use_route::<Route>();
     
-    let is_active = |href: &str| {
+    let is_active = move |href: &str| {
         match href {
-            "/" => current_path == "/" || current_path.starts_with("/post/"),
-            _ => current_path.starts_with(href)
+            "/" => matches!(route, Route::Home),
+            "/about" => matches!(route, Route::About),
+            "/tags" => matches!(route, Route::Tags),
+            "/dev" => matches!(route, Route::Dev),
+            _ => false
         }
     };
 
@@ -62,8 +65,8 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                     {NAV_ITEMS.iter().map(|(href, label)| {
                         let active = is_active(href);
                         rsx! {
-                            a {
-                                href: *href,
+                            Link {
+                                to: *href,
                                 class: if active { "nav-link nav-active" } else { "nav-link" },
                                 { label }
                             }
@@ -97,7 +100,7 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                                         d: "M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"
                                     }
                                 }
-                            },
+                            }
                         }
                     }
                 }

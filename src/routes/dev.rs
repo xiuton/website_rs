@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
+use gloo_timers::future::TimeoutFuture;
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen::JsCast;
-use gloo_timers::callback::Timeout;
 
 #[component]
 pub fn Dev() -> Element {

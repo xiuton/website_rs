@@ -1,3 +1,3 @@
 mod models;
 
-pub use models::{BlogPost, RuntimeBlogPost}; 
+pub use models::{RuntimeBlogPost, BlogPost}; 
