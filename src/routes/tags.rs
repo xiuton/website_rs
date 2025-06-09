@@ -69,7 +69,7 @@ pub fn Tags() -> Element {
             spawn_local(async {
                 // 给DOM一点时间更新
                 gloo_timers::callback::Timeout::new(100, move || {
-                    if let Some(window) = web_sys::window() {
+            if let Some(window) = web_sys::window() {
                         if let Some(document) = window.document() {
                             if let Some(element) = document.query_selector(".highlight").ok().flatten() {
                                 element.scroll_into_view_with_bool(true);
@@ -125,10 +125,10 @@ pub fn Tags() -> Element {
             // 搜索栏
             div { class: "search-bar",
                 div { class: "search-input-wrapper",
-                    input {
+                input {
                         class: "search-input",
-                        placeholder: "搜索书签...",
-                        value: "{search_text}",
+                    placeholder: "搜索书签...",
+                    value: "{search_text}",
                         oninput: move |evt| search_text.set(evt.value().clone()),
                         onkeydown: handle_keydown
                     }
@@ -157,16 +157,16 @@ pub fn Tags() -> Element {
                     rsx! {
                         div {
                             class: if *is_match { "bookmark-item highlight" } else { "bookmark-item" },
-                            a {
-                                href: "{bookmark.url}",
-                                target: "_blank",
+                        a {
+                            href: "{bookmark.url}",
+                            target: "_blank",
                                 class: "bookmark-link",
-                                div { class: "bookmark-icon",
-                                    {get_bookmark_icon(&bookmark.icon)}
-                                }
+                            div { class: "bookmark-icon",
+                                {get_bookmark_icon(&bookmark.icon)}
+                            }
                                 div { class: "bookmark-info",
-                                    h3 { class: "bookmark-title", "{bookmark.title}" }
-                                    p { class: "bookmark-description", "{bookmark.description}" }
+                                h3 { class: "bookmark-title", "{bookmark.title}" }
+                                p { class: "bookmark-description", "{bookmark.description}" }
                                 }
                             }
                         }

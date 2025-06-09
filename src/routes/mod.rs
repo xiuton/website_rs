@@ -42,9 +42,9 @@ fn Layout() -> Element {
         div { class: "app",
             Navbar { is_dark: is_dark }
             div { class: "main-content",
-                Outlet::<Route> {}
-            }
+            Outlet::<Route> {}
+        }
             Footer {}
         }
     }
-}
+} 

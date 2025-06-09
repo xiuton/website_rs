@@ -773,7 +773,7 @@ html, body {
           .pagination {
             display: flex;
             align-items: center;
-            justify-content: center;
+            // justify-content: center;
             // gap: 1rem;
             // padding: 1rem;
 
@@ -853,58 +853,99 @@ html, body {
             transform: translateY(-50%);
             z-index: 1000;
             display: flex;
-            // flex-direction: column;
             gap: 0.75rem;
-            // writing-mode: vertical-lr;
-            // text-orientation: mixed;
             letter-spacing: 0.1rem;
 
-            .back-button,
-            .function-button {
-              width: 2.5rem;
-              height: 2.5rem;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              background: rgba(var(--bg-primary-rgb), 0.8);
-              backdrop-filter: blur(8px);
-              border: 1px solid var(--border-color);
-              border-radius: 8px;
-              color: var(--text-primary);
-              text-decoration: none;
-              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-              font-size: 1.2rem;
-              cursor: pointer;
-              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            .back-buttons-group {
+                position: relative;
+                display: flex;
+                gap: 0.5rem;
 
-              &:hover {
-                transform: translateY(-4px);
-                background: rgba(var(--bg-secondary-rgb), 0.9);
-                border-color: var(--accent-color);
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-              }
+                .back-button {
+                    width: 2.5rem;
+                    height: 2.5rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: rgba(var(--bg-primary-rgb), 0.8);
+                    backdrop-filter: blur(8px);
+                    border: 1px solid var(--border-color);
+                    border-radius: 8px;
+                    color: var(--text-primary);
+                    text-decoration: none;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    font-size: 1.2rem;
+                    cursor: pointer;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 
-              &:active {
-                transform: translateY(-2px);
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-              }
+                    &:hover {
+                        transform: translateY(-4px);
+                        background: rgba(var(--bg-secondary-rgb), 0.9);
+                        border-color: var(--accent-color);
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    }
 
-              &.active {
-                background: var(--accent-color);
-                color: var(--bg-primary);
-                border-color: var(--accent-color);
-              }
-            }
+                    &:active {
+                        transform: translateY(-2px);
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                    }
+                }
 
-            .back-button {
-              height: 2.5rem;
-              font-size: 1.2rem;
+                .home-back {
+                    position: absolute;
+                    left: 0;
+                    opacity: 0;
+                    transform: translateX(-10px);
+                    pointer-events: none;
+                    transition: all 0.3s ease;
+                }
+
+                &:hover {
+                    .history-back {
+                        transform: translateX(3rem);
+                    }
+                    
+                    .home-back {
+                        opacity: 1;
+                        transform: translateX(0);
+                        pointer-events: auto;
+                    }
+                }
             }
 
             .function-buttons {
               display: flex;
-              // flex-direction: column;
               gap: 0.75rem;
+
+              .function-button {
+                width: 2.5rem;
+                height: 2.5rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: rgba(var(--bg-primary-rgb), 0.8);
+                backdrop-filter: blur(8px);
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                color: var(--text-primary);
+                text-decoration: none;
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                font-size: 1.2rem;
+                cursor: pointer;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+                &:hover {
+                  transform: translateY(-4px);
+                  background: rgba(var(--bg-secondary-rgb), 0.9);
+                  border-color: var(--accent-color);
+                  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                }
+
+                &.active {
+                  background: var(--primary-color);
+                  color: #fff;
+                }
+              }
             }
           }
 
@@ -925,18 +966,27 @@ html, body {
               flex-direction: row;
               justify-content: flex-end;
               gap: 0.75rem;
-              padding: 0 1rem 0 0;
+              padding: 0 1rem;
 
-              .back-button,
-              .function-button {
-                width: 2.5rem;
-                height: 2.5rem;
-                writing-mode: horizontal-tb;
-                font-size: 1.2rem;
-              }
-
-              .function-buttons {
+              .back-buttons-group {
                 flex-direction: row;
+
+                .home-back {
+                  position: absolute;
+                  right: 0;
+                  left: auto;
+                  transform: translateY(0);
+                }
+
+                &:hover {
+                  .history-back {
+                    transform: translateX(0);
+                  }
+                  
+                  .home-back {
+                    transform: translateY(-3rem);
+                  }
+                }
               }
             }
           }
@@ -1177,6 +1227,27 @@ html, body {
             justify-content: flex-end;
             gap: 0.75rem;
             padding: 0 1rem 0 0;
+
+            .back-buttons-group {
+              flex-direction: row !important;
+
+              .home-back {
+                position: absolute !important;
+                right: 0 !important;
+                left: auto !important;
+                transform: translateY(0) !important;
+              }
+
+              &:hover {
+                .history-back {
+                  transform: translateX(0) !important;
+                }
+                
+                .home-back {
+                  transform: translateY(-3rem) !important;
+                }
+              }
+            }
           }
         }
       }
@@ -1187,6 +1258,22 @@ html, body {
       font-size: 1rem;
       width: 100%;
       padding-bottom: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+
+      .icp-info {
+        a {
+          color: rgb(107 114 128);
+          text-decoration: none;
+          transition: color 0.2s ease;
+          font-size: 0.9rem;
+
+          &:hover {
+            color: var(--accent-color);
+          }
+        }
+      }
     }
   }
 }

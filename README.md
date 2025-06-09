@@ -42,6 +42,12 @@ trunk serve
 ```
 这将启动一个开发服务器，通常在 http://localhost:8080 访问。
 
+自定义端口
+```bash
+trunk serve --port 3128
+```
+在 http://localhost:3218 访问。
+
 2. 构建项目：
 ```bash
 trunk build
@@ -193,12 +199,12 @@ $ trunk serve --port 8081
 
 新建博客文章
 ```bash
-$ cargo run --bin cp my-post
+$ cargo run --bin new my-post
 ```
 
 新建博客帮助
 ```bash
-$ cargo run --bin cp
+$ cargo run --bin new
 ```
 
 

@@ -82,12 +82,12 @@ pub fn BlogPostView(slug: String) -> Element {
                     // 创建一个 Promise 来跟踪所有语言模块的加载
                     const loadPromises = languages.map(lang => {
                         return new Promise((resolve) => {
-                            const script = document.createElement('script');
-                            script.src = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/${lang.file}`;
-                            script.async = true;
+                        const script = document.createElement('script');
+                        script.src = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/${lang.file}`;
+                        script.async = true;
                             script.onload = () => resolve();
-                            document.head.appendChild(script);
-                        });
+                        document.head.appendChild(script);
+                    });
                     });
 
                     // 等待所有语言模块加载完成后再应用高亮
@@ -101,7 +101,7 @@ pub fn BlogPostView(slug: String) -> Element {
                             }
                         });
                         // 应用高亮
-                        hljs.highlightAll();
+                    hljs.highlightAll();
                     });
                 } else {
                     setTimeout(loadLanguages, 100);
@@ -154,19 +154,45 @@ pub fn BlogPostView(slug: String) -> Element {
                 div { 
                     class: if is_wide_mode() { "blog-post wide-mode" } else { "blog-post" },
                     div { class: "blog-nav",
-                        Link { to: Route::Home, class: "back-button",
-                            svg {
-                                xmlns: "http://www.w3.org/2000/svg",
-                                view_box: "0 0 24 24",
-                                width: "24",
-                                height: "24",
-                                fill: "none",
-                                stroke: "currentColor",
-                                stroke_width: "2",
-                                stroke_linecap: "round",
-                                stroke_linejoin: "round",
-                                path {
-                                    d: "M15.75 19.5 8.25 12l7.5-7.5"
+                        div { class: "back-buttons-group",
+                            button { 
+                                class: "back-button history-back",
+                                onclick: move |_| {
+                                    if let Some(window) = web_sys::window() {
+                                        let _ = window.history().unwrap().back();
+                                    }
+                                },
+                                svg {
+                                    xmlns: "http://www.w3.org/2000/svg",
+                                    view_box: "0 0 24 24",
+                                    width: "24",
+                                    height: "24",
+                                    fill: "none",
+                                    stroke: "currentColor",
+                                    stroke_width: "2",
+                                    stroke_linecap: "round",
+                                    stroke_linejoin: "round",
+                                    path {
+                                        d: "M15.75 19.5 8.25 12l7.5-7.5"
+                                    }
+                                }
+                            }
+                            Link { 
+                                to: Route::Home, 
+                                class: "back-button home-back",
+                                svg {
+                                    xmlns: "http://www.w3.org/2000/svg",
+                                    view_box: "0 0 24 24",
+                                    width: "24",
+                                    height: "24",
+                                    fill: "none",
+                                    stroke: "currentColor",
+                                    stroke_width: "2",
+                                    stroke_linecap: "round",
+                                    stroke_linejoin: "round",
+                                    path {
+                                        d: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                                    }
                                 }
                             }
                         }
@@ -193,7 +219,7 @@ pub fn BlogPostView(slug: String) -> Element {
                                 }
                             }
                             button { 
-                                class: "function-button",
+                                class: if is_wide_mode() { "function-button active" } else { "function-button" },
                                 onclick: move |_| {
                                     let new_mode = !is_wide_mode();
                                     is_wide_mode.set(new_mode);
@@ -205,38 +231,19 @@ pub fn BlogPostView(slug: String) -> Element {
                                     }
                                 },
                                 {
-                                    if is_wide_mode() {
-                                        rsx! {
-                                            svg {
-                                                xmlns: "http://www.w3.org/2000/svg",
-                                                view_box: "0 0 24 24",
-                                                width: "24",
-                                                height: "24",
-                                                fill: "none",
-                                                stroke: "currentColor",
-                                                stroke_width: "2",
-                                                stroke_linecap: "round",
-                                                stroke_linejoin: "round",
-                                                path {
-                                                    d: "M8 3h8m-8 18h8M4 12h16M3 9l3 3-3 3m18-6l-3 3 3 3"
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        rsx! {
-                                            svg {
-                                                xmlns: "http://www.w3.org/2000/svg",
-                                                view_box: "0 0 24 24",
-                                                width: "24",
-                                                height: "24",
-                                                fill: "none",
-                                                stroke: "currentColor",
-                                                stroke_width: "2",
-                                                stroke_linecap: "round",
-                                                stroke_linejoin: "round",
-                                                path {
-                                                    d: "M8 3h8m-8 18h8M4 12h16M4 12l3-3m-3 3l3 3m13-3l-3-3m3 3l-3 3"
-                                                }
+                                    rsx! {
+                                        svg {
+                                            xmlns: "http://www.w3.org/2000/svg",
+                                            view_box: "0 0 24 24",
+                                            width: "24",
+                                            height: "24",
+                                            fill: "none",
+                                            stroke: "currentColor",
+                                            stroke_width: "2",
+                                            stroke_linecap: "round",
+                                            stroke_linejoin: "round",
+                                            path {
+                                                d: "M8 3h8m-8 18h8M4 12h16M4 12l3-3m-3 3l3 3m13-3l-3-3m3 3l-3 3"
                                             }
                                         }
                                     }

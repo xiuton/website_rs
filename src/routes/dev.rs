@@ -1,5 +1,4 @@
 use dioxus::prelude::*;
-use gloo_timers::future::TimeoutFuture;
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen::JsCast;
 

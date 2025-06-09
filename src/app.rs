@@ -27,6 +27,6 @@ pub fn use_dark_mode() -> Signal<bool> {
 #[component]
 pub fn App() -> Element {
     rsx! {
-        Router::<Route> {}
+                Router::<Route> {}
     }
 }

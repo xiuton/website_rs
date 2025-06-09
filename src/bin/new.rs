@@ -41,10 +41,10 @@ fn main() {
     // 创建模板内容
     let content = format!(
         r#"---
-title: "{}"
-date: "{}"
-author: "干徒"
-tags: ["tag"]
+title: {}
+date: {}
+author: 干徒
+tags: [tag]
 ---
 
 # Title One

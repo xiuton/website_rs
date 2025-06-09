@@ -77,13 +77,13 @@ pub fn Home() -> Element {
         spawn_local(async move {
             // 使用构建脚本生成的文章列表
             let loaded_posts = BLOG_POSTS.iter().map(|post| RuntimeBlogPost {
-                title: post.title.to_string(),
-                date: post.date.to_string(),
-                author: post.author.to_string(),
-                tags: post.tags.iter().map(|&s| s.to_string()).collect(),
-                content: post.content.to_string(),
-                slug: post.slug.to_string(),
-            }).collect();
+                    title: post.title.to_string(),
+                    date: post.date.to_string(),
+                    author: post.author.to_string(),
+                    tags: post.tags.iter().map(|&s| s.to_string()).collect(),
+                    content: post.content.to_string(),
+                    slug: post.slug.to_string(),
+                }).collect();
             posts.set(loaded_posts);
         });
     });
