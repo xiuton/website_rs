@@ -9,6 +9,8 @@ pub fn About() -> Element {
                 h2 { "👋 你好" }
                 div { class: "tech-stack",
                     span { "🦀 Rust" }
+                    span { "🧬 Dioxus" }
+                    span { "🐍 Python" }
                     span { "🐹 Go" }
                     span { "☕ Java" }
                     span { "💛 JavaScript" }

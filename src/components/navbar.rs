@@ -45,7 +45,7 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
     
     let is_active = move |href: &str| {
         match href {
-            "/" => matches!(route, Route::Home),
+            "/" => matches!(route, Route::Home | Route::BlogPostView { slug: _ }),
             "/about" => matches!(route, Route::About),
             "/tags" => matches!(route, Route::Tags),
             "/dev" => matches!(route, Route::Dev),

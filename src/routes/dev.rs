@@ -5,7 +5,7 @@ use wasm_bindgen::JsCast;
 #[component]
 pub fn Dev() -> Element {
     let img_url = use_signal(|| None::<String>);
-    let mut is_background_mode = use_signal(|| false);
+    let is_background_mode = use_signal(|| false);
     let background_images = use_signal(Vec::new);
     let current_bg_index = use_signal(|| 0);
     let bg_timer_handle = use_signal(|| None::<i32>);
@@ -43,11 +43,6 @@ pub fn Dev() -> Element {
             let current_bg_index = current_bg_index.clone();
             let mut bg_timer_handle = bg_timer_handle.clone();
             
-            // 初始化背景图片列表，添加默认图片
-            let mut initial_images = Vec::new();
-            initial_images.push(default_bg_image.to_string());
-            background_images.set(initial_images);
-
             // 创建轮播定时器的函数
             let create_carousel_timer = move || {
                 let background_images = background_images.clone();
@@ -69,11 +64,19 @@ pub fn Dev() -> Element {
             // 如果已经有加载的图片（不只是默认图片），直接启动轮播
             if background_images().len() > 1 {
                 let handle = create_carousel_timer();
-                *bg_timer_handle.write() = Some(handle);
+                bg_timer_handle.set(Some(handle));
                 return;
             }
 
-            // 如果没有加载的图片（除默认外），加载新图片
+            // 如果没有加载的图片或只有默认图片，初始化并加载新图片
+            if background_images().is_empty() {
+                // 初始化背景图片列表，添加默认图片
+                let mut initial_images = Vec::new();
+                initial_images.push(default_bg_image.to_string());
+                background_images.set(initial_images);
+            }
+
+            // 加载新图片
             spawn_local(async move {
                 let mut loaded_count = 0;
                 while loaded_count < 5 {
@@ -86,7 +89,7 @@ pub fn Dev() -> Element {
                             // 尝试加载图片
                             let load_image = |url: String| -> std::pin::Pin<Box<dyn std::future::Future<Output = bool>>> {
                                 Box::pin(async move {
-                            let img = web_sys::HtmlImageElement::new().unwrap();
+                                    let img = web_sys::HtmlImageElement::new().unwrap();
                                     let (tx, rx) = futures::channel::oneshot::channel();
                                     
                                     let tx_success = std::sync::Arc::new(std::sync::Mutex::new(Some(tx)));
@@ -124,24 +127,24 @@ pub fn Dev() -> Element {
                             for _ in 0..2 {
                                 if load_image(url.clone()).await {
                                     success = true;
-                                let mut imgs = background_images();
+                                    let mut imgs = background_images();
                                     if !imgs.contains(&url) {
                                         // 如果这是第一张成功加载的图片（除了默认图片），移除默认图片
                                         if imgs.len() == 1 && imgs[0] == default_bg_image {
                                             imgs.clear();
                                         }
                                         imgs.push(url.clone());
-                                background_images.set(imgs);
+                                        background_images.set(imgs);
                                         loaded_count += 1;
 
                                         // 如果这是第一张成功加载的图片，启动轮播
                                         if loaded_count == 1 {
                                             // 确保没有其他定时器在运行
-                                            if let Some(old_handle) = *bg_timer_handle.read() {
+                                            if let Some(old_handle) = bg_timer_handle() {
                                                 web_sys::window().unwrap().clear_interval_with_handle(old_handle);
                                             }
                                             let handle = create_carousel_timer();
-                                            *bg_timer_handle.write() = Some(handle);
+                                            bg_timer_handle.set(Some(handle));
                                         }
                                     }
                                     break;
@@ -160,15 +163,15 @@ pub fn Dev() -> Element {
 
     // 退出背景墙时停止轮播
     let mut exit_background_mode = {
+        let mut is_background_mode = is_background_mode.clone();
         let mut bg_timer_handle = bg_timer_handle.clone();
         move || {
             is_background_mode.set(false);
-            let handle_opt = bg_timer_handle.read().clone();
-            if let Some(handle) = handle_opt {
+            if let Some(handle) = bg_timer_handle() {
                 web_sys::window().unwrap().clear_interval_with_handle(handle);
-                *bg_timer_handle.write() = None;
+                bg_timer_handle.set(None);
             }
-            // 不再清空图片列表
+            // 不清空图片列表，保持已加载的图片
         }
     };
 

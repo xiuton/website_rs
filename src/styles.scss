@@ -54,7 +54,7 @@ $font-families: (
   --accent-color: #2563eb;
 
   // 编程语言标识
-  --programming-language-logotype-bg-color: rgb(233, 233, 233, 0.9);
+  --programming-language-logotype-bg-color: rgb(215 215 215 / 90%);
 
   // 新添加的变量
   --shadow: 0 2px 8px rgba(0,0,0,0.04);
@@ -975,16 +975,20 @@ html, body {
                   position: absolute;
                   right: 0;
                   left: auto;
-                  transform: translateY(0);
+                  transform: translateY(10px);
+                  pointer-events: none;
+                  transition: all 0.3s ease;
                 }
 
                 &:hover {
                   .history-back {
-                    transform: translateX(0);
+                    transform: translateY(-3rem);
                   }
                   
                   .home-back {
-                    transform: translateY(-3rem);
+                    opacity: 1;
+                    transform: translateY(0);
+                    pointer-events: auto;
                   }
                 }
               }
@@ -1038,7 +1042,7 @@ html, body {
           code:not(pre code) {
             font-family: map.get($font-families, 'jetbrains'), map.get($font-families, 'consolas'), map.get($font-families, 'monospace');
             font-size: 0.9rem;
-            padding: 0.2rem 0.4rem;
+            padding: 0.06rem 0.4rem;
             margin: 0 0.2rem;
             border-radius: 4px;
             background-color: var(--bg-secondary);
@@ -1202,49 +1206,126 @@ html, body {
           background: var(--bg-primary);
         }
       }
+
+      .not-found {
+        border: 4px solid #8f0202;
+        background-color: rgba(143, 2, 2, 0.1);
+        border-radius: 15px;
+        padding: 2rem;
+
+        .not-found-content {
+          display: flex;
+          flex-direction: column;
+          gap: 1.5rem;
+          align-items: center;
+          
+          .not-found-icon {
+            width: 120px;
+            height: 120px;
+            color: #ff3737;
+            animation: pulse 2s infinite;
+          }
+
+          h1 {
+            font-size: 2rem;
+            color: var(--text-primary);
+            margin: 0;
+          }
+
+          .not-found-path {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            margin: 0;
+            word-break: break-all;
+
+            .not-found-path-text {
+              color: #ff3737;
+              font-weight: bold;
+              font-size: 1.5rem;
+            }
+          }
+
+          .back-home {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            width: fit-content;
+
+            &:hover {
+              background: var(--primary-color-dark);
+              transform: translateY(-2px);
+            }
+          }
+        }
+      }
+
+      @keyframes pulse {
+        0% {
+            transform: scale(1);
+            opacity: 1;
+        }
+        50% {
+            transform: scale(1.1);
+            opacity: 0.7;
+        }
+        100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+      }
     }
 
     &:has(.wide-mode) {
       max-width: 1200px;
-      // 宽屏模式下的样式
-      .wide-mode {
-        // 在宽屏模式下，当屏幕宽度小于等于1360px时，将 .blog-nav 修改到下方
-        @media screen and (max-width: 1360px) {
-          .blog-nav {
-            position: fixed;
-            left: 0;
-            right: 0;
-            bottom: 1rem;
-            top: auto !important;
-            transform: none !important;
-            writing-mode: horizontal-tb;
-            text-orientation: mixed;
-            letter-spacing: normal;
-            background: transparent;
-            z-index: 1000;
-            display: flex;
-            flex-direction: row;
-            justify-content: flex-end;
-            gap: 0.75rem;
-            padding: 0 1rem 0 0;
+      .blog-post {
+        &.wide-mode {
+          // 在宽屏模式下，当屏幕宽度小于等于1360px时的样式
+          @media screen and (max-width: 1360px) {
+            .blog-nav {
+              position: fixed;
+              left: 0;
+              right: 0;
+              bottom: 1rem;
+              top: auto;
+              transform: none;
+              writing-mode: horizontal-tb;
+              text-orientation: mixed;
+              letter-spacing: normal;
+              background: transparent;
+              z-index: 1000;
+              display: flex;
+              flex-direction: row;
+              justify-content: flex-end;
+              gap: 0.75rem;
+              padding: 0 1rem;
 
-            .back-buttons-group {
-              flex-direction: row !important;
+              .back-buttons-group {
+                flex-direction: row;
 
-              .home-back {
-                position: absolute !important;
-                right: 0 !important;
-                left: auto !important;
-                transform: translateY(0) !important;
-              }
-
-              &:hover {
-                .history-back {
-                  transform: translateX(0) !important;
-                }
-                
                 .home-back {
-                  transform: translateY(-3rem) !important;
+                  position: absolute;
+                  right: 0;
+                  left: auto;
+                  transform: translateY(10px);
+                  pointer-events: none;
+                  transition: all 0.3s ease;
+                }
+
+                &:hover {
+                  .history-back {
+                    transform: translateY(-3rem);
+                  }
+                  
+                  .home-back {
+                    opacity: 1;
+                    transform: translateY(0);
+                    pointer-events: auto;
+                  }
                 }
               }
             }
@@ -1466,15 +1547,15 @@ html.dark::view-transition-new(root) {
             position: relative;
 
             &:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 12px var(--shadow-color);
+              transform: translateY(-2px);
+              box-shadow: 0 4px 12px var(--shadow-color);
 
-                background-color: rgba(var(--primary-rgb), 0.6) !important;
+              background-color: rgba(var(--primary-rgb), 0.6) !important;
             }
 
             &.highlight {
-                animation: highlight-pulse 2s ease-in-out;
-                background-color: rgba(var(--primary-rgb), 0.4);
+              animation: highlight-pulse 2s ease-in-out;
+              background-color: rgba(var(--primary-rgb), 0.4);
             }
 
             .bookmark-link {
