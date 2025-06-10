@@ -15,7 +15,6 @@ pub use blog_post::BlogPostView;
 pub use tags::Tags;
 pub use not_found::NotFound;
 use crate::components::{Navbar, Footer};
-use crate::app::use_dark_mode;
 
 #[derive(Routable, Clone)]
 pub enum Route {
@@ -32,6 +31,29 @@ pub enum Route {
     BlogPostView { slug: String },
     #[route("/:..route")]
     NotFound { route: Vec<String> },
+}
+
+pub fn use_dark_mode() -> Signal<bool> {
+    use_signal(|| {
+        if let Some(window) = web_sys::window() {
+            if let Some(document) = window.document() {
+                if let Some(html) = document.document_element() {
+                    if let Some(storage) = window.local_storage().ok().flatten() {
+                        if let Ok(Some(theme)) = storage.get_item("theme") {
+                            if theme == "dark" {
+                                html.set_attribute("class", "dark").unwrap();
+                                return true;
+                            } else {
+                                html.remove_attribute("class").unwrap();
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        false
+    })
 }
 
 #[component]

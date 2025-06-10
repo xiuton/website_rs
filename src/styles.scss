@@ -724,14 +724,63 @@ html, body {
             flex-direction: column;
             row-gap: 1rem;
 
-              .blog-preview {
-                cursor: pointer;
-                transition: transform 0.2s ease;
+            .blog-preview {
+              border-radius: 12px;
+              background: rgba(var(--primary-rgb), 0.1);
+              box-shadow: var(--shadow);
+              cursor: pointer;
+              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+              position: relative;
+              overflow: hidden;
+
+              &::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(135deg, 
+                  rgba(var(--primary-rgb), 0.3) 0%,
+                  rgba(255, 0, 0, 0.3) 100%
+                );
+                opacity: 0;
+                transition: opacity 0.3s ease;
+                pointer-events: none;
+                z-index: 1;
+              }
+
+              a {
+                position: relative;
+                z-index: 2;
+                display: block;
+                text-decoration: none;
+                padding: 1.5rem;
+              }
+
+              &:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 8px 24px rgba(var(--primary-rgb), 0.15);
+
+                &::before {
+                  opacity: 1;
+                }
+
+                .preview-title {
+                  color: var(--primary-color);
+                }
+
+                .preview-tag {
+                  transform: translateY(-2px);
+                  box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.2);
+                }
+              }
 
               .preview-title {
                 font-size: 1.5rem;
                 margin: 0 0 .5rem 0;
                 color: var(--text-primary);
+                transition: color 0.3s ease;
               }
 
               .preview-meta {
@@ -739,34 +788,31 @@ html, body {
                 gap: 1rem;
                 font-size: 0.9rem;
                 color: var(--text-secondary);
-                margin-bottom: .5rem;
+                margin-bottom: 1rem;
               }
 
               .preview-tags {
                 display: flex;
-                gap: 0.5rem;
+                gap: 0.75rem;
                 flex-wrap: wrap;
               }
 
               .preview-tag {
-                background: var(--accent-color);
-                color: var(--bg-primary);
-                padding: 0.25rem 0.75rem;
-                border-radius: 999px;
-                font-size: 0.8rem;
+                background: var(--primary-color);
+                color: white;
+                padding: 0.4rem 0.75rem;
+                border-radius: 6px;
+                font-size: 0.85rem;
                 display: flex;
                 align-items: center;
-                gap: 0.25rem;
+                gap: 0.4rem;
+                transition: all 0.3s ease;
       
                 svg {
                   width: 0.9rem;
                   height: 0.9rem;
                 }
               }
-            }
-    
-            .blog-preview:hover {
-              transform: translateY(-2px);
             }
           }
 
