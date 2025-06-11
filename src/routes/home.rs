@@ -2,10 +2,22 @@ use dioxus::prelude::*;
 use dioxus_router::prelude::Link;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::UrlSearchParams;
+use pulldown_cmark::{Parser, html::push_html, Options};
 
 use crate::models::RuntimeBlogPost;
 use crate::routes::Route;
 use crate::BLOG_POSTS;
+
+fn markdown_to_html(markdown: &str) -> String {
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TABLES);
+    
+    let parser = Parser::new_ext(markdown, options);
+    let mut html_output = String::new();
+    push_html(&mut html_output, parser);
+    html_output
+}
 
 #[component]
 pub fn Home() -> Element {
@@ -112,6 +124,16 @@ pub fn Home() -> Element {
                                         div { class: "preview-meta",
                                             span { class: "preview-date", {post.date.clone()} }
                                             span { class: "preview-author", {post.author.clone()} }
+                                        }
+                                        div { 
+                                            class: "preview-content",
+                                            dangerous_inner_html: {
+                                                let preview = post.content
+                                                    .chars()
+                                                    .take(200)
+                                                    .collect::<String>();
+                                                markdown_to_html(&preview) + "..."
+                                            }
                                         }
                                         div { class: "preview-tags",
                                             {post.tags.iter().map(|tag| {

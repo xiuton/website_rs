@@ -2,6 +2,7 @@
 // 暂时为空，因为我们还没有任何工具函数需要放在这里 
 
 use web_sys::{window, Document, Element};
+use pulldown_cmark::{Parser, html::push_html, Options};
 
 pub fn get_window() -> Option<web_sys::Window> {
     window()
@@ -55,4 +56,15 @@ pub fn get_theme_preference() -> bool {
         }
     }
     false
+}
+
+pub fn markdown_to_html(markdown: &str) -> String {
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TABLES);
+    
+    let parser = Parser::new_ext(markdown, options);
+    let mut html_output = String::new();
+    push_html(&mut html_output, parser);
+    html_output
 } 
