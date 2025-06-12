@@ -2,24 +2,36 @@
 .playground-page {
     margin: 0;
     padding: 0;
-    height: 100vh;
     position: relative;
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
+    min-height: 100vh;
 }
 
-/* Glass container styles */
+/* Glass gallery layout */
+.glass-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Base glass container styles */
 .glass-container {
-    position: absolute;
+    position: relative;
     overflow: hidden;
     box-shadow: 0 6px 6px rgba(0, 0, 0, 0.2), 0 0 20px rgba(0, 0, 0, 0.1);
     border-radius: 50px;
-    width: 100px;
-    height: 100px;
-    pointer-events: none;
+    width: 200px;
+    height: 200px;
+    pointer-events: auto;
     will-change: transform;
-    transition: transform 0.05s ease-out;
+    transition: all 0.3s ease-out;
+    margin: 0 auto;
+    cursor: pointer;
 }
 
 /* Glass filter styles */
@@ -28,8 +40,137 @@
     inset: 0;
     z-index: 0;
     backdrop-filter: blur(4px);
-    filter: url(#lg-dist);
     isolation: isolate;
+    transition: filter 0.3s ease;
+}
+
+/* Default filter applications */
+.glass-container.bounce .glass-filter { filter: url(#lg-dist); }
+.glass-container.float .glass-filter { filter: url(#lg-ripple); }
+.glass-container.pulse .glass-filter { filter: url(#lg-dist); }
+.glass-container.rotate .glass-filter { filter: url(#lg-wobble); }
+.glass-container.wobble .glass-filter { filter: url(#lg-wobble); }
+.glass-container.jelly .glass-filter { filter: url(#lg-ripple); }
+.glass-container.morph .glass-filter { filter: url(#lg-morph); }
+.glass-container.splash .glass-filter { filter: url(#lg-splash); }
+.glass-container.wave .glass-filter { filter: url(#lg-wave); }
+.glass-container.twist .glass-filter { filter: url(#lg-dist); }
+.glass-container.bubble .glass-filter { filter: url(#lg-ripple); }
+.glass-container.shatter .glass-filter { filter: url(#lg-wobble); }
+.glass-container.realistic .glass-filter { filter: url(#lg-realistic); }
+
+/* Realistic glass specific styles */
+.glass-container.realistic {
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.15) 0%,
+        rgba(255, 255, 255, 0.08) 50%,
+        rgba(255, 255, 255, 0.05) 100%
+    );
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-container.realistic .glass-reflection {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        225deg,
+        rgba(255, 255, 255, 0.25) 0%,
+        transparent 35%
+    );
+    opacity: 0.3;
+    border-radius: inherit;
+}
+
+.glass-container.realistic .glass-refraction {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+        circle at 30% 30%,
+        rgba(255, 255, 255, 0.15) 0%,
+        transparent 70%
+    );
+    opacity: 0.5;
+    border-radius: inherit;
+    mix-blend-mode: screen;
+}
+
+.glass-container.realistic .glass-highlight {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        45deg,
+        transparent 20%,
+        rgba(255, 255, 255, 0.2) 30%,
+        rgba(255, 255, 255, 0.1) 40%,
+        transparent 60%
+    );
+    border-radius: inherit;
+    opacity: 0.4;
+    mix-blend-mode: overlay;
+}
+
+.glass-container.realistic .glass-specular {
+    box-shadow: 
+        inset 0 0 30px rgba(255, 255, 255, 0.2),
+        inset 0 0 100px rgba(255, 255, 255, 0.1),
+        0 0 15px rgba(255, 255, 255, 0.1),
+        0 4px 15px rgba(0, 0, 0, 0.1);
+    background: none;
+}
+
+/* Realistic glass hover effect */
+.glass-container.realistic:hover {
+    transform: scale(1.05) translateY(-5px);
+    box-shadow: 
+        0 10px 30px rgba(0, 0, 0, 0.1),
+        0 0 40px rgba(255, 255, 255, 0.1);
+}
+
+.glass-container.realistic:hover .glass-reflection {
+    animation: reflectionShift 2s ease-in-out infinite;
+}
+
+.glass-container.realistic:hover .glass-refraction {
+    animation: refractionMove 3s ease-in-out infinite;
+}
+
+.glass-container.realistic:hover .glass-highlight {
+    animation: highlightSlide 2.5s ease-in-out infinite;
+}
+
+/* Realistic glass animations */
+@keyframes reflectionShift {
+    0%, 100% {
+        opacity: 0.3;
+        transform: translateY(0);
+    }
+    50% {
+        opacity: 0.4;
+        transform: translateY(-10px);
+    }
+}
+
+@keyframes refractionMove {
+    0%, 100% {
+        transform: scale(1) rotate(0deg);
+    }
+    50% {
+        transform: scale(1.1) rotate(5deg);
+    }
+}
+
+@keyframes highlightSlide {
+    0%, 100% {
+        transform: translateX(0) translateY(0);
+        opacity: 0.4;
+    }
+    50% {
+        transform: translateX(10px) translateY(-5px);
+        opacity: 0.5;
+    }
 }
 
 /* Glass specular effect */
@@ -48,4 +189,130 @@
         rgba(255, 255, 255, 0.1) 50%,
         rgba(255, 255, 255, 0.05) 100%
     );
+}
+
+/* Hover animations */
+.glass-container.bounce:hover {
+    animation: bounce 1s ease-in-out infinite;
+}
+
+.glass-container.float:hover {
+    animation: float 2s ease-in-out infinite;
+}
+
+.glass-container.pulse:hover {
+    animation: pulse 1s ease-in-out infinite;
+}
+
+.glass-container.rotate:hover {
+    animation: rotate 3s linear infinite;
+}
+
+.glass-container.wobble:hover {
+    animation: wobble 1.5s ease-in-out infinite;
+}
+
+.glass-container.jelly:hover {
+    animation: jelly 1s ease-in-out infinite;
+}
+
+.glass-container.morph:hover {
+    animation: morph 2s ease-in-out infinite;
+}
+
+.glass-container.splash:hover {
+    animation: splash 1s ease-in-out infinite;
+}
+
+.glass-container.wave:hover {
+    animation: wave 2s ease-in-out infinite;
+}
+
+.glass-container.twist:hover {
+    animation: twist 1.5s ease-in-out infinite;
+}
+
+.glass-container.bubble:hover {
+    animation: bubble 2s ease-in-out infinite;
+}
+
+.glass-container.shatter:hover {
+    animation: shatter 1s ease-in-out infinite;
+}
+
+/* Base hover effect */
+.glass-container:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 8px rgba(0, 0, 0, 0.3), 0 0 30px rgba(0, 0, 0, 0.2);
+}
+
+/* Keyframe animations */
+@keyframes bounce {
+    0%, 100% { transform: translateY(0) scale(1.05); }
+    50% { transform: translateY(-20px) scale(1.05); }
+}
+
+@keyframes float {
+    0%, 100% { transform: translate(0, 0) scale(1.05); }
+    25% { transform: translate(10px, -10px) scale(1.05); }
+    50% { transform: translate(0, -20px) scale(1.05); }
+    75% { transform: translate(-10px, -10px) scale(1.05); }
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1.05); }
+    50% { transform: scale(1.15); }
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg) scale(1.05); }
+    to { transform: rotate(360deg) scale(1.05); }
+}
+
+@keyframes wobble {
+    0%, 100% { transform: scale(1.05) rotate(0deg); }
+    33% { transform: scale(1.15) rotate(5deg); }
+    66% { transform: scale(0.95) rotate(-5deg); }
+}
+
+@keyframes jelly {
+    0%, 100% { transform: scale(1.05); }
+    25% { transform: scale(1, 1.1); }
+    50% { transform: scale(1.1, 1); }
+    75% { transform: scale(1, 1.1); }
+}
+
+@keyframes morph {
+    0%, 100% { transform: scale(1.05) rotate(0deg); border-radius: 50px; }
+    25% { transform: scale(1.1) rotate(5deg); border-radius: 60px 40px 55px 45px; }
+    50% { transform: scale(1.05) rotate(-5deg); border-radius: 45px 55px 40px 60px; }
+    75% { transform: scale(1.1) rotate(5deg); border-radius: 55px 45px 60px 40px; }
+}
+
+@keyframes splash {
+    0%, 100% { transform: scale(1.05); }
+    50% { transform: scale(1.15) rotate(5deg); }
+}
+
+@keyframes wave {
+    0%, 100% { transform: translateX(0) scale(1.05); }
+    25% { transform: translateX(-10px) scale(1.1); }
+    75% { transform: translateX(10px) scale(1.1); }
+}
+
+@keyframes twist {
+    0%, 100% { transform: rotate(0deg) scale(1.05); }
+    50% { transform: rotate(180deg) scale(1.15); }
+}
+
+@keyframes bubble {
+    0%, 100% { transform: scale(1.05); border-radius: 50px; }
+    50% { transform: scale(1.15); border-radius: 100px; }
+}
+
+@keyframes shatter {
+    0%, 100% { transform: scale(1.05) rotate(0deg); clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+    25% { transform: scale(1.1) rotate(2deg); clip-path: polygon(5% 0, 100% 5%, 95% 100%, 0 95%); }
+    50% { transform: scale(1.15) rotate(-2deg); clip-path: polygon(0 5%, 95% 0, 100% 95%, 5% 100%); }
+    75% { transform: scale(1.1) rotate(2deg); clip-path: polygon(5% 5%, 95% 5%, 95% 95%, 5% 95%); }
 } 

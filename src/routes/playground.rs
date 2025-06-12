@@ -5,72 +5,126 @@ static STYLE: &str = include_str!("../assets/playground.css");
 
 #[component]
 pub fn Playground() -> Element {
-    let mut glass_container = use_signal(|| None::<web_sys::Element>);
-    let mut playground_page = use_signal(|| None::<web_sys::Element>);
-    
-    // Initialize mouse tracking and CSS on component mount
+    // Initialize CSS on component mount
     use_effect(move || {
         if let Some(window) = web_sys::window() {
             let document = window.document().unwrap();
-            
-            // Add CSS to document head
             if let Some(head) = document.head() {
                 let style = document.create_element("style").unwrap();
                 style.set_text_content(Some(STYLE));
                 let _ = head.append_child(&style);
             }
-            
-            // Initialize element references
-            if let Ok(container) = document.query_selector(".glass-container") {
-                if let Some(element) = container {
-                    glass_container.set(Some(element));
-                }
-            }
-            if let Ok(page) = document.query_selector(".playground-page") {
-                if let Some(element) = page {
-                    playground_page.set(Some(element));
-                }
-            }
         }
     });
-
-    // Mouse move handler
-    let onmousemove = move |e: Event<MouseData>| {
-        if let Some(container) = glass_container() {
-            if let Some(page) = playground_page() {
-                // Get page element's bounding rectangle
-                let rect = page.get_bounding_client_rect();
-                // Calculate mouse position relative to the playground-page element
-                let x = e.client_coordinates().x - rect.left();
-                let y = e.client_coordinates().y - rect.top();
-                // Use transform to position the glass effect
-                let _ = container.set_attribute("style", &format!(
-                    "transform: translate({}px, {}px);",
-                    x - 50.0, // Center horizontally (100px width / 2)
-                    y - 50.0  // Center vertically (100px height / 2)
-                ));
-            }
-        }
-    };
 
     rsx! {
         div { 
             class: "playground-page",
-            onmousemove: onmousemove,
-            style: "background-image: url('https://files.ganto.cn/files/123.jpg');",
+            style: "background-image: url('https://files.ganto.cn/files/148.jpg');",
 
-            // Glass container
+            // Glass gallery container
             div { 
-                class: "glass-container",
-                // Glass filter with liquid effect
-                div { class: "glass-filter" }
-                // Edge specular effect
-                div { class: "glass-specular" }
+                class: "glass-gallery",
+                
+                // Bouncing glass element
+                div { 
+                    class: "glass-container bounce",
+                    div { class: "glass-filter" }
+                    div { class: "glass-specular" }
+                }
+
+                // Floating glass element
+                div { 
+                    class: "glass-container float",
+                    div { class: "glass-filter" }
+                    div { class: "glass-specular" }
+                }
+
+                // Pulsing glass element
+                div { 
+                    class: "glass-container pulse",
+                    div { class: "glass-filter" }
+                    div { class: "glass-specular" }
+                }
+
+                // Rotating glass element
+                div { 
+                    class: "glass-container rotate",
+                    div { class: "glass-filter" }
+                    div { class: "glass-specular" }
+                }
+
+                // Wobble glass element
+                div { 
+                    class: "glass-container wobble",
+                    div { class: "glass-filter" }
+                    div { class: "glass-specular" }
+                }
+
+                // Jelly glass element
+                div { 
+                    class: "glass-container jelly",
+                    div { class: "glass-filter" }
+                    div { class: "glass-specular" }
+                }
+
+                // New: Morph glass element
+                div { 
+                    class: "glass-container morph",
+                    div { class: "glass-filter" }
+                    div { class: "glass-specular" }
+                }
+
+                // New: Splash glass element
+                div { 
+                    class: "glass-container splash",
+                    div { class: "glass-filter" }
+                    div { class: "glass-specular" }
+                }
+
+                // New: Wave glass element
+                div { 
+                    class: "glass-container wave",
+                    div { class: "glass-filter" }
+                    div { class: "glass-specular" }
+                }
+
+                // New: Twist glass element
+                div { 
+                    class: "glass-container twist",
+                    div { class: "glass-filter" }
+                    div { class: "glass-specular" }
+                }
+
+                // New: Bubble glass element
+                div { 
+                    class: "glass-container bubble",
+                    div { class: "glass-filter" }
+                    div { class: "glass-specular" }
+                }
+
+                // New: Shatter glass element
+                div { 
+                    class: "glass-container shatter",
+                    div { class: "glass-filter" }
+                    div { class: "glass-specular" }
+                }
+
+                // Realistic glass element
+                div { 
+                    class: "glass-container realistic",
+                    div { class: "glass-filter" }
+                    div { class: "glass-specular" }
+                    div { class: "glass-reflection" }
+                    div { class: "glass-refraction" }
+                    div { class: "glass-highlight" }
+                }
             }
 
-            // SVG filter definition
+            // SVG filter definitions
             svg {
                 style: "display: none",
+                // Original liquid distortion filter
                 filter {
                     id: "lg-dist",
                     height: "100%",
@@ -95,6 +149,211 @@ pub fn Playground() -> Element {
                         scale: "70",
                         x_channel_selector: "R",
                         y_channel_selector: "G"
+                    }
+                }
+
+                // Strong wobble filter
+                filter {
+                    id: "lg-wobble",
+                    height: "100%",
+                    width: "100%",
+                    x: "0%",
+                    y: "0%",
+                    feTurbulence {
+                        base_frequency: "0.015 0.015",
+                        num_octaves: "3",
+                        result: "noise",
+                        seed: "10",
+                        "type": "fractalNoise"
+                    }
+                    feGaussianBlur {
+                        "in": "noise",
+                        result: "blurred",
+                        std_deviation: "3"
+                    }
+                    feDisplacementMap {
+                        "in": "SourceGraphic",
+                        in2: "blurred",
+                        scale: "100",
+                        x_channel_selector: "R",
+                        y_channel_selector: "G"
+                    }
+                }
+
+                // Gentle ripple filter
+                filter {
+                    id: "lg-ripple",
+                    height: "100%",
+                    width: "100%",
+                    x: "0%",
+                    y: "0%",
+                    feTurbulence {
+                        base_frequency: "0.005 0.005",
+                        num_octaves: "2",
+                        result: "noise",
+                        seed: "30",
+                        "type": "fractalNoise"
+                    }
+                    feGaussianBlur {
+                        "in": "noise",
+                        result: "blurred",
+                        std_deviation: "1"
+                    }
+                    feDisplacementMap {
+                        "in": "SourceGraphic",
+                        in2: "blurred",
+                        scale: "40",
+                        x_channel_selector: "R",
+                        y_channel_selector: "G"
+                    }
+                }
+
+                // New: Wave distortion filter
+                filter {
+                    id: "lg-wave",
+                    height: "100%",
+                    width: "100%",
+                    x: "0%",
+                    y: "0%",
+                    feTurbulence {
+                        base_frequency: "0.01 0.003",
+                        num_octaves: "1",
+                        result: "noise",
+                        seed: "5",
+                        "type": "fractalNoise"
+                    }
+                    feGaussianBlur {
+                        "in": "noise",
+                        result: "blurred",
+                        std_deviation: "1.5"
+                    }
+                    feDisplacementMap {
+                        "in": "SourceGraphic",
+                        in2: "blurred",
+                        scale: "50",
+                        x_channel_selector: "R",
+                        y_channel_selector: "G"
+                    }
+                }
+
+                // New: Morph distortion filter
+                filter {
+                    id: "lg-morph",
+                    height: "100%",
+                    width: "100%",
+                    x: "0%",
+                    y: "0%",
+                    feTurbulence {
+                        base_frequency: "0.02 0.02",
+                        num_octaves: "4",
+                        result: "noise",
+                        seed: "15",
+                        "type": "fractalNoise"
+                    }
+                    feGaussianBlur {
+                        "in": "noise",
+                        result: "blurred",
+                        std_deviation: "2.5"
+                    }
+                    feDisplacementMap {
+                        "in": "SourceGraphic",
+                        in2: "blurred",
+                        scale: "85",
+                        x_channel_selector: "R",
+                        y_channel_selector: "G"
+                    }
+                }
+
+                // New: Splash distortion filter
+                filter {
+                    id: "lg-splash",
+                    height: "100%",
+                    width: "100%",
+                    x: "0%",
+                    y: "0%",
+                    feTurbulence {
+                        base_frequency: "0.04 0.04",
+                        num_octaves: "1",
+                        result: "noise",
+                        seed: "25",
+                        "type": "turbulence"
+                    }
+                    feGaussianBlur {
+                        "in": "noise",
+                        result: "blurred",
+                        std_deviation: "1"
+                    }
+                    feDisplacementMap {
+                        "in": "SourceGraphic",
+                        in2: "blurred",
+                        scale: "60",
+                        x_channel_selector: "R",
+                        y_channel_selector: "G"
+                    }
+                }
+
+                // Realistic glass filter
+                filter {
+                    id: "lg-realistic",
+                    height: "200%",
+                    width: "200%",
+                    x: "-50%",
+                    y: "-50%",
+                    // Gaussian blur for overall softness
+                    feGaussianBlur {
+                        "in": "SourceGraphic",
+                        result: "blur",
+                        std_deviation: "2"
+                    }
+                    // Color matrix for glass tint
+                    feColorMatrix {
+                        "type": "matrix",
+                        "in": "blur",
+                        result: "tint",
+                        values: "1.1 0 0 0 0
+                                0 1.1 0 0 0
+                                0 0 1.2 0 0
+                                0 0 0 1 0"
+                    }
+                    // Specular highlight
+                    feSpecularLighting {
+                        "in": "tint",
+                        result: "specular",
+                        lighting_color: "#ffffff",
+                        surface_scale: "2",
+                        specular_constant: "1",
+                        specular_exponent: "20",
+                        fePointLight {
+                            x: "100",
+                            y: "100",
+                            z: "100"
+                        }
+                    }
+                    // Composite specular over tint
+                    feComposite {
+                        "in": "specular",
+                        in2: "tint",
+                        operator: "arithmetic",
+                        k1: "0",
+                        k2: "1",
+                        k3: "1",
+                        k4: "0",
+                        result: "composite"
+                    }
+                    // Add subtle distortion
+                    feTurbulence {
+                        "type": "fractalNoise",
+                        base_frequency: "0.01",
+                        num_octaves: "2",
+                        result: "noise"
+                    }
+                    feDisplacementMap {
+                        "in": "composite",
+                        in2: "noise",
+                        scale: "10",
+                        x_channel_selector: "R",
+                        y_channel_selector: "G",
+                        result: "displacement"
                     }
                 }
             }
