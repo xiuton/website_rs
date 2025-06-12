@@ -162,18 +162,18 @@ pub fn BlogPostView(slug: String) -> Element {
                                         let _ = window.history().unwrap().back();
                                     }
                                 },
-                                svg {
-                                    xmlns: "http://www.w3.org/2000/svg",
-                                    view_box: "0 0 24 24",
-                                    width: "24",
-                                    height: "24",
-                                    fill: "none",
-                                    stroke: "currentColor",
-                                    stroke_width: "2",
-                                    stroke_linecap: "round",
-                                    stroke_linejoin: "round",
-                                    path {
-                                        d: "M15.75 19.5 8.25 12l7.5-7.5"
+                            svg {
+                                xmlns: "http://www.w3.org/2000/svg",
+                                view_box: "0 0 24 24",
+                                width: "24",
+                                height: "24",
+                                fill: "none",
+                                stroke: "currentColor",
+                                stroke_width: "2",
+                                stroke_linecap: "round",
+                                stroke_linejoin: "round",
+                                path {
+                                    d: "M15.75 19.5 8.25 12l7.5-7.5"
                                     }
                                 }
                             }
@@ -231,19 +231,19 @@ pub fn BlogPostView(slug: String) -> Element {
                                     }
                                 },
                                 {
-                                    rsx! {
-                                        svg {
-                                            xmlns: "http://www.w3.org/2000/svg",
-                                            view_box: "0 0 24 24",
-                                            width: "24",
-                                            height: "24",
-                                            fill: "none",
-                                            stroke: "currentColor",
-                                            stroke_width: "2",
-                                            stroke_linecap: "round",
-                                            stroke_linejoin: "round",
-                                            path {
-                                                d: "M8 3h8m-8 18h8M4 12h16M4 12l3-3m-3 3l3 3m13-3l-3-3m3 3l-3 3"
+                                        rsx! {
+                                            svg {
+                                                xmlns: "http://www.w3.org/2000/svg",
+                                                view_box: "0 0 24 24",
+                                                width: "24",
+                                                height: "24",
+                                                fill: "none",
+                                                stroke: "currentColor",
+                                                stroke_width: "2",
+                                                stroke_linecap: "round",
+                                                stroke_linejoin: "round",
+                                                path {
+                                                    d: "M8 3h8m-8 18h8M4 12h16M4 12l3-3m-3 3l3 3m13-3l-3-3m3 3l-3 3"
                                             }
                                         }
                                     }

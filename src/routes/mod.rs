@@ -7,6 +7,7 @@ pub mod home;
 pub mod blog_post;
 pub mod tags;
 pub mod not_found;
+pub mod playground;
 
 pub use about::About;
 pub use dev::Dev;
@@ -14,6 +15,7 @@ pub use home::Home;
 pub use blog_post::BlogPostView;
 pub use tags::Tags;
 pub use not_found::NotFound;
+pub use playground::Playground;
 use crate::components::{Navbar, Footer};
 
 #[derive(Routable, Clone)]
@@ -27,6 +29,8 @@ pub enum Route {
     Dev,
     #[route("/tags")]
     Tags,
+    #[route("/playground")]
+    Playground,
     #[route("/post/:slug")]
     BlogPostView { slug: String },
     #[route("/:..route")]
