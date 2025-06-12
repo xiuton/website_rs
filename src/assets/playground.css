@@ -1,24 +1,25 @@
 /* Playground page styles */
 .playground-page {
     margin: 0;
+    padding: 0;
     height: 100vh;
-    overflow: hidden;
     position: relative;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
 }
 
 /* Glass container styles */
 .glass-container {
-    position: fixed;
+    position: absolute;
     overflow: hidden;
     box-shadow: 0 6px 6px rgba(0, 0, 0, 0.2), 0 0 20px rgba(0, 0, 0, 0.1);
     border-radius: 50px;
     width: 100px;
     height: 100px;
-    /* background: rgba(255, 255, 255, 0.25); */
     pointer-events: none;
     will-change: transform;
-    top: 0;
-    left: 0;
+    transition: transform 0.05s ease-out;
 }
 
 /* Glass filter styles */
@@ -29,6 +30,7 @@
     backdrop-filter: blur(4px);
     filter: url(#lg-dist);
     isolation: isolate;
+    background: rgba(255, 255, 255, 0.1);
 }
 
 /* Glass specular effect */
@@ -38,6 +40,13 @@
     z-index: 2;
     border-radius: inherit;
     overflow: hidden;
-    box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.75),
-                inset 0 0 5px rgba(255, 255, 255, 0.75);
+    box-shadow: 
+        inset 1px 1px 0 rgba(255, 255, 255, 0.75),
+        inset 0 0 5px rgba(255, 255, 255, 0.75);
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.25) 0%,
+        rgba(255, 255, 255, 0.1) 50%,
+        rgba(255, 255, 255, 0.05) 100%
+    );
 } 

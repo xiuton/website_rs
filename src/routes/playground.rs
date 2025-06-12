@@ -43,7 +43,12 @@ pub fn Playground() -> Element {
                 // Calculate mouse position relative to the playground-page element
                 let x = e.client_coordinates().x - rect.left();
                 let y = e.client_coordinates().y - rect.top();
-                let _ = container.set_attribute("style", &format!("transform: translate(-50%, -50%) translate({}px, {}px);", x, y));
+                // Use transform to position the glass effect
+                let _ = container.set_attribute("style", &format!(
+                    "transform: translate({}px, {}px);",
+                    x - 50.0, // Center horizontally (100px width / 2)
+                    y - 50.0  // Center vertically (100px height / 2)
+                ));
             }
         }
     };
@@ -52,7 +57,7 @@ pub fn Playground() -> Element {
         div { 
             class: "playground-page",
             onmousemove: onmousemove,
-            style: "height: 100vh; background: url('https://files.ganto.cn/files/123.jpg') center no-repeat; background-size: cover; margin: 0; position: relative;",
+            style: "background-image: url('https://files.ganto.cn/files/123.jpg');",
 
             // Glass container
             div { 
