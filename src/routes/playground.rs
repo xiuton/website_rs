@@ -20,7 +20,7 @@ pub fn Playground() -> Element {
     rsx! {
         div { 
             class: "playground-page",
-            style: "background-image: url('https://files.ganto.cn/files/148.jpg');",
+            style: "background-image: url('/static/images/img.png');",
 
             // Glass gallery container
             div { 
@@ -114,6 +114,7 @@ pub fn Playground() -> Element {
                 div { 
                     class: "glass-container realistic",
                     div { class: "glass-filter" }
+                    div { class: "glass-distortion" }
                     div { class: "glass-specular" }
                     div { class: "glass-reflection" }
                     div { class: "glass-refraction" }
@@ -292,7 +293,80 @@ pub fn Playground() -> Element {
                     }
                 }
 
-                // Realistic glass filter
+                // Liquid Glass Filter - balanced distortion
+                filter { 
+                    id: "lg-realistic-distortion",
+                    height: "200%",
+                    width: "200%",
+                    x: "-50%",
+                    y: "-50%",
+                    // Liquid turbulence
+                    feTurbulence {
+                        base_frequency: "0.02 0.02",
+                        num_octaves: "3",
+                        result: "turbulence",
+                        seed: "42",
+                        "type": "fractalNoise"
+                    }
+                    // Smooth blur
+                    feGaussianBlur {
+                        "in": "turbulence",
+                        result: "blurred-turbulence",
+                        std_deviation: "3"
+                    }
+                    // Glass displacement - moderate distortion
+                    feDisplacementMap {
+                        "in": "SourceGraphic",
+                        in2: "blurred-turbulence",
+                        scale: "25",
+                        x_channel_selector: "R",
+                        y_channel_selector: "G",
+                        result: "displacement"
+                    }
+                    // Subtle color enhancement
+                    feColorMatrix {
+                        "type": "matrix",
+                        "in": "displacement",
+                        result: "enhanced",
+                        values: "1.05 0 0 0 0
+                                0 1.05 0 0 0
+                                0 0 1.08 0 0
+                                0 0 0 1 0"
+                    }
+                    // Glass specular lighting
+                    feSpecularLighting {
+                        "in": "enhanced",
+                        result: "specular",
+                        lighting_color: "#ffffff",
+                        surface_scale: "4",
+                        specular_constant: "1.5",
+                        specular_exponent: "30",
+                        fePointLight {
+                            x: "100",
+                            y: "100",
+                            z: "200"
+                        }
+                    }
+                    // Composite specular
+                    feComposite {
+                        "in": "specular",
+                        in2: "enhanced",
+                        operator: "arithmetic",
+                        k1: "0",
+                        k2: "1",
+                        k3: "1",
+                        k4: "0",
+                        result: "composite"
+                    }
+                    // Final glass blur
+                    feGaussianBlur {
+                        "in": "composite",
+                        result: "final",
+                        std_deviation: "1.5"
+                    }
+                }
+
+                // Original realistic glass filter (keeping for reference)
                 filter {
                     id: "lg-realistic",
                     height: "200%",

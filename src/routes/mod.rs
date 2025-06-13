@@ -51,10 +51,10 @@ pub fn use_dark_mode() -> Signal<bool> {
                                 html.remove_attribute("class").unwrap();
                                 return false;
                             }
-                        }
-                    }
-                }
             }
+                    }
+        }
+    }
         }
         false
     })

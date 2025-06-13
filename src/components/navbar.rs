@@ -9,6 +9,7 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
         ("/about", "关于"),
         ("/tags", "书签"),
         ("/dev", "开发"),
+        ("/playground", "游乐场"),
     ];
 
     let onclick = move |e: Event<MouseData>| {

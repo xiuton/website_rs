@@ -3,16 +3,15 @@
     margin: 0;
     padding: 0;
     position: relative;
+    /* background-size: 150px 150px; */
     background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    min-height: 100vh;
+    background-attachment: fixed;
 }
 
 /* Glass gallery layout */
 .glass-gallery {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
     gap: 2rem;
     padding: 2rem;
     max-width: 1200px;
@@ -25,8 +24,8 @@
     overflow: hidden;
     box-shadow: 0 6px 6px rgba(0, 0, 0, 0.2), 0 0 20px rgba(0, 0, 0, 0.1);
     border-radius: 50px;
-    width: 200px;
-    height: 200px;
+    width: 100px;
+    height: 100px;
     pointer-events: auto;
     will-change: transform;
     transition: all 0.3s ease-out;
@@ -57,120 +56,65 @@
 .glass-container.twist .glass-filter { filter: url(#lg-dist); }
 .glass-container.bubble .glass-filter { filter: url(#lg-ripple); }
 .glass-container.shatter .glass-filter { filter: url(#lg-wobble); }
-.glass-container.realistic .glass-filter { filter: url(#lg-realistic); }
+.glass-container.realistic .glass-filter {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    backdrop-filter: blur(4px);
+    isolation: isolate;
+    transition: filter 0.3s ease;
+    filter: url(#lg-splash);
+}
 
-/* Realistic glass specific styles */
+/* Realistic glass specific styles - now using splash effect */
 .glass-container.realistic {
-    background: linear-gradient(
-        135deg,
-        rgba(255, 255, 255, 0.15) 0%,
-        rgba(255, 255, 255, 0.08) 50%,
-        rgba(255, 255, 255, 0.05) 100%
-    );
-    backdrop-filter: blur(6px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.glass-container.realistic .glass-reflection {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-        225deg,
-        rgba(255, 255, 255, 0.25) 0%,
-        transparent 35%
-    );
-    opacity: 0.3;
-    border-radius: inherit;
-}
-
-.glass-container.realistic .glass-refraction {
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(
-        circle at 30% 30%,
-        rgba(255, 255, 255, 0.15) 0%,
-        transparent 70%
-    );
-    opacity: 0.5;
-    border-radius: inherit;
-    mix-blend-mode: screen;
-}
-
-.glass-container.realistic .glass-highlight {
-    position: absolute;
+    grid-column: 1 / -1;
     width: 100%;
-    height: 100%;
-    background: linear-gradient(
-        45deg,
-        transparent 20%,
-        rgba(255, 255, 255, 0.2) 30%,
-        rgba(255, 255, 255, 0.1) 40%,
-        transparent 60%
-    );
-    border-radius: inherit;
-    opacity: 0.4;
-    mix-blend-mode: overlay;
+    height: 200px;
+    max-width: 800px;
+    margin: 0 auto;
+    border-radius: 30px;
+    position: relative;
+    overflow: hidden;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    animation: none;
+}
+
+/* Remove all the complex liquid glass styles and use simple splash-like structure */
+.glass-container.realistic::before,
+.glass-container.realistic::after {
+    display: none;
+}
+
+.glass-container.realistic .glass-distortion,
+.glass-container.realistic .glass-reflection,
+.glass-container.realistic .glass-refraction,
+.glass-container.realistic .glass-highlight {
+    display: none;
 }
 
 .glass-container.realistic .glass-specular {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border-radius: inherit;
+    overflow: hidden;
     box-shadow: 
-        inset 0 0 30px rgba(255, 255, 255, 0.2),
-        inset 0 0 100px rgba(255, 255, 255, 0.1),
-        0 0 15px rgba(255, 255, 255, 0.1),
-        0 4px 15px rgba(0, 0, 0, 0.1);
-    background: none;
+        inset 1px 1px 0 rgba(255, 255, 255, 0.75),
+        inset 0 0 5px rgba(255, 255, 255, 0.75);
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.25) 0%,
+        rgba(255, 255, 255, 0.1) 50%,
+        rgba(255, 255, 255, 0.05) 100%
+    );
 }
 
-/* Realistic glass hover effect */
+/* Splash hover effect for realistic */
 .glass-container.realistic:hover {
-    transform: scale(1.05) translateY(-5px);
-    box-shadow: 
-        0 10px 30px rgba(0, 0, 0, 0.1),
-        0 0 40px rgba(255, 255, 255, 0.1);
-}
-
-.glass-container.realistic:hover .glass-reflection {
-    animation: reflectionShift 2s ease-in-out infinite;
-}
-
-.glass-container.realistic:hover .glass-refraction {
-    animation: refractionMove 3s ease-in-out infinite;
-}
-
-.glass-container.realistic:hover .glass-highlight {
-    animation: highlightSlide 2.5s ease-in-out infinite;
-}
-
-/* Realistic glass animations */
-@keyframes reflectionShift {
-    0%, 100% {
-        opacity: 0.3;
-        transform: translateY(0);
-    }
-    50% {
-        opacity: 0.4;
-        transform: translateY(-10px);
-    }
-}
-
-@keyframes refractionMove {
-    0%, 100% {
-        transform: scale(1) rotate(0deg);
-    }
-    50% {
-        transform: scale(1.1) rotate(5deg);
-    }
-}
-
-@keyframes highlightSlide {
-    0%, 100% {
-        transform: translateX(0) translateY(0);
-        opacity: 0.4;
-    }
-    50% {
-        transform: translateX(10px) translateY(-5px);
-        opacity: 0.5;
-    }
+    animation: splash 1s ease-in-out infinite;
 }
 
 /* Glass specular effect */
