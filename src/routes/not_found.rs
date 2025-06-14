@@ -1,11 +1,18 @@
 use dioxus::prelude::*;
 use dioxus_router::prelude::Link;
 use crate::routes::Route;
+use crate::utils::title;
 
 #[component]
 pub fn NotFound(route: Vec<String>) -> Element {
     let route_str = route.join("/");
     
+    // Set page title
+    use_effect(move || {
+        title::set_page_title("404 - 页面未找到");
+        ()
+    });
+
     rsx! {
         div { class: "not-found",
             div { class: "not-found-content",

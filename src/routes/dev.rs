@@ -1,9 +1,16 @@
 use dioxus::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen::JsCast;
+use crate::utils::title;
 
 #[component]
 pub fn Dev() -> Element {
+    // Set page title
+    use_effect(move || {
+        title::set_page_title("开发 - 干徒");
+        ()
+    });
+
     let img_url = use_signal(|| None::<String>);
     let is_background_mode = use_signal(|| false);
     let background_images = use_signal(Vec::new);

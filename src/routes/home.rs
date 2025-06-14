@@ -7,6 +7,7 @@ use pulldown_cmark::{Parser, html::push_html, Options};
 use crate::models::RuntimeBlogPost;
 use crate::routes::Route;
 use crate::BLOG_POSTS;
+use crate::utils::title;
 
 fn markdown_to_html(markdown: &str) -> String {
     let mut options = Options::empty();
@@ -23,6 +24,12 @@ fn markdown_to_html(markdown: &str) -> String {
 pub fn Home() -> Element {
     let posts = use_signal(|| Vec::<RuntimeBlogPost>::new());
     
+    // Set page title
+    use_effect(move || {
+        title::set_page_title("首页 - 干徒");
+        ()
+    });
+
     // 获取当前 URL 的查询参数
     let location = web_sys::window()
         .unwrap()

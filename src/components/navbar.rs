@@ -9,7 +9,7 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
         ("/about", "关于"),
         ("/tags", "书签"),
         ("/dev", "开发"),
-        ("/playground", "游乐场"),
+        ("/playground", "操场"),
     ];
 
     let onclick = move |e: Event<MouseData>| {
@@ -50,6 +50,7 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
             "/about" => matches!(route, Route::About),
             "/tags" => matches!(route, Route::Tags),
             "/dev" => matches!(route, Route::Dev),
+            "/playground" => matches!(route, Route::Playground),
             _ => false
         }
     };

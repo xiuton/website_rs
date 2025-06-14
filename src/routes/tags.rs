@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use serde::{Serialize, Deserialize};
+use crate::utils::title;
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 struct Bookmark {
@@ -57,6 +58,11 @@ impl BookmarkManager {
 
 #[component]
 pub fn Tags() -> Element {
+    // Set page title
+    use_effect(move || {
+        title::set_page_title("书签 - 干徒");
+    });
+
     let bookmark_manager = use_signal(BookmarkManager::load_from_storage);
     let mut search_text = use_signal(String::new);
     let mut search_query = use_signal(String::new);  // 实际的搜索关键词

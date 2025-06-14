@@ -1,7 +1,14 @@
 use dioxus::prelude::*;
+use crate::utils::title;
 
 #[component]
 pub fn About() -> Element {
+    // Set page title
+    use_effect(move || {
+        title::set_page_title("关于 - 干徒");
+        ()
+    });
+
     rsx! {
         div { class: "about-container",
             // 个人介绍部分

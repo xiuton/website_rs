@@ -2,6 +2,7 @@ use dioxus::prelude::*;
 use crate::routes::Route;
 use crate::models::RuntimeBlogPost;
 use crate::BLOG_POSTS;
+use crate::utils::title;
 
 #[component]
 pub fn BlogPostView(slug: String) -> Element {
@@ -17,6 +18,14 @@ pub fn BlogPostView(slug: String) -> Element {
                 content: p.content.to_string(),
                 slug: p.slug.to_string(),
             })
+    });
+
+    // Set page title
+    use_effect(move || {
+        if let Some(post) = post() {
+            title::set_page_title(&format!("{} - 干徒", post.title));
+        }
+        ()
     });
 
     // 在页面加载时，读取 localStorage 恢复宽屏状态
