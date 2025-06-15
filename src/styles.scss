@@ -41,7 +41,8 @@ $font-families: (
   --navbar-link-active: #292929;
   --navbar-link-hover: #292929;
   --navbar-border: #c2c2c2;
-  --navbar-glow: #60a5fa;
+  --navbar-glow-color-1: #137dff;
+  --navbar-glow-color-2: #00ff00;
   --hole-bg-color: #ffffff;
   --hole-border-color: #141414;
   
@@ -87,7 +88,8 @@ $font-families: (
   --navbar-link-active: #ffffff;
   --navbar-link-hover: #ffffff;
   --navbar-border: #595959;
-  --navbar-glow: #eaff7b;
+  --navbar-glow-color-1: #eaff7b;
+  --navbar-glow-color-2: #ff3d1a;
   --hole-bg-color: #141414;
   --hole-border-color: #ffffff;
   
@@ -220,10 +222,30 @@ html, body {
           .navbar-title {
             font-size: 3rem;
             font-weight: bold;
-            color: var(--navbar-title);
             letter-spacing: 0.1rem;
             position: relative;
             z-index: 1;
+
+            @supports (-webkit-background-clip: text) or (background-clip: text) {
+              background: linear-gradient(90deg, var(--navbar-glow-color-2), var(--navbar-glow-color-1));
+              background-size: 200% 100%;
+              animation: gradientMove 3s ease infinite;
+              -webkit-background-clip: text;
+              background-clip: text;
+              color: transparent;
+            }
+
+            @keyframes gradientMove {
+              0% {
+                background-position: 0% 50%;
+              }
+              50% {
+                background-position: 100% 50%;
+              }
+              100% {
+                background-position: 0% 50%;
+              }
+            }
           }
 
           .navbar-glow {
@@ -234,7 +256,7 @@ html, body {
             left: -2rem;
             filter: blur(60px);
             border-radius: 50%;
-            background-image: linear-gradient(135deg, #ffd744bb 50%, #93ff93bb 50%);
+            background-image: linear-gradient(135deg, var(--navbar-glow-color-1) 50%, var(--navbar-glow-color-2) 50%);
             position: absolute;
             top: 50%;
             transform: translateY(-50%);
