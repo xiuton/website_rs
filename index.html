@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>干徒 - 开发爱好者</title>
+    <script>
+        // 在页面加载时立即检查并设置主题，避免闪烁
+        (function() {
+            const theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+    <link rel="shortcut icon" href="/favicon.svg" type="image/x-icon">
+    <link rel="stylesheet" href="/styles-1783df68b0c33d44.css" data-sass-options="&#x7B;&quot;style&quot;&#x3A;&quot;compressed&quot;&#x2C;&quot;sourceMap&quot;&#x3A;false&#x2C;&quot;quietDeps&quot;&#x3A;true&#x7D;" integrity="sha384-4WWyqeTxeSwcwNyOV8gQZ4gIT3K4uzOv7jKs5R8nbeRm3Fmi73c620luXm34nBkZ"/>
+    
+<script type="module">
+import init, * as bindings from '/web-rs-7ea21296799ba53a.js';
+const wasm = await init({ module_or_path: '/web-rs-7ea21296799ba53a_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        window.addEventListener('error', function(e) {
+            // 忽略资源加载错误
+            if (e.target && (e.target.tagName === 'LINK' || e.target.tagName === 'IMG' || e.target.tagName === 'SCRIPT')) {
+                e.preventDefault();
+                return;
+            }
+            
+            // 对于其他错误，只在开发环境下显示
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                console.warn('Non-critical error:', e.error);
+            }
+        });
+    </script>
+    <!-- 静态资源复制配置 -->
+    
+    
+    
+<link rel="modulepreload" href="/web-rs-7ea21296799ba53a.js" crossorigin="anonymous" integrity="sha384-nbjpiervouJzhS7Qkf6rDiCZLYo2zFWFYswEnZqO8lA/MNvFS+6dEw6gT5iUrbOc"><link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC"><link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv"><link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous" integrity="sha384-pfz3GoOS0du3Se5f5C1lkvbvMo0g507e24Rcu0dm29CmSCqxguUw3chk5PS1brtF"><link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7"><link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU"><link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous" integrity="sha384-2DHjVGrzcpbms06h5LAGWYB1zXEqfWTjATq1YsBBgX1CE2W+T4mRjoljwlXKhTcj"><link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3"><link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG"><link rel="preload" href="/web-rs-7ea21296799ba53a_bg.wasm" crossorigin="anonymous" integrity="sha384-AW86rFqxQ8VFfOseuIeQ7bwm+kRQn7kAWZWSVbjWCsKiqQC3F1nDj2ewBfSQJBZh" as="fetch" type="application/wasm"></head>
+<body>
+    <div id="main"></div>
+</body>
+</html>
