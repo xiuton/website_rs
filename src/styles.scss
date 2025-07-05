@@ -360,10 +360,14 @@ html, body {
         .intro-section {
           text-align: center;
 
-          p {
+          .intro-text {
             color: var(--text-secondary);
-            margin: 0.5rem 0;
+            margin: 1rem 0 1.5rem 0;
             font-size: 1.1rem;
+            line-height: 1.6;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
           }
 
           .tech-stack {
@@ -438,6 +442,110 @@ html, body {
                   padding: 0.25rem 0.75rem;
                   border-radius: 6px;
                   font-size: 0.8rem;
+                }
+              }
+            }
+          }
+        }
+
+        // 本站介绍部分
+        .site-section {
+          .site-info {
+            .site-description {
+              color: var(--text-secondary);
+              font-size: 1.1rem;
+              line-height: 1.6;
+              margin-bottom: 2rem;
+              text-align: center;
+            }
+
+            .tech-highlight {
+              margin-bottom: 2rem;
+
+              h3 {
+                color: var(--text-primary);
+                margin-bottom: 1.5rem;
+                font-size: 1.3rem;
+                text-align: center;
+              }
+
+              .tech-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 1.5rem;
+                margin-bottom: 2rem;
+              }
+
+              .tech-item {
+                display: flex;
+                align-items: flex-start;
+                gap: 1rem;
+                padding: 1.5rem;
+                background: var(--bg-secondary);
+                border-radius: 12px;
+                border: 1px solid var(--border-color);
+                transition: all 0.3s ease;
+
+                &:hover {
+                  transform: translateY(-2px);
+                  box-shadow: 0 4px 12px var(--shadow-color);
+                  border-color: var(--primary-color);
+                }
+
+                .tech-icon {
+                  width: 44px;
+                  height: 44px;
+                  font-size: 2rem;
+                  flex-shrink: 0;
+                }
+
+                .tech-content {
+                  h4 {
+                    color: var(--text-primary);
+                    margin: 0 0 0.5rem 0;
+                    font-size: 1.2rem;
+                  }
+
+                  p {
+                    color: var(--text-secondary);
+                    margin: 0;
+                    line-height: 1.5;
+                    font-size: 0.95rem;
+                  }
+                }
+              }
+            }
+
+            .features-list {
+              h3 {
+                color: var(--text-primary);
+                margin-bottom: 1.5rem;
+                font-size: 1.3rem;
+                text-align: center;
+              }
+
+              ul {
+                list-style: none;
+                padding: 0;
+                margin: 0;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 1rem;
+
+                li {
+                  color: var(--text-secondary);
+                  padding: 0.75rem 1rem;
+                  background: var(--bg-secondary);
+                  border-radius: 8px;
+                  border: 1px solid var(--border-color);
+                  font-size: 0.95rem;
+                  transition: all 0.3s ease;
+
+                  &:hover {
+                    background: var(--primary-color);
+                    color: white;
+                    transform: translateX(5px);
+                  }
                 }
               }
             }
@@ -1838,7 +1946,7 @@ html.dark::view-transition-new(root) {
 .test-container {
   max-width: 800px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 2rem 0;
 
   .test-title {
     font-size: 2.5rem;
@@ -1858,9 +1966,12 @@ html.dark::view-transition-new(root) {
     background: var(--card-bg);
     border-radius: 12px;
     padding: 2rem;
-    margin-bottom: 2rem;
     box-shadow: var(--shadow);
     border: 1px solid var(--border-color);
+
+    &+.test-section {
+      margin-top: 2rem;
+    }
 
     h2 {
       color: var(--text-primary);

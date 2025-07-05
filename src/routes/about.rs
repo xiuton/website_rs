@@ -14,6 +14,10 @@ pub fn About() -> Element {
             // 个人介绍部分
             section { class: "about-section intro-section",
                 h2 { "👋 你好" }
+                p { class: "intro-text",
+                    "我是一名全栈开发者，热爱技术，喜欢探索新的编程语言和框架。"
+                    "专注于构建高性能、可维护的Web应用。"
+                }
                 div { class: "tech-stack",
                     span { "🦀 Rust" }
                     span { "🧬 Dioxus" }
@@ -26,6 +30,62 @@ pub fn About() -> Element {
                     span { "💚 Vue" }
                     span { "🐢 Node.js" }
                     span { "🦕 Deno" }
+                }
+            }
+
+            // 本站介绍部分
+            section { class: "about-section site-section",
+                h2 { "🌐 关于本站" }
+                div { class: "site-info",
+                    p { class: "site-description",
+                        "本站是基于现代Web技术栈构建的个人网站，采用前沿的WebAssembly技术，"
+                        "实现了高性能的前端应用。"
+                    }
+                    div { class: "tech-highlight",
+                        h3 { "🚀 核心技术栈" }
+                        div { class: "tech-grid",
+                            div { class: "tech-item",
+                                div { class: "tech-icon", "🦀" }
+                                div { class: "tech-content",
+                                    h4 { "Rust" }
+                                    p { "系统级编程语言，提供内存安全和并发性能" }
+                                }
+                            }
+                            div { class: "tech-item",
+                                div { class: "tech-icon", "🧬" }
+                                div { class: "tech-content",
+                                    h4 { "Dioxus" }
+                                    p { "基于Rust的声明式UI框架，类似React但性能更优" }
+                                }
+                            }
+                            div { class: "tech-item",
+                                div { class: "tech-icon", "📦" }
+                                div { class: "tech-content",
+                                    h4 { "Trunk" }
+                                    p { "Rust WebAssembly应用构建工具，简化开发流程" }
+                                }
+                            }
+                            div { class: "tech-item",
+                                div { class: "tech-icon", "⚡" }
+                                div { class: "tech-content",
+                                    h4 { "WebAssembly" }
+                                    p { "高性能的Web技术，接近原生性能的执行速度" }
+                                }
+                            }
+                        }
+                    }
+                    div { class: "features-list",
+                        h3 { "✨ 主要特性" }
+                        ul {
+                            li { "⚡ 基于WebAssembly的高性能渲染" }
+                            li { "🎨 支持明暗主题切换" }
+                            li { "📱 完全响应式设计" }
+                            li { "🔍 内置博客系统" }
+                            li { "🏷️ 标签分类管理" }
+                            li { "🎮 交互式组件演示" }
+                            li { "🚀 快速加载和流畅动画" }
+                        }
+                    }
                 }
             }
 
