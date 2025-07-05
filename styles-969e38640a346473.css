@@ -297,10 +297,14 @@ html, body {
 #main .app .main-content .about-container .intro-section {
   text-align: center;
 }
-#main .app .main-content .about-container .intro-section p {
+#main .app .main-content .about-container .intro-section .intro-text {
   color: var(--text-secondary);
-  margin: 0.5rem 0;
+  margin: 1rem 0 1.5rem 0;
   font-size: 1.1rem;
+  line-height: 1.6;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
 }
 #main .app .main-content .about-container .intro-section .tech-stack {
   margin-top: 1.5rem;
@@ -363,6 +367,88 @@ html, body {
   padding: 0.25rem 0.75rem;
   border-radius: 6px;
   font-size: 0.8rem;
+}
+#main .app .main-content .about-container .site-section .site-info .site-description {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+#main .app .main-content .about-container .site-section .site-info .tech-highlight {
+  margin-bottom: 2rem;
+}
+#main .app .main-content .about-container .site-section .site-info .tech-highlight h3 {
+  color: var(--text-primary);
+  margin-bottom: 1.5rem;
+  font-size: 1.3rem;
+  text-align: center;
+}
+#main .app .main-content .about-container .site-section .site-info .tech-highlight .tech-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+#main .app .main-content .about-container .site-section .site-info .tech-highlight .tech-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  transition: all 0.3s ease;
+}
+#main .app .main-content .about-container .site-section .site-info .tech-highlight .tech-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--shadow-color);
+  border-color: var(--primary-color);
+}
+#main .app .main-content .about-container .site-section .site-info .tech-highlight .tech-item .tech-icon {
+  width: 44px;
+  height: 44px;
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+#main .app .main-content .about-container .site-section .site-info .tech-highlight .tech-item .tech-content h4 {
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+  font-size: 1.2rem;
+}
+#main .app .main-content .about-container .site-section .site-info .tech-highlight .tech-item .tech-content p {
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+#main .app .main-content .about-container .site-section .site-info .features-list h3 {
+  color: var(--text-primary);
+  margin-bottom: 1.5rem;
+  font-size: 1.3rem;
+  text-align: center;
+}
+#main .app .main-content .about-container .site-section .site-info .features-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+}
+#main .app .main-content .about-container .site-section .site-info .features-list ul li {
+  color: var(--text-secondary);
+  padding: 0.75rem 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+}
+#main .app .main-content .about-container .site-section .site-info .features-list ul li:hover {
+  background: var(--primary-color);
+  color: white;
+  transform: translateX(5px);
 }
 #main .app .main-content .about-container .contact-section .contact-links {
   display: flex;
@@ -1549,7 +1635,7 @@ html.dark::view-transition-new(root) {
 .test-container {
   max-width: 800px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 2rem 0;
 }
 .test-container .test-title {
   font-size: 2.5rem;
@@ -1567,9 +1653,11 @@ html.dark::view-transition-new(root) {
   background: var(--card-bg);
   border-radius: 12px;
   padding: 2rem;
-  margin-bottom: 2rem;
   box-shadow: var(--shadow);
   border: 1px solid var(--border-color);
+}
+.test-container .test-section + .test-section {
+  margin-top: 2rem;
 }
 .test-container .test-section h2 {
   color: var(--text-primary);
