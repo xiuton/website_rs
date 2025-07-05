@@ -2,9 +2,9 @@ name: Build and Deploy Dioxus Web App
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ mod ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ mod ]
 
 jobs:
   build:
