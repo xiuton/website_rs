@@ -26,8 +26,8 @@
   --navbar-link-active: #292929;
   --navbar-link-hover: #292929;
   --navbar-border: #c2c2c2;
-  --navbar-glow-color-1: #137dff;
-  --navbar-glow-color-2: #00ff00;
+  --navbar-glow-color-1: #00eeff;
+  --navbar-glow-color-2: #137dff;
   --hole-bg-color: #ffffff;
   --hole-border-color: #141414;
   --bg-primary: #ffffff;
@@ -67,8 +67,8 @@
   --navbar-link-active: #ffffff;
   --navbar-link-hover: #ffffff;
   --navbar-border: #595959;
-  --navbar-glow-color-1: #eaff7b;
-  --navbar-glow-color-2: #ff3d1a;
+  --navbar-glow-color-1: #00ff00;
+  --navbar-glow-color-2: #ffea00;
   --hole-bg-color: #141414;
   --hole-border-color: #ffffff;
   --bg-primary: #21212d;
@@ -180,27 +180,6 @@ html, body {
   letter-spacing: 0.1rem;
   position: relative;
   z-index: 1;
-}
-@supports (-webkit-background-clip: text) or (background-clip: text) {
-  #main .app .navbar-content .navbar-ui .navbar-title-wrapper .navbar-title {
-    background: linear-gradient(90deg, var(--navbar-glow-color-2), var(--navbar-glow-color-1));
-    background-size: 200% 100%;
-    animation: gradientMove 3s ease infinite;
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-}
-@keyframes gradientMove {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
 }
 #main .app .navbar-content .navbar-ui .navbar-title-wrapper .navbar-glow {
   transition: all 0.5s;
@@ -1565,5 +1544,286 @@ html.dark::view-transition-new(root) {
   .modal-content {
     width: 95%;
     padding: 16px;
+  }
+}
+.test-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+.test-container .test-title {
+  font-size: 2.5rem;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  text-align: center;
+}
+.test-container .test-description {
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: 3rem;
+  font-size: 1.1rem;
+}
+.test-container .test-section {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border-color);
+}
+.test-container .test-section h2 {
+  color: var(--text-primary);
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.test-container .test-section .counter-display {
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+.test-container .test-section .counter-display .counter-value {
+  font-weight: bold;
+  color: var(--primary-color);
+  font-size: 1.5rem;
+}
+.test-container .test-section .counter-controls {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.test-container .test-section .test-btn {
+  padding: 0.75rem 1.5rem;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.test-container .test-section .test-btn:hover {
+  background: var(--primary-color-dark);
+  transform: translateY(-2px);
+}
+.test-container .test-section .test-btn:active {
+  transform: translateY(0);
+}
+.test-container .test-section .input-group {
+  margin-bottom: 1rem;
+}
+.test-container .test-section .test-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 1rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: border-color 0.3s ease;
+}
+.test-container .test-section .test-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+.test-container .test-section .input-display {
+  margin-top: 0.5rem;
+  color: var(--text-secondary);
+}
+.test-container .test-section .input-display .input-value {
+  color: var(--primary-color);
+  font-weight: bold;
+}
+.test-container .test-section .select-group {
+  margin-bottom: 1rem;
+}
+.test-container .test-section .test-select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 1rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.test-container .test-section .test-select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+.test-container .test-section .select-display {
+  margin-top: 0.5rem;
+  color: var(--text-secondary);
+}
+.test-container .test-section .select-display .select-value {
+  color: var(--primary-color);
+  font-weight: bold;
+}
+.test-container .test-section .checkbox-group {
+  margin-bottom: 1rem;
+}
+.test-container .test-section .test-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.test-container .test-section .test-checkbox input[type=checkbox] {
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: var(--primary-color);
+}
+.test-container .test-section .checkbox-display {
+  margin-top: 0.5rem;
+  color: var(--text-secondary);
+}
+.test-container .test-section .checkbox-display .checkbox-value {
+  color: var(--primary-color);
+  font-weight: bold;
+}
+.test-container .test-section .slider-group {
+  margin-bottom: 1rem;
+}
+.test-container .test-section .test-slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border-color);
+  outline: none;
+  -webkit-appearance: none;
+}
+.test-container .test-section .test-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  cursor: pointer;
+}
+.test-container .test-section .test-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  cursor: pointer;
+  border: none;
+}
+.test-container .test-section .slider-display {
+  margin-top: 0.5rem;
+  color: var(--text-secondary);
+}
+.test-container .test-section .slider-display .slider-value {
+  color: var(--primary-color);
+  font-weight: bold;
+}
+.test-container .test-section .color-test {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.test-container .test-section .color-box {
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: bold;
+  color: white;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.test-container .test-section .color-box.primary {
+  background: var(--primary-color);
+}
+.test-container .test-section .color-box.secondary {
+  background: var(--text-secondary);
+}
+.test-container .test-section .color-box.accent {
+  background: var(--accent-color);
+}
+.test-container .test-section .color-box.text {
+  background: var(--text-primary);
+}
+.test-container .test-section .color-box.background {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+.test-container .test-section .animation-test {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.test-container .test-section .animated-box {
+  padding: 1rem;
+  background: var(--primary-color);
+  color: white;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.test-container .test-section .animated-box:hover.bounce {
+  animation: bounce 1s infinite;
+}
+.test-container .test-section .animated-box:hover.pulse {
+  animation: pulse 1s infinite;
+}
+.test-container .test-section .animated-box:hover.rotate {
+  animation: rotate 2s linear infinite;
+}
+.test-container .test-section .animated-box:hover.slide {
+  animation: slide 1s ease-in-out infinite;
+}
+.test-container .test-section .responsive-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.test-container .test-section .responsive-item {
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  text-align: center;
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+}
+.test-container .test-section .responsive-item:hover {
+  background: var(--primary-color);
+  color: white;
+  transform: translateY(-2px);
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes slide {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(10px);
   }
 }
