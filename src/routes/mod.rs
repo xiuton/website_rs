@@ -8,6 +8,7 @@ pub mod blog_post;
 pub mod tags;
 pub mod not_found;
 pub mod playground;
+pub mod test;
 
 pub use about::About;
 pub use dev::Dev;
@@ -16,6 +17,7 @@ pub use blog_post::BlogPostView;
 pub use tags::Tags;
 pub use not_found::NotFound;
 pub use playground::Playground;
+pub use test::Test;
 use crate::components::{Navbar, Footer};
 
 #[derive(Routable, Clone)]
@@ -29,12 +31,16 @@ pub enum Route {
     Dev,
     #[route("/tags")]
     Tags,
-    #[route("/playground")]
-    Playground,
     #[route("/post/:slug")]
     BlogPostView { slug: String },
+    #[route("/playground")]
+    Playground,
     #[route("/:..route")]
     NotFound { route: Vec<String> },
+    #[end_layout]
+
+    #[route("/test")]
+    Test,
 }
 
 pub fn use_dark_mode() -> Signal<bool> {

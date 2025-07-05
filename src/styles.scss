@@ -41,8 +41,8 @@ $font-families: (
   --navbar-link-active: #292929;
   --navbar-link-hover: #292929;
   --navbar-border: #c2c2c2;
-  --navbar-glow-color-1: #137dff;
-  --navbar-glow-color-2: #00ff00;
+  --navbar-glow-color-1: #00eeff;
+  --navbar-glow-color-2: #137dff;
   --hole-bg-color: #ffffff;
   --hole-border-color: #141414;
   
@@ -88,8 +88,8 @@ $font-families: (
   --navbar-link-active: #ffffff;
   --navbar-link-hover: #ffffff;
   --navbar-border: #595959;
-  --navbar-glow-color-1: #eaff7b;
-  --navbar-glow-color-2: #ff3d1a;
+  --navbar-glow-color-1: #00ff00;
+  --navbar-glow-color-2: #ffea00;
   --hole-bg-color: #141414;
   --hole-border-color: #ffffff;
   
@@ -225,27 +225,6 @@ html, body {
             letter-spacing: 0.1rem;
             position: relative;
             z-index: 1;
-
-            @supports (-webkit-background-clip: text) or (background-clip: text) {
-              background: linear-gradient(90deg, var(--navbar-glow-color-2), var(--navbar-glow-color-1));
-              background-size: 200% 100%;
-              animation: gradientMove 3s ease infinite;
-              -webkit-background-clip: text;
-              background-clip: text;
-              color: transparent;
-            }
-
-            @keyframes gradientMove {
-              0% {
-                background-position: 0% 50%;
-              }
-              50% {
-                background-position: 100% 50%;
-              }
-              100% {
-                background-position: 0% 50%;
-              }
-            }
           }
 
           .navbar-glow {
@@ -1853,4 +1832,336 @@ html.dark::view-transition-new(root) {
         width: 95%;
         padding: 16px;
     }
+}
+
+// 测试页面样式
+.test-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+
+  .test-title {
+    font-size: 2.5rem;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+
+  .test-description {
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: 3rem;
+    font-size: 1.1rem;
+  }
+
+  .test-section {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-color);
+
+    h2 {
+      color: var(--text-primary);
+      margin-bottom: 1.5rem;
+      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    // 计数器样式
+    .counter-display {
+      margin-bottom: 1rem;
+      font-size: 1.1rem;
+      color: var(--text-primary);
+
+      .counter-value {
+        font-weight: bold;
+        color: var(--primary-color);
+        font-size: 1.5rem;
+      }
+    }
+
+    .counter-controls {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    // 按钮样式
+    .test-btn {
+      padding: 0.75rem 1.5rem;
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+
+      &:hover {
+        background: var(--primary-color-dark);
+        transform: translateY(-2px);
+      }
+
+      &:active {
+        transform: translateY(0);
+      }
+    }
+
+    // 输入框样式
+    .input-group {
+      margin-bottom: 1rem;
+    }
+
+    .test-input {
+      width: 100%;
+      padding: 0.75rem;
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 1rem;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      transition: border-color 0.3s ease;
+
+      &:focus {
+        outline: none;
+        border-color: var(--primary-color);
+      }
+    }
+
+    .input-display {
+      margin-top: 0.5rem;
+      color: var(--text-secondary);
+
+      .input-value {
+        color: var(--primary-color);
+        font-weight: bold;
+      }
+    }
+
+    // 选择框样式
+    .select-group {
+      margin-bottom: 1rem;
+    }
+
+    .test-select {
+      width: 100%;
+      padding: 0.75rem;
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 1rem;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      cursor: pointer;
+
+      &:focus {
+        outline: none;
+        border-color: var(--primary-color);
+      }
+    }
+
+    .select-display {
+      margin-top: 0.5rem;
+      color: var(--text-secondary);
+
+      .select-value {
+        color: var(--primary-color);
+        font-weight: bold;
+      }
+    }
+
+    // 复选框样式
+    .checkbox-group {
+      margin-bottom: 1rem;
+    }
+
+    .test-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      color: var(--text-primary);
+
+      input[type="checkbox"] {
+        width: 1.2rem;
+        height: 1.2rem;
+        accent-color: var(--primary-color);
+      }
+    }
+
+    .checkbox-display {
+      margin-top: 0.5rem;
+      color: var(--text-secondary);
+
+      .checkbox-value {
+        color: var(--primary-color);
+        font-weight: bold;
+      }
+    }
+
+    // 滑块样式
+    .slider-group {
+      margin-bottom: 1rem;
+    }
+
+    .test-slider {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--border-color);
+      outline: none;
+      -webkit-appearance: none;
+
+      &::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        cursor: pointer;
+      }
+
+      &::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        cursor: pointer;
+        border: none;
+      }
+    }
+
+    .slider-display {
+      margin-top: 0.5rem;
+      color: var(--text-secondary);
+
+      .slider-value {
+        color: var(--primary-color);
+        font-weight: bold;
+      }
+    }
+
+    // 颜色测试样式
+    .color-test {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .color-box {
+      padding: 1rem;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: bold;
+      color: white;
+      min-height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      &.primary {
+        background: var(--primary-color);
+      }
+
+      &.secondary {
+        background: var(--text-secondary);
+      }
+
+      &.accent {
+        background: var(--accent-color);
+      }
+
+      &.text {
+        background: var(--text-primary);
+      }
+
+      &.background {
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+      }
+    }
+
+    // 动画测试样式
+    .animation-test {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .animated-box {
+      padding: 1rem;
+      background: var(--primary-color);
+      color: white;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+
+      &:hover {
+        &.bounce {
+          animation: bounce 1s infinite;
+        }
+
+        &.pulse {
+          animation: pulse 1s infinite;
+        }
+
+        &.rotate {
+          animation: rotate 2s linear infinite;
+        }
+
+        &.slide {
+          animation: slide 1s ease-in-out infinite;
+        }
+      }
+    }
+
+    // 响应式测试样式
+    .responsive-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .responsive-item {
+      padding: 1rem;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      text-align: center;
+      color: var(--text-primary);
+      transition: all 0.3s ease;
+
+      &:hover {
+        background: var(--primary-color);
+        color: white;
+        transform: translateY(-2px);
+      }
+    }
+  }
+}
+
+// 动画关键帧
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes slide {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(10px); }
 }
