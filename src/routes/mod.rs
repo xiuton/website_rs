@@ -1,5 +1,5 @@
 use dioxus::prelude::*;
-use dioxus_router::prelude::{Routable, Outlet};
+use dioxus_router::prelude::{Routable};
 
 pub mod about;
 pub mod dev;
@@ -18,7 +18,7 @@ pub use tags::Tags;
 pub use not_found::NotFound;
 pub use playground::Playground;
 pub use test::Test;
-use crate::components::{Navbar, Footer};
+use crate::components::Layout;
 
 #[derive(Routable, Clone)]
 pub enum Route {
@@ -42,41 +42,3 @@ pub enum Route {
     #[route("/test")]
     Test,
 }
-
-pub fn use_dark_mode() -> Signal<bool> {
-    use_signal(|| {
-        if let Some(window) = web_sys::window() {
-            if let Some(document) = window.document() {
-                if let Some(html) = document.document_element() {
-                    if let Some(storage) = window.local_storage().ok().flatten() {
-                        if let Ok(Some(theme)) = storage.get_item("theme") {
-                            if theme == "dark" {
-                                html.set_attribute("class", "dark").unwrap();
-                                return true;
-                            } else {
-                                html.remove_attribute("class").unwrap();
-                                return false;
-                            }
-            }
-                    }
-        }
-    }
-        }
-        false
-    })
-}
-
-#[component]
-fn Layout() -> Element {
-    let is_dark = use_dark_mode();
-
-    rsx! {
-        div { class: "app",
-            Navbar { is_dark: is_dark }
-            div { class: "main-content",
-            Outlet::<Route> {}
-        }
-            Footer {}
-        }
-    }
-} 
