@@ -1945,8 +1945,7 @@ html.dark::view-transition-new(root) {
 // 测试页面样式
 .test-container {
   max-width: 800px;
-  margin: 0 auto;
-  padding: 2rem 0;
+  margin: 0 auto 2rem;
 
   .test-title {
     font-size: 2.5rem;

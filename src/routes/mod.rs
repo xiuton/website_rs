@@ -1,24 +1,10 @@
 use dioxus::prelude::*;
 use dioxus_router::prelude::{Routable};
 
-pub mod about;
-pub mod dev;
-pub mod home;
-pub mod blog_post;
-pub mod tags;
-pub mod not_found;
-pub mod playground;
-pub mod test;
-
-pub use about::About;
-pub use dev::Dev;
-pub use home::Home;
-pub use blog_post::BlogPostView;
-pub use tags::Tags;
-pub use not_found::NotFound;
-pub use playground::Playground;
-pub use test::Test;
-use crate::components::Layout;
+use crate::components::{ Layout, TestLayout };
+use crate::pages::{
+    About, Dev, Home, BlogPostView, Tags, NotFound, Playground, Test
+};
 
 #[derive(Routable, Clone)]
 pub enum Route {
@@ -39,6 +25,7 @@ pub enum Route {
     NotFound { route: Vec<String> },
     #[end_layout]
 
+    #[layout[TestLayout]]
     #[route("/test")]
     Test,
 }

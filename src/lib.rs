@@ -3,6 +3,7 @@ pub mod components;
 pub mod routes;
 pub mod models;
 pub mod utils;
+pub mod pages;
 
 pub use app::App;
 pub use routes::Route;
