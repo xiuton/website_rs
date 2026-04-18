@@ -1,8 +1,8 @@
 import { RawInterpreter } from './snippets/dioxus-interpreter-js-53424282ea002554/inline0.js';
 import { setAttributeInner } from './snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js';
-import { get_select_data } from './snippets/dioxus-web-bf44d47c344f35d0/inline0.js';
+import { get_select_data } from './snippets/dioxus-web-bf44d47c344f35d0/inline1.js';
 import { WebDioxusChannel } from './snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js';
-import * as __wbg_star0 from './snippets/dioxus-web-bf44d47c344f35d0/inline1.js';
+import * as __wbg_star0 from './snippets/dioxus-web-bf44d47c344f35d0/inline0.js';
 
 let wasm;
 
@@ -247,19 +247,23 @@ function debugString(val) {
     return className;
 }
 function __wbg_adapter_50(arg0, arg1) {
-    wasm._dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__ha33f751402c07855(arg0, arg1);
+    wasm._dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__hed80e9b94cc3a826(arg0, arg1);
 }
 
-function __wbg_adapter_53(arg0, arg1, arg2) {
-    wasm.closure1503_externref_shim(arg0, arg1, arg2);
+function __wbg_adapter_53(arg0, arg1) {
+    wasm._dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__hbdd46a1d90caedc5(arg0, arg1);
 }
 
 function __wbg_adapter_56(arg0, arg1, arg2) {
-    wasm.closure1507_externref_shim(arg0, arg1, arg2);
+    wasm.closure1675_externref_shim(arg0, arg1, arg2);
 }
 
 function __wbg_adapter_59(arg0, arg1, arg2) {
-    wasm.closure1756_externref_shim(arg0, arg1, arg2);
+    wasm.closure1681_externref_shim(arg0, arg1, arg2);
+}
+
+function __wbg_adapter_62(arg0, arg1, arg2) {
+    wasm.closure1768_externref_shim(arg0, arg1, arg2);
 }
 
 const __wbindgen_enum_ScrollBehavior = ["auto", "instant", "smooth"];
@@ -1576,20 +1580,24 @@ function __wbg_get_imports() {
         const ret = false;
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper3564 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 1504, __wbg_adapter_50);
+    imports.wbg.__wbindgen_closure_wrapper3200 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 1363, __wbg_adapter_50);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper3565 = function(arg0, arg1, arg2) {
-        const ret = makeClosure(arg0, arg1, 1504, __wbg_adapter_53);
+    imports.wbg.__wbindgen_closure_wrapper3686 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 1676, __wbg_adapter_53);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper3567 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 1504, __wbg_adapter_56);
+    imports.wbg.__wbindgen_closure_wrapper3687 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 1676, __wbg_adapter_56);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper3897 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 1757, __wbg_adapter_59);
+    imports.wbg.__wbindgen_closure_wrapper3690 = function(arg0, arg1, arg2) {
+        const ret = makeClosure(arg0, arg1, 1676, __wbg_adapter_59);
+        return ret;
+    };
+    imports.wbg.__wbindgen_closure_wrapper3905 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 1769, __wbg_adapter_62);
         return ret;
     };
     imports.wbg.__wbindgen_debug_string = function(arg0, arg1) {
@@ -1675,7 +1683,7 @@ function __wbg_get_imports() {
     imports.wbg.__wbindgen_throw = function(arg0, arg1) {
         throw new Error(getStringFromWasm0(arg0, arg1));
     };
-    imports['./snippets/dioxus-web-bf44d47c344f35d0/inline1.js'] = __wbg_star0;
+    imports['./snippets/dioxus-web-bf44d47c344f35d0/inline0.js'] = __wbg_star0;
 
     return imports;
 }
