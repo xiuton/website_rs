@@ -20,7 +20,7 @@ struct BookmarkManager {
 #[allow(unused)]
 impl BookmarkManager {
     fn new() -> Self {
-        let config = include_str!("../../bookmarks.toml");
+        let config = include_str!("../../data/bookmarks.toml");
         let bookmarks: toml::Value = toml::from_str(config).unwrap_or_else(|_| toml::Value::Table(toml::Table::new()));
         
         let bookmarks = bookmarks["bookmark"]
