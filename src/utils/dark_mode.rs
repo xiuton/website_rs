@@ -1,5 +1,6 @@
 use dioxus::prelude::*;
 
+#[allow(unused)]
 pub fn use_dark_mode() -> Signal<bool> {
     use_signal(|| {
         if let Some(window) = web_sys::window() {

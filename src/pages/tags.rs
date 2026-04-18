@@ -3,6 +3,7 @@ use wasm_bindgen_futures::spawn_local;
 use serde::{Serialize, Deserialize};
 use crate::utils::title;
 
+#[allow(unused)]
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 struct Bookmark {
     title: String,
@@ -11,10 +12,12 @@ struct Bookmark {
     icon: String,
 }
 
+#[allow(unused)]
 struct BookmarkManager {
     bookmarks: Vec<Bookmark>,
 }
 
+#[allow(unused)]
 impl BookmarkManager {
     fn new() -> Self {
         let config = include_str!("../../bookmarks.toml");
@@ -183,6 +186,7 @@ pub fn Tags() -> Element {
     }
 }
 
+#[allow(unused)]
 fn get_bookmark_icon(icon_name: &str) -> Element {
     // 如果 icon_name 为空字符串或者没有设置 icon 字段（传入空字符串），显示默认图标
     if icon_name.is_empty() {

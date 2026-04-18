@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 use crate::utils::title;
 
-// Import the CSS file
+#[allow(unused)]
 static STYLE: &str = include_str!("../assets/playground.css");
 
 #[component]

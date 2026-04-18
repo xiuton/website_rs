@@ -6,6 +6,7 @@ use crate::pages::{
     About, Dev, Home, BlogPostView, Tags, NotFound, Playground, Test
 };
 
+#[allow(unused)]
 #[derive(Routable, Clone)]
 pub enum Route {
     #[layout(Layout)]

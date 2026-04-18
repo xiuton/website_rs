@@ -1,3 +1,4 @@
+#[allow(unused)]
 #[derive(Clone, PartialEq)]
 pub struct BlogPost {
     pub title: &'static str,
@@ -8,6 +9,7 @@ pub struct BlogPost {
     pub slug: &'static str,
 }
 
+#[allow(unused)]
 #[derive(Clone, PartialEq)]
 pub struct RuntimeBlogPost {
     pub title: String,
