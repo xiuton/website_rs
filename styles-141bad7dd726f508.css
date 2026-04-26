@@ -944,29 +944,36 @@ html.dark #main .app .main-content .dev-container .dev-img-wrapper .background-m
     justify-content: flex-end;
     gap: 0.75rem;
     padding: 0 1rem;
+    height: auto;
+  }
+  #main .app .main-content .blog-container .blog-post .blog-nav .back-button {
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1rem;
   }
   #main .app .main-content .blog-container .blog-post .blog-nav .back-buttons-group {
+    display: flex;
     flex-direction: row;
+    gap: 0.5rem;
+    position: relative;
+    height: auto;
   }
   #main .app .main-content .blog-container .blog-post .blog-nav .back-buttons-group .home-back {
-    position: absolute;
-    right: 0;
+    position: relative;
     left: auto;
+    right: auto;
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
     pointer-events: auto;
-    transition: all 0.3s ease;
   }
   #main .app .main-content .blog-container .blog-post .blog-nav .back-buttons-group .history-back {
-    transform: translateY(-3rem);
+    transform: none;
   }
-  #main .app .main-content .blog-container .blog-post .blog-nav .back-buttons-group:hover .history-back {
-    transform: translateY(-3rem);
-  }
-  #main .app .main-content .blog-container .blog-post .blog-nav .back-buttons-group:hover .home-back {
-    opacity: 1;
-    transform: translateY(0);
-    pointer-events: auto;
+  #main .app .main-content .blog-container .blog-post .blog-nav .function-buttons {
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+    height: auto;
   }
 }
 #main .app .main-content .blog-container .blog-post .blog-title-wrapper .blog-title {
@@ -1229,29 +1236,36 @@ html.dark #main .app .main-content .dev-container .dev-img-wrapper .background-m
     justify-content: flex-end;
     gap: 0.75rem;
     padding: 0 1rem;
+    height: auto;
+  }
+  #main .app:has(.wide-mode) .blog-post.wide-mode .blog-nav .back-button {
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1rem;
   }
   #main .app:has(.wide-mode) .blog-post.wide-mode .blog-nav .back-buttons-group {
+    display: flex;
     flex-direction: row;
+    gap: 0.5rem;
+    position: relative;
+    height: auto;
   }
   #main .app:has(.wide-mode) .blog-post.wide-mode .blog-nav .back-buttons-group .home-back {
-    position: absolute;
-    right: 0;
+    position: relative;
     left: auto;
+    right: auto;
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
     pointer-events: auto;
-    transition: all 0.3s ease;
   }
   #main .app:has(.wide-mode) .blog-post.wide-mode .blog-nav .back-buttons-group .history-back {
-    transform: translateY(-3rem);
+    transform: none;
   }
-  #main .app:has(.wide-mode) .blog-post.wide-mode .blog-nav .back-buttons-group:hover .history-back {
-    transform: translateY(-3rem);
-  }
-  #main .app:has(.wide-mode) .blog-post.wide-mode .blog-nav .back-buttons-group:hover .home-back {
-    opacity: 1;
-    transform: translateY(0);
-    pointer-events: auto;
+  #main .app:has(.wide-mode) .blog-post.wide-mode .blog-nav .function-buttons {
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+    height: auto;
   }
 }
 #main .app .footer-content {
