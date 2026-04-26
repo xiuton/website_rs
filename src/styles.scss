@@ -1132,35 +1132,40 @@ html, body {
               justify-content: flex-end;
               gap: 0.75rem;
               padding: 0 1rem;
+              height: auto;
+
+              .back-button {
+                width: 2.5rem;
+                height: 2.5rem;
+                font-size: 1rem;
+              }
 
               .back-buttons-group {
+                display: flex;
                 flex-direction: row;
+                gap: 0.5rem;
+                position: relative;
+                height: auto;
 
                 .home-back {
-                  position: absolute;
-                  right: 0;
+                  position: relative;
                   left: auto;
+                  right: auto;
                   opacity: 1;
-                  transform: translateY(0);
+                  transform: none;
                   pointer-events: auto;
-                  transition: all 0.3s ease;
                 }
 
                 .history-back {
-                  transform: translateY(-3rem);
+                  transform: none;
                 }
+              }
 
-                &:hover {
-                  .history-back {
-                    transform: translateY(-3rem);
-                  }
-                  
-                  .home-back {
-                    opacity: 1;
-                    transform: translateY(0);
-                    pointer-events: auto;
-                  }
-                }
+              .function-buttons {
+                display: flex;
+                flex-direction: row;
+                gap: 0.5rem;
+                height: auto;
               }
             }
           }
@@ -1454,7 +1459,6 @@ html, body {
       max-width: 1200px;
       .blog-post {
         &.wide-mode {
-          // 在宽屏模式下，当屏幕宽度小于等于1360px时的样式
           @media screen and (max-width: 1360px) {
             .blog-nav {
               position: fixed;
@@ -1473,35 +1477,40 @@ html, body {
               justify-content: flex-end;
               gap: 0.75rem;
               padding: 0 1rem;
+              height: auto;
+
+              .back-button {
+                width: 2.5rem;
+                height: 2.5rem;
+                font-size: 1rem;
+              }
 
               .back-buttons-group {
+                display: flex;
                 flex-direction: row;
+                gap: 0.5rem;
+                position: relative;
+                height: auto;
 
                 .home-back {
-                  position: absolute;
-                  right: 0;
+                  position: relative;
                   left: auto;
+                  right: auto;
                   opacity: 1;
-                  transform: translateY(0);
+                  transform: none;
                   pointer-events: auto;
-                  transition: all 0.3s ease;
                 }
 
                 .history-back {
-                  transform: translateY(-3rem);
+                  transform: none;
                 }
+              }
 
-                &:hover {
-                  .history-back {
-                    transform: translateY(-3rem);
-                  }
-                  
-                  .home-back {
-                    opacity: 1;
-                    transform: translateY(0);
-                    pointer-events: auto;
-                  }
-                }
+              .function-buttons {
+                display: flex;
+                flex-direction: row;
+                gap: 0.5rem;
+                height: auto;
               }
             }
           }
