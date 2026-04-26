@@ -1,34 +1,73 @@
-# Ganto's Website
+# 干徒 - Ganto's Website
 
-这是一个使用 Dioxus 和 Rust 构建的个人网站项目。
+基于 **Rust + Dioxus + WebAssembly** 构建的个人网站，提供博客、书签管理、代码实验等功能。
 
 ## 功能特点
 
-- 🌓 支持亮色/暗色主题切换
-- 📱 响应式设计，适配移动端
-- ⚡ 基于 Rust 和 WebAssembly 的高性能实现
-- 🎨 现代化的 UI 设计
-- 🔄 平滑的主题切换动画
+- 🌓 **亮色/暗色主题切换** — 支持 View Transition API 平滑过渡，记忆用户偏好
+- 📱 **响应式设计** — 适配桌面端与移动端，工具栏自动调整位置
+- ⚡ **WebAssembly 驱动** — 基于 Rust 编译为 Wasm，接近原生的运行性能
+- 📝 **Markdown 博客** — Front Matter 元数据，comrak 渲染，highlight.js 代码高亮
+- 🏷️ **标签系统** — 文章标签展示
+- 🔖 **书签管理** — TOML 配置的书签页面，支持搜索筛选
+- 🎮 **操场 (Playground)** — 代码实验环境
+- 🔧 **开发工具页** — 内置开发辅助功能
+- 🧪 **测试页面** — 组件功能验证
+- 🔄 **宽屏模式** — 博客文章支持一键切换宽屏布局
+- 📦 **GitHub Actions CI/CD** — 自动构建部署到 GitHub Pages
+- ☁️ **Netlify 部署** — SPA 路由重定向配置
+
+## 技术栈
+
+| 类别 | 技术 |
+|------|------|
+| 框架 | [Dioxus 0.6.3](https://dioxuslabs.com/) |
+| 语言 | Rust (edition 2021) |
+| 编译目标 | wasm32-unknown-unknown |
+| 构建工具 | [Trunk 0.21](https://trunkrs.dev/) |
+| 样式 | SCSS (Sass) |
+| Markdown 渲染 | [comrak](https://docs.rs/comrak) (GFM 兼容) |
+| 代码高亮 | [highlight.js 11](https://highlightjs.org/) |
+| Markdown 解析 | pulldown-cmark (首页预览) |
+| 路由 | dioxus-router 0.6.3 |
+| 构建脚本 | `build.rs` 编译期解析博客文章 |
+| 字体 | Inter, JetBrains Mono, MiSans, 得意黑 |
 
 ## 环境要求
 
-- Rust 1.70.0 或更高版本
-- Node.js 16.0.0 或更高版本
-- Trunk (Rust WebAssembly 构建工具)
+- **Rust** 1.70.0+
+- **wasm32-unknown-unknown** 目标
+- **Trunk** (Rust → Wasm 构建工具)
+- **Sass** (SCSS 编译)
 
 ## 安装步骤
 
-1. 安装 Rust：
+### 1. 安装 Rust
+
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-2. 安装 Trunk：
+### 2. 添加 Wasm 编译目标
+
+```bash
+rustup target add wasm32-unknown-unknown
+```
+
+### 3. 安装 Trunk
+
 ```bash
 cargo install trunk
 ```
 
-3. 克隆项目：
+### 4. 安装 Sass
+
+```bash
+npm install -g sass
+```
+
+### 5. 克隆项目
+
 ```bash
 git clone https://github.com/xiuton/website_rs.git
 cd website_rs
@@ -36,204 +75,291 @@ cd website_rs
 
 ## 开发指南
 
-1. 启动开发服务器：
+### 启动开发服务器
+
 ```bash
 trunk serve
 ```
-这将启动一个开发服务器，通常在 http://localhost:8080 访问。
 
-自定义端口
-```bash
-trunk serve --port 3128
-```
-在 http://localhost:3218 访问。
+默认在 `http://localhost:8080` 访问。
 
-2. 构建项目：
+自定义端口：
+
 ```bash
-trunk build
+trunk serve --port 8081
 ```
-构建后的文件将生成在 `dist` 目录中。
+
+### 构建生产版本
+
+```bash
+trunk build --release
+```
+
+构建产物输出到 `dist/` 目录。
+
+### 清理并重新构建
+
+```bash
+cargo clean ; trunk clean ; trunk build ; trunk serve
+```
+
+### 新建博客文章
+
+```bash
+cargo run --bin new 文章标题
+```
+
+将在 `posts/` 目录下生成带 Front Matter 模板的 Markdown 文件。
+
+查看帮助：
+
+```bash
+cargo run --bin new
+```
+
+**Front Matter 格式示例：**
+
+```yaml
+---
+title: 我的第一篇文章
+date: 2026-04-19 20:30:00
+author: 干徒
+tags: [rust, dioxus]
+---
+
+# 一级标题
+
+正文内容...
+```
+
+> `build.rs` 会在编译时扫描 `posts/` 目录，解析所有 `.md` 文件的 Front Matter，
+> 生成包含文章元数据和内容的 Rust 数组，嵌入到最终 Wasm 产物中。
 
 ## 项目结构
 
 ```
 .
+├── .github/
+│   └── workflows/
+│       └── build.yml        # GitHub Actions CI/CD
+├── data/                    # 应用数据
+│   └── bookmarks.toml       # 书签配置
+├── posts/                   # 博客 Markdown 文章
+│   ├── Rust所有权.md
+│   ├── Dioxus基于Rust的多平台开发框架.md
+│   └── ...
 ├── src/
-│   ├── main.rs          # 主程序入口
-│   └── styles.css       # 样式文件
-├── index.html           # HTML 模板
-├── Cargo.toml           # Rust 依赖配置
-└── README.md           # 项目说明文档
+│   ├── bin/
+│   │   └── new.rs           # CLI 工具：新建博客文章
+│   ├── assets/
+│   │   └── playground.css   # 操场页面专用样式
+│   ├── components/          # 可复用 UI 组件
+│   │   ├── mod.rs
+│   │   ├── footer.rs        # 页脚（版权、ICP 备案）
+│   │   ├── layout.rs        # 主布局（导航栏 + 内容 + 页脚）
+│   │   ├── navbar.rs        # 导航栏（路由、主题切换）
+│   │   └── test_layout.rs   # 测试页面专用布局
+│   ├── models/
+│   │   └── mod.rs           # 数据模型：BlogPost, RuntimeBlogPost
+│   ├── pages/               # 页面组件（对应路由）
+│   │   ├── mod.rs
+│   │   ├── about.rs         # 关于页面
+│   │   ├── blog_post.rs     # 博客文章详情页
+│   │   ├── dev.rs           # 开发工具页面
+│   │   ├── home.rs          # 首页（博客列表 + 分页）
+│   │   ├── not_found.rs     # 404 页面
+│   │   ├── playground.rs    # 操场（代码实验）
+│   │   ├── tags.rs          # 书签页（搜索 + 筛选）
+│   │   └── test.rs          # 测试页面
+│   ├── routes/
+│   │   └── mod.rs           # 路由定义（Dioxus Router）
+│   ├── utils/
+│   │   ├── mod.rs
+│   │   ├── dark_mode.rs     # 暗色模式状态管理
+│   │   └── title.rs         # 页面标题设置
+│   ├── app.rs               # 应用根组件
+│   ├── lib.rs               # 库入口（模块声明 + 公开 API）
+│   ├── main.rs              # 程序入口
+│   └── styles.scss          # 全局样式（Sass）
+├── static/                  # 静态资源
+│   ├── blog-images/         # 博客文章配图
+│   ├── fonts/               # 字体文件
+│   │   ├── IBMPlexSansSC-Medium.woff2
+│   │   ├── JetBrainsMonoNLNerdFont-Regular.ttf
+│   │   ├── MiSans-Regular.otf
+│   │   ├── NeueMachina-Bold.woff2
+│   │   └── SmileySans-Oblique.otf
+│   ├── images/              # 通用图片
+│   └── favicon.svg          # 网站图标
+├── .gitignore
+├── Cargo.toml               # Rust 依赖配置
+├── Cargo.lock
+├── LICENSE                  # MIT 许可证
+├── README.md
+├── Trunk.toml               # Trunk 构建配置（Wasm 优化）
+├── build.rs                 # 构建脚本（编译期解析文章）
+├── index.html               # HTML 入口模板
+└── netlify.toml             # Netlify 部署配置（SPA 路由）
+```
+
+## 路由一览
+
+| 路由 | 页面 | 组件 | 布局 |
+|------|------|------|------|
+| `/` | 首页 | `Home` | `Layout` |
+| `/about` | 关于 | `About` | `Layout` |
+| `/tags` | 书签 | `Tags` | `Layout` |
+| `/dev` | 开发 | `Dev` | `Layout` |
+| `/post/:slug` | 博客详情 | `BlogPostView` | `Layout` |
+| `/playground` | 操场 | `Playground` | `Layout` |
+| `/test` | 测试 | `Test` | `TestLayout` |
+| `/:..route` | 404 | `NotFound` | `Layout` |
+
+## 核心依赖
+
+```toml
+[dependencies]
+dioxus = { version = "0.6.3", features = ["web", "router"] }
+dioxus-web = "0.6.3"
+dioxus-hooks = "0.6.2"
+dioxus-router = "0.6.3"
+wasm-bindgen = "0.2.89"
+web-sys = "0.3.66"        # DOM / Storage / History API
+comrak = "0.20.0"          # Markdown → HTML (GFM)
+pulldown-cmark = "0.13.0"  # 首页文章预览
+toml = "0.8.8"            # 书签配置解析
+serde = "1.0"             # 序列化
+chrono = "0.4"            # 日期时间
+gloo-timers = "0.3.0"     # 异步定时器
+
+[build-dependencies]
+walkdir = "2.4.0"         # 构建时遍历 posts 目录
+comrak = "0.20.0"
 ```
 
 ## 部署说明
 
 ### 静态文件部署
 
-1. 构建项目：
 ```bash
-trunk build
+trunk build --release
 ```
 
-2. 将 `dist` 目录下的所有文件部署到你的 Web 服务器。
+将 `dist/` 目录部署到任意静态 Web 服务器即可。
 
-### 使用 Docker 部署
+### GitHub Pages（Actions 自动部署）
 
-1. 构建 Docker 镜像：
-```bash
-docker build -t ganto-website .
-```
+推送代码到 `mod` 分支后，GitHub Actions 自动：
 
-2. 运行容器：
-```bash
-docker run -p 8080:80 ganto-website
+1. 安装 Rust wasm 工具链
+2. 运行 `trunk build --release`
+3. 将 `dist/` 部署到 `gh-pages` 分支
+
+配置文件：[.github/workflows/build.yml](.github/workflows/build.yml)
+
+### Netlify
+
+项目包含 `netlify.toml`，配置了 SPA 路由重定向：
+
+```toml
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
 ```
 
 ## 主题定制
 
-项目使用 CSS 变量实现主题切换，可以在 `src/styles.css` 中修改以下变量来自定义主题：
+主题通过 CSS 变量实现，在 `src/styles.scss` 中定义：
 
-```css
+```scss
 :root {
   --bg-color: #f7f7f7;
   --text-color: #222;
   --card-bg: #fff;
-  /* 更多变量... */
+  --primary-color: #...;
+  --accent-color: #...;
+  --border-color: #...;
+  /* ... */
 }
 
 .dark {
   --bg-color: #18181c;
   --text-color: #f7f7f7;
   --card-bg: #1a1a20;
-  /* 更多变量... */
+  /* ... */
 }
+```
+
+主题切换支持 [View Transition API](https://developer.chrome.com/docs/web-platform/view-transitions/)，提供圆形扩散动画效果。用户选择会持久化到 `localStorage`。
+
+## 代码高亮主题
+
+博客文章使用 highlight.js 渲染代码块，支持切换主题：
+
+**浅色主题：** github、atom-one-light、vs、solarized-light、xcode
+
+**深色主题：** atom-one-dark、vs2015、monokai、dracula、solarized-dark、night-owl、tokyo-night-dark、github-dark
+
+**特色主题：** gradient-dark、gradient-light、rainbow、brown-paper
+
+## Windows 开发环境补充
+
+### 安装 wasm-opt
+
+Trunk 的 `--release` 构建需要 wasm-opt 来优化 Wasm 产物。
+
+**方法一：手动安装**
+
+1. 创建目录 `C:\Users\{用户名}\.cache\trunk\bin`
+2. 下载 wasm-opt：
+   ```powershell
+   $url = "https://github.com/WebAssembly/binaryen/releases/download/version_123/binaryen-version_123-x86_64-windows.tar.gz"
+   Invoke-WebRequest -Uri $url -OutFile "$env:USERPROFILE\.cache\trunk\bin\binaryen.tar.gz"
+   ```
+3. 解压并将 `binaryen-version_123\bin\wasm-opt.exe` 移动到 `C:\Users\{用户名}\.cache\trunk\bin\`
+
+**方法二：脚本自动化**
+
+```powershell
+# 创建目标目录
+$targetDir = "$env:USERPROFILE\.cache\trunk\bin"
+New-Item -ItemType Directory -Force -Path $targetDir
+
+# 下载
+$url = "https://github.com/WebAssembly/binaryen/releases/download/version_123/binaryen-version_123-x86_64-windows.tar.gz"
+Invoke-WebRequest -Uri $url -OutFile "$targetDir\binaryen.tar.gz"
+
+# 解压并移动
+tar -xf "$targetDir\binaryen.tar.gz" -C $targetDir
+Move-Item "$targetDir\binaryen-version_123\bin\wasm-opt.exe" $targetDir -Force
+
+# 清理
+Remove-Item "$targetDir\binaryen-version_123" -Recurse -Force
+Remove-Item "$targetDir\binaryen.tar.gz" -Force
+
+Write-Host "wasm-opt setup completed!"
+```
+
+> 开发模式 (`trunk serve`) 不需要 wasm-opt，只有 `trunk build --release` 才需要。
+
+### 关闭 Release 优化
+
+如果不需要 wasm-opt，可在 `Trunk.toml` 中设置：
+
+```toml
+[wasm]
+opt = false
 ```
 
 ## 贡献指南
 
 1. Fork 项目
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
+2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
+3. 提交更改 (`git commit -m 'feat: add amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
 5. 创建 Pull Request
 
 ## 许可证
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
-
-安装Rust
-
-安装Trunk包 0.22.x
-```sh
-$ cargo install trunk --force
-```
-
-安装CMake
-
-安装dioxus-cli
-
-安装wasm-opt
-先创建目录 `C:\Users\{UserName}\.cache\trunk\bin`
-在该目录下执行命令
-```sh
-$ Invoke-WebRequest -Uri "https://github.com/WebAssembly/binaryen/releases/download/version_123/binaryen-version_123-x86_64-windows.tar.gz" -OutFile "binaryen-version_123-x86_64-windows.tar.gz"
-```
-解压文件
-```sh
-$ tar binaryen-version_123-x86_64-windows.tar.gz
-```
-
-将解压出的`binaryen-version_123\bin\wasm-opt.exe`文件移动到 `C:\Users\{UserName}\.cache\trunk\bin`目录
-
-
-或者 直接以脚本的形式安装并配置 wasm-opt
-```sh
-$ powershell -ExecutionPolicy Bypass -File setup-wasm-opt.ps1
-```
-setup-wasm-opt.ps1
-```ps1
-# Create target directory
-$targetDir = "$env:USERPROFILE\.cache\trunk\bin"
-New-Item -ItemType Directory -Force -Path $targetDir
-
-# Download wasm-opt
-$url = "https://github.com/WebAssembly/binaryen/releases/download/version_123/binaryen-version_123-x86_64-windows.tar.gz"
-$outputFile = "$targetDir\binaryen-version_123-x86_64-windows.tar.gz"
-
-Write-Host "Downloading wasm-opt..."
-Invoke-WebRequest -Uri $url -OutFile $outputFile
-
-# Extract files
-Write-Host "Extracting files..."
-tar -xf $outputFile -C $targetDir
-
-# Move wasm-opt.exe to correct location
-$sourceFile = "$targetDir\binaryen-version_123\bin\wasm-opt.exe"
-$destFile = "$targetDir\wasm-opt.exe"
-Move-Item -Path $sourceFile -Destination $destFile -Force
-
-# Clean up temporary files
-Write-Host "Cleaning up temporary files..."
-Remove-Item -Path "$targetDir\binaryen-version_123" -Recurse -Force
-Remove-Item -Path $outputFile -Force
-
-Write-Host "wasm-opt setup completed!" 
-```
-
-
-
-安装sass
-```sh
-npm install -g sass
-```
-
-清空缓存并打包运行
-```bash
-$ cargo clean ; trunk clean ; trunk build ; trunk serve
-```
-
-指定端口
-```bash
-$ trunk serve --port 8081
-```
-
-新建博客文章
-```bash
-$ cargo run --bin new my-post
-```
-
-新建博客帮助
-```bash
-$ cargo run --bin new
-```
-
-
-// 浅色主题：
-// github.min.css - GitHub 风格
-// atom-one-light.min.css - Atom 编辑器浅色主题
-// vs.min.css - Visual Studio 风格
-// solarized-light.min.css - Solarized 浅色主题
-// xcode.min.css - Xcode 风格
-// stackoverflow-light.min.css - Stack Overflow 浅色主题
-// default.min.css - 默认浅色主题
-
-// 深色主题：
-// atom-one-dark.min.css - Atom 编辑器深色主题
-// vs2015.min.css - Visual Studio 2015 风格
-// monokai.min.css - Monokai 风格
-// dracula.min.css - Dracula 主题
-// solarized-dark.min.css - Solarized 深色主题
-// night-owl.min.css - Night Owl 主题
-// tokyo-night-dark.min.css - Tokyo Night 深色主题
-// github-dark.min.css - GitHub 深色主题
-// stackoverflow-dark.min.css - Stack Overflow 深色主题
-
-// 其他特色主题：
-// gradient-dark.min.css - 渐变深色主题
-// gradient-light.min.css - 渐变浅色主题
-// rainbow.min.css - 彩虹主题
-// brown-paper.min.css - 牛皮纸风格
-// docco.min.css - Docco 风格
-// far.min.css - Far 主题
-// kimbie.dark.min.css - Kimbie 深色主题
-// kimbie.light.min.css - Kimbie 浅色主题
+MIT License — 详见 [LICENSE](LICENSE)
