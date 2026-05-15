@@ -2,8 +2,12 @@ use dioxus::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen::JsCast;
 use crate::utils::title;
+use dioxus_router::prelude::Link;
+use crate::routes::Route;
 
 const BG_IMG_COUNT: u32 = 5;
+const HIDE_BTN_DELAY_MS: i32 = 3000;
+const CAROUSEL_INTERVAL_MS: i32 = 15000;
 
 fn extract_filenames(text: &str) -> Vec<String> {
     if let Ok(obj) = serde_json::from_str::<serde_json::Value>(text) {
@@ -14,6 +18,83 @@ fn extract_filenames(text: &str) -> Vec<String> {
         }
     }
     Vec::new()
+}
+
+fn create_delayed_hide_timer(
+    mut show_exit_button: Signal<bool>,
+    mut hide_btn_timer: Signal<Option<i32>>,
+    mut hide_cursor: Signal<bool>,
+    delay_ms: i32,
+) -> i32 {
+    let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+        show_exit_button.set(false);
+        hide_cursor.set(true);
+        hide_btn_timer.set(None);
+    }) as Box<dyn FnMut()>);
+    let handle = web_sys::window().expect("Failed to get window")
+        .set_timeout_with_callback_and_timeout_and_arguments_0(
+            closure.as_ref().unchecked_ref(),
+            delay_ms,
+        )
+        .expect("Failed to set timeout");
+    closure.forget();
+    handle
+}
+
+fn create_carousel_timer(
+    background_images: Signal<Vec<String>>,
+    mut current_bg_index: Signal<usize>,
+) -> i32 {
+    let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+        let len = background_images().len();
+        if len > 0 {
+            current_bg_index.set((current_bg_index() + 1) % len);
+        }
+    }) as Box<dyn FnMut()>);
+    let handle = web_sys::window().expect("Failed to get window")
+        .set_interval_with_callback_and_timeout_and_arguments_0(
+            closure.as_ref().unchecked_ref(),
+            CAROUSEL_INTERVAL_MS,
+        )
+        .expect("Failed to set interval");
+    closure.forget();
+    handle
+}
+
+fn load_single_image(url: &str) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool>>> {
+    let url = url.to_string();
+    Box::pin(async move {
+        let img = web_sys::HtmlImageElement::new().expect("Failed to create HtmlImageElement");
+        let (tx, rx) = futures_channel::oneshot::channel();
+        let tx_success = std::sync::Arc::new(std::sync::Mutex::new(Some(tx)));
+        let tx_error = tx_success.clone();
+        let success_callback = wasm_bindgen::closure::Closure::wrap(
+            Box::new(move || { if let Some(tx) = tx_success.lock().expect("Failed to lock mutex").take() { let _ = tx.send(true); } }) as Box<dyn FnMut()>
+        );
+        let error_callback = wasm_bindgen::closure::Closure::wrap(
+            Box::new(move || { if let Some(tx) = tx_error.lock().expect("Failed to lock mutex").take() { let _ = tx.send(false); } }) as Box<dyn FnMut()>
+        );
+        img.set_onload(Some(success_callback.as_ref().unchecked_ref()));
+        img.set_onerror(Some(error_callback.as_ref().unchecked_ref()));
+        img.set_src(&url);
+        success_callback.forget();
+        error_callback.forget();
+        rx.await.unwrap_or(false)
+    })
+}
+
+fn fetch_and_set_random_image(mut img_url: Signal<Option<String>>) {
+    spawn_local(async move {
+        let resp = gloo_net::http::Request::get("https://yun.ganto.cn/api/v1/images/random/1").send().await;
+        if let Ok(response) = resp {
+            if let Ok(text) = response.text().await {
+                let filenames = extract_filenames(&text);
+                if let Some(url) = filenames.first() {
+                    img_url.set(Some(url.clone()));
+                }
+            }
+        }
+    });
 }
 
 #[component]
@@ -36,18 +117,7 @@ pub fn Dev() -> Element {
     let fetch_random_img = {
         let img_url = img_url.clone();
         move |_evt: Event<MouseData>| {
-            let mut img_url = img_url.clone();
-            spawn_local(async move {
-                let resp = gloo_net::http::Request::get("https://yun.ganto.cn/api/v1/images/random/1").send().await;
-                if let Ok(response) = resp {
-                    if let Ok(text) = response.text().await {
-                        let filenames = extract_filenames(&text);
-                        if let Some(url) = filenames.first() {
-                            img_url.set(Some(url.clone()));
-                        }
-                    }
-                }
-            });
+            fetch_and_set_random_image(img_url.clone());
         }
     };
 
@@ -62,25 +132,8 @@ pub fn Dev() -> Element {
             let current_bg_index = current_bg_index.clone();
             let mut bg_timer_handle = bg_timer_handle.clone();
 
-            let create_carousel_timer = move || {
-                let background_images = background_images.clone();
-                let mut current_bg_index = current_bg_index.clone();
-                let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
-                    let len = background_images().len();
-                    if len > 0 {
-                        current_bg_index.set((current_bg_index() + 1) % len);
-                    }
-                }) as Box<dyn FnMut()>);
-                let handle = web_sys::window().unwrap().set_interval_with_callback_and_timeout_and_arguments_0(
-                    closure.as_ref().unchecked_ref(),
-                    15000
-                ).unwrap();
-                closure.forget();
-                handle
-            };
-
             if background_images().len() > 1 {
-                let handle = create_carousel_timer();
+                let handle = create_carousel_timer(background_images.clone(), current_bg_index.clone());
                 bg_timer_handle.set(Some(handle));
                 return;
             }
@@ -107,32 +160,10 @@ pub fn Dev() -> Element {
 
                 for url in &filenames {
                     let url = url.clone();
-                    let url_clone = url.clone();
                     let mut background_images = background_images.clone();
 
-                    let load_image = |url: String| -> std::pin::Pin<Box<dyn std::future::Future<Output = bool>>> {
-                        Box::pin(async move {
-                            let img = web_sys::HtmlImageElement::new().unwrap();
-                            let (tx, rx) = futures::channel::oneshot::channel();
-                            let tx_success = std::sync::Arc::new(std::sync::Mutex::new(Some(tx)));
-                            let tx_error = tx_success.clone();
-                            let success_callback = wasm_bindgen::closure::Closure::wrap(
-                                Box::new(move || { if let Some(tx) = tx_success.lock().unwrap().take() { let _ = tx.send(true); } }) as Box<dyn FnMut()>
-                            );
-                            let error_callback = wasm_bindgen::closure::Closure::wrap(
-                                Box::new(move || { if let Some(tx) = tx_error.lock().unwrap().take() { let _ = tx.send(false); } }) as Box<dyn FnMut()>
-                            );
-                            img.set_onload(Some(success_callback.as_ref().unchecked_ref()));
-                            img.set_onerror(Some(error_callback.as_ref().unchecked_ref()));
-                            img.set_src(&url);
-                            success_callback.forget();
-                            error_callback.forget();
-                            rx.await.unwrap_or(false)
-                        })
-                    };
-
                     for _ in 0..2 {
-                        if load_image(url_clone.clone()).await {
+                        if load_single_image(&url).await {
                             let mut imgs = background_images();
                             if !imgs.contains(&url) {
                                 if imgs.len() == 1 && imgs[0] == default_bg_image {
@@ -144,9 +175,9 @@ pub fn Dev() -> Element {
 
                                 if loaded_count == 0 {
                                     if let Some(old_handle) = bg_timer_handle() {
-                                        web_sys::window().unwrap().clear_interval_with_handle(old_handle);
+                                        web_sys::window().expect("Failed to get window").clear_interval_with_handle(old_handle);
                                     }
-                                    let handle = create_carousel_timer();
+                                    let handle = create_carousel_timer(background_images.clone(), current_bg_index.clone());
                                     bg_timer_handle.set(Some(handle));
                                 }
                             }
@@ -164,7 +195,7 @@ pub fn Dev() -> Element {
         move || {
             is_background_mode.set(false);
             if let Some(handle) = bg_timer_handle() {
-                web_sys::window().unwrap().clear_interval_with_handle(handle);
+                web_sys::window().expect("Failed to get window").clear_interval_with_handle(handle);
                 bg_timer_handle.set(None);
             }
         }
@@ -172,18 +203,7 @@ pub fn Dev() -> Element {
 
     use_effect(move || {
         if img_url().is_none() {
-            let mut img_url = img_url.clone();
-            spawn_local(async move {
-                let resp = gloo_net::http::Request::get("https://yun.ganto.cn/api/v1/images/random/1").send().await;
-                if let Ok(response) = resp {
-                    if let Ok(text) = response.text().await {
-                        let filenames = extract_filenames(&text);
-                        if let Some(url) = filenames.first() {
-                            img_url.set(Some(url.clone()));
-                        }
-                    }
-                }
-            });
+            fetch_and_set_random_image(img_url.clone());
         }
         ()
     });
@@ -191,7 +211,7 @@ pub fn Dev() -> Element {
     // 预加载背景墙图片
     use_effect(move || {
         for url in background_images().iter() {
-            let img = web_sys::HtmlImageElement::new().unwrap();
+            let img = web_sys::HtmlImageElement::new().expect("Failed to create HtmlImageElement");
             img.set_src(url);
         }
     });
@@ -259,6 +279,25 @@ pub fn Dev() -> Element {
                             }
                         }
                     }
+                    Link {
+                        to: Route::CircleGenerator,
+                        class: "dev-tool-link",
+                        style: "backdrop-filter: blur(8px); background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.3); padding: 8px; border-radius: 8px; margin-left: 8px; transition: all 0.3s ease; display: inline-flex; align-items: center; text-decoration: none; color: inherit;",
+                        svg {
+                            xmlns: "http://www.w3.org/2000/svg",
+                            view_box: "0 0 24 24",
+                            width: "24",
+                            height: "24",
+                            fill: "none",
+                            stroke: "currentColor",
+                            stroke_width: "2",
+                            stroke_linecap: "round",
+                            stroke_linejoin: "round",
+                            circle { cx: "12", cy: "12", r: "10" }
+                            circle { cx: "12", cy: "12", r: "6" }
+                            circle { cx: "12", cy: "12", r: "2" }
+                        }
+                    }
                 }
             }
             // 最上层的背景墙元素
@@ -268,32 +307,22 @@ pub fn Dev() -> Element {
                     onmousemove: move |_| {
                         show_exit_button.set(true);
                         hide_cursor.set(false);
-                        // 清除旧的定时器
                         if let Some(handle) = hide_btn_timer() {
-                            web_sys::window().unwrap().clear_timeout_with_handle(handle);
+                            web_sys::window().expect("Failed to get window").clear_timeout_with_handle(handle);
                         }
-                        // 新建定时器
-                        let mut show_exit_button = show_exit_button.clone();
-                        let mut hide_btn_timer = hide_btn_timer.clone();
-                        let mut hide_cursor = hide_cursor.clone();
-                        let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
-                            show_exit_button.set(false);
-                            hide_cursor.set(true);
-                            hide_btn_timer.set(None);
-                        }) as Box<dyn FnMut()>);
-                        let handle = web_sys::window().unwrap()
-                            .set_timeout_with_callback_and_timeout_and_arguments_0(closure.as_ref().unchecked_ref(), 3000)
-                            .unwrap();
+                        let handle = create_delayed_hide_timer(
+                            show_exit_button.clone(),
+                            hide_btn_timer.clone(),
+                            hide_cursor.clone(),
+                            HIDE_BTN_DELAY_MS,
+                        );
                         hide_btn_timer.set(Some(handle));
-                        closure.forget();
                     },
                     onmouseleave: move |_| {
-                        // 鼠标移出背景墙时立即隐藏按钮和光标
                         show_exit_button.set(false);
                         hide_cursor.set(true);
-                        // 清除定时器
                         if let Some(handle) = hide_btn_timer() {
-                            web_sys::window().unwrap().clear_timeout_with_handle(handle);
+                            web_sys::window().expect("Failed to get window").clear_timeout_with_handle(handle);
                             hide_btn_timer.set(None);
                         }
                     },
@@ -313,24 +342,18 @@ pub fn Dev() -> Element {
                             show_exit_button.set(true);
                             hide_cursor.set(false);
                             if let Some(handle) = hide_btn_timer() {
-                                web_sys::window().unwrap().clear_timeout_with_handle(handle);
+                                web_sys::window().expect("Failed to get window").clear_timeout_with_handle(handle);
                                 hide_btn_timer.set(None);
                             }
                         },
                         onmouseleave: move |_| {
-                            let mut show_exit_button = show_exit_button.clone();
-                            let mut hide_btn_timer = hide_btn_timer.clone();
-                            let mut hide_cursor = hide_cursor.clone();
-                            let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
-                                show_exit_button.set(false);
-                                hide_cursor.set(true);
-                                hide_btn_timer.set(None);
-                            }) as Box<dyn FnMut()>);
-                            let handle = web_sys::window().unwrap()
-                                .set_timeout_with_callback_and_timeout_and_arguments_0(closure.as_ref().unchecked_ref(), 3000)
-                                .unwrap();
+                            let handle = create_delayed_hide_timer(
+                                show_exit_button.clone(),
+                                hide_btn_timer.clone(),
+                                hide_cursor.clone(),
+                                HIDE_BTN_DELAY_MS,
+                            );
                             hide_btn_timer.set(Some(handle));
-                            closure.forget();
                         },
                         button {
                             class: "exit-background-btn",
@@ -357,4 +380,60 @@ pub fn Dev() -> Element {
             }
         }
     }
-} 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_filenames_empty() {
+        let result = extract_filenames("");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_extract_filenames_invalid_json() {
+        let result = extract_filenames("not json");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_extract_filenames_valid() {
+        let json = r#"{"code":200,"message":"success","data":{"data":["https://yun.ganto.cn/f/img1.jpg","https://yun.ganto.cn/f/img2.jpg"],"total":2}}"#;
+        let result = extract_filenames(json);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], "https://yun.ganto.cn/f/img1.jpg");
+        assert_eq!(result[1], "https://yun.ganto.cn/f/img2.jpg");
+    }
+
+    #[test]
+    fn test_extract_filenames_single() {
+        let json = r#"{"code":200,"message":"success","data":{"data":["https://yun.ganto.cn/f/img.jpg"],"total":1}}"#;
+        let result = extract_filenames(json);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "https://yun.ganto.cn/f/img.jpg");
+    }
+
+    #[test]
+    fn test_extract_filenames_empty_array() {
+        let json = r#"{"code":200,"message":"success","data":{"data":[],"total":0}}"#;
+        let result = extract_filenames(json);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_extract_filenames_missing_data_field() {
+        let json = r#"{"code":200,"message":"success"}"#;
+        let result = extract_filenames(json);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_extract_filenames_trim_whitespace() {
+        let json = r#"{"data":{"data":["  https://yun.ganto.cn/f/img.jpg  "]}}"#;
+        let result = extract_filenames(json);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "https://yun.ganto.cn/f/img.jpg");
+    }
+}

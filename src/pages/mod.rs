@@ -4,7 +4,10 @@ pub mod home;
 pub mod blog_post;
 pub mod tags;
 pub mod not_found;
+pub mod circle_generator;
+#[cfg(feature = "dev-pages")]
 pub mod playground;
+#[cfg(feature = "dev-pages")]
 pub mod test;
 
 pub use about::About;
@@ -13,5 +16,8 @@ pub use home::Home;
 pub use blog_post::BlogPostView;
 pub use tags::Tags;
 pub use not_found::NotFound;
+pub use circle_generator::CircleGenerator;
+#[cfg(feature = "dev-pages")]
 pub use playground::Playground;
+#[cfg(feature = "dev-pages")]
 pub use test::Test;

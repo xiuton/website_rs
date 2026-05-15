@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod models;
 mod routes;
 mod app;

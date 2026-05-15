@@ -1,27 +1,12 @@
 use dioxus::prelude::*;
 use crate::utils::title;
 
-#[allow(unused)]
-static STYLE: &str = include_str!("../assets/playground.css");
-
 #[component]
 pub fn Playground() -> Element {
     // Set page title
     use_effect(move || {
         title::set_page_title("操场 - 干徒");
         ()
-    });
-
-    // Initialize CSS on component mount
-    use_effect(move || {
-        if let Some(window) = web_sys::window() {
-            let document = window.document().unwrap();
-            if let Some(head) = document.head() {
-                let style = document.create_element("style").unwrap();
-                style.set_text_content(Some(STYLE));
-                let _ = head.append_child(&style);
-            }
-        }
     });
 
     rsx! {

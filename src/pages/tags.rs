@@ -1,9 +1,9 @@
 use dioxus::prelude::*;
 use wasm_bindgen_futures::spawn_local;
+use wasm_bindgen::JsCast;
 use serde::{Serialize, Deserialize};
 use crate::utils::title;
 
-#[allow(unused)]
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 struct Bookmark {
     title: String,
@@ -12,12 +12,10 @@ struct Bookmark {
     icon: String,
 }
 
-#[allow(unused)]
 struct BookmarkManager {
     bookmarks: Vec<Bookmark>,
 }
 
-#[allow(unused)]
 impl BookmarkManager {
     fn new() -> Self {
         let config = include_str!("../../data/bookmarks.toml");
@@ -33,7 +31,6 @@ impl BookmarkManager {
                     item.get("url").and_then(|v| v.as_str()),
                     item.get("description").and_then(|v| v.as_str()),
                 ) {
-                    // 如果 icon 字段不存在，使用空字符串
                     let icon = item.get("icon")
                         .and_then(|v| v.as_str())
                         .unwrap_or("")
@@ -53,10 +50,6 @@ impl BookmarkManager {
 
         Self { bookmarks }
     }
-
-    fn load_from_storage() -> Self {
-        Self::new()
-    }
 }
 
 #[component]
@@ -66,7 +59,7 @@ pub fn Tags() -> Element {
         title::set_page_title("书签 - 干徒");
     });
 
-    let bookmark_manager = use_signal(BookmarkManager::load_from_storage);
+    let bookmark_manager = use_signal(BookmarkManager::new);
     let mut search_text = use_signal(String::new);
     let mut search_query = use_signal(String::new);  // 实际的搜索关键词
 
@@ -76,16 +69,21 @@ pub fn Tags() -> Element {
         // 在搜索后添加滚动到第一个匹配项的逻辑
         if !search_text().is_empty() {
             spawn_local(async {
-                // 给DOM一点时间更新
-                gloo_timers::callback::Timeout::new(100, move || {
-            if let Some(window) = web_sys::window() {
+                let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+                    if let Some(window) = web_sys::window() {
                         if let Some(document) = window.document() {
                             if let Some(element) = document.query_selector(".highlight").ok().flatten() {
                                 element.scroll_into_view_with_bool(true);
                             }
                         }
                     }
-                }).forget();
+                }) as Box<dyn FnMut()>);
+                let _handle = web_sys::window().expect("Failed to get window")
+                    .set_timeout_with_callback_and_timeout_and_arguments_0(
+                        closure.as_ref().unchecked_ref(),
+                        100
+                    ).expect("Failed to set timeout");
+                closure.forget();
             });
         }
     };
@@ -97,8 +95,7 @@ pub fn Tags() -> Element {
             // 在回车搜索后也添加滚动到第一个匹配项的逻辑
             if !search_text().is_empty() {
                 spawn_local(async {
-                    // 给DOM一点时间更新
-                    gloo_timers::callback::Timeout::new(100, move || {
+                    let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
                         if let Some(window) = web_sys::window() {
                             if let Some(document) = window.document() {
                                 if let Some(element) = document.query_selector(".highlight").ok().flatten() {
@@ -106,7 +103,13 @@ pub fn Tags() -> Element {
                                 }
                             }
                         }
-                    }).forget();
+                    }) as Box<dyn FnMut()>);
+                    let _handle = web_sys::window().expect("Failed to get window")
+                        .set_timeout_with_callback_and_timeout_and_arguments_0(
+                            closure.as_ref().unchecked_ref(),
+                            100
+                        ).expect("Failed to set timeout");
+                    closure.forget();
                 });
             }
         }
@@ -186,7 +189,6 @@ pub fn Tags() -> Element {
     }
 }
 
-#[allow(unused)]
 fn get_bookmark_icon(icon_name: &str) -> Element {
     // 如果 icon_name 为空字符串或者没有设置 icon 字段（传入空字符串），显示默认图标
     if icon_name.is_empty() {

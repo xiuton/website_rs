@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 use crate::routes::Route;
 use crate::models::RuntimeBlogPost;
 use crate::BLOG_POSTS;
-use crate::utils::title;
+use crate::utils::{title, code_highlight};
 
 #[component]
 pub fn BlogPostView(slug: String) -> Element {
@@ -44,116 +44,14 @@ pub fn BlogPostView(slug: String) -> Element {
 
     // 初始化代码高亮
     use_effect(move || {
-        let window = web_sys::window().unwrap();
-        let document = window.document().unwrap();
-        
-        // 添加 highlight.js CSS
-        let link = document.create_element("link").unwrap();
-        link.set_attribute("rel", "stylesheet").unwrap();
-        link.set_attribute("href", "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css").unwrap();
-        document.head().unwrap().append_child(&link).unwrap();
-        
-        // 添加 highlight.js 脚本
-        let script = document.create_element("script").unwrap();
-        script.set_attribute("src", "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js").unwrap();
-        script.set_attribute("async", "false").unwrap();
-        document.head().unwrap().append_child(&script).unwrap();
-        
-        // 等待主脚本加载完成后再加载语言模块
-        let init_script = document.create_element("script").unwrap();
-        let _ = init_script.set_text_content(Some(r#"
-            function loadLanguages() {
-                if (typeof hljs !== 'undefined') {
-                    const languages = [
-                        { name: "rust", file: "rust.min.js" },
-                        { name: "javascript", file: "javascript.min.js" },
-                        { name: "typescript", file: "typescript.min.js" },
-                        { name: "python", file: "python.min.js" },
-                        { name: "go", file: "go.min.js" },
-                        { name: "java", file: "java.min.js" },
-                        { name: "cpp", file: "cpp.min.js" },
-                        { name: "csharp", file: "csharp.min.js" },
-                        { name: "php", file: "php.min.js" },
-                        { name: "ruby", file: "ruby.min.js" },
-                        { name: "swift", file: "swift.min.js" },
-                        { name: "kotlin", file: "kotlin.min.js" },
-                        { name: "scala", file: "scala.min.js" },
-                        { name: "bash", file: "bash.min.js" },
-                        { name: "shell", file: "shell.min.js" },
-                        { name: "sql", file: "sql.min.js" },
-                        { name: "xml", file: "xml.min.js" },
-                        { name: "yaml", file: "yaml.min.js" },
-                        { name: "json", file: "json.min.js" },
-                        { name: "markdown", file: "markdown.min.js" },
-                        { name: "html", file: "xml.min.js" }
-                    ];
-                    
-                    // 创建一个 Promise 来跟踪所有语言模块的加载
-                    const loadPromises = languages.map(lang => {
-                        return new Promise((resolve) => {
-                        const script = document.createElement('script');
-                        script.src = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/${lang.file}`;
-                        script.async = true;
-                            script.onload = () => resolve();
-                        document.head.appendChild(script);
-                    });
-                    });
-
-                    // 等待所有语言模块加载完成后再应用高亮
-                    Promise.all(loadPromises).then(() => {
-                        // 确保代码块有正确的语言类名
-                        document.querySelectorAll('pre code').forEach((block) => {
-                            const languageClass = block.className.split(' ').find(cls => cls.startsWith('language-'));
-                            if (languageClass) {
-                                const language = languageClass.replace('language-', '');
-                                block.parentElement.setAttribute('data-lang', language);
-                            }
-                        });
-                        // 应用高亮
-                    hljs.highlightAll();
-                    });
-                } else {
-                    setTimeout(loadLanguages, 100);
-                }
-            }
-
-            // 初始加载语言模块
-            loadLanguages();
-        "#));
-        let _ = document.body().unwrap().append_child(&init_script);
+        code_highlight::init_highlight();
     });
 
     // 监听文章内容变化，重新应用代码高亮
     use_effect(move || {
         let post = post();
         if post.is_some() {
-            let window = web_sys::window().unwrap();
-            let document = window.document().unwrap();
-            
-            // 等待 DOM 更新后应用高亮
-            let init_script = document.create_element("script").unwrap();
-            let _ = init_script.set_text_content(Some(r#"
-                function applyHighlight() {
-                    if (typeof hljs !== 'undefined') {
-                        // 确保代码块有正确的语言类名
-                        document.querySelectorAll('pre code').forEach((block) => {
-                            const languageClass = block.className.split(' ').find(cls => cls.startsWith('language-'));
-                            if (languageClass) {
-                                const language = languageClass.replace('language-', '');
-                                block.parentElement.setAttribute('data-lang', language);
-                            }
-                        });
-                        // 应用高亮
-                        hljs.highlightAll();
-                    } else {
-                        setTimeout(applyHighlight, 100);
-                    }
-                }
-
-                // 初始应用高亮
-                applyHighlight();
-            "#));
-            let _ = document.body().unwrap().append_child(&init_script);
+            code_highlight::reapply_highlight();
         }
     });
 
@@ -168,7 +66,7 @@ pub fn BlogPostView(slug: String) -> Element {
                                 class: "back-button history-back",
                                 onclick: move |_| {
                                     if let Some(window) = web_sys::window() {
-                                        let _ = window.history().unwrap().back();
+                                        let _ = window.history().expect("Failed to get history").back();
                                     }
                                 },
                             svg {
@@ -209,7 +107,7 @@ pub fn BlogPostView(slug: String) -> Element {
                             button { 
                                 class: "function-button",
                                 onclick: move |_| {
-                                    let window = web_sys::window().unwrap();
+                                    let window = web_sys::window().expect("Failed to get window");
                                     let _ = window.scroll_to_with_x_and_y(0.0, 0.0);
                                 },
                                 svg {
@@ -292,23 +190,7 @@ pub fn BlogPostView(slug: String) -> Element {
                     div { 
                         class: "blog-content",
                         dangerous_inner_html: {
-                            let mut options = comrak::ComrakOptions::default();
-                            options.extension.table = true;
-                            options.extension.strikethrough = true;
-                            options.extension.autolink = true;
-                            options.extension.tasklist = true;
-                            options.extension.superscript = true;
-                            options.extension.header_ids = Some("".to_string());
-                            options.extension.footnotes = true;
-                            options.extension.description_lists = true;
-                            options.parse.smart = true;
-                            options.render.hardbreaks = true;
-                            options.render.github_pre_lang = true;
-                            options.render.unsafe_ = true;
-                            options.render.escape = false;
-                            
-                            let html = comrak::markdown_to_html(&post.content, &options);
-                            // 确保代码块的语言标识被正确保留
+                            let html = crate::utils::markdown::markdown_to_html(&post.content);
                             let html = html.replace("<pre><code>", "<pre><code class=\"language-plaintext\">");
                             let html = html.replace("<pre><code class=\"", "<pre><code class=\"language-");
                             html

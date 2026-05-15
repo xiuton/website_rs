@@ -4,35 +4,37 @@ use crate::routes::Route;
 
 #[component]
 pub fn Navbar(is_dark: Signal<bool>) -> Element {
-    const NAV_ITEMS: &[(&str, &str)] = &[
+    let nav_items: &[(&str, &str)] = &[
         ("/", "首页"),
         ("/about", "关于"),
         ("/tags", "书签"),
         ("/dev", "开发"),
+        #[cfg(feature = "dev-pages")]
         ("/playground", "操场"),
+        #[cfg(feature = "dev-pages")]
         ("/test", "测试"),
     ];
 
     let onclick = move |e: Event<MouseData>| {
-        let window = web_sys::window().unwrap();
-        let document = window.document().unwrap();
-        let html = document.document_element().unwrap();
+        let window = web_sys::window().expect("Failed to get window");
+        let document = window.document().expect("Failed to get document");
+        let html = document.document_element().expect("Failed to get document element");
         let coords = e.client_coordinates();
         let x = coords.x;
         let y = coords.y;
-        let width = window.inner_width().unwrap().as_f64().unwrap();
-        let height = window.inner_height().unwrap().as_f64().unwrap();
+        let width = window.inner_width().expect("Failed to get inner width").as_f64().expect("Failed to convert width to f64");
+        let height = window.inner_height().expect("Failed to get inner height").as_f64().expect("Failed to convert height to f64");
         let end_radius = ((x.max(width - x)).powi(2) + (y.max(height - y)).powi(2)).sqrt();
-        html.set_attribute("style", &format!("--x: {}px; --y: {}px; --r: {}px", x, y, end_radius)).unwrap();
-        let supports_transition = js_sys::eval("Boolean(document.startViewTransition)").unwrap().as_bool().unwrap_or(false);
+        html.set_attribute("style", &format!("--x: {}px; --y: {}px; --r: {}px", x, y, end_radius)).expect("Failed to set style attribute");
+        let supports_transition = js_sys::eval("Boolean(document.startViewTransition)").expect("Failed to eval startViewTransition").as_bool().unwrap_or(false);
         if supports_transition {
             let _ = js_sys::eval("document.startViewTransition(() => { document.documentElement.classList.toggle('dark'); })");
         } else {
             let class = html.class_name();
             if class.contains("dark") {
-                html.set_attribute("class", "").unwrap();
+                html.set_attribute("class", "").expect("Failed to remove dark class");
             } else {
-                html.set_attribute("class", "dark").unwrap();
+                html.set_attribute("class", "dark").expect("Failed to set dark class");
             }
         }
         is_dark.set(!is_dark());
@@ -51,7 +53,9 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
             "/about" => matches!(route, Route::About),
             "/tags" => matches!(route, Route::Tags),
             "/dev" => matches!(route, Route::Dev),
+            #[cfg(feature = "dev-pages")]
             "/playground" => matches!(route, Route::Playground),
+            #[cfg(feature = "dev-pages")]
             "/test" => matches!(route, Route::Test),
             _ => false
         }
@@ -66,7 +70,7 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                 }
                 div { class: "navbar-subtitle", "这很酷" }
                 div { class: "navbar-links",
-                    {NAV_ITEMS.iter().map(|(href, label)| {
+                    {nav_items.iter().map(|(href, label)| {
                         let active = is_active(href);
                         rsx! {
                             Link {

@@ -1,12 +1,14 @@
 use dioxus::prelude::*;
 use dioxus_router::prelude::{Routable};
 
-use crate::components::{ Layout, TestLayout };
+use crate::components::Layout;
+use crate::components::TestLayout;
 use crate::pages::{
-    About, Dev, Home, BlogPostView, Tags, NotFound, Playground, Test
+    About, Dev, Home, BlogPostView, Tags, NotFound, CircleGenerator,
 };
+#[cfg(feature = "dev-pages")]
+use crate::pages::{Playground, Test};
 
-#[allow(unused)]
 #[derive(Routable, Clone)]
 pub enum Route {
     #[layout(Layout)]
@@ -20,13 +22,17 @@ pub enum Route {
     Tags,
     #[route("/post/:slug")]
     BlogPostView { slug: String },
+    #[cfg(feature = "dev-pages")]
     #[route("/playground")]
     Playground,
     #[route("/:..route")]
     NotFound { route: Vec<String> },
     #[end_layout]
 
-    #[layout[TestLayout]]
+    #[layout(TestLayout)]
+    #[route("/circle-generator")]
+    CircleGenerator,
+    #[cfg(feature = "dev-pages")]
     #[route("/test")]
     Test,
 }

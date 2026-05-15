@@ -1,3 +1,7 @@
 [wasm]
 # 启用 wasm-opt 优化
 opt = true
+
+[serve]
+# 开发服务器端口
+port = 8080

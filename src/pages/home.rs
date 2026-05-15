@@ -2,23 +2,11 @@ use dioxus::prelude::*;
 use dioxus_router::prelude::Link;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::UrlSearchParams;
-use pulldown_cmark::{Parser, html::push_html, Options};
 
 use crate::models::RuntimeBlogPost;
 use crate::routes::Route;
 use crate::BLOG_POSTS;
 use crate::utils::title;
-
-fn markdown_to_html(markdown: &str) -> String {
-    let mut options = Options::empty();
-    options.insert(Options::ENABLE_STRIKETHROUGH);
-    options.insert(Options::ENABLE_TABLES);
-
-    let parser = Parser::new_ext(markdown, options);
-    let mut html_output = String::new();
-    push_html(&mut html_output, parser);
-    html_output
-}
 
 #[component]
 pub fn Home() -> Element {
@@ -32,10 +20,10 @@ pub fn Home() -> Element {
 
     // 获取当前 URL 的查询参数
     let location = web_sys::window()
-        .unwrap()
+        .expect("Failed to get window")
         .location();
     let search = location.search().unwrap_or_default();
-    let query_params: UrlSearchParams = UrlSearchParams::new_with_str(&search).unwrap();
+    let query_params: UrlSearchParams = UrlSearchParams::new_with_str(&search).expect("Failed to create URLSearchParams");
     
     // 从 URL 参数中获取页码和每页数量
     let page_from_url = query_params.get("page")
@@ -70,12 +58,12 @@ pub fn Home() -> Element {
     // 更新 URL 的函数
     let update_url = move |page: usize, size: usize| {
         if let Some(window) = web_sys::window() {
-            if let Ok(url) = web_sys::Url::new(&window.location().href().unwrap()) {
+            if let Ok(url) = web_sys::Url::new(&window.location().href().expect("Failed to get href")) {
                 let search_params = url.search_params();
                 search_params.set("page", &page.to_string());
                 search_params.set("size", &size.to_string());
                 let new_url = format!("/?{}", search_params.to_string());
-                let _ = window.history().unwrap()
+                let _ = window.history().expect("Failed to get history")
                     .replace_state_with_url(
                         &wasm_bindgen::JsValue::NULL,
                         "",
@@ -139,7 +127,7 @@ pub fn Home() -> Element {
                                                     .chars()
                                                     .take(200)
                                                     .collect::<String>();
-                                                markdown_to_html(&preview) + "..."
+                                                crate::utils::markdown::markdown_to_html_preview(&preview) + "..."
                                             }
                                         }
                                         div { class: "preview-tags",

@@ -5,7 +5,7 @@ use crate::routes::Route;
 #[component]
 pub fn TestLayout() -> Element {
     rsx! {
-        div { class: "app",
+        div { class: "app app-standalone",
             div {
                 style: "display: flex; justify-content: center; padding: 2rem 0;",
                 Link {
