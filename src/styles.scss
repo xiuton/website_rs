@@ -1861,6 +1861,7 @@ html.dark::view-transition-new(root) {
                         overflow: hidden;
                         text-overflow: ellipsis;
                         display: -webkit-box;
+                        line-clamp: 1;
                         -webkit-line-clamp: 1;
                         -webkit-box-orient: vertical;
                     }
@@ -2191,6 +2192,7 @@ html.dark::view-transition-new(root) {
       border-radius: 3px;
       background: var(--border-color);
       outline: none;
+      appearance: none;
       -webkit-appearance: none;
 
       &::-webkit-slider-thumb {
@@ -2622,8 +2624,11 @@ html.dark::view-transition-new(root) {
   border: 1px solid var(--border-color);
   border-radius: 10px;
   padding: 20px;
-  margin-bottom: 20px;
   box-shadow: var(--shadow);
+}
+
+.cg-config-section .cg-card {
+  margin-bottom: 0;
 }
 
 .cg-canvas-section {
@@ -2671,6 +2676,30 @@ html.dark::view-transition-new(root) {
 
 .cg-config-section {
   margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.cg-card-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cg-card-actions {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+
+  button {
+    width: 100%;
+  }
 }
 
 .cg-config-grid {
@@ -2709,8 +2738,12 @@ html.dark::view-transition-new(root) {
   }
 }
 
-.cg-config-action {
-  justify-content: flex-end;
+.cg-cycle-label {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  color: #4f6ef7 !important;
+  min-width: auto !important;
+  text-align: left !important;
 }
 
 .cg-speed-wrap {
@@ -2942,9 +2975,5 @@ html.dark::view-transition-new(root) {
 @media (max-width: 640px) {
   .cg-config-grid {
     grid-template-columns: repeat(2, 1fr);
-  }
-
-  .cg-config-action {
-    grid-column: 1 / -1;
   }
 } 

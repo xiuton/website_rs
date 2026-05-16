@@ -2,8 +2,83 @@ use dioxus::prelude::*;
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
+use serde::{Deserialize, Serialize};
 use crate::utils::circle_generator::{generate_circles, Circle, GenerationConfig};
 use crate::utils::title;
+
+#[derive(Serialize, Deserialize, Clone)]
+struct PageConfig {
+    config_width: f64,
+    config_height: f64,
+    gap: f64,
+    min_radius: f64,
+    max_radius: f64,
+    picker_speed: f64,
+    anim_duration: f64,
+    dwell_time: f64,
+}
+
+impl Default for PageConfig {
+    fn default() -> Self {
+        Self {
+            config_width: 800.0,
+            config_height: 600.0,
+            gap: 10.0,
+            min_radius: 10.0,
+            max_radius: 60.0,
+            picker_speed: 200.0,
+            anim_duration: 60.0,
+            dwell_time: 100.0,
+        }
+    }
+}
+
+fn save_config(config: &PageConfig) {
+    if let Ok(Some(storage)) = web_sys::window()
+        .map(|w| w.local_storage())
+        .unwrap_or(Err("no window".into()))
+    {
+        if let Ok(json) = serde_json::to_string(config) {
+            let _ = storage.set_item("circle_generator_config", &json);
+        }
+    }
+}
+
+fn load_config() -> PageConfig {
+    if let Ok(Some(storage)) = web_sys::window()
+        .map(|w| w.local_storage())
+        .unwrap_or(Err("no window".into()))
+    {
+        if let Ok(Some(json)) = storage.get_item("circle_generator_config") {
+            if let Ok(config) = serde_json::from_str(&json) {
+                return config;
+            }
+        }
+    }
+    PageConfig::default()
+}
+
+fn save_all_config(
+    config_width: f64,
+    config_height: f64,
+    gap: f64,
+    min_radius: f64,
+    max_radius: f64,
+    picker_speed: f64,
+    anim_duration: f64,
+    dwell_time: f64,
+) {
+    save_config(&PageConfig {
+        config_width,
+        config_height,
+        gap,
+        min_radius,
+        max_radius,
+        picker_speed,
+        anim_duration,
+        dwell_time,
+    });
+}
 
 fn hsl_color(index: usize, total: usize) -> String {
     let hue = (index as f64 / total.max(1) as f64) * 360.0;
@@ -104,23 +179,29 @@ fn render_canvas(circles: &[Circle], config_width: f64, config_height: f64, high
         }
     }
 
+    let mask_pos = mask_hole.or_else(|| {
+        highlight.and_then(|idx| circles.get(idx).map(|c| {
+            (c.x * scale_x, c.y * scale_y, c.radius * scale_x + 4.0)
+        }))
+    });
+
+    if let Some((hole_cx, hole_cy, hole_cr)) = mask_pos {
+        ctx.save();
+        ctx.begin_path();
+        ctx.rect(0.0, 0.0, display_width, display_height);
+        let _ = ctx.arc_with_anticlockwise(hole_cx, hole_cy, hole_cr, 0.0, std::f64::consts::PI * 2.0, true);
+        ctx.clip();
+
+        ctx.set_fill_style_str("rgba(0,0,0,0.35)");
+        ctx.fill_rect(0.0, 0.0, display_width, display_height);
+        ctx.restore();
+    }
+
     if let Some(idx) = highlight {
         if let Some(circle) = circles.get(idx) {
             let cx = circle.x * scale_x;
             let cy = circle.y * scale_y;
             let cr = circle.radius * scale_x + 4.0;
-
-            let (hole_cx, hole_cy, hole_cr) = mask_hole.unwrap_or((cx, cy, cr));
-
-            ctx.save();
-            ctx.begin_path();
-            ctx.rect(0.0, 0.0, display_width, display_height);
-            let _ = ctx.arc_with_anticlockwise(hole_cx, hole_cy, hole_cr, 0.0, std::f64::consts::PI * 2.0, true);
-            ctx.clip();
-
-            ctx.set_fill_style_str("rgba(0,0,0,0.35)");
-            ctx.fill_rect(0.0, 0.0, display_width, display_height);
-            ctx.restore();
 
             ctx.begin_path();
             ctx.arc(cx, cy, cr, 0.0, std::f64::consts::PI * 2.0)
@@ -149,12 +230,13 @@ pub fn CircleGenerator() -> Element {
         ()
     });
 
+    let cfg = load_config();
     let mut circles = use_signal(|| Vec::<Circle>::new());
-    let mut config_width = use_signal(|| 800.0);
-    let mut config_height = use_signal(|| 600.0);
-    let mut gap = use_signal(|| 10.0);
-    let mut min_radius = use_signal(|| 10.0);
-    let mut max_radius = use_signal(|| 60.0);
+    let mut config_width = use_signal(|| cfg.config_width);
+    let mut config_height = use_signal(|| cfg.config_height);
+    let mut gap = use_signal(|| cfg.gap);
+    let mut min_radius = use_signal(|| cfg.min_radius);
+    let mut max_radius = use_signal(|| cfg.max_radius);
     let mut generating = use_signal(|| false);
     let mut selecting = use_signal(|| false);
     let mut highlight_index = use_signal(|| None::<usize>);
@@ -162,8 +244,11 @@ pub fn CircleGenerator() -> Element {
     let mut show_modal = use_signal(|| false);
 
     let mut timer_handle = use_signal(|| None::<i32>);
-    let mut picker_speed = use_signal(|| 80.0);
-    let mut anim_duration = use_signal(|| 60.0);
+    let mut picker_speed = use_signal(|| cfg.picker_speed);
+    let mut anim_duration = use_signal(|| cfg.anim_duration);
+    let mut dwell_time = use_signal(|| cfg.dwell_time);
+    let mut last_picked_idx = use_signal(|| None::<usize>);
+    let mut anim_frame_handle = use_signal(|| None::<i32>);
 
     let mut generate = move || {
         generating.set(true);
@@ -218,10 +303,18 @@ pub fn CircleGenerator() -> Element {
                 let _ = web_sys::window().map(|w| w.clear_interval_with_handle(handle));
                 timer_handle.set(None);
             }
+            if let Some(handle) = anim_frame_handle() {
+                let _ = web_sys::window().map(|w| w.cancel_animation_frame(handle));
+                anim_frame_handle.set(None);
+            }
             selecting.set(false);
             let circles_snapshot = circles();
-            let idx = highlight_index();
-            if let Some(i) = idx {
+            let final_idx = last_picked_idx().or(highlight_index());
+            if let Some(i) = final_idx {
+                highlight_index.set(Some(i));
+                let w = config_width();
+                let h = config_height();
+                render_canvas(&circles_snapshot, w, h, Some(i), None, None);
                 if let Some(circle) = circles_snapshot.get(i) {
                     selected_circle.set(Some((i, circle.clone())));
                     show_modal.set(true);
@@ -233,14 +326,12 @@ pub fn CircleGenerator() -> Element {
                 return;
             }
             selecting.set(true);
-            highlight_index.set(None);
             selected_circle.set(None);
             show_modal.set(false);
 
             let window = web_sys::window().expect("Failed to get window");
             let window_for_interval = window.clone();
-            let prev_idx = std::cell::Cell::new(None::<usize>);
-            let anim_handle = std::rc::Rc::new(std::cell::Cell::new(None::<i32>));
+            let prev_idx = std::cell::Cell::new(highlight_index());
             let interval_closure = Closure::wrap(Box::new(move || {
                 let circles_snapshot = circles();
                 if circles_snapshot.is_empty() {
@@ -249,12 +340,13 @@ pub fn CircleGenerator() -> Element {
                 let idx = (js_sys::Math::random() * circles_snapshot.len() as f64) as usize;
                 let prev = prev_idx.get();
                 prev_idx.set(Some(idx));
+                last_picked_idx.set(Some(idx));
 
                 if prev.is_none() {
                     highlight_index.set(Some(idx));
                 }
 
-                if let Some(handle) = anim_handle.get() {
+                if let Some(handle) = anim_frame_handle() {
                     let _ = window_for_interval.cancel_animation_frame(handle);
                 }
 
@@ -282,7 +374,6 @@ pub fn CircleGenerator() -> Element {
                     let duration = anim_duration();
                     let window2 = window_for_interval.clone();
                     let circles_clone = circles_snapshot.clone();
-                    let anim_handle_for_frame = anim_handle.clone();
                     let target_idx = idx;
                     let prev_idx_val = prev;
 
@@ -299,7 +390,7 @@ pub fn CircleGenerator() -> Element {
                         let my = from_sy + (to_sy - from_sy) * eased;
                         let mr = from_sr + (to_sr - from_sr) * eased;
 
-                        render_canvas(&circles_clone, w, h, prev_idx_val, None, Some((mx, my, mr)));
+                        render_canvas(&circles_clone, w, h, None, None, Some((mx, my, mr)));
 
                         if t < 1.0 {
                             let rc = anim_rc_clone.clone();
@@ -312,12 +403,12 @@ pub fn CircleGenerator() -> Element {
                                 }
                             });
                             let h = window2.request_animation_frame(next.as_ref().unchecked_ref()).expect("Failed to request animation frame");
-                            anim_handle_for_frame.set(Some(h));
+                            anim_frame_handle.set(Some(h));
                             next.forget();
                         } else {
                             highlight_index.set(Some(target_idx));
                             render_canvas(&circles_clone, w, h, Some(target_idx), prev_idx_val, None);
-                            anim_handle_for_frame.set(None);
+                            anim_frame_handle.set(None);
                         }
                     }) as Box<dyn FnMut()>);
 
@@ -328,7 +419,7 @@ pub fn CircleGenerator() -> Element {
                         if let Some(c) = borrowed.as_ref() {
                             let func: &js_sys::Function = c.as_ref().unchecked_ref();
                             let handle = window_for_interval.request_animation_frame(func).expect("Failed to request animation frame");
-                            anim_handle.set(Some(handle));
+                            anim_frame_handle.set(Some(handle));
                         }
                     }
                 } else {
@@ -339,7 +430,7 @@ pub fn CircleGenerator() -> Element {
             let handle = window
                 .set_interval_with_callback_and_timeout_and_arguments_0(
                     interval_closure.as_ref().unchecked_ref(),
-                    picker_speed() as i32,
+                    (anim_duration() + dwell_time() + picker_speed()) as i32,
                 )
                 .expect("Failed to set interval");
             interval_closure.forget();
@@ -392,6 +483,9 @@ pub fn CircleGenerator() -> Element {
 
             div { class: "cg-config-section",
                 div { class: "cg-card",
+                    div { class: "cg-card-header",
+                        span { "重新生成配置" }
+                    }
                     div { class: "cg-config-grid",
                         div { class: "cg-config-item",
                             label { r#for: "cg-width", "宽度" }
@@ -404,6 +498,7 @@ pub fn CircleGenerator() -> Element {
                                 oninput: move |e| {
                                     if let Ok(v) = e.value().parse::<f64>() {
                                         config_width.set(v.max(200.0));
+                                        save_all_config(config_width(), config_height(), gap(), min_radius(), max_radius(), picker_speed(), anim_duration(), dwell_time());
                                     }
                                 }
                             }
@@ -419,6 +514,7 @@ pub fn CircleGenerator() -> Element {
                                 oninput: move |e| {
                                     if let Ok(v) = e.value().parse::<f64>() {
                                         config_height.set(v.max(200.0));
+                                        save_all_config(config_width(), config_height(), gap(), min_radius(), max_radius(), picker_speed(), anim_duration(), dwell_time());
                                     }
                                 }
                             }
@@ -434,6 +530,7 @@ pub fn CircleGenerator() -> Element {
                                 oninput: move |e| {
                                     if let Ok(v) = e.value().parse::<f64>() {
                                         gap.set(v.max(0.0));
+                                        save_all_config(config_width(), config_height(), gap(), min_radius(), max_radius(), picker_speed(), anim_duration(), dwell_time());
                                     }
                                 }
                             }
@@ -449,6 +546,7 @@ pub fn CircleGenerator() -> Element {
                                 oninput: move |e| {
                                     if let Ok(v) = e.value().parse::<f64>() {
                                         min_radius.set(v.max(5.0));
+                                        save_all_config(config_width(), config_height(), gap(), min_radius(), max_radius(), picker_speed(), anim_duration(), dwell_time());
                                     }
                                 }
                             }
@@ -465,10 +563,27 @@ pub fn CircleGenerator() -> Element {
                                     if let Ok(v) = e.value().parse::<f64>() {
                                         let min = min_radius();
                                         max_radius.set(v.max(min + 1.0));
+                                        save_all_config(config_width(), config_height(), gap(), min_radius(), max_radius(), picker_speed(), anim_duration(), dwell_time());
                                     }
                                 }
                             }
                         }
+                    }
+                    div { class: "cg-card-actions",
+                        button {
+                            class: "cg-btn",
+                            disabled: generating(),
+                            onclick: move |_| generate(),
+                            if generating() { "生成中..." } else { "重新生成" }
+                        }
+                    }
+                }
+
+                div { class: "cg-card",
+                    div { class: "cg-card-header",
+                        span { "随机选取配置" }
+                    }
+                    div { class: "cg-config-grid",
                         div { class: "cg-config-item",
                             label { r#for: "cg-picker-speed", "选取速度" }
                             div { class: "cg-speed-wrap",
@@ -483,17 +598,25 @@ pub fn CircleGenerator() -> Element {
                                         if let Ok(v) = e.value().parse::<f64>() {
                                             picker_speed.set(v);
                                             if anim_duration() > v {
-                                                anim_duration.set(v);
+                                                anim_duration.set(v.max(10.0));
                                             }
+                                            save_all_config(config_width(), config_height(), gap(), min_radius(), max_radius(), picker_speed(), anim_duration(), dwell_time());
                                             if selecting() {
                                                 if let Some(handle) = timer_handle() {
                                                     let _ = web_sys::window().map(|w| w.clear_interval_with_handle(handle));
                                                     timer_handle.set(None);
                                                 }
+                                                if let Some(handle) = anim_frame_handle() {
+                                                    let _ = web_sys::window().map(|w| w.cancel_animation_frame(handle));
+                                                    anim_frame_handle.set(None);
+                                                }
+                                                let circles_snapshot = circles();
+                                                let w = config_width();
+                                                let h = config_height();
+                                                render_canvas(&circles_snapshot, w, h, last_picked_idx(), None, None);
                                                 let window = web_sys::window().expect("Failed to get window");
                                                 let window_for_interval = window.clone();
-                                                let prev_idx = std::cell::Cell::new(None::<usize>);
-                                                let anim_handle = std::rc::Rc::new(std::cell::Cell::new(None::<i32>));
+                                                let prev_idx = std::cell::Cell::new(last_picked_idx());
                                                 let interval_closure = Closure::wrap(Box::new(move || {
                                                     let circles_snapshot = circles();
                                                     if circles_snapshot.is_empty() {
@@ -502,12 +625,13 @@ pub fn CircleGenerator() -> Element {
                                                     let idx = (js_sys::Math::random() * circles_snapshot.len() as f64) as usize;
                                                     let prev = prev_idx.get();
                                                     prev_idx.set(Some(idx));
+                                                    last_picked_idx.set(Some(idx));
 
                                                     if prev.is_none() {
                                                         highlight_index.set(Some(idx));
                                                     }
 
-                                                    if let Some(handle) = anim_handle.get() {
+                                                    if let Some(handle) = anim_frame_handle() {
                                                         let _ = window_for_interval.cancel_animation_frame(handle);
                                                     }
 
@@ -535,7 +659,6 @@ pub fn CircleGenerator() -> Element {
                                                         let duration = anim_duration();
                                                         let window2 = window_for_interval.clone();
                                                         let circles_clone = circles_snapshot.clone();
-                                                        let anim_handle_for_frame = anim_handle.clone();
                                                         let target_idx = idx;
                                                         let prev_idx_val = prev;
 
@@ -552,7 +675,7 @@ pub fn CircleGenerator() -> Element {
                                                             let my = from_sy + (to_sy - from_sy) * eased;
                                                             let mr = from_sr + (to_sr - from_sr) * eased;
 
-                                                            render_canvas(&circles_clone, w, h, prev_idx_val, None, Some((mx, my, mr)));
+                                                            render_canvas(&circles_clone, w, h, None, None, Some((mx, my, mr)));
 
                                                             if t < 1.0 {
                                                                 let rc = anim_rc_clone.clone();
@@ -565,12 +688,12 @@ pub fn CircleGenerator() -> Element {
                                                                     }
                                                                 });
                                                                 let h = window2.request_animation_frame(next.as_ref().unchecked_ref()).expect("Failed to request animation frame");
-                                                                anim_handle_for_frame.set(Some(h));
+                                                                anim_frame_handle.set(Some(h));
                                                                 next.forget();
                                                             } else {
                                                                 highlight_index.set(Some(target_idx));
                                                                 render_canvas(&circles_clone, w, h, Some(target_idx), prev_idx_val, None);
-                                                                anim_handle_for_frame.set(None);
+                                                                anim_frame_handle.set(None);
                                                             }
                                                         }) as Box<dyn FnMut()>);
 
@@ -581,7 +704,7 @@ pub fn CircleGenerator() -> Element {
                                                             if let Some(c) = borrowed.as_ref() {
                                                                 let func: &js_sys::Function = c.as_ref().unchecked_ref();
                                                                 let handle = window_for_interval.request_animation_frame(func).expect("Failed to request animation frame");
-                                                                anim_handle.set(Some(handle));
+                                                                anim_frame_handle.set(Some(handle));
                                                             }
                                                         }
                                                     } else {
@@ -592,7 +715,7 @@ pub fn CircleGenerator() -> Element {
                                                 let handle = window
                                                     .set_interval_with_callback_and_timeout_and_arguments_0(
                                                         interval_closure.as_ref().unchecked_ref(),
-                                                        v as i32,
+                                                        (anim_duration() + dwell_time() + picker_speed()) as i32,
                                                     )
                                                     .expect("Failed to set interval");
                                                 interval_closure.forget();
@@ -605,39 +728,300 @@ pub fn CircleGenerator() -> Element {
                             }
                         }
                         div { class: "cg-config-item",
+                            label { r#for: "cg-dwell-time", "停留时间" }
+                            div { class: "cg-speed-wrap",
+                                input {
+                                    id: "cg-dwell-time",
+                                    r#type: "range",
+                                    min: "10",
+                                    max: "1000",
+                                    step: "10",
+                                    value: "{dwell_time()}",
+                                    oninput: move |e| {
+                                        if let Ok(v) = e.value().parse::<f64>() {
+                                            dwell_time.set(v);
+                                            save_all_config(config_width(), config_height(), gap(), min_radius(), max_radius(), picker_speed(), anim_duration(), dwell_time());
+                                            if selecting() {
+                                                if let Some(handle) = timer_handle() {
+                                                    let _ = web_sys::window().map(|w| w.clear_interval_with_handle(handle));
+                                                    timer_handle.set(None);
+                                                }
+                                                if let Some(handle) = anim_frame_handle() {
+                                                    let _ = web_sys::window().map(|w| w.cancel_animation_frame(handle));
+                                                    anim_frame_handle.set(None);
+                                                }
+                                                let circles_snapshot = circles();
+                                                let w = config_width();
+                                                let h = config_height();
+                                                render_canvas(&circles_snapshot, w, h, last_picked_idx(), None, None);
+                                                let window = web_sys::window().expect("Failed to get window");
+                                                let window_for_interval = window.clone();
+                                                let prev_idx = std::cell::Cell::new(last_picked_idx());
+                                                let interval_closure = Closure::wrap(Box::new(move || {
+                                                    let circles_snapshot = circles();
+                                                    if circles_snapshot.is_empty() {
+                                                        return;
+                                                    }
+                                                    let idx = (js_sys::Math::random() * circles_snapshot.len() as f64) as usize;
+                                                    let prev = prev_idx.get();
+                                                    prev_idx.set(Some(idx));
+                                                    last_picked_idx.set(Some(idx));
+
+                                                    if prev.is_none() {
+                                                        highlight_index.set(Some(idx));
+                                                    }
+
+                                                    if let Some(handle) = anim_frame_handle() {
+                                                        let _ = window_for_interval.cancel_animation_frame(handle);
+                                                    }
+
+                                                    let from_pos = prev.and_then(|p| circles_snapshot.get(p).map(|c| (c.x, c.y, c.radius)));
+                                                    let to_pos = circles_snapshot.get(idx).map(|c| (c.x, c.y, c.radius));
+
+                                                    let w = config_width();
+                                                    let h = config_height();
+                                                    let document = web_sys::window().and_then(|w| w.document());
+                                                    let canvas_el = document.and_then(|d| d.get_element_by_id("circle-canvas"));
+                                                    let client_w = canvas_el.and_then(|c| {
+                                                        c.dyn_into::<web_sys::HtmlCanvasElement>().ok().map(|el| el.client_width() as f64)
+                                                    }).unwrap_or(800.0);
+                                                    let scale = client_w / w;
+
+                                                    if let (Some(from), Some(to)) = (from_pos, to_pos) {
+                                                        let from_sx = from.0 * scale;
+                                                        let from_sy = from.1 * scale;
+                                                        let from_sr = from.2 * scale + 4.0;
+                                                        let to_sx = to.0 * scale;
+                                                        let to_sy = to.1 * scale;
+                                                        let to_sr = to.2 * scale + 4.0;
+
+                                                        let start_time = js_sys::Date::now();
+                                                        let duration = anim_duration();
+                                                        let window2 = window_for_interval.clone();
+                                                        let circles_clone = circles_snapshot.clone();
+                                                        let target_idx = idx;
+                                                        let prev_idx_val = prev;
+
+                                                        let anim_rc: std::rc::Rc<std::cell::RefCell<Option<Closure<dyn FnMut()>>>> = std::rc::Rc::new(std::cell::RefCell::new(None));
+                                                        let anim_rc_clone = anim_rc.clone();
+
+                                                        let frame_closure = Closure::wrap(Box::new(move || {
+                                                            let now = js_sys::Date::now();
+                                                            let elapsed = now - start_time;
+                                                            let t = (elapsed / duration).min(1.0);
+                                                            let eased = 1.0 - (1.0 - t) * (1.0 - t);
+
+                                                            let mx = from_sx + (to_sx - from_sx) * eased;
+                                                            let my = from_sy + (to_sy - from_sy) * eased;
+                                                            let mr = from_sr + (to_sr - from_sr) * eased;
+
+                                                            render_canvas(&circles_clone, w, h, None, None, Some((mx, my, mr)));
+
+                                                            if t < 1.0 {
+                                                                let rc = anim_rc_clone.clone();
+                                                                let next = Closure::once(move || {
+                                                                    let c = rc.borrow_mut().take();
+                                                                    if let Some(c) = c {
+                                                                        let func: &js_sys::Function = c.as_ref().unchecked_ref();
+                                                                        let _ = func.call0(&JsValue::null());
+                                                                        *rc.borrow_mut() = Some(c);
+                                                                    }
+                                                                });
+                                                                let h = window2.request_animation_frame(next.as_ref().unchecked_ref()).expect("Failed to request animation frame");
+                                                                anim_frame_handle.set(Some(h));
+                                                                next.forget();
+                                                            } else {
+                                                                highlight_index.set(Some(target_idx));
+                                                                render_canvas(&circles_clone, w, h, Some(target_idx), prev_idx_val, None);
+                                                                anim_frame_handle.set(None);
+                                                            }
+                                                        }) as Box<dyn FnMut()>);
+
+                                                        *anim_rc.borrow_mut() = Some(frame_closure);
+
+                                                        {
+                                                            let borrowed = anim_rc.borrow();
+                                                            if let Some(c) = borrowed.as_ref() {
+                                                                let func: &js_sys::Function = c.as_ref().unchecked_ref();
+                                                                let handle = window_for_interval.request_animation_frame(func).expect("Failed to request animation frame");
+                                                                anim_frame_handle.set(Some(handle));
+                                                            }
+                                                        }
+                                                    } else {
+                                                        highlight_index.set(Some(idx));
+                                                        render_canvas(&circles_snapshot, w, h, Some(idx), prev, None);
+                                                    }
+                                                }) as Box<dyn FnMut()>);
+                                                let handle = window
+                                                    .set_interval_with_callback_and_timeout_and_arguments_0(
+                                                        interval_closure.as_ref().unchecked_ref(),
+                                                        (anim_duration() + dwell_time() + picker_speed()) as i32,
+                                                    )
+                                                    .expect("Failed to set interval");
+                                                interval_closure.forget();
+                                                timer_handle.set(Some(handle));
+                                            }
+                                        }
+                                    }
+                                }
+                                span { class: "cg-speed-label", "{dwell_time() as u32}ms" }
+                            }
+                        }
+                        div { class: "cg-config-item",
                             label { r#for: "cg-anim-duration", "动画时长" }
                             div { class: "cg-speed-wrap",
                                 input {
                                     id: "cg-anim-duration",
                                     r#type: "range",
                                     min: "10",
-                                    max: "{picker_speed()}",
+                                    max: "1000",
                                     step: "10",
                                     value: "{anim_duration()}",
                                     oninput: move |e| {
                                         if let Ok(v) = e.value().parse::<f64>() {
-                                            let max = picker_speed();
-                                            let clamped = v.min(max).max(10.0);
+                                            let clamped = v.min(1000.0).max(10.0);
                                             anim_duration.set(clamped);
+                                            if clamped > picker_speed() {
+                                                picker_speed.set(clamped);
+                                            }
+                                            save_all_config(config_width(), config_height(), gap(), min_radius(), max_radius(), picker_speed(), anim_duration(), dwell_time());
+                                            if selecting() {
+                                                if let Some(handle) = timer_handle() {
+                                                    let _ = web_sys::window().map(|w| w.clear_interval_with_handle(handle));
+                                                    timer_handle.set(None);
+                                                }
+                                                if let Some(handle) = anim_frame_handle() {
+                                                    let _ = web_sys::window().map(|w| w.cancel_animation_frame(handle));
+                                                    anim_frame_handle.set(None);
+                                                }
+                                                let circles_snapshot = circles();
+                                                let w = config_width();
+                                                let h = config_height();
+                                                render_canvas(&circles_snapshot, w, h, last_picked_idx(), None, None);
+                                                let window = web_sys::window().expect("Failed to get window");
+                                                let window_for_interval = window.clone();
+                                                let prev_idx = std::cell::Cell::new(last_picked_idx());
+                                                let interval_closure = Closure::wrap(Box::new(move || {
+                                                    let circles_snapshot = circles();
+                                                    if circles_snapshot.is_empty() {
+                                                        return;
+                                                    }
+                                                    let idx = (js_sys::Math::random() * circles_snapshot.len() as f64) as usize;
+                                                    let prev = prev_idx.get();
+                                                    prev_idx.set(Some(idx));
+                                                    last_picked_idx.set(Some(idx));
+
+                                                    if prev.is_none() {
+                                                        highlight_index.set(Some(idx));
+                                                    }
+
+                                                    if let Some(handle) = anim_frame_handle() {
+                                                        let _ = window_for_interval.cancel_animation_frame(handle);
+                                                    }
+
+                                                    let from_pos = prev.and_then(|p| circles_snapshot.get(p).map(|c| (c.x, c.y, c.radius)));
+                                                    let to_pos = circles_snapshot.get(idx).map(|c| (c.x, c.y, c.radius));
+
+                                                    let w = config_width();
+                                                    let h = config_height();
+                                                    let document = web_sys::window().and_then(|w| w.document());
+                                                    let canvas_el = document.and_then(|d| d.get_element_by_id("circle-canvas"));
+                                                    let client_w = canvas_el.and_then(|c| {
+                                                        c.dyn_into::<web_sys::HtmlCanvasElement>().ok().map(|el| el.client_width() as f64)
+                                                    }).unwrap_or(800.0);
+                                                    let scale = client_w / w;
+
+                                                    if let (Some(from), Some(to)) = (from_pos, to_pos) {
+                                                        let from_sx = from.0 * scale;
+                                                        let from_sy = from.1 * scale;
+                                                        let from_sr = from.2 * scale + 4.0;
+                                                        let to_sx = to.0 * scale;
+                                                        let to_sy = to.1 * scale;
+                                                        let to_sr = to.2 * scale + 4.0;
+
+                                                        let start_time = js_sys::Date::now();
+                                                        let duration = anim_duration();
+                                                        let window2 = window_for_interval.clone();
+                                                        let circles_clone = circles_snapshot.clone();
+                                                        let target_idx = idx;
+                                                        let prev_idx_val = prev;
+
+                                                        let anim_rc: std::rc::Rc<std::cell::RefCell<Option<Closure<dyn FnMut()>>>> = std::rc::Rc::new(std::cell::RefCell::new(None));
+                                                        let anim_rc_clone = anim_rc.clone();
+
+                                                        let frame_closure = Closure::wrap(Box::new(move || {
+                                                            let now = js_sys::Date::now();
+                                                            let elapsed = now - start_time;
+                                                            let t = (elapsed / duration).min(1.0);
+                                                            let eased = 1.0 - (1.0 - t) * (1.0 - t);
+
+                                                            let mx = from_sx + (to_sx - from_sx) * eased;
+                                                            let my = from_sy + (to_sy - from_sy) * eased;
+                                                            let mr = from_sr + (to_sr - from_sr) * eased;
+
+                                                            render_canvas(&circles_clone, w, h, None, None, Some((mx, my, mr)));
+
+                                                            if t < 1.0 {
+                                                                let rc = anim_rc_clone.clone();
+                                                                let next = Closure::once(move || {
+                                                                    let c = rc.borrow_mut().take();
+                                                                    if let Some(c) = c {
+                                                                        let func: &js_sys::Function = c.as_ref().unchecked_ref();
+                                                                        let _ = func.call0(&JsValue::null());
+                                                                        *rc.borrow_mut() = Some(c);
+                                                                    }
+                                                                });
+                                                                let h = window2.request_animation_frame(next.as_ref().unchecked_ref()).expect("Failed to request animation frame");
+                                                                anim_frame_handle.set(Some(h));
+                                                                next.forget();
+                                                            } else {
+                                                                highlight_index.set(Some(target_idx));
+                                                                render_canvas(&circles_clone, w, h, Some(target_idx), prev_idx_val, None);
+                                                                anim_frame_handle.set(None);
+                                                            }
+                                                        }) as Box<dyn FnMut()>);
+
+                                                        *anim_rc.borrow_mut() = Some(frame_closure);
+
+                                                        {
+                                                            let borrowed = anim_rc.borrow();
+                                                            if let Some(c) = borrowed.as_ref() {
+                                                                let func: &js_sys::Function = c.as_ref().unchecked_ref();
+                                                                let handle = window_for_interval.request_animation_frame(func).expect("Failed to request animation frame");
+                                                                anim_frame_handle.set(Some(handle));
+                                                            }
+                                                        }
+                                                    } else {
+                                                        highlight_index.set(Some(idx));
+                                                        render_canvas(&circles_snapshot, w, h, Some(idx), prev, None);
+                                                    }
+                                                }) as Box<dyn FnMut()>);
+                                                let handle = window
+                                                    .set_interval_with_callback_and_timeout_and_arguments_0(
+                                                        interval_closure.as_ref().unchecked_ref(),
+                                                        (anim_duration() + dwell_time() + picker_speed()) as i32,
+                                                    )
+                                                    .expect("Failed to set interval");
+                                                interval_closure.forget();
+                                                timer_handle.set(Some(handle));
+                                            }
                                         }
                                     }
                                 }
                                 span { class: "cg-speed-label", "{anim_duration() as u32}ms" }
                             }
                         }
-                        div { class: "cg-config-item cg-config-action",
-                            button {
-                                class: "cg-btn",
-                                disabled: generating(),
-                                onclick: move |_| generate(),
-                                if generating() { "生成中..." } else { "重新生成" }
-                            }
-                            button {
-                                class: "cg-btn cg-btn-picker",
-                                disabled: generating() || circles().is_empty(),
-                                onclick: move |_| toggle_picker(),
-                                if selecting() { "停止选取" } else { "随机选取" }
-                            }
+                        div { class: "cg-config-item",
+                            label { "总周期" }
+                            span { class: "cg-speed-label cg-cycle-label", "{((anim_duration() + dwell_time() + picker_speed()) as u32)}ms" }
+                        }
+                    }
+                    div { class: "cg-card-actions",
+                        button {
+                            class: "cg-btn cg-btn-picker",
+                            disabled: generating() || circles().is_empty(),
+                            onclick: move |_| toggle_picker(),
+                            if selecting() { "停止选取" } else { "随机选取" }
                         }
                     }
                 }
