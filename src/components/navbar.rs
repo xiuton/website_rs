@@ -72,11 +72,30 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                 div { class: "navbar-links",
                     {nav_items.iter().map(|(href, label)| {
                         let active = is_active(href);
-                        rsx! {
-                            Link {
-                                to: *href,
-                                class: if active { "nav-link nav-active" } else { "nav-link" },
-                                { label }
+                        if *href == "/dev" {
+                            rsx! {
+                                div { class: "nav-item-with-sub",
+                                    Link {
+                                        to: *href,
+                                        class: if active { "nav-link nav-active" } else { "nav-link" },
+                                        { label }
+                                    }
+                                    div { class: "nav-submenu",
+                                        Link {
+                                            to: Route::CircleGenerator,
+                                            class: "nav-sub-link",
+                                            "圆形生成器"
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            rsx! {
+                                Link {
+                                    to: *href,
+                                    class: if active { "nav-link nav-active" } else { "nav-link" },
+                                    { label }
+                                }
                             }
                         }
                     })}
