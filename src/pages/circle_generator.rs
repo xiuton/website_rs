@@ -80,12 +80,16 @@ fn save_all_config(
     });
 }
 
-fn hsl_color(index: usize, total: usize) -> String {
+fn hsl_color(index: usize, total: usize, dark_mode: bool) -> String {
     let hue = (index as f64 / total.max(1) as f64) * 360.0;
-    format!("hsl({}, 65%, 60%)", hue as u32)
+    if dark_mode {
+        format!("hsl({}, 70%, 70%)", hue as u32)
+    } else {
+        format!("hsl({}, 65%, 60%)", hue as u32)
+    }
 }
 
-fn render_canvas(circles: &[Circle], config_width: f64, config_height: f64, highlight: Option<usize>, prev_highlight: Option<usize>, mask_hole: Option<(f64, f64, f64)>) {
+fn render_canvas(circles: &[Circle], config_width: f64, config_height: f64, fullscreen: bool, highlight: Option<usize>, prev_highlight: Option<usize>, mask_hole: Option<(f64, f64, f64)>) {
     let window = web_sys::window().expect("Failed to get window");
     let document = window.document().expect("Failed to get document");
 
@@ -98,11 +102,17 @@ fn render_canvas(circles: &[Circle], config_width: f64, config_height: f64, high
     let dpr = window.device_pixel_ratio();
 
     let display_width = canvas.client_width() as f64;
-    let aspect_ratio = config_height / config_width;
-    let display_height = display_width * aspect_ratio;
-
-    canvas.set_width((display_width * dpr) as u32);
-    canvas.set_height((display_height * dpr) as u32);
+    let (final_w, final_h) = if fullscreen {
+        let dh = canvas.client_height() as f64;
+        canvas.set_width((display_width * dpr) as u32);
+        canvas.set_height((dh * dpr) as u32);
+        (display_width, dh)
+    } else {
+        let dh = display_width * config_height / config_width;
+        canvas.set_width((display_width * dpr) as u32);
+        canvas.set_height((dh * dpr) as u32);
+        (display_width, dh)
+    };
 
     let ctx = canvas
         .get_context("2d")
@@ -111,18 +121,24 @@ fn render_canvas(circles: &[Circle], config_width: f64, config_height: f64, high
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .expect("Failed to cast to CanvasRenderingContext2d");
 
+    let is_dark = document
+        .document_element()
+        .map(|el| el.matches(".dark").unwrap_or(false))
+        .unwrap_or(false);
+
     ctx.set_transform(dpr, 0.0, 0.0, dpr, 0.0, 0.0)
         .expect("Failed to set transform");
-    ctx.clear_rect(0.0, 0.0, display_width, display_height);
+    ctx.clear_rect(0.0, 0.0, final_w, final_h);
 
-    ctx.set_fill_style_str("#f8f9fa");
-    ctx.fill_rect(0.0, 0.0, display_width, display_height);
+    let bg_color = if is_dark { "#1a1a1a" } else { "#f8f9fa" };
+    ctx.set_fill_style_str(bg_color);
+    ctx.fill_rect(0.0, 0.0, final_w, final_h);
 
-    let scale_x = display_width / config_width;
-    let scale_y = display_height / config_height;
+    let scale_x = final_w / config_width;
+    let scale_y = final_h / config_height;
 
     for (i, circle) in circles.iter().enumerate() {
-        let color = hsl_color(i, circles.len());
+        let color = hsl_color(i, circles.len(), is_dark);
 
         let cx = circle.x * scale_x;
         let cy = circle.y * scale_y;
@@ -132,14 +148,15 @@ fn render_canvas(circles: &[Circle], config_width: f64, config_height: f64, high
         ctx.arc(cx, cy, cr, 0.0, std::f64::consts::PI * 2.0)
             .expect("Failed to create arc");
         ctx.set_fill_style_str(&color);
-        ctx.set_global_alpha(0.5);
+        ctx.set_global_alpha(if is_dark { 0.6 } else { 0.5 });
         ctx.fill();
         ctx.set_global_alpha(1.0);
         ctx.set_stroke_style_str(&color);
         ctx.set_line_width(2.0);
         ctx.stroke();
 
-        ctx.set_fill_style_str("#333");
+        let text_color = if is_dark { "#ccc" } else { "#333" };
+        ctx.set_fill_style_str(text_color);
         ctx.set_font("11px sans-serif");
         ctx.set_text_align("center");
         ctx.set_text_baseline("middle");
@@ -188,12 +205,12 @@ fn render_canvas(circles: &[Circle], config_width: f64, config_height: f64, high
     if let Some((hole_cx, hole_cy, hole_cr)) = mask_pos {
         ctx.save();
         ctx.begin_path();
-        ctx.rect(0.0, 0.0, display_width, display_height);
+        ctx.rect(0.0, 0.0, final_w, final_h);
         let _ = ctx.arc_with_anticlockwise(hole_cx, hole_cy, hole_cr, 0.0, std::f64::consts::PI * 2.0, true);
         ctx.clip();
 
-        ctx.set_fill_style_str("rgba(0,0,0,0.35)");
-        ctx.fill_rect(0.0, 0.0, display_width, display_height);
+        ctx.set_fill_style_str(if is_dark { "rgba(0,0,0,0.55)" } else { "rgba(0,0,0,0.35)" });
+        ctx.fill_rect(0.0, 0.0, final_w, final_h);
         ctx.restore();
     }
 
@@ -214,7 +231,7 @@ fn render_canvas(circles: &[Circle], config_width: f64, config_height: f64, high
             ctx.set_line_width(4.0);
             ctx.stroke();
 
-            ctx.set_fill_style_str("#000");
+            ctx.set_fill_style_str(if is_dark { "#fff" } else { "#000" });
             ctx.set_font("bold 14px sans-serif");
             ctx.set_text_align("center");
             ctx.set_text_baseline("middle");
@@ -249,6 +266,104 @@ pub fn CircleGenerator() -> Element {
     let mut dwell_time = use_signal(|| cfg.dwell_time);
     let mut last_picked_idx = use_signal(|| None::<usize>);
     let mut anim_frame_handle = use_signal(|| None::<i32>);
+    let mut fullscreen_mode = use_signal(|| false);
+    let mut pre_fs_width = use_signal(|| cfg.config_width);
+      let mut pre_fs_height = use_signal(|| cfg.config_height);
+    let mut panels_hidden = use_signal(|| false);
+    let mut resize_pending = use_signal(|| false);
+    let mut fs_trigger = use_signal(|| false);
+
+    let mut toggle_fullscreen = move || {
+        let entering = !fullscreen_mode();
+        if entering {
+            pre_fs_width.set(config_width());
+            pre_fs_height.set(config_height());
+            let window = web_sys::window().expect("Failed to get window");
+            let ww = window.inner_width().expect("Failed to get width").as_f64().unwrap();
+            let wh = window.inner_height().expect("Failed to get height").as_f64().unwrap();
+            config_width.set(ww);
+            config_height.set(wh);
+            fullscreen_mode.set(true);
+        } else {
+            config_width.set(pre_fs_width());
+            config_height.set(pre_fs_height());
+            fullscreen_mode.set(false);
+        }
+        fs_trigger.set(!fs_trigger());
+    };
+
+    use_effect(move || {
+        fs_trigger();
+        if !circles.peek().is_empty() {
+            generating.set(true);
+            let new_w = *config_width.peek();
+            let new_h = *config_height.peek();
+            let g = *gap.peek();
+            let min_r = *min_radius.peek();
+            let max_r = *max_radius.peek();
+            let hl = *highlight_index.peek();
+            let fs = *fullscreen_mode.peek();
+
+            let window = web_sys::window().expect("Failed to get window");
+            let window2 = window.clone();
+            let closure = Closure::once(move || {
+                let closure2 = Closure::once(move || {
+                    let cfg = GenerationConfig {
+                        width: new_w,
+                        height: new_h,
+                        gap: g,
+                        min_radius: min_r,
+                        max_radius: max_r,
+                        max_retries: None,
+                    };
+                    let new_circles = generate_circles(&cfg);
+                    render_canvas(&new_circles, new_w, new_h, fs, hl, None, None);
+                    circles.set(new_circles);
+                    generating.set(false);
+                });
+                window2
+                    .set_timeout_with_callback_and_timeout_and_arguments_0(
+                        closure2.as_ref().unchecked_ref(),
+                        0,
+                    )
+                    .expect("Failed to set timeout");
+                closure2.forget();
+            });
+            window
+                .request_animation_frame(closure.as_ref().unchecked_ref())
+                .expect("Failed to request animation frame");
+            closure.forget();
+        }
+    });
+
+    use_effect(move || {
+        let fs = fullscreen_mode();
+        if fs {
+            resize_pending.set(false);
+            let window = web_sys::window().expect("Failed to get window");
+            let window_for_listener = window.clone();
+            let resize_handle = std::rc::Rc::new(std::cell::Cell::new(None::<i32>));
+            let resize_handle_clone = resize_handle.clone();
+            let closure = Closure::wrap(Box::new(move || {
+                if let Some(handle) = resize_handle_clone.get() {
+                    let _ = window.clear_timeout_with_handle(handle);
+                }
+                let handle = window
+                    .set_timeout_with_callback_and_timeout_and_arguments_0(
+                        Closure::once_into_js(move || {
+                            resize_pending.set(true);
+                        }).as_ref().unchecked_ref(),
+                        400,
+                    )
+                    .expect("Failed to set timeout");
+                resize_handle_clone.set(Some(handle));
+            }) as Box<dyn FnMut()>);
+            window_for_listener
+                .add_event_listener_with_callback("resize", closure.as_ref().unchecked_ref())
+                .expect("Failed to add resize listener");
+            closure.forget();
+        }
+    });
 
     let mut generate = move || {
         generating.set(true);
@@ -279,7 +394,7 @@ pub fn CircleGenerator() -> Element {
                     max_retries: None,
                 };
                 let new_circles = generate_circles(&cfg);
-                render_canvas(&new_circles, w, h, None, None, None);
+                render_canvas(&new_circles, w, h, false, None, None, None);
                 circles.set(new_circles);
                 generating.set(false);
             });
@@ -314,7 +429,7 @@ pub fn CircleGenerator() -> Element {
                 highlight_index.set(Some(i));
                 let w = config_width();
                 let h = config_height();
-                render_canvas(&circles_snapshot, w, h, Some(i), None, None);
+                render_canvas(&circles_snapshot, w, h, fullscreen_mode(), Some(i), None, None);
                 if let Some(circle) = circles_snapshot.get(i) {
                     selected_circle.set(Some((i, circle.clone())));
                     show_modal.set(true);
@@ -390,7 +505,7 @@ pub fn CircleGenerator() -> Element {
                         let my = from_sy + (to_sy - from_sy) * eased;
                         let mr = from_sr + (to_sr - from_sr) * eased;
 
-                        render_canvas(&circles_clone, w, h, None, None, Some((mx, my, mr)));
+                        render_canvas(&circles_clone, w, h, fullscreen_mode(), None, None, Some((mx, my, mr)));
 
                         if t < 1.0 {
                             let rc = anim_rc_clone.clone();
@@ -407,7 +522,7 @@ pub fn CircleGenerator() -> Element {
                             next.forget();
                         } else {
                             highlight_index.set(Some(target_idx));
-                            render_canvas(&circles_clone, w, h, Some(target_idx), prev_idx_val, None);
+                            render_canvas(&circles_clone, w, h, fullscreen_mode(), Some(target_idx), prev_idx_val, None);
                             anim_frame_handle.set(None);
                         }
                     }) as Box<dyn FnMut()>);
@@ -424,7 +539,7 @@ pub fn CircleGenerator() -> Element {
                     }
                 } else {
                     highlight_index.set(Some(idx));
-                    render_canvas(&circles_snapshot, w, h, Some(idx), prev, None);
+                    render_canvas(&circles_snapshot, w, h, fullscreen_mode(), Some(idx), prev, None);
                 }
             }) as Box<dyn FnMut()>);
             let handle = window
@@ -454,15 +569,23 @@ pub fn CircleGenerator() -> Element {
                 max_retries: None,
             };
             let new_circles = generate_circles(&cfg);
-            render_canvas(&new_circles, w, h, None, None, None);
+            render_canvas(&new_circles, w, h, false, None, None, None);
             circles.set(new_circles);
             ()
         });
     }
 
     rsx! {
-        div { class: "circle-generator-page",
-            h1 { "圆形生成器" }
+        div {
+            id: "circle-generator-page",
+            class: "circle-generator-page",
+            class: if fullscreen_mode() { "cg-fullscreen-active" },
+
+            button {
+                class: "cg-fullscreen-btn",
+                onclick: move |_| toggle_fullscreen(),
+                if fullscreen_mode() { "\u{2716}" } else { "\u{26F6}" }
+            }
 
             div { class: "cg-canvas-section",
                 div { class: "cg-card cg-canvas-card",
@@ -481,8 +604,20 @@ pub fn CircleGenerator() -> Element {
                 }
             }
 
-            div { class: "cg-config-section",
-                div { class: "cg-card",
+            div { class: if fullscreen_mode() { "cg-overlay-content" } else { "" }, class: if panels_hidden() { "cg-panels-hidden" },
+                if fullscreen_mode() {
+                    button {
+                        class: "cg-toggle-panels-btn",
+                        onclick: move |_| {
+                            panels_hidden.set(!panels_hidden());
+                        },
+                        if panels_hidden() { "\u{25A0}" } else { "\u{25A1}" }
+                    }
+                }
+                h1 { "圆形生成器" }
+
+                div { class: "cg-config-section",
+                    div { class: "cg-card",
                     div { class: "cg-card-header",
                         span { "重新生成配置" }
                     }
@@ -613,7 +748,7 @@ pub fn CircleGenerator() -> Element {
                                                 let circles_snapshot = circles();
                                                 let w = config_width();
                                                 let h = config_height();
-                                                render_canvas(&circles_snapshot, w, h, last_picked_idx(), None, None);
+                                                render_canvas(&circles_snapshot, w, h, fullscreen_mode(), last_picked_idx(), None, None);
                                                 let window = web_sys::window().expect("Failed to get window");
                                                 let window_for_interval = window.clone();
                                                 let prev_idx = std::cell::Cell::new(last_picked_idx());
@@ -675,7 +810,7 @@ pub fn CircleGenerator() -> Element {
                                                             let my = from_sy + (to_sy - from_sy) * eased;
                                                             let mr = from_sr + (to_sr - from_sr) * eased;
 
-                                                            render_canvas(&circles_clone, w, h, None, None, Some((mx, my, mr)));
+                                                            render_canvas(&circles_clone, w, h, fullscreen_mode(), None, None, Some((mx, my, mr)));
 
                                                             if t < 1.0 {
                                                                 let rc = anim_rc_clone.clone();
@@ -692,7 +827,7 @@ pub fn CircleGenerator() -> Element {
                                                                 next.forget();
                                                             } else {
                                                                 highlight_index.set(Some(target_idx));
-                                                                render_canvas(&circles_clone, w, h, Some(target_idx), prev_idx_val, None);
+                                                                render_canvas(&circles_clone, w, h, fullscreen_mode(), Some(target_idx), prev_idx_val, None);
                                                                 anim_frame_handle.set(None);
                                                             }
                                                         }) as Box<dyn FnMut()>);
@@ -709,7 +844,7 @@ pub fn CircleGenerator() -> Element {
                                                         }
                                                     } else {
                                                         highlight_index.set(Some(idx));
-                                                        render_canvas(&circles_snapshot, w, h, Some(idx), prev, None);
+                                                        render_canvas(&circles_snapshot, w, h, fullscreen_mode(), Some(idx), prev, None);
                                                     }
                                                 }) as Box<dyn FnMut()>);
                                                 let handle = window
@@ -753,7 +888,7 @@ pub fn CircleGenerator() -> Element {
                                                 let circles_snapshot = circles();
                                                 let w = config_width();
                                                 let h = config_height();
-                                                render_canvas(&circles_snapshot, w, h, last_picked_idx(), None, None);
+                                                render_canvas(&circles_snapshot, w, h, fullscreen_mode(), last_picked_idx(), None, None);
                                                 let window = web_sys::window().expect("Failed to get window");
                                                 let window_for_interval = window.clone();
                                                 let prev_idx = std::cell::Cell::new(last_picked_idx());
@@ -815,7 +950,7 @@ pub fn CircleGenerator() -> Element {
                                                             let my = from_sy + (to_sy - from_sy) * eased;
                                                             let mr = from_sr + (to_sr - from_sr) * eased;
 
-                                                            render_canvas(&circles_clone, w, h, None, None, Some((mx, my, mr)));
+                                                            render_canvas(&circles_clone, w, h, fullscreen_mode(), None, None, Some((mx, my, mr)));
 
                                                             if t < 1.0 {
                                                                 let rc = anim_rc_clone.clone();
@@ -832,7 +967,7 @@ pub fn CircleGenerator() -> Element {
                                                                 next.forget();
                                                             } else {
                                                                 highlight_index.set(Some(target_idx));
-                                                                render_canvas(&circles_clone, w, h, Some(target_idx), prev_idx_val, None);
+                                                                render_canvas(&circles_clone, w, h, fullscreen_mode(), Some(target_idx), prev_idx_val, None);
                                                                 anim_frame_handle.set(None);
                                                             }
                                                         }) as Box<dyn FnMut()>);
@@ -849,7 +984,7 @@ pub fn CircleGenerator() -> Element {
                                                         }
                                                     } else {
                                                         highlight_index.set(Some(idx));
-                                                        render_canvas(&circles_snapshot, w, h, Some(idx), prev, None);
+                                                        render_canvas(&circles_snapshot, w, h, fullscreen_mode(), Some(idx), prev, None);
                                                     }
                                                 }) as Box<dyn FnMut()>);
                                                 let handle = window
@@ -897,7 +1032,7 @@ pub fn CircleGenerator() -> Element {
                                                 let circles_snapshot = circles();
                                                 let w = config_width();
                                                 let h = config_height();
-                                                render_canvas(&circles_snapshot, w, h, last_picked_idx(), None, None);
+                                                render_canvas(&circles_snapshot, w, h, fullscreen_mode(), last_picked_idx(), None, None);
                                                 let window = web_sys::window().expect("Failed to get window");
                                                 let window_for_interval = window.clone();
                                                 let prev_idx = std::cell::Cell::new(last_picked_idx());
@@ -959,7 +1094,7 @@ pub fn CircleGenerator() -> Element {
                                                             let my = from_sy + (to_sy - from_sy) * eased;
                                                             let mr = from_sr + (to_sr - from_sr) * eased;
 
-                                                            render_canvas(&circles_clone, w, h, None, None, Some((mx, my, mr)));
+                                                            render_canvas(&circles_clone, w, h, fullscreen_mode(), None, None, Some((mx, my, mr)));
 
                                                             if t < 1.0 {
                                                                 let rc = anim_rc_clone.clone();
@@ -976,7 +1111,7 @@ pub fn CircleGenerator() -> Element {
                                                                 next.forget();
                                                             } else {
                                                                 highlight_index.set(Some(target_idx));
-                                                                render_canvas(&circles_clone, w, h, Some(target_idx), prev_idx_val, None);
+                                                                render_canvas(&circles_clone, w, h, fullscreen_mode(), Some(target_idx), prev_idx_val, None);
                                                                 anim_frame_handle.set(None);
                                                             }
                                                         }) as Box<dyn FnMut()>);
@@ -993,7 +1128,7 @@ pub fn CircleGenerator() -> Element {
                                                         }
                                                     } else {
                                                         highlight_index.set(Some(idx));
-                                                        render_canvas(&circles_snapshot, w, h, Some(idx), prev, None);
+                                                        render_canvas(&circles_snapshot, w, h, fullscreen_mode(), Some(idx), prev, None);
                                                     }
                                                 }) as Box<dyn FnMut()>);
                                                 let handle = window
@@ -1027,7 +1162,8 @@ pub fn CircleGenerator() -> Element {
                 }
             }
 
-            div { class: "cg-data-section",
+            if !fullscreen_mode() {
+                div { class: "cg-data-section",
                 div { class: "cg-card",
                     div { class: "cg-data-header",
                         span { "圆形数据" }
@@ -1060,6 +1196,7 @@ pub fn CircleGenerator() -> Element {
                         }
                     }
                 }
+            }
             }
 
             if show_modal() {
@@ -1105,8 +1242,49 @@ pub fn CircleGenerator() -> Element {
                             }
                         }
                     }
+            }
+            }
+
+            if resize_pending() {
+                div { class: "cg-modal-overlay",
+                    div { class: "cg-modal cg-resize-modal",
+                        div { class: "cg-modal-header",
+                            span { "窗口大小已变化" }
+                            button {
+                                class: "cg-modal-close",
+                                onclick: move |_| resize_pending.set(false),
+                                "\u{2716}"
+                            }
+                        }
+                        div { class: "cg-modal-body",
+                            div { class: "cg-resize-info",
+                                span { "检测到浏览器窗口大小已变化，是否重新生成圆形以适配新尺寸？" }
+                            }
+                        }
+                        div { class: "cg-modal-footer",
+                            button {
+                                class: "cg-btn",
+                                onclick: move |_| resize_pending.set(false),
+                                "取消"
+                            }
+                            button {
+                                class: "cg-btn cg-btn-primary",
+                                onclick: move |_| {
+                                    resize_pending.set(false);
+                                    let window = web_sys::window().expect("Failed to get window");
+                                    let ww = window.inner_width().expect("Failed to get width").as_f64().unwrap();
+                                    let wh = window.inner_height().expect("Failed to get height").as_f64().unwrap();
+                                    config_width.set(ww);
+                                    config_height.set(wh);
+                                    generate();
+                                },
+                                "重新生成"
+                            }
+                        }
+                    }
                 }
             }
         }
     }
+}
 }
