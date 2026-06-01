@@ -91,6 +91,7 @@ pub fn Home() -> Element {
                     content: post.content.to_string(),
                     slug: post.slug.to_string(),
                     category: post.category.to_string(),
+                    summary: post.summary.to_string(),
                 }).collect();
             posts.set(loaded_posts);
         });
@@ -179,14 +180,13 @@ pub fn Home() -> Element {
                                             span { class: "preview-date", {post.date.clone()} }
                                             span { class: "preview-author", {post.author.clone()} }
                                         }
-                                        div {
-                                            class: "preview-content",
-                                            dangerous_inner_html: {
-                                                let preview = post.content
-                                                    .chars()
-                                                    .take(200)
-                                                    .collect::<String>();
-                                                crate::utils::markdown::markdown_to_html_preview(&preview) + "..."
+                                        div { class: "preview-content",
+                                            p { class: "preview-excerpt",
+                                                {if !post.summary.is_empty() {
+                                                    post.summary.clone()
+                                                } else {
+                                                    crate::utils::markdown::clean_markdown_excerpt(&post.content, 150)
+                                                }}
                                             }
                                         }
                                         div { class: "preview-tags",

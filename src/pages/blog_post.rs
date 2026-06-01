@@ -18,6 +18,7 @@ pub fn BlogPostView(slug: String) -> Element {
                 content: p.content.to_string(),
                 slug: p.slug.to_string(),
                 category: p.category.to_string(),
+                summary: p.summary.to_string(),
             })
     });
 
@@ -62,14 +63,14 @@ pub fn BlogPostView(slug: String) -> Element {
                 div { 
                     class: if is_wide_mode() { "blog-post wide-mode" } else { "blog-post" },
                     div { class: "blog-nav",
-                        div { class: "back-buttons-group",
-                            button { 
-                                class: "back-button history-back",
-                                onclick: move |_| {
-                                    if let Some(window) = web_sys::window() {
-                                        let _ = window.history().expect("Failed to get history").back();
-                                    }
-                                },
+                        button { 
+                            class: "back-button",
+                            aria_label: "后退",
+                            onclick: move |_| {
+                                if let Some(window) = web_sys::window() {
+                                    let _ = window.history().expect("Failed to get history").back();
+                                }
+                            },
                             svg {
                                 xmlns: "http://www.w3.org/2000/svg",
                                 view_box: "0 0 24 24",
@@ -80,80 +81,72 @@ pub fn BlogPostView(slug: String) -> Element {
                                 stroke_width: "2",
                                 stroke_linecap: "round",
                                 stroke_linejoin: "round",
-                                path {
-                                    d: "M15.75 19.5 8.25 12l7.5-7.5"
-                                    }
-                                }
-                            }
-                            Link { 
-                                to: Route::Home, 
-                                class: "back-button home-back",
-                                svg {
-                                    xmlns: "http://www.w3.org/2000/svg",
-                                    view_box: "0 0 24 24",
-                                    width: "24",
-                                    height: "24",
-                                    fill: "none",
-                                    stroke: "currentColor",
-                                    stroke_width: "2",
-                                    stroke_linecap: "round",
-                                    stroke_linejoin: "round",
-                                    path {
-                                        d: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                                    }
-                                }
+                                path { d: "M15.75 19.5 8.25 12l7.5-7.5" }
                             }
                         }
-                        div { class: "function-buttons",
-                            button { 
-                                class: "function-button",
-                                onclick: move |_| {
-                                    let window = web_sys::window().expect("Failed to get window");
-                                    let _ = window.scroll_to_with_x_and_y(0.0, 0.0);
-                                },
-                                svg {
-                                    xmlns: "http://www.w3.org/2000/svg",
-                                    view_box: "0 0 24 24",
-                                    width: "24",
-                                    height: "24",
-                                    fill: "none",
-                                    stroke: "currentColor",
-                                    stroke_width: "2",
-                                    stroke_linecap: "round",
-                                    stroke_linejoin: "round",
-                                    path {
-                                        d: "m4.5 15.75 7.5-7.5 7.5 7.5"
+                        Link { 
+                            to: Route::Home, 
+                            class: "back-button",
+                            aria_label: "首页",
+                            svg {
+                                xmlns: "http://www.w3.org/2000/svg",
+                                view_box: "0 0 24 24",
+                                width: "24",
+                                height: "24",
+                                fill: "none",
+                                stroke: "currentColor",
+                                stroke_width: "2",
+                                stroke_linecap: "round",
+                                stroke_linejoin: "round",
+                                path { d: "m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" }
+                            }
+                        }
+                        span { class: "nav-divider" }
+                        button { 
+                            class: "function-button",
+                            aria_label: "回顶部",
+                            onclick: move |_| {
+                                let window = web_sys::window().expect("Failed to get window");
+                                let _ = window.scroll_to_with_x_and_y(0.0, 0.0);
+                            },
+                            svg {
+                                xmlns: "http://www.w3.org/2000/svg",
+                                view_box: "0 0 24 24",
+                                width: "24",
+                                height: "24",
+                                fill: "none",
+                                stroke: "currentColor",
+                                stroke_width: "2",
+                                stroke_linecap: "round",
+                                stroke_linejoin: "round",
+                                path { d: "m4.5 15.75 7.5-7.5 7.5 7.5" }
+                            }
+                        }
+                        button { 
+                            class: if is_wide_mode() { "function-button active" } else { "function-button" },
+                            aria_label: if is_wide_mode() { "关闭宽屏" } else { "宽屏模式" },
+                            onclick: move |_| {
+                                let new_mode = !is_wide_mode();
+                                is_wide_mode.set(new_mode);
+                                if let Some(window) = web_sys::window() {
+                                    if let Some(storage) = window.local_storage().ok().flatten() {
+                                        let _ = storage.set_item("blog_wide_mode", if new_mode { "true" } else { "false" });
                                     }
                                 }
-                            }
-                            button { 
-                                class: if is_wide_mode() { "function-button active" } else { "function-button" },
-                                onclick: move |_| {
-                                    let new_mode = !is_wide_mode();
-                                    is_wide_mode.set(new_mode);
-                                    // 存储宽屏状态
-                                    if let Some(window) = web_sys::window() {
-                                        if let Some(storage) = window.local_storage().ok().flatten() {
-                                            let _ = storage.set_item("blog_wide_mode", if new_mode { "true" } else { "false" });
-                                        }
-                                    }
-                                },
-                                {
-                                        rsx! {
-                                            svg {
-                                                xmlns: "http://www.w3.org/2000/svg",
-                                                view_box: "0 0 24 24",
-                                                width: "24",
-                                                height: "24",
-                                                fill: "none",
-                                                stroke: "currentColor",
-                                                stroke_width: "2",
-                                                stroke_linecap: "round",
-                                                stroke_linejoin: "round",
-                                                path {
-                                                    d: "M8 3h8m-8 18h8M4 12h16M4 12l3-3m-3 3l3 3m13-3l-3-3m3 3l-3 3"
-                                            }
-                                        }
+                            },
+                            {
+                                rsx! {
+                                    svg {
+                                        xmlns: "http://www.w3.org/2000/svg",
+                                        view_box: "0 0 24 24",
+                                        width: "24",
+                                        height: "24",
+                                        fill: "none",
+                                        stroke: "currentColor",
+                                        stroke_width: "2",
+                                        stroke_linecap: "round",
+                                        stroke_linejoin: "round",
+                                        path { d: "M8 3h8m-8 18h8M4 12h16M4 12l3-3m-3 3l3 3m13-3l-3-3m3 3l-3 3" }
                                     }
                                 }
                             }

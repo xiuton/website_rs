@@ -7,6 +7,7 @@ pub struct BlogPost {
     pub content: &'static str,
     pub slug: &'static str,
     pub category: &'static str,
+    pub summary: &'static str,
 }
 
 #[derive(Clone, PartialEq)]
@@ -18,4 +19,5 @@ pub struct RuntimeBlogPost {
     pub content: String,
     pub slug: String,
     pub category: String,
+    pub summary: String,
 }

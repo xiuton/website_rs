@@ -29,7 +29,7 @@ fn main() {
         return;
     }
 
-    let mut posts: Vec<(String, String, String, Vec<String>, String, String, String)> = Vec::new();
+    let mut posts: Vec<(String, String, String, Vec<String>, String, String, String, String)> = Vec::new();
     let mut date_count: HashMap<String, i32> = HashMap::new();
 
     scan_dir(posts_dir, posts_dir, "", &mut posts, &mut date_count);
@@ -38,9 +38,9 @@ fn main() {
 
     let mut output = String::from("pub const BLOG_POSTS: &[BlogPost] = &[\n");
 
-    for (title, date, author, tags, content, slug, category) in posts {
+    for (title, date, author, tags, content, slug, category, summary) in posts {
         output.push_str(&format!(
-            "    BlogPost {{\n        title: r#####\"{}\"#####,\n        date: r#####\"{}\"#####,\n        author: r#####\"{}\"#####,\n        tags: &[{}],\n        content: r#####\"{}\"#####,\n        slug: r#####\"{}\"#####,\n        category: r#####\"{}\"#####,\n    }},\n",
+            "    BlogPost {{\n        title: r#####\"{}\"#####,\n        date: r#####\"{}\"#####,\n        author: r#####\"{}\"#####,\n        tags: &[{}],\n        content: r#####\"{}\"#####,\n        slug: r#####\"{}\"#####,\n        category: r#####\"{}\"#####,\n        summary: r#####\"{}\"#####,\n    }},\n",
             title,
             date,
             author,
@@ -51,6 +51,7 @@ fn main() {
             content,
             slug,
             category,
+            summary,
         ));
     }
 
@@ -64,7 +65,7 @@ fn scan_dir(
     dir: &Path,
     base_dir: &Path,
     category: &str,
-    posts: &mut Vec<(String, String, String, Vec<String>, String, String, String)>,
+    posts: &mut Vec<(String, String, String, Vec<String>, String, String, String, String)>,
     date_count: &mut HashMap<String, i32>,
 ) {
     if let Ok(entries) = fs::read_dir(dir) {
@@ -99,7 +100,7 @@ fn scan_dir(
 fn process_post(
     content: &str,
     category: &str,
-    posts: &mut Vec<(String, String, String, Vec<String>, String, String, String)>,
+    posts: &mut Vec<(String, String, String, Vec<String>, String, String, String, String)>,
     date_count: &mut HashMap<String, i32>,
 ) {
     let mut lines = content.lines();
@@ -164,6 +165,14 @@ fn process_post(
         })
         .unwrap_or_default();
 
+    let summary = strip_yaml_quotes(
+        &front_matter
+            .lines()
+            .find(|l| l.starts_with("summary:"))
+            .map(|l| l.replace("summary:", "").trim().to_string())
+            .unwrap_or_default(),
+    );
+
     let date_parts: Vec<&str> = date.split(' ').collect();
     let date_str = if date_parts.len() >= 1 {
         date_parts[0].replace('-', "")
@@ -189,5 +198,6 @@ fn process_post(
         post_content,
         slug,
         category.to_string(),
+        summary,
     ));
 }

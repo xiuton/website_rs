@@ -15,8 +15,8 @@ pub fn About() -> Element {
             section { class: "about-section intro-section",
                 h2 { "👋 你好" }
                 p { class: "intro-text",
-                    "我是一名全栈开发者，热爱技术，喜欢探索新的编程语言和框架。"
-                    "专注于构建高性能、可维护的Web应用。"
+                    "我是一名全栈开发者爱好者，热爱技术，喜欢探索新的编程语言和框架。"
+                    "专注于构建高性能、可维护的编程应用。"
                 }
                 div { class: "tech-stack",
                     span { "🦀 Rust" }

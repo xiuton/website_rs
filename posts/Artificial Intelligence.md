@@ -1,11 +1,11 @@
 ---
-title: Artificial Intelligence
+title: 人工智能（AI）基础解析
 date: 2026-01-29 22:26:15
 author: 干徒
 tags: [Artificial Intelligence]
+summary: 人工智能（AI）已经越来越融入我们的生活，从智能助手到智能机器人，从智能交通到智能医疗，AI正在改变我们的世界。
 ---
 
-# 人工智能（AI）基础解析  
 ## 一、AI的定义  
 人工智能（Artificial Intelligence，简称AI）是一门研究、开发用于**模拟、延伸和扩展人类智能**的理论、方法、技术及应用系统的技术科学，核心目标是让机器具备类似人类的感知、推理、学习、决策、创造等智能行为，能够自主处理问题并适应不同场景。  
   

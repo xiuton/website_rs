@@ -239,7 +239,6 @@ pub fn Dev() -> Element {
                     class: "dev-btns",
                     button {
                         class: "img-switch-btn",
-                        style: "backdrop-filter: blur(8px); background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.3); padding: 8px; border-radius: 8px; transition: all 0.3s ease;",
                         onclick: fetch_random_img,
                         svg {
                             xmlns: "http://www.w3.org/2000/svg",
@@ -258,7 +257,6 @@ pub fn Dev() -> Element {
                     }
                     button {
                         class: "background-mode-btn",
-                        style: "backdrop-filter: blur(8px); background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.3); padding: 8px; border-radius: 8px; margin-left: 8px; transition: all 0.3s ease;",
                         onclick: move |_| {
                             enter_background_mode();
                         },

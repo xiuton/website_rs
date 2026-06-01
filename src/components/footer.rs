@@ -12,7 +12,7 @@ pub fn Footer() -> Element {
     rsx! {
         div { class: "footer-content",
             div { class: "copyright",
-                span { "2019-2025 " }
+                span { "2019-2026 " }
                 svg {
                     xmlns: "http://www.w3.org/2000/svg",
                     width: "14",

@@ -1,5 +1,7 @@
 use dioxus::prelude::*;
 use dioxus_router::prelude::Link;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 use crate::routes::Route;
 
 #[component]
@@ -60,6 +62,92 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
             _ => false
         }
     };
+
+    use_effect(move || {
+        let window = web_sys::window().expect("Failed to get window");
+        let document = window.document().expect("Failed to get document");
+
+        let is_stuck = std::rc::Rc::new(std::cell::Cell::new(false));
+        let trigger_y = std::rc::Rc::new(std::cell::Cell::new(0.0));
+        let interval_id = std::rc::Rc::new(std::cell::Cell::new(0));
+
+        let document_for_interval = document.clone();
+        let window_for_interval = window.clone();
+
+        let closure = {
+            let document = document.clone();
+            let window = window.clone();
+            let is_stuck = is_stuck.clone();
+            let trigger_y = trigger_y.clone();
+            let interval_id = interval_id.clone();
+            let document_for_interval = document_for_interval.clone();
+            let window_for_interval = window_for_interval.clone();
+            Closure::<dyn FnMut()>::new(move || {
+                if let Some(nav_links) = document.query_selector(".navbar-links").ok().flatten() {
+                    if trigger_y.get() == 0.0 {
+                        let rect = nav_links.get_bounding_client_rect();
+                        let scroll_y = window.scroll_y().unwrap_or(0.0);
+                        trigger_y.set(rect.top() + scroll_y);
+                    }
+
+                    let current_scroll_y = window.scroll_y().unwrap_or(0.0);
+                    if current_scroll_y >= trigger_y.get() {
+                        if !is_stuck.get() {
+                            is_stuck.set(true);
+                        }
+                        if interval_id.get() == 0 {
+                            let doc = document_for_interval.clone();
+                            let win = window_for_interval.clone();
+                            let stuck = is_stuck.clone();
+                            let iid = interval_id.clone();
+                            let cb = Closure::<dyn FnMut()>::new(move || {
+                                if stuck.get() {
+                                    if let Some(nl) = doc.query_selector(".navbar-links").ok().flatten() {
+                                        if let Some(app) = doc.query_selector(".app").ok().flatten() {
+                                            let r = app.get_bounding_client_rect();
+                                            let _ = nl.set_attribute(
+                                                "style",
+                                                &format!("position:fixed;top:0.5rem;left:{}px;width:{}px;", r.left(), r.width()),
+                                            );
+                                        }
+                                    }
+                                }
+                            });
+                            let id = win.set_interval_with_callback_and_timeout_and_arguments_0(
+                                cb.as_ref().unchecked_ref(),
+                                100,
+                            ).unwrap_or(0);
+                            iid.set(id);
+                            cb.forget();
+                        }
+                        if let Some(app) = document.query_selector(".app").ok().flatten() {
+                            let app_rect = app.get_bounding_client_rect();
+                            let _ = nav_links.set_attribute(
+                                "style",
+                                &format!("position:fixed;top:0.5rem;left:{}px;width:{}px;", app_rect.left(), app_rect.width()),
+                            );
+                        }
+                        let _ = nav_links.set_attribute("data-stuck", "true");
+                    } else {
+                        if is_stuck.get() {
+                            let id = interval_id.get();
+                            if id != 0 {
+                                window_for_interval.clear_interval_with_handle(id);
+                                interval_id.set(0);
+                            }
+                            let _ = nav_links.remove_attribute("style");
+                            let _ = nav_links.remove_attribute("data-stuck");
+                            is_stuck.set(false);
+                        }
+                    }
+                }
+            })
+        };
+
+        let _ = window.add_event_listener_with_callback("scroll", closure.as_ref().unchecked_ref());
+
+        closure.forget();
+    });
 
     rsx! {
         div { class: "navbar-content",
