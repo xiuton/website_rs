@@ -871,6 +871,37 @@ html, body {
           flex-direction: column;
           row-gap: 1rem;
 
+          .category-filter {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            padding: 0.25rem 0;
+
+            .category-btn {
+              padding: 0.35rem 0.9rem;
+              border-radius: 999px;
+              font-size: 0.85rem;
+              border: 1px solid var(--border-color, #e5e7eb);
+              background: var(--bg-secondary, #f9fafb);
+              color: var(--text-secondary, #6b7280);
+              cursor: pointer;
+              transition: all 0.2s ease;
+              white-space: nowrap;
+
+              &:hover {
+                border-color: var(--accent-color);
+                color: var(--accent-color);
+                background: var(--accent-light, rgba(59, 130, 246, 0.08));
+              }
+
+              &.active {
+                background: var(--accent-color);
+                color: #fff;
+                border-color: var(--accent-color);
+              }
+            }
+          }
+
           .blog-posts {
             display: flex;
             flex-direction: column;
@@ -892,10 +923,28 @@ html, body {
                 transform: translateY(-2px);
               }
 
-              .preview-title {
-                font-size: 2.2rem;
+              .preview-header {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
                 margin: 0 0 .5rem 0;
-                color: var(--text-primary);
+                flex-wrap: wrap;
+
+                .preview-title {
+                  font-size: 2.2rem;
+                  margin: 0;
+                  color: var(--text-primary);
+                }
+
+                .preview-category {
+                  background: var(--accent-light, rgba(59, 130, 246, 0.12));
+                  color: var(--accent-color);
+                  padding: 0.2rem 0.7rem;
+                  border-radius: 999px;
+                  font-size: 0.8rem;
+                  font-weight: 500;
+                  flex-shrink: 0;
+                }
               }
 
               .preview-meta {
@@ -1224,6 +1273,24 @@ html, body {
               font-size: 2rem;
               margin: 0 0 1rem 0;
               color: var(--text-primary);
+
+              .blog-category {
+                display: inline-block;
+                background: var(--accent-light, rgba(59, 130, 246, 0.12));
+                color: var(--accent-color);
+                padding: 0.25rem 0.8rem;
+                border-radius: 999px;
+                font-size: 0.85rem;
+                font-weight: 500;
+                margin-left: 0.75rem;
+                vertical-align: middle;
+              }
+
+              h2 {
+                display: inline;
+                font-size: inherit;
+                margin: 0;
+              }
             }
     
             .blog-meta {

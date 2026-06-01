@@ -2,6 +2,7 @@ use dioxus::prelude::*;
 use dioxus_router::prelude::Link;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::UrlSearchParams;
+use std::collections::BTreeSet;
 
 use crate::models::RuntimeBlogPost;
 use crate::routes::Route;
@@ -11,33 +12,30 @@ use crate::utils::title;
 #[component]
 pub fn Home() -> Element {
     let posts = use_signal(|| Vec::<RuntimeBlogPost>::new());
-    
-    // Set page title
+    let mut selected_category = use_signal(|| "全部".to_string());
+
     use_effect(move || {
         title::set_page_title("首页 - 干徒");
         ()
     });
 
-    // 获取当前 URL 的查询参数
     let location = web_sys::window()
         .expect("Failed to get window")
         .location();
     let search = location.search().unwrap_or_default();
     let query_params: UrlSearchParams = UrlSearchParams::new_with_str(&search).expect("Failed to create URLSearchParams");
-    
-    // 从 URL 参数中获取页码和每页数量
+
     let page_from_url = query_params.get("page")
         .and_then(|v| v.parse::<usize>().ok());
     let size_from_url = query_params.get("size")
         .and_then(|v| v.parse::<usize>().ok());
+    let cat_from_url = query_params.get("category");
 
     let mut current_page = use_signal(|| page_from_url.unwrap_or(1));
     let mut page_size = use_signal(|| {
-        // 优先使用 URL 参数
         if let Some(size) = size_from_url {
             return size;
         }
-        // 其次使用 localStorage 保存的值
         if let Some(window) = web_sys::window() {
             if let Some(storage) = window.local_storage().ok().flatten() {
                 if let Ok(Some(size)) = storage.get_item("blog_page_size") {
@@ -47,21 +45,26 @@ pub fn Home() -> Element {
                 }
             }
         }
-        10  // 默认值
+        10
     });
 
-    let total_pages = use_memo(move || {
-        let total = posts.read().len();
-        ((total as f64) / (page_size() as f64)).ceil() as usize
+    use_effect(move || {
+        if let Some(cat) = cat_from_url.as_ref() {
+            selected_category.set(cat.clone());
+        }
     });
 
-    // 更新 URL 的函数
-    let update_url = move |page: usize, size: usize| {
+    let update_url = move |page: usize, size: usize, cat: &str| {
         if let Some(window) = web_sys::window() {
             if let Ok(url) = web_sys::Url::new(&window.location().href().expect("Failed to get href")) {
                 let search_params = url.search_params();
                 search_params.set("page", &page.to_string());
                 search_params.set("size", &size.to_string());
+                if cat == "全部" {
+                    search_params.delete("category");
+                } else {
+                    search_params.set("category", cat);
+                }
                 let new_url = format!("/?{}", search_params.to_string());
                 let _ = window.history().expect("Failed to get history")
                     .replace_state_with_url(
@@ -73,16 +76,13 @@ pub fn Home() -> Element {
         }
     };
 
-    // 监听页码和每页数量变化，更新 URL
     use_effect(move || {
-        update_url(current_page(), page_size());
+        update_url(current_page(), page_size(), &selected_category());
     });
 
-    // 加载博客文章列表
     use_effect(move || {
         let mut posts = posts.clone();
         spawn_local(async move {
-            // 使用构建脚本生成的文章列表
             let loaded_posts = BLOG_POSTS.iter().map(|post| RuntimeBlogPost {
                     title: post.title.to_string(),
                     date: post.date.to_string(),
@@ -90,14 +90,41 @@ pub fn Home() -> Element {
                     tags: post.tags.iter().map(|&s| s.to_string()).collect(),
                     content: post.content.to_string(),
                     slug: post.slug.to_string(),
+                    category: post.category.to_string(),
                 }).collect();
             posts.set(loaded_posts);
         });
     });
 
-    // 获取当前页的文章
+    let categories: BTreeSet<String> = {
+        let mut cats = BTreeSet::new();
+        for post in posts.read().iter() {
+            if !post.category.is_empty() {
+                cats.insert(post.category.clone());
+            }
+        }
+        cats
+    };
+
+    let filtered_posts = use_memo(move || {
+        let cat = selected_category();
+        if cat == "全部" {
+            posts.read().clone()
+        } else {
+            posts.read().iter()
+                .filter(|p| p.category == cat)
+                .cloned()
+                .collect::<Vec<_>>()
+        }
+    });
+
+    let total_pages = use_memo(move || {
+        let total = filtered_posts.read().len();
+        if total == 0 { 1 } else { ((total as f64) / (page_size() as f64)).ceil() as usize }
+    });
+
     let current_page_posts = use_memo(move || {
-        let posts = posts.read();
+        let posts = filtered_posts.read();
         let start = (current_page() - 1) * page_size();
         let end = start + page_size();
         posts[start.min(posts.len())..end.min(posts.len())].to_vec()
@@ -106,6 +133,33 @@ pub fn Home() -> Element {
     rsx! {
         div { class: "blog-container",
             div { class: "blog-list",
+                if !categories.is_empty() {
+                    div { class: "category-filter",
+                        {
+                            let all_cats = {
+                                let mut c = vec!["全部".to_string()];
+                                c.extend(categories.iter().cloned());
+                                c
+                            };
+                            all_cats.into_iter().map(|cat| {
+                                let is_active = selected_category() == cat;
+                                rsx! {
+                                    button {
+                                        class: if is_active { "category-btn active" } else { "category-btn" },
+                                        onclick: {
+                                            let cat = cat.clone();
+                                            move |_| {
+                                                selected_category.set(cat.clone());
+                                                current_page.set(1);
+                                            }
+                                        },
+                                        {cat.clone()}
+                                    }
+                                }
+                            })
+                        }
+                    }
+                }
                 if posts.read().is_empty() {
                     div { class: "loading", "加载中..." }
                 } else {
@@ -115,12 +169,17 @@ pub fn Home() -> Element {
                             rsx! {
                                 div { class: "blog-preview",
                                     Link { to: Route::BlogPostView { slug: post.slug.clone() },
-                                        h2 { class: "preview-title", {post.title.clone()} }
+                                        div { class: "preview-header",
+                                            h2 { class: "preview-title", {post.title.clone()} }
+                                            if !post.category.is_empty() {
+                                                span { class: "preview-category", {post.category.clone()} }
+                                            }
+                                        }
                                         div { class: "preview-meta",
                                             span { class: "preview-date", {post.date.clone()} }
                                             span { class: "preview-author", {post.author.clone()} }
                                         }
-                                        div { 
+                                        div {
                                             class: "preview-content",
                                             dangerous_inner_html: {
                                                 let preview = post.content
@@ -133,7 +192,7 @@ pub fn Home() -> Element {
                                         div { class: "preview-tags",
                                             {post.tags.iter().map(|tag| {
                                                 rsx! {
-                                                    span { class: "preview-tag", 
+                                                    span { class: "preview-tag",
                                                         svg {
                                                             xmlns: "http://www.w3.org/2000/svg",
                                                             fill: "none",
@@ -147,7 +206,7 @@ pub fn Home() -> Element {
                                                                 d: "M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"
                                                             }
                                                         }
-                                                        {tag.clone()} 
+                                                        {tag.clone()}
                                                     }
                                                 }
                                             })}
@@ -157,9 +216,7 @@ pub fn Home() -> Element {
                             }
                         })}
                     }
-                    // 分页控制
                     div { class: "pagination",
-                        // 上一页按钮
                         button {
                             class: "pagination-btn",
                             disabled: current_page() <= 1,
@@ -182,11 +239,9 @@ pub fn Home() -> Element {
                                 }
                             }
                         }
-                        // 页码显示
                         span { class: "pagination-info",
                             "{current_page()}/{total_pages()}"
                         }
-                        // 下一页按钮
                         button {
                             class: "pagination-btn",
                             disabled: current_page() >= total_pages(),
@@ -209,7 +264,6 @@ pub fn Home() -> Element {
                                 }
                             }
                         }
-                        // 每页显示数量选择
                         select {
                             class: "page-size-select",
                             name: "page-size-select",
@@ -218,8 +272,7 @@ pub fn Home() -> Element {
                                 let value = evt.data.value();
                                 if let Ok(new_size) = value.parse::<usize>() {
                                     page_size.set(new_size);
-                                    current_page.set(1);  // 重置到第一页
-                                    // 保存选择到 localStorage
+                                    current_page.set(1);
                                     if let Some(window) = web_sys::window() {
                                         if let Some(storage) = window.local_storage().ok().flatten() {
                                             let _ = storage.set_item("blog_page_size", &new_size.to_string());

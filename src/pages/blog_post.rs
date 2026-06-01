@@ -17,6 +17,7 @@ pub fn BlogPostView(slug: String) -> Element {
                 tags: p.tags.iter().map(|&s| s.to_string()).collect(),
                 content: p.content.to_string(),
                 slug: p.slug.to_string(),
+                category: p.category.to_string(),
             })
     });
 
@@ -161,6 +162,9 @@ pub fn BlogPostView(slug: String) -> Element {
                     div { class: "blog-title-wrapper",
                         div { class: "blog-title",
                             h2 { {post.title.clone()} }
+                            if !post.category.is_empty() {
+                                span { class: "blog-category", {post.category.clone()} }
+                            }
                         }
                         div { class: "blog-meta",
                             span { class: "blog-date", {post.date.clone()} }

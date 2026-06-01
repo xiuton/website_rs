@@ -1,8 +1,13 @@
+#[cfg(not(target_arch = "wasm32"))]
 use chrono::Local;
+#[cfg(not(target_arch = "wasm32"))]
 use std::env;
+#[cfg(not(target_arch = "wasm32"))]
 use std::fs;
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() {
     // 获取命令行参数
     let args: Vec<String> = env::args().collect();
@@ -71,4 +76,7 @@ Text Example
     fs::write(&file_path, content).expect("无法写入文件");
 
     println!("已创建: {}", display_path);
-} 
+}
+
+#[cfg(target_arch = "wasm32")]
+fn main() {} 
