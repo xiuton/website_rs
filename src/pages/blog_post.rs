@@ -163,26 +163,6 @@ pub fn BlogPostView(slug: String) -> Element {
                             span { class: "blog-date", {post.date.clone()} }
                             span { class: "blog-author", {post.author.clone()} }
                         }
-                        div { class: "blog-tags",
-                            {post.tags.iter().map(|tag| rsx! {
-                                span { class: "blog-tag",
-                                    svg {
-                                        xmlns: "http://www.w3.org/2000/svg",
-                                        fill: "none",
-                                        view_box: "0 0 24 24",
-                                        stroke_width: "1.5",
-                                        stroke: "currentColor",
-                                        class: "size-6",
-                                        path {
-                                            stroke_linecap: "round",
-                                            stroke_linejoin: "round",
-                                            d: "M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"
-                                        }
-                                    }
-                                    {tag.clone()}
-                                }
-                            })}
-                        }
                     }
                     div { 
                         class: "blog-content",
@@ -192,6 +172,26 @@ pub fn BlogPostView(slug: String) -> Element {
                             let html = html.replace("<pre><code class=\"", "<pre><code class=\"language-");
                             html
                         }
+                    }
+                    div { class: "blog-tags",
+                        {post.tags.iter().map(|tag| rsx! {
+                            span { class: "blog-tag",
+                                svg {
+                                    xmlns: "http://www.w3.org/2000/svg",
+                                    fill: "none",
+                                    view_box: "0 0 24 24",
+                                    stroke_width: "1.5",
+                                    stroke: "currentColor",
+                                    class: "size-6",
+                                    path {
+                                        stroke_linecap: "round",
+                                        stroke_linejoin: "round",
+                                        d: "M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"
+                                    }
+                                }
+                                {tag.clone()}
+                            }
+                        })}
                     }
                 }
             } else {
