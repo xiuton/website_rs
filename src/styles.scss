@@ -234,6 +234,43 @@ html, body {
   color: var(--accent-text);
 }
 
+// 滚动条样式
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+pre::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+pre::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+// Firefox 滚动条
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-default) transparent;
+}
+
+pre {
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
 // 布局
 #main {
   margin: 0 1.2rem;
@@ -312,8 +349,7 @@ html, body {
             background: var(--navbar-bg);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            border-radius: 0 0 var(--radius-md) var(--radius-md);
-            border-top: none;
+            border-radius: var(--radius-md);
             box-shadow: var(--shadow-md);
             padding: 0.4rem 0.5rem;
           }
@@ -1264,26 +1300,27 @@ html, body {
               color: var(--text-tertiary);
               margin-bottom: 0.75rem;
             }
-    
-            .blog-tags {
+          }
+
+          .blog-tags {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-top: 2rem;
+
+            .blog-tag {
+              background: var(--accent-soft);
+              color: var(--accent-text);
+              padding: 0.2rem 0.65rem;
+              border-radius: var(--radius-full);
+              font-size: 0.75rem;
               display: flex;
-              gap: 0.5rem;
-              flex-wrap: wrap;
+              align-items: center;
+              gap: 0.2rem;
 
-              .blog-tag {
-                background: var(--accent-soft);
-                color: var(--accent-text);
-                padding: 0.2rem 0.65rem;
-                border-radius: var(--radius-full);
-                font-size: 0.75rem;
-                display: flex;
-                align-items: center;
-                gap: 0.2rem;
-
-                svg {
-                  width: 0.8rem;
-                  height: 0.8rem;
-                }
+              svg {
+                width: 0.8rem;
+                height: 0.8rem;
               }
             }
           }
@@ -1360,16 +1397,24 @@ html, body {
             background: var(--accent-soft);
             color: var(--accent-text);
             border: 1px solid var(--border-subtle);
+
+            html.dark & {
+              background: #242424;
+            }
           }
 
           pre {
             background: #0d1117;
             border-radius: var(--radius-md);
-            padding: 1.25rem;
+            padding: 0;
             margin: 1.25rem 0;
-            overflow-x: auto;
+            overflow: auto;
             position: relative;
             border: 1px solid var(--border-default);
+
+            html.dark & {
+              background: #242424;
+            }
 
             &::before {
               content: attr(data-lang);
@@ -1387,6 +1432,8 @@ html, body {
             }
 
             code {
+              display: block;
+              padding: 1.25rem;
               font-family: map.get($font-families, 'jetbrains'), map.get($font-families, 'mi-sans'), map.get($font-families, 'sans'), map.get($font-families, 'consolas'), map.get($font-families, 'monospace');
               font-size: 0.88rem;
               line-height: 1.6;
@@ -1431,11 +1478,6 @@ html, body {
         .dark .blog-preview,
         .dark .blog-post {
           background: var(--bg-elevated);
-        }
-
-        .dark .blog-content code,
-        .dark .blog-content pre {
-          background: var(--bg-primary);
         }
       }
 
@@ -3109,7 +3151,7 @@ html.dark::view-transition-new(root) {
   overflow-y: auto;
 
   &::-webkit-scrollbar { width: 6px; }
-  &::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+  &::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 3px; }
 }
 
 .cg-table-wrap table {
