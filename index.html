@@ -18,24 +18,223 @@
     <link data-trunk rel="rust" data-bin="web-rs" />
     <script>
         window.addEventListener('error', function(e) {
-            // 忽略资源加载错误
             if (e.target && (e.target.tagName === 'LINK' || e.target.tagName === 'IMG' || e.target.tagName === 'SCRIPT')) {
                 e.preventDefault();
                 return;
             }
-            
-            // 对于其他错误，只在开发环境下显示
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
                 console.warn('Non-critical error:', e.error);
             }
         });
     </script>
-    <!-- 静态资源复制配置 -->
     <link data-trunk rel="copy-dir" href="static" />
     <link data-trunk rel="copy-file" href="netlify.toml" data-optional />
     <link data-trunk rel="copy-file" href="static/favicon.svg" data-optional />
+    <style>
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176,162,144,0.1); }
+    </style>
 </head>
 <body>
-    <div id="main"></div>
+    <div id="main">
+        <div id="main-skeleton">
+            <div class="app">
+                <!-- 所有页面共享的 Navbar -->
+                <div class="navbar-content">
+                    <div class="navbar-ui">
+                        <h1 class="navbar-title">干徒</h1>
+                        <div class="navbar-subtitle">这很酷</div>
+                        <div class="navbar-links">
+                            <span class="skeleton-nav-item">首页</span>
+                            <span class="skeleton-nav-item">关于</span>
+                            <span class="skeleton-nav-item">书签</span>
+                            <span class="skeleton-nav-item">开发</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="main-content">
+                    <!-- 首页骨架：博客列表 -->
+                    <div class="sk-page" data-route="/">
+                        <div class="skeleton-card"><div class="skeleton-line skeleton-line--long"></div><div class="skeleton-line skeleton-line--short"></div><div class="skeleton-line skeleton-line--medium"></div></div>
+                        <div class="skeleton-card"><div class="skeleton-line skeleton-line--long"></div><div class="skeleton-line skeleton-line--short"></div><div class="skeleton-line skeleton-line--medium"></div></div>
+                        <div class="skeleton-card"><div class="skeleton-line skeleton-line--long"></div><div class="skeleton-line skeleton-line--short"></div><div class="skeleton-line skeleton-line--medium"></div></div>
+                        <div class="skeleton-card"><div class="skeleton-line skeleton-line--long"></div><div class="skeleton-line skeleton-line--short"></div><div class="skeleton-line skeleton-line--medium"></div></div>
+                    </div>
+
+                    <!-- 关于页骨架 -->
+                    <div class="sk-page" data-route="/about">
+                        <div class="about-container">
+                            <div class="about-section intro-section">
+                                <h2>👋 你好</h2>
+                                <div class="skeleton-line skeleton-line--long" style="margin:1rem 0;"></div>
+                                <div class="skeleton-line skeleton-line--medium"></div>
+                                <div class="sk-tech-stack" style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+                                    <span class="skeleton-tag"></span><span class="skeleton-tag"></span><span class="skeleton-tag"></span><span class="skeleton-tag"></span><span class="skeleton-tag"></span><span class="skeleton-tag"></span>
+                                </div>
+                            </div>
+                            <div class="about-section site-section">
+                                <h2>🌐 关于本站</h2>
+                                <div class="skeleton-line skeleton-line--long" style="margin:1rem 0;"></div>
+                                <div class="skeleton-line skeleton-line--medium"></div>
+                                <div class="sk-tech-grid" style="margin-top:1.5rem;display:grid;grid-template-columns:repeat(2,1fr);gap:0.75rem;">
+                                    <div class="skeleton-card" style="padding:0.75rem;margin:0;height:4rem;"></div>
+                                    <div class="skeleton-card" style="padding:0.75rem;margin:0;height:4rem;"></div>
+                                    <div class="skeleton-card" style="padding:0.75rem;margin:0;height:4rem;"></div>
+                                    <div class="skeleton-card" style="padding:0.75rem;margin:0;height:4rem;"></div>
+                                </div>
+                            </div>
+                            <div class="about-section skills-section">
+                                <h2>💪 技能特长</h2>
+                                <div class="sk-skills-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;">
+                                    <div class="skeleton-card" style="padding:1rem;margin:0;min-height:7rem;"></div>
+                                    <div class="skeleton-card" style="padding:1rem;margin:0;min-height:7rem;"></div>
+                                    <div class="skeleton-card" style="padding:1rem;margin:0;min-height:7rem;"></div>
+                                </div>
+                            </div>
+                            <div class="about-section contact-section">
+                                <h2>📫 联系我</h2>
+                                <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+                                    <div class="skeleton-line" style="width:7rem;height:2.5rem;margin:0;"></div>
+                                    <div class="skeleton-line" style="width:7rem;height:2.5rem;margin:0;"></div>
+                                    <div class="skeleton-line" style="width:7rem;height:2.5rem;margin:0;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 书签页骨架 -->
+                    <div class="sk-page" data-route="/tags">
+                        <div class="bookmarks-container">
+                            <div class="skeleton-line" style="width:100%;height:2.5rem;margin-bottom:1.5rem;border-radius:var(--radius-md);"></div>
+                            <div class="sk-bookmarks-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem;">
+                                <div class="skeleton-card" style="padding:1rem;margin:0;min-height:5rem;"></div>
+                                <div class="skeleton-card" style="padding:1rem;margin:0;min-height:5rem;"></div>
+                                <div class="skeleton-card" style="padding:1rem;margin:0;min-height:5rem;"></div>
+                                <div class="skeleton-card" style="padding:1rem;margin:0;min-height:5rem;"></div>
+                                <div class="skeleton-card" style="padding:1rem;margin:0;min-height:5rem;"></div>
+                                <div class="skeleton-card" style="padding:1rem;margin:0;min-height:5rem;"></div>
+                                <div class="skeleton-card" style="padding:1rem;margin:0;min-height:5rem;"></div>
+                                <div class="skeleton-card" style="padding:1rem;margin:0;min-height:5rem;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 开发页骨架 -->
+                    <div class="sk-page" data-route="/dev">
+                        <div class="dev-container">
+                            <div class="identification">
+                                <div class="skeleton-line" style="width:180px;height:80px;margin:0 auto;border-radius:var(--radius-md);"></div>
+                            </div>
+                            <div style="text-align:center;margin:1.5rem 0;">
+                                <div class="skeleton-line" style="width:260px;height:180px;margin:0 auto;border-radius:var(--radius-lg);"></div>
+                                <div style="display:flex;justify-content:center;gap:0.75rem;margin-top:1rem;">
+                                    <div class="skeleton-line" style="width:3rem;height:2.25rem;margin:0;border-radius:var(--radius-md);"></div>
+                                    <div class="skeleton-line" style="width:3rem;height:2.25rem;margin:0;border-radius:var(--radius-md);"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 文章详情页骨架 -->
+                    <div class="sk-page" data-route="/post/">
+                        <div class="blog-post">
+                            <div class="skeleton-line skeleton-line--long" style="height:1.8rem;margin-bottom:0.75rem;"></div>
+                            <div class="skeleton-line skeleton-line--short" style="margin-bottom:0.5rem;"></div>
+                            <div class="skeleton-line skeleton-line--medium" style="margin-bottom:1.5rem;"></div>
+                            <div class="skeleton-line skeleton-line--long" style="margin-bottom:0.5rem;"></div>
+                            <div class="skeleton-line skeleton-line--long" style="margin-bottom:0.5rem;"></div>
+                            <div class="skeleton-line skeleton-line--medium" style="margin-bottom:0.5rem;"></div>
+                            <div class="skeleton-line skeleton-line--long" style="margin-bottom:0.5rem;"></div>
+                            <div class="skeleton-line" style="width:90%;margin-bottom:0.5rem;"></div>
+                            <div class="skeleton-line" style="width:30%;margin-bottom:1.5rem;"></div>
+                            <div class="skeleton-line skeleton-line--long" style="margin-bottom:0.5rem;"></div>
+                            <div class="skeleton-line skeleton-line--long" style="margin-bottom:0.5rem;"></div>
+                            <div class="skeleton-line skeleton-line--medium" style="margin-bottom:0.5rem;"></div>
+                            <div class="skeleton-line skeleton-line--long" style="margin-bottom:0.5rem;"></div>
+                            <div class="skeleton-line" style="width:40%;"></div>
+                        </div>
+                    </div>
+
+                    <!-- 圆形生成器页骨架 -->
+                    <div class="sk-page" data-route="/circle-generator">
+                        <div class="skeleton-card" style="min-height:300px;"></div>
+                    </div>
+
+                    <!-- 操场页骨架 -->
+                    <div class="sk-page" data-route="/playground">
+                        <div class="skeleton-card" style="min-height:200px;"></div>
+                    </div>
+
+                    <!-- 测试页骨架 -->
+                    <div class="sk-page" data-route="/test">
+                        <div class="skeleton-card" style="min-height:300px;"></div>
+                    </div>
+
+                    <!-- 默认兜底（未匹配到路由时显示首页骨架） -->
+                    <div class="sk-page sk-fallback">
+                        <div class="skeleton-card"><div class="skeleton-line skeleton-line--long"></div><div class="skeleton-line skeleton-line--short"></div><div class="skeleton-line skeleton-line--medium"></div></div>
+                        <div class="skeleton-card"><div class="skeleton-line skeleton-line--long"></div><div class="skeleton-line skeleton-line--short"></div><div class="skeleton-line skeleton-line--medium"></div></div>
+                        <div class="skeleton-card"><div class="skeleton-line skeleton-line--long"></div><div class="skeleton-line skeleton-line--short"></div><div class="skeleton-line skeleton-line--medium"></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        (function() {
+            var skeleton = document.getElementById('main-skeleton');
+            var main = document.getElementById('main');
+            if (!skeleton || !main) return;
+
+            // 根据当前路由显示对应的骨架页
+            (function() {
+                var path = window.location.pathname;
+                var pages = document.querySelectorAll('.sk-page[data-route]');
+                var matched = false;
+                for (var i = 0; i < pages.length; i++) {
+                    var route = pages[i].getAttribute('data-route');
+                    if (route === path || (route !== '/' && path.indexOf(route) === 0)) {
+                        pages[i].classList.add('active');
+                        matched = true;
+                    }
+                }
+                if (!matched) {
+                    var fallback = document.querySelector('.sk-fallback');
+                    if (fallback) fallback.classList.add('active');
+                }
+            })();
+
+            // Dioxus 挂载后隐藏骨架屏
+            var observer = new MutationObserver(function(mutations) {
+                for (var i = 0; i < mutations.length; i++) {
+                    var m = mutations[i];
+                    for (var j = 0; j < m.addedNodes.length; j++) {
+                        var node = m.addedNodes[j];
+                        if (node.id !== 'main-skeleton' && node.nodeType === 1) {
+                            skeleton.classList.add('fade-out');
+                            setTimeout(function() { skeleton.remove(); }, 300);
+                            observer.disconnect();
+                            return;
+                        }
+                    }
+                }
+            });
+            observer.observe(main, { childList: true });
+
+            // 兜底：10 秒后强制隐藏
+            setTimeout(function() {
+                if (skeleton.parentNode) {
+                    skeleton.classList.add('fade-out');
+                    setTimeout(function() { skeleton.remove(); }, 300);
+                    observer.disconnect();
+                }
+            }, 10000);
+        })();
+    </script>
 </body>
 </html>
