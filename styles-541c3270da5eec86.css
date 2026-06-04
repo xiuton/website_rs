@@ -23,8 +23,6 @@
   --bg-color: var(--bg-base);
   --bg-secondary: var(--bg-elevated);
   --bg-primary: var(--bg-elevated);
-  --bg-primary-rgb: 253, 251, 247;
-  --bg-secondary-rgb: 240, 235, 224;
   --text-color: var(--text-primary);
   --text-color-anti: #ffffff;
   --border-color: var(--border-default);
@@ -34,27 +32,12 @@
   --primary-color-dark: var(--accent-hover);
   --primary-color-alpha: var(--accent-soft);
   --link-color: var(--accent-text);
-  --tag-bg: var(--bg-subtle);
   --card-bg: var(--bg-elevated);
   --shadow-color: rgba(62, 51, 39, 0.07);
-  --danger-color: #c8484a;
-  --danger-color-dark: #a33a3c;
   --navbar-bg: rgba(248, 244, 237, 0.8);
-  --main-content-bg: var(--bg-base);
-  --secondary-bg: var(--bg-subtle);
-  --navbar-title: var(--text-primary);
-  --navbar-subtitle: var(--text-tertiary);
-  --navbar-link: var(--text-secondary);
-  --navbar-link-active: var(--text-primary);
-  --navbar-link-hover: var(--text-primary);
-  --navbar-border: var(--border-subtle);
-  --navbar-glow-color-1: var(--accent);
-  --navbar-glow-color-2: var(--accent-text);
   --hole-bg-color: #fdfbf7;
   --hole-border-color: #3e3327;
   --accent-color: var(--accent);
-  --accent-light: var(--accent-soft);
-  --accent-light-rgb: var(--accent-rgb);
   --programming-language-logotype-bg-color: rgba(122, 108, 90, 0.1);
   --shadow: var(--shadow-sm);
 }
@@ -79,8 +62,6 @@
   --bg-color: var(--bg-base);
   --bg-secondary: var(--bg-elevated);
   --bg-primary: var(--bg-elevated);
-  --bg-primary-rgb: 36, 30, 25;
-  --bg-secondary-rgb: 45, 38, 32;
   --text-color: var(--text-primary);
   --text-color-anti: #000000;
   --border-color: var(--border-default);
@@ -90,31 +71,23 @@
   --primary-color-dark: var(--accent-hover);
   --primary-color-alpha: var(--accent-soft);
   --link-color: var(--accent-text);
-  --tag-bg: var(--bg-subtle);
   --card-bg: var(--bg-elevated);
   --shadow-color: rgba(0, 0, 0, 0.4);
-  --danger-color: #e06060;
-  --danger-color-dark: #c8484a;
   --navbar-bg: rgba(27, 22, 18, 0.8);
-  --main-content-bg: var(--bg-base);
-  --secondary-bg: var(--bg-subtle);
-  --navbar-title: var(--text-primary);
-  --navbar-subtitle: var(--text-tertiary);
-  --navbar-link: var(--text-secondary);
-  --navbar-link-active: var(--text-primary);
-  --navbar-link-hover: var(--text-primary);
-  --navbar-border: var(--border-subtle);
-  --navbar-glow-color-1: var(--accent);
-  --navbar-glow-color-2: var(--accent-text);
   --hole-bg-color: #1b1612;
   --hole-border-color: #ede4d6;
   --accent-color: var(--accent);
-  --accent-light: var(--accent-soft);
-  --accent-light-rgb: var(--accent-rgb);
   --programming-language-logotype-bg-color: rgba(176, 162, 144, 0.08);
   --shadow: var(--shadow-sm);
 }
 
+@font-face {
+  font-family: "SmileySans";
+  src: url("/static/fonts/SmileySans-Oblique.otf") format("opentype");
+  font-display: swap;
+  font-weight: normal;
+  font-style: normal;
+}
 @font-face {
   font-family: "MiSans";
   src: url("/static/fonts/MiSans-Regular.otf") format("opentype");
@@ -123,23 +96,11 @@
   font-style: normal;
 }
 @font-face {
-  font-family: "JetBrainsMono";
+  font-family: "JetBrains Mono";
   src: url("/static/fonts/JetBrainsMonoNLNerdFont-Regular.ttf") format("truetype");
   font-display: swap;
   font-weight: normal;
   font-style: normal;
-}
-@font-face {
-  font-family: SmileySans;
-  src: url(./static/fonts/SmileySans-Oblique.otf);
-}
-@font-face {
-  font-family: MiSans;
-  src: url(./static/fonts/MiSans-Regular.otf);
-}
-@font-face {
-  font-family: JetBrains Mono;
-  src: url(./static/fonts/JetBrainsMonoNLNerdFont-Regular.ttf);
 }
 html {
   scroll-behavior: smooth;
@@ -276,20 +237,17 @@ pre {
   align-items: center;
   gap: 0;
   padding: 0.35rem;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  width: fit-content;
-  z-index: 100;
-  transition: box-shadow 0.2s ease, border-radius 0.2s ease, background 0.2s ease, backdrop-filter 0.2s ease, padding 0.2s ease, margin 0.2s ease;
-}
-#main .app .navbar-content .navbar-ui .navbar-links[data-stuck] {
   background: var(--navbar-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
-  padding: 0.4rem 0.5rem;
+  width: fit-content;
+  z-index: 100;
+  position: sticky;
+  top: 0.5rem;
+  transition: box-shadow 0.2s ease, border-radius 0.2s ease, background 0.2s ease, backdrop-filter 0.2s ease, padding 0.2s ease, margin 0.2s ease;
 }
 #main .app .navbar-content .navbar-ui .navbar-links .nav-link {
   color: var(--text-secondary);
