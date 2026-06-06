@@ -4,7 +4,7 @@ use wasm_bindgen::JsCast;
 use serde::{Serialize, Deserialize};
 use std::sync::LazyLock;
 use crate::utils::title;
-use crate::components::icons::{BookmarkIcon, GitHubIcon};
+use crate::components::icons::{BookmarkIcon, GitHubIcon, SearchIcon};
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 struct Bookmark {
@@ -126,18 +126,7 @@ pub fn Tags() -> Element {
                     button {
                         class: "search-button",
                         onclick: handle_search,
-                        svg {
-                            xmlns: "http://www.w3.org/2000/svg",
-                            fill: "none",
-                            view_box: "0 0 24 24",
-                            stroke_width: "2",
-                            stroke: "currentColor",
-                            path {
-                                stroke_linecap: "round",
-                                stroke_linejoin: "round",
-                                d: "m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-                            }
-                        }
+                        SearchIcon {}
                     }
                 }
             }

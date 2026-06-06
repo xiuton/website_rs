@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 use crate::utils::title;
-use crate::components::icons::GitHubIcon;
+use crate::components::icons::{GitHubIcon, EmailIcon, BlogIcon};
 
 #[component]
 pub fn About() -> Element {
@@ -134,14 +134,7 @@ pub fn About() -> Element {
                     a { 
                         href: "mailto:i@ganto.me",
                         class: "contact-link email-link",
-                        svg {
-                            xmlns: "http://www.w3.org/2000/svg",
-                            view_box: "0 0 24 24",
-                            fill: "currentColor",
-                            path {
-                                d: "M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"
-                            }
-                        }
+                        EmailIcon {}
                         span { "i@ganto.me" }
                     }
                     a { 
@@ -155,14 +148,7 @@ pub fn About() -> Element {
                         href: "https://cnblogs.com/ganto",
                         target: "_blank",
                         class: "contact-link blog-link",
-                        svg {
-                            xmlns: "http://www.w3.org/2000/svg",
-                            view_box: "0 0 24 24",
-                            fill: "currentColor",
-                            path {
-                                d: "M12.75 19.5v-.75a7.5 7.5 0 0 0-7.5-7.5H4.5m0-6.75h.75c7.87 0 14.25 6.38 14.25 14.25v.75M6 18.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"
-                            }
-                        }
+                        BlogIcon {}
                         span { "博客园" }
                     }
                 }

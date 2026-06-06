@@ -7,6 +7,9 @@ use crate::models::RuntimeBlogPost;
 use crate::routes::Route;
 use crate::BLOG_POSTS;
 use crate::utils::title;
+use crate::components::icons::{TagIcon, ChevronLeftIcon, ChevronRightIcon};
+
+const ALL_CATEGORY: &str = "全部";
 
 fn get_page_size(size_from_url: Option<usize>) -> usize {
     if let Some(size) = size_from_url {
@@ -27,7 +30,7 @@ fn get_page_size(size_from_url: Option<usize>) -> usize {
 #[component]
 pub fn Home() -> Element {
     let mut posts = use_signal(Vec::<RuntimeBlogPost>::new);
-    let mut selected_category = use_signal(|| "全部".to_string());
+    let mut selected_category = use_signal(|| ALL_CATEGORY.to_string());
 
     use_effect(move || {
         title::set_page_title("首页 - 干徒");
@@ -46,7 +49,7 @@ pub fn Home() -> Element {
         if let Ok(params) = UrlSearchParams::new_with_str(&search) {
             current_page.set(params.get("page").and_then(|v| v.parse().ok()).unwrap_or(1));
             page_size.set(get_page_size(params.get("size").and_then(|v| v.parse().ok())));
-            selected_category.set(params.get("category").unwrap_or_else(|| "全部".to_string()));
+            selected_category.set(params.get("category").unwrap_or_else(|| ALL_CATEGORY.to_string()));
         }
     });
 
@@ -57,7 +60,7 @@ pub fn Home() -> Element {
                 let search_params = url.search_params();
                 search_params.set("page", &page.to_string());
                 search_params.set("size", &size.to_string());
-                if cat == "全部" {
+                if cat == ALL_CATEGORY {
                     search_params.delete("category");
                 } else {
                     search_params.set("category", cat);
@@ -95,7 +98,7 @@ pub fn Home() -> Element {
 
     let filtered_posts = use_memo(move || {
         let cat = selected_category();
-        if cat == "全部" {
+        if cat == ALL_CATEGORY {
             posts.read().clone()
         } else {
             posts.read().iter()
@@ -124,7 +127,7 @@ pub fn Home() -> Element {
                     div { class: "category-filter",
                         {
                             let all_cats = {
-                                let mut c = vec!["全部".to_string()];
+                                let mut c = vec![ALL_CATEGORY.to_string()];
                                 c.extend(categories.iter().cloned());
                                 c
                             };
@@ -179,19 +182,7 @@ pub fn Home() -> Element {
                                             {post.tags.iter().map(|tag| {
                                                 rsx! {
                                                     span { class: "preview-tag",
-                                                        svg {
-                                                            xmlns: "http://www.w3.org/2000/svg",
-                                                            fill: "none",
-                                                            view_box: "0 0 24 24",
-                                                            stroke_width: "1.5",
-                                                            stroke: "currentColor",
-                                                            class: "size-6",
-                                                            path {
-                                                                stroke_linecap: "round",
-                                                                stroke_linejoin: "round",
-                                                                d: "M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"
-                                                            }
-                                                        }
+                                                        TagIcon {}
                                                         {tag.clone()}
                                                     }
                                                 }
@@ -211,19 +202,7 @@ pub fn Home() -> Element {
                                     current_page.set(current_page() - 1);
                                 }
                             },
-                            svg {
-                                xmlns: "http://www.w3.org/2000/svg",
-                                fill: "none",
-                                view_box: "0 0 24 24",
-                                stroke_width: "2",
-                                stroke: "currentColor",
-                                class: "size-5",
-                                path {
-                                    stroke_linecap: "round",
-                                    stroke_linejoin: "round",
-                                    d: "M15.75 19.5L8.25 12l7.5-7.5"
-                                }
-                            }
+                            ChevronLeftIcon {}
                         }
                         span { class: "pagination-info",
                             "{current_page()}/{total_pages()}"
@@ -236,19 +215,7 @@ pub fn Home() -> Element {
                                     current_page.set(current_page() + 1);
                                 }
                             },
-                            svg {
-                                xmlns: "http://www.w3.org/2000/svg",
-                                fill: "none",
-                                view_box: "0 0 24 24",
-                                stroke_width: "2",
-                                stroke: "currentColor",
-                                class: "size-5",
-                                path {
-                                    stroke_linecap: "round",
-                                    stroke_linejoin: "round",
-                                    d: "M8.25 4.5l7.5 7.5-7.5 7.5"
-                                }
-                            }
+                            ChevronRightIcon {}
                         }
                         select {
                             class: "page-size-select",

@@ -7,6 +7,7 @@ use crate::utils::dev_helpers::{
     fetch_and_set_random_image, load_background_wall_images,
     HIDE_BTN_DELAY_MS,
 };
+use crate::components::icons::{RefreshIcon, FullscreenIcon, CloseIcon};
 
 #[component]
 pub fn Dev() -> Element {
@@ -108,40 +109,14 @@ pub fn Dev() -> Element {
                     button {
                         class: "img-switch-btn",
                         onclick: fetch_random_img,
-                        svg {
-                            xmlns: "http://www.w3.org/2000/svg",
-                            view_box: "0 0 24 24",
-                            width: "24",
-                            height: "24",
-                            fill: "none",
-                            stroke: "currentColor",
-                            stroke_width: "2",
-                            stroke_linecap: "round",
-                            stroke_linejoin: "round",
-                            path {
-                                d: "M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
-                            }
-                        }
+                        RefreshIcon {}
                     }
                     button {
                         class: "background-mode-btn",
                         onclick: move |_| {
                             enter_background_mode();
                         },
-                        svg {
-                            xmlns: "http://www.w3.org/2000/svg",
-                            view_box: "0 0 24 24",
-                            width: "24",
-                            height: "24",
-                            fill: "none",
-                            stroke: "currentColor",
-                            stroke_width: "2",
-                            stroke_linecap: "round",
-                            stroke_linejoin: "round",
-                            path {
-                                d: "m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z"
-                            }
-                        }
+                        FullscreenIcon {}
                     }
                 }
             }
@@ -205,20 +180,7 @@ pub fn Dev() -> Element {
                             onclick: move |_| {
                                 exit_background_mode();
                             },
-                            svg {
-                                xmlns: "http://www.w3.org/2000/svg",
-                                view_box: "0 0 24 24",
-                                width: "24",
-                                height: "24",
-                                fill: "none",
-                                stroke: "currentColor",
-                                stroke_width: "2",
-                                stroke_linecap: "round",
-                                stroke_linejoin: "round",
-                                path {
-                                    d: "M6 6l12 12M6 18L18 6"
-                                }
-                            }
+                            CloseIcon {}
                         }
                     }
                 }
