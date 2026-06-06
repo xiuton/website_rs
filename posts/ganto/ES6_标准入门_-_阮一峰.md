@@ -114,7 +114,7 @@ console.log(obj['name1'], obj.name1); // 小强 小强
 ```js
 let obj = {name1: '小强', name2: '小虎', name3: '小华', name4: '小明'}
 const objKeys = Object.keys(obj)
-console.log(objKeys) // (4) ['name1', 'name2', 'name3', 'name4']
+console.log(objKeys) // (4)['name1', 'name2', 'name3', 'name4']
 
 ```
 

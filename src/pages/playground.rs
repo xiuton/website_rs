@@ -6,7 +6,7 @@ pub fn Playground() -> Element {
     // Set page title
     use_effect(move || {
         title::set_page_title("操场 - 干徒");
-        ()
+        
     });
 
     rsx! {

@@ -24,13 +24,14 @@ fn random_in_range(min: f64, max: f64) -> f64 {
     min + (random_f64() * (max - min))
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Circle {
     pub x: f64,
     pub y: f64,
     pub radius: f64,
 }
 
+#[derive(Debug)]
 pub struct GenerationConfig {
     pub width: f64,
     pub height: f64,
@@ -94,20 +95,13 @@ pub fn generate_circles(config: &GenerationConfig) -> Vec<Circle> {
                 continue;
             }
 
-            let mut overlaps = false;
-            for j in 0..circles.len() {
-                if circles_overlap(&candidate, &circles[j], gap) {
-                    overlaps = true;
-                    break;
-                }
+            if circles.iter().any(|c| circles_overlap(&candidate, c, gap)) {
+                continue;
             }
-
-            if !overlaps {
-                circles.push(candidate);
-                placed = true;
-                failed_streak = 0;
-                break;
-            }
+            circles.push(candidate);
+            placed = true;
+            failed_streak = 0;
+            break;
         }
 
         if !placed {

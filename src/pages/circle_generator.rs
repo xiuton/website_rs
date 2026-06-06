@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 use crate::utils::circle_generator::{generate_circles, Circle, GenerationConfig};
 use crate::utils::title;
 
-#[derive(Serialize, Deserialize, Clone)]
+type AnimRc = std::rc::Rc<std::cell::RefCell<Option<wasm_bindgen::prelude::Closure<dyn FnMut()>>>>;
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 struct PageConfig {
     config_width: f64,
     config_height: f64,
@@ -58,26 +60,8 @@ fn load_config() -> PageConfig {
     PageConfig::default()
 }
 
-fn save_all_config(
-    config_width: f64,
-    config_height: f64,
-    gap: f64,
-    min_radius: f64,
-    max_radius: f64,
-    picker_speed: f64,
-    anim_duration: f64,
-    dwell_time: f64,
-) {
-    save_config(&PageConfig {
-        config_width,
-        config_height,
-        gap,
-        min_radius,
-        max_radius,
-        picker_speed,
-        anim_duration,
-        dwell_time,
-    });
+fn save_all_config(config: &PageConfig) {
+    save_config(config);
 }
 
 fn hsl_color(index: usize, total: usize, dark_mode: bool) -> String {
@@ -89,7 +73,30 @@ fn hsl_color(index: usize, total: usize, dark_mode: bool) -> String {
     }
 }
 
+struct RenderConfig<'a> {
+    circles: &'a [Circle],
+    config_width: f64,
+    config_height: f64,
+    fullscreen: bool,
+    highlight: Option<usize>,
+    prev_highlight: Option<usize>,
+    mask_hole: Option<(f64, f64, f64)>,
+}
+
 fn render_canvas(circles: &[Circle], config_width: f64, config_height: f64, fullscreen: bool, highlight: Option<usize>, prev_highlight: Option<usize>, mask_hole: Option<(f64, f64, f64)>) {
+    let cfg = RenderConfig {
+        circles,
+        config_width,
+        config_height,
+        fullscreen,
+        highlight,
+        prev_highlight,
+        mask_hole,
+    };
+    render_canvas_inner(&cfg)
+}
+
+fn render_canvas_inner(cfg: &RenderConfig) {
     let window = web_sys::window().expect("Failed to get window");
     let document = window.document().expect("Failed to get document");
 
@@ -102,13 +109,13 @@ fn render_canvas(circles: &[Circle], config_width: f64, config_height: f64, full
     let dpr = window.device_pixel_ratio();
 
     let display_width = canvas.client_width() as f64;
-    let (final_w, final_h) = if fullscreen {
+    let (final_w, final_h) = if cfg.fullscreen {
         let dh = canvas.client_height() as f64;
         canvas.set_width((display_width * dpr) as u32);
         canvas.set_height((dh * dpr) as u32);
         (display_width, dh)
     } else {
-        let dh = display_width * config_height / config_width;
+        let dh = display_width * cfg.config_height / cfg.config_width;
         canvas.set_width((display_width * dpr) as u32);
         canvas.set_height((dh * dpr) as u32);
         (display_width, dh)
@@ -134,11 +141,11 @@ fn render_canvas(circles: &[Circle], config_width: f64, config_height: f64, full
     ctx.set_fill_style_str(bg_color);
     ctx.fill_rect(0.0, 0.0, final_w, final_h);
 
-    let scale_x = final_w / config_width;
-    let scale_y = final_h / config_height;
+    let scale_x = final_w / cfg.config_width;
+    let scale_y = final_h / cfg.config_height;
 
-    for (i, circle) in circles.iter().enumerate() {
-        let color = hsl_color(i, circles.len(), is_dark);
+    for (i, circle) in cfg.circles.iter().enumerate() {
+        let color = hsl_color(i, cfg.circles.len(), is_dark);
 
         let cx = circle.x * scale_x;
         let cy = circle.y * scale_y;
@@ -163,9 +170,9 @@ fn render_canvas(circles: &[Circle], config_width: f64, config_height: f64, full
         let _ = ctx.fill_text(&format!("{}", i + 1), cx, cy);
     }
 
-    if let (Some(prev), Some(cur)) = (prev_highlight, highlight) {
+    if let (Some(prev), Some(cur)) = (cfg.prev_highlight, cfg.highlight) {
         if prev != cur {
-            if let (Some(pc), Some(cc)) = (circles.get(prev), circles.get(cur)) {
+            if let (Some(pc), Some(cc)) = (cfg.circles.get(prev), cfg.circles.get(cur)) {
                 let px = pc.x * scale_x;
                 let py = pc.y * scale_y;
                 let cx2 = cc.x * scale_x;
@@ -196,8 +203,8 @@ fn render_canvas(circles: &[Circle], config_width: f64, config_height: f64, full
         }
     }
 
-    let mask_pos = mask_hole.or_else(|| {
-        highlight.and_then(|idx| circles.get(idx).map(|c| {
+    let mask_pos = cfg.mask_hole.or_else(|| {
+        cfg.highlight.and_then(|idx| cfg.circles.get(idx).map(|c| {
             (c.x * scale_x, c.y * scale_y, c.radius * scale_x + 4.0)
         }))
     });
@@ -214,8 +221,8 @@ fn render_canvas(circles: &[Circle], config_width: f64, config_height: f64, full
         ctx.restore();
     }
 
-    if let Some(idx) = highlight {
-        if let Some(circle) = circles.get(idx) {
+    if let Some(idx) = cfg.highlight {
+        if let Some(circle) = cfg.circles.get(idx) {
             let cx = circle.x * scale_x;
             let cy = circle.y * scale_y;
             let cr = circle.radius * scale_x + 4.0;
@@ -244,11 +251,11 @@ fn render_canvas(circles: &[Circle], config_width: f64, config_height: f64, full
 pub fn CircleGenerator() -> Element {
     use_effect(move || {
         title::set_page_title("圆形生成器 - 干徒");
-        ()
+        
     });
 
     let cfg = load_config();
-    let mut circles = use_signal(|| Vec::<Circle>::new());
+    let mut circles = use_signal(Vec::<Circle>::new);
     let mut config_width = use_signal(|| cfg.config_width);
     let mut config_height = use_signal(|| cfg.config_height);
     let mut gap = use_signal(|| cfg.gap);
@@ -346,7 +353,7 @@ pub fn CircleGenerator() -> Element {
             let resize_handle_clone = resize_handle.clone();
             let closure = Closure::wrap(Box::new(move || {
                 if let Some(handle) = resize_handle_clone.get() {
-                    let _ = window.clear_timeout_with_handle(handle);
+                    window.clear_timeout_with_handle(handle);
                 }
                 let handle = window
                     .set_timeout_with_callback_and_timeout_and_arguments_0(
@@ -492,7 +499,7 @@ pub fn CircleGenerator() -> Element {
                     let target_idx = idx;
                     let prev_idx_val = prev;
 
-                    let anim_rc: std::rc::Rc<std::cell::RefCell<Option<Closure<dyn FnMut()>>>> = std::rc::Rc::new(std::cell::RefCell::new(None));
+                    let anim_rc: AnimRc = std::rc::Rc::new(std::cell::RefCell::new(None));
                     let anim_rc_clone = anim_rc.clone();
 
                     let frame_closure = Closure::wrap(Box::new(move || {
@@ -571,7 +578,7 @@ pub fn CircleGenerator() -> Element {
             let new_circles = generate_circles(&cfg);
             render_canvas(&new_circles, w, h, false, None, None, None);
             circles.set(new_circles);
-            ()
+            
         });
     }
 
@@ -633,7 +640,7 @@ pub fn CircleGenerator() -> Element {
                                 oninput: move |e| {
                                     if let Ok(v) = e.value().parse::<f64>() {
                                         config_width.set(v.max(200.0));
-                                        save_all_config(config_width(), config_height(), gap(), min_radius(), max_radius(), picker_speed(), anim_duration(), dwell_time());
+                                        save_all_config(&PageConfig { config_width: config_width(), config_height: config_height(), gap: gap(), min_radius: min_radius(), max_radius: max_radius(), picker_speed: picker_speed(), anim_duration: anim_duration(), dwell_time: dwell_time() });
                                     }
                                 }
                             }
@@ -649,7 +656,7 @@ pub fn CircleGenerator() -> Element {
                                 oninput: move |e| {
                                     if let Ok(v) = e.value().parse::<f64>() {
                                         config_height.set(v.max(200.0));
-                                        save_all_config(config_width(), config_height(), gap(), min_radius(), max_radius(), picker_speed(), anim_duration(), dwell_time());
+                                        save_all_config(&PageConfig { config_width: config_width(), config_height: config_height(), gap: gap(), min_radius: min_radius(), max_radius: max_radius(), picker_speed: picker_speed(), anim_duration: anim_duration(), dwell_time: dwell_time() });
                                     }
                                 }
                             }
@@ -665,7 +672,7 @@ pub fn CircleGenerator() -> Element {
                                 oninput: move |e| {
                                     if let Ok(v) = e.value().parse::<f64>() {
                                         gap.set(v.max(0.0));
-                                        save_all_config(config_width(), config_height(), gap(), min_radius(), max_radius(), picker_speed(), anim_duration(), dwell_time());
+                                        save_all_config(&PageConfig { config_width: config_width(), config_height: config_height(), gap: gap(), min_radius: min_radius(), max_radius: max_radius(), picker_speed: picker_speed(), anim_duration: anim_duration(), dwell_time: dwell_time() });
                                     }
                                 }
                             }
@@ -681,7 +688,7 @@ pub fn CircleGenerator() -> Element {
                                 oninput: move |e| {
                                     if let Ok(v) = e.value().parse::<f64>() {
                                         min_radius.set(v.max(5.0));
-                                        save_all_config(config_width(), config_height(), gap(), min_radius(), max_radius(), picker_speed(), anim_duration(), dwell_time());
+                                        save_all_config(&PageConfig { config_width: config_width(), config_height: config_height(), gap: gap(), min_radius: min_radius(), max_radius: max_radius(), picker_speed: picker_speed(), anim_duration: anim_duration(), dwell_time: dwell_time() });
                                     }
                                 }
                             }
@@ -698,7 +705,7 @@ pub fn CircleGenerator() -> Element {
                                     if let Ok(v) = e.value().parse::<f64>() {
                                         let min = min_radius();
                                         max_radius.set(v.max(min + 1.0));
-                                        save_all_config(config_width(), config_height(), gap(), min_radius(), max_radius(), picker_speed(), anim_duration(), dwell_time());
+                                        save_all_config(&PageConfig { config_width: config_width(), config_height: config_height(), gap: gap(), min_radius: min_radius(), max_radius: max_radius(), picker_speed: picker_speed(), anim_duration: anim_duration(), dwell_time: dwell_time() });
                                     }
                                 }
                             }
@@ -735,7 +742,7 @@ pub fn CircleGenerator() -> Element {
                                             if anim_duration() > v {
                                                 anim_duration.set(v.max(10.0));
                                             }
-                                            save_all_config(config_width(), config_height(), gap(), min_radius(), max_radius(), picker_speed(), anim_duration(), dwell_time());
+                                            save_all_config(&PageConfig { config_width: config_width(), config_height: config_height(), gap: gap(), min_radius: min_radius(), max_radius: max_radius(), picker_speed: picker_speed(), anim_duration: anim_duration(), dwell_time: dwell_time() });
                                             if selecting() {
                                                 if let Some(handle) = timer_handle() {
                                                     let _ = web_sys::window().map(|w| w.clear_interval_with_handle(handle));
@@ -797,7 +804,7 @@ pub fn CircleGenerator() -> Element {
                                                         let target_idx = idx;
                                                         let prev_idx_val = prev;
 
-                                                        let anim_rc: std::rc::Rc<std::cell::RefCell<Option<Closure<dyn FnMut()>>>> = std::rc::Rc::new(std::cell::RefCell::new(None));
+                                                        let anim_rc: AnimRc = std::rc::Rc::new(std::cell::RefCell::new(None));
                                                         let anim_rc_clone = anim_rc.clone();
 
                                                         let frame_closure = Closure::wrap(Box::new(move || {
@@ -875,7 +882,7 @@ pub fn CircleGenerator() -> Element {
                                     oninput: move |e| {
                                         if let Ok(v) = e.value().parse::<f64>() {
                                             dwell_time.set(v);
-                                            save_all_config(config_width(), config_height(), gap(), min_radius(), max_radius(), picker_speed(), anim_duration(), dwell_time());
+                                            save_all_config(&PageConfig { config_width: config_width(), config_height: config_height(), gap: gap(), min_radius: min_radius(), max_radius: max_radius(), picker_speed: picker_speed(), anim_duration: anim_duration(), dwell_time: dwell_time() });
                                             if selecting() {
                                                 if let Some(handle) = timer_handle() {
                                                     let _ = web_sys::window().map(|w| w.clear_interval_with_handle(handle));
@@ -937,7 +944,7 @@ pub fn CircleGenerator() -> Element {
                                                         let target_idx = idx;
                                                         let prev_idx_val = prev;
 
-                                                        let anim_rc: std::rc::Rc<std::cell::RefCell<Option<Closure<dyn FnMut()>>>> = std::rc::Rc::new(std::cell::RefCell::new(None));
+                                                        let anim_rc: AnimRc = std::rc::Rc::new(std::cell::RefCell::new(None));
                                                         let anim_rc_clone = anim_rc.clone();
 
                                                         let frame_closure = Closure::wrap(Box::new(move || {
@@ -1014,12 +1021,12 @@ pub fn CircleGenerator() -> Element {
                                     value: "{anim_duration()}",
                                     oninput: move |e| {
                                         if let Ok(v) = e.value().parse::<f64>() {
-                                            let clamped = v.min(1000.0).max(10.0);
+                                            let clamped = v.clamp(10.0, 1000.0);
                                             anim_duration.set(clamped);
                                             if clamped > picker_speed() {
                                                 picker_speed.set(clamped);
                                             }
-                                            save_all_config(config_width(), config_height(), gap(), min_radius(), max_radius(), picker_speed(), anim_duration(), dwell_time());
+                                            save_all_config(&PageConfig { config_width: config_width(), config_height: config_height(), gap: gap(), min_radius: min_radius(), max_radius: max_radius(), picker_speed: picker_speed(), anim_duration: anim_duration(), dwell_time: dwell_time() });
                                             if selecting() {
                                                 if let Some(handle) = timer_handle() {
                                                     let _ = web_sys::window().map(|w| w.clear_interval_with_handle(handle));
@@ -1081,7 +1088,7 @@ pub fn CircleGenerator() -> Element {
                                                         let target_idx = idx;
                                                         let prev_idx_val = prev;
 
-                                                        let anim_rc: std::rc::Rc<std::cell::RefCell<Option<Closure<dyn FnMut()>>>> = std::rc::Rc::new(std::cell::RefCell::new(None));
+                                                        let anim_rc: AnimRc = std::rc::Rc::new(std::cell::RefCell::new(None));
                                                         let anim_rc_clone = anim_rc.clone();
 
                                                         let frame_closure = Closure::wrap(Box::new(move || {

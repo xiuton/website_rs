@@ -1,13 +1,3 @@
-#![allow(dead_code)]
-
-mod models;
-mod routes;
-mod app;
-mod components;
-mod pages;
-mod utils;
-
-use web_rs::BLOG_POSTS;
 use dioxus::launch;
 
 fn main() {

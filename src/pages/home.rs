@@ -1,6 +1,5 @@
 use dioxus::prelude::*;
-use dioxus_router::prelude::Link;
-use wasm_bindgen_futures::spawn_local;
+use dioxus_router::prelude::{Link, use_route};
 use web_sys::UrlSearchParams;
 use std::collections::BTreeSet;
 
@@ -9,54 +8,52 @@ use crate::routes::Route;
 use crate::BLOG_POSTS;
 use crate::utils::title;
 
+fn get_page_size(size_from_url: Option<usize>) -> usize {
+    if let Some(size) = size_from_url {
+        return size;
+    }
+    if let Some(window) = web_sys::window() {
+        if let Some(storage) = window.local_storage().ok().flatten() {
+            if let Ok(Some(size)) = storage.get_item("blog_page_size") {
+                if let Ok(size) = size.parse::<usize>() {
+                    return size;
+                }
+            }
+        }
+    }
+    10
+}
+
 #[component]
 pub fn Home() -> Element {
-    let posts = use_signal(|| Vec::<RuntimeBlogPost>::new());
+    let mut posts = use_signal(Vec::<RuntimeBlogPost>::new);
     let mut selected_category = use_signal(|| "全部".to_string());
 
     use_effect(move || {
         title::set_page_title("首页 - 干徒");
-        ()
+        
     });
 
-    let location = web_sys::window()
-        .expect("Failed to get window")
-        .location();
-    let search = location.search().unwrap_or_default();
-    let query_params: UrlSearchParams = UrlSearchParams::new_with_str(&search).expect("Failed to create URLSearchParams");
+    let mut current_page = use_signal(|| 1);
+    let mut page_size = use_signal(|| 10);
 
-    let page_from_url = query_params.get("page")
-        .and_then(|v| v.parse::<usize>().ok());
-    let size_from_url = query_params.get("size")
-        .and_then(|v| v.parse::<usize>().ok());
-    let cat_from_url = query_params.get("category");
-
-    let mut current_page = use_signal(|| page_from_url.unwrap_or(1));
-    let mut page_size = use_signal(|| {
-        if let Some(size) = size_from_url {
-            return size;
-        }
-        if let Some(window) = web_sys::window() {
-            if let Some(storage) = window.local_storage().ok().flatten() {
-                if let Ok(Some(size)) = storage.get_item("blog_page_size") {
-                    if let Ok(size) = size.parse::<usize>() {
-                        return size;
-                    }
-                }
-            }
-        }
-        10
-    });
-
+    // 监听路由导航（包括同路由切换），从 URL 同步分页、每页条数和分类
     use_effect(move || {
-        if let Some(cat) = cat_from_url.as_ref() {
-            selected_category.set(cat.clone());
+        let _route = use_route::<Route>();
+        let search = web_sys::window()
+            .map(|w| w.location().search().unwrap_or_default())
+            .unwrap_or_default();
+        if let Ok(params) = UrlSearchParams::new_with_str(&search) {
+            current_page.set(params.get("page").and_then(|v| v.parse().ok()).unwrap_or(1));
+            page_size.set(get_page_size(params.get("size").and_then(|v| v.parse().ok())));
+            selected_category.set(params.get("category").unwrap_or_else(|| "全部".to_string()));
         }
     });
 
     let update_url = move |page: usize, size: usize, cat: &str| {
         if let Some(window) = web_sys::window() {
-            if let Ok(url) = web_sys::Url::new(&window.location().href().expect("Failed to get href")) {
+            let href = window.location().href().unwrap_or_default();
+            if let Ok(url) = web_sys::Url::new(&href) {
                 let search_params = url.search_params();
                 search_params.set("page", &page.to_string());
                 search_params.set("size", &size.to_string());
@@ -66,12 +63,13 @@ pub fn Home() -> Element {
                     search_params.set("category", cat);
                 }
                 let new_url = format!("/?{}", search_params.to_string());
-                let _ = window.history().expect("Failed to get history")
-                    .replace_state_with_url(
+                if let Ok(history) = window.history() {
+                    let _ = history.replace_state_with_url(
                         &wasm_bindgen::JsValue::NULL,
                         "",
                         Some(&new_url),
                     );
+                }
             }
         }
     };
@@ -81,20 +79,8 @@ pub fn Home() -> Element {
     });
 
     use_effect(move || {
-        let mut posts = posts.clone();
-        spawn_local(async move {
-            let loaded_posts = BLOG_POSTS.iter().map(|post| RuntimeBlogPost {
-                    title: post.title.to_string(),
-                    date: post.date.to_string(),
-                    author: post.author.to_string(),
-                    tags: post.tags.iter().map(|&s| s.to_string()).collect(),
-                    content: post.content.to_string(),
-                    slug: post.slug.to_string(),
-                    category: post.category.to_string(),
-                    summary: post.summary.to_string(),
-                }).collect();
-            posts.set(loaded_posts);
-        });
+        let loaded_posts = BLOG_POSTS.iter().map(RuntimeBlogPost::from_static).collect();
+        posts.set(loaded_posts);
     });
 
     let categories: BTreeSet<String> = {

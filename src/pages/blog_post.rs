@@ -3,6 +3,13 @@ use crate::routes::Route;
 use crate::models::RuntimeBlogPost;
 use crate::BLOG_POSTS;
 use crate::utils::{title, code_highlight};
+use crate::components::icons::{BackArrowIcon, HomeIcon, ScrollTopIcon, TagIcon};
+
+fn prepare_blog_html(content: &str) -> String {
+    let html = crate::utils::markdown::markdown_to_html(content);
+    let html = html.replace("<pre><code>", "<pre><code class=\"language-plaintext\">");
+    html.replace("<pre><code class=\"", "<pre><code class=\"language-")
+}
 
 #[component]
 pub fn BlogPostView(slug: String) -> Element {
@@ -10,16 +17,7 @@ pub fn BlogPostView(slug: String) -> Element {
     let post = use_memo(move || {
         BLOG_POSTS.iter()
             .find(|p| p.slug == slug)
-            .map(|p| RuntimeBlogPost {
-                title: p.title.to_string(),
-                date: p.date.to_string(),
-                author: p.author.to_string(),
-                tags: p.tags.iter().map(|&s| s.to_string()).collect(),
-                content: p.content.to_string(),
-                slug: p.slug.to_string(),
-                category: p.category.to_string(),
-                summary: p.summary.to_string(),
-            })
+            .map(|p| -> RuntimeBlogPost { RuntimeBlogPost::from_static(p) })
     });
 
     // Set page title
@@ -27,7 +25,7 @@ pub fn BlogPostView(slug: String) -> Element {
         if let Some(post) = post() {
             title::set_page_title(&format!("{} - 干徒", post.title));
         }
-        ()
+        
     });
 
     // 在页面加载时，读取 localStorage 恢复宽屏状态
@@ -41,7 +39,7 @@ pub fn BlogPostView(slug: String) -> Element {
                 }
             }
         }
-        ()
+        
     });
 
     // 初始化代码高亮
@@ -68,59 +66,29 @@ pub fn BlogPostView(slug: String) -> Element {
                             aria_label: "后退",
                             onclick: move |_| {
                                 if let Some(window) = web_sys::window() {
-                                    let _ = window.history().expect("Failed to get history").back();
+                                    if let Ok(history) = window.history() {
+                                    let _ = history.back();
+                                }
                                 }
                             },
-                            svg {
-                                xmlns: "http://www.w3.org/2000/svg",
-                                view_box: "0 0 24 24",
-                                width: "24",
-                                height: "24",
-                                fill: "none",
-                                stroke: "currentColor",
-                                stroke_width: "2",
-                                stroke_linecap: "round",
-                                stroke_linejoin: "round",
-                                path { d: "M15.75 19.5 8.25 12l7.5-7.5" }
-                            }
+                            BackArrowIcon {}
                         }
                         Link { 
                             to: Route::Home, 
                             class: "back-button",
                             aria_label: "首页",
-                            svg {
-                                xmlns: "http://www.w3.org/2000/svg",
-                                view_box: "0 0 24 24",
-                                width: "24",
-                                height: "24",
-                                fill: "none",
-                                stroke: "currentColor",
-                                stroke_width: "2",
-                                stroke_linecap: "round",
-                                stroke_linejoin: "round",
-                                path { d: "m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" }
-                            }
+                            HomeIcon {}
                         }
                         span { class: "nav-divider" }
                         button { 
                             class: "function-button",
                             aria_label: "回顶部",
                             onclick: move |_| {
-                                let window = web_sys::window().expect("Failed to get window");
-                                let _ = window.scroll_to_with_x_and_y(0.0, 0.0);
-                            },
-                            svg {
-                                xmlns: "http://www.w3.org/2000/svg",
-                                view_box: "0 0 24 24",
-                                width: "24",
-                                height: "24",
-                                fill: "none",
-                                stroke: "currentColor",
-                                stroke_width: "2",
-                                stroke_linecap: "round",
-                                stroke_linejoin: "round",
-                                path { d: "m4.5 15.75 7.5-7.5 7.5 7.5" }
+                                if let Some(window) = web_sys::window() {
+                                window.scroll_to_with_x_and_y(0.0, 0.0);
                             }
+                            },
+                            ScrollTopIcon {}
                         }
                         button { 
                             class: if is_wide_mode() { "function-button active" } else { "function-button" },
@@ -166,29 +134,12 @@ pub fn BlogPostView(slug: String) -> Element {
                     }
                     div { 
                         class: "blog-content",
-                        dangerous_inner_html: {
-                            let html = crate::utils::markdown::markdown_to_html(&post.content);
-                            let html = html.replace("<pre><code>", "<pre><code class=\"language-plaintext\">");
-                            let html = html.replace("<pre><code class=\"", "<pre><code class=\"language-");
-                            html
-                        }
+                        dangerous_inner_html: prepare_blog_html(&post.content)
                     }
                     div { class: "blog-tags",
                         {post.tags.iter().map(|tag| rsx! {
                             span { class: "blog-tag",
-                                svg {
-                                    xmlns: "http://www.w3.org/2000/svg",
-                                    fill: "none",
-                                    view_box: "0 0 24 24",
-                                    stroke_width: "1.5",
-                                    stroke: "currentColor",
-                                    class: "size-6",
-                                    path {
-                                        stroke_linecap: "round",
-                                        stroke_linejoin: "round",
-                                        d: "M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"
-                                    }
-                                }
+                                TagIcon {}
                                 {tag.clone()}
                             }
                         })}

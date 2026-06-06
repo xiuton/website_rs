@@ -4,7 +4,7 @@ use crate::utils::title;
 #[component]
 pub fn Test() -> Element {
     let mut counter = use_signal(|| 0);
-    let mut input_value = use_signal(|| String::new());
+    let mut input_value = use_signal(String::new);
     let mut selected_option = use_signal(|| "option1".to_string());
     let mut is_checked = use_signal(|| false);
     let mut slider_value = use_signal(|| 50.0);
@@ -12,7 +12,7 @@ pub fn Test() -> Element {
     // Set page title
     use_effect(move || {
         title::set_page_title("测试页面 - 干徒");
-        ()
+        
     });
 
     rsx! {

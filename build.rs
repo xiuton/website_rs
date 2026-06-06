@@ -3,6 +3,17 @@ use std::fs;
 use std::path::Path;
 use std::collections::HashMap;
 
+struct PostData {
+    title: String,
+    date: String,
+    author: String,
+    tags: Vec<String>,
+    content: String,
+    slug: String,
+    category: String,
+    summary: String,
+}
+
 fn escape_rust_string(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
@@ -29,29 +40,29 @@ fn main() {
         return;
     }
 
-    let mut posts: Vec<(String, String, String, Vec<String>, String, String, String, String)> = Vec::new();
+    let mut posts: Vec<PostData> = Vec::new();
     let mut date_count: HashMap<String, i32> = HashMap::new();
 
     scan_dir(posts_dir, posts_dir, "", &mut posts, &mut date_count);
 
-    posts.sort_by(|a, b| b.1.cmp(&a.1));
+    posts.sort_by(|a, b| b.date.cmp(&a.date));
 
     let mut output = String::from("pub const BLOG_POSTS: &[BlogPost] = &[\n");
 
-    for (title, date, author, tags, content, slug, category, summary) in posts {
+    for post in &posts {
         output.push_str(&format!(
             "    BlogPost {{\n        title: r#####\"{}\"#####,\n        date: r#####\"{}\"#####,\n        author: r#####\"{}\"#####,\n        tags: &[{}],\n        content: r#####\"{}\"#####,\n        slug: r#####\"{}\"#####,\n        category: r#####\"{}\"#####,\n        summary: r#####\"{}\"#####,\n    }},\n",
-            title,
-            date,
-            author,
-            tags.iter()
+            post.title,
+            post.date,
+            post.author,
+            post.tags.iter()
                 .map(|t| format!("\"{}\"", escape_rust_string(t)))
                 .collect::<Vec<_>>()
                 .join(", "),
-            content,
-            slug,
-            category,
-            summary,
+            post.content,
+            post.slug,
+            post.category,
+            post.summary,
         ));
     }
 
@@ -63,36 +74,41 @@ fn main() {
 
 fn scan_dir(
     dir: &Path,
-    base_dir: &Path,
+    _base_dir: &Path,
     category: &str,
-    posts: &mut Vec<(String, String, String, Vec<String>, String, String, String, String)>,
+    posts: &mut Vec<PostData>,
     date_count: &mut HashMap<String, i32>,
 ) {
-    if let Ok(entries) = fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if let Ok(file_type) = entry.file_type() {
-                if file_type.is_dir() {
-                    let dir_name = path
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("");
-                    scan_dir(&path, base_dir, dir_name, posts, date_count);
-                } else if file_type.is_file() {
-                    if let Some(ext) = path.extension() {
-                        if ext == "md" {
-                            if let Ok(content) = fs::read_to_string(&path) {
-                                process_post(
-                                    &content,
-                                    category,
-                                    posts,
-                                    date_count,
-                                );
+    match fs::read_dir(dir) {
+        Ok(entries) => {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if let Ok(file_type) = entry.file_type() {
+                    if file_type.is_dir() {
+                        let dir_name = path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("");
+                        scan_dir(&path, _base_dir, dir_name, posts, date_count);
+                    } else if file_type.is_file() {
+                        if let Some(ext) = path.extension() {
+                            if ext == "md" {
+                                if let Ok(content) = fs::read_to_string(&path) {
+                                    process_post(
+                                        &content,
+                                        category,
+                                        posts,
+                                        date_count,
+                                    );
+                                }
                             }
                         }
                     }
                 }
             }
+        }
+        Err(e) => {
+            eprintln!("cargo:warning=Failed to read directory {:?}: {}", dir, e);
         }
     }
 }
@@ -100,32 +116,32 @@ fn scan_dir(
 fn process_post(
     content: &str,
     category: &str,
-    posts: &mut Vec<(String, String, String, Vec<String>, String, String, String, String)>,
+    posts: &mut Vec<PostData>,
     date_count: &mut HashMap<String, i32>,
 ) {
-    let mut lines = content.lines();
-    let mut front_matter = String::new();
     let mut in_front_matter = false;
+    let mut front_matter = String::new();
     let mut post_content = String::new();
+    let mut in_front_matter_content = false;
 
-    while let Some(line) = lines.next() {
+    for line in content.lines() {
         if line == "---" {
             if !in_front_matter {
                 in_front_matter = true;
+                in_front_matter_content = true;
                 continue;
             } else {
-                break;
+                in_front_matter_content = false;
+                continue;
             }
         }
-        if in_front_matter {
+        if in_front_matter_content {
             front_matter.push_str(line);
             front_matter.push('\n');
+        } else if in_front_matter {
+            post_content.push_str(line);
+            post_content.push('\n');
         }
-    }
-
-    for line in lines {
-        post_content.push_str(line);
-        post_content.push('\n');
     }
 
     let title = strip_yaml_quotes(
@@ -173,31 +189,38 @@ fn process_post(
             .unwrap_or_default(),
     );
 
-    let date_parts: Vec<&str> = date.split(' ').collect();
-    let date_str = if date_parts.len() >= 1 {
-        date_parts[0].replace('-', "")
+    let custom_slug = front_matter
+        .lines()
+        .find(|l| l.starts_with("slug:"))
+        .map(|l| l.replace("slug:", "").trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    let slug = if let Some(slug) = custom_slug {
+        slug
     } else {
-        "00000000".to_string()
+        let date_parts: Vec<&str> = date.split(' ').collect();
+        let date_str = if !date_parts.is_empty() {
+            date_parts[0].replace('-', "")
+        } else {
+            "00000000".to_string()
+        };
+        let count = date_count.entry(date_str.clone()).or_insert(0);
+        *count += 1;
+        if *count > 1 {
+            format!("{}-{}", date_str, *count)
+        } else {
+            date_str
+        }
     };
 
-    let count = date_count.entry(date_str.clone()).or_insert(0);
-    *count += 1;
-    let base_slug = if *count > 1 {
-        format!("{}-{}", date_str, *count)
-    } else {
-        date_str
-    };
-
-    let slug = base_slug;
-
-    posts.push((
+    posts.push(PostData {
         title,
         date,
         author,
         tags,
-        post_content,
+        content: post_content,
         slug,
-        category.to_string(),
+        category: category.to_string(),
         summary,
-    ));
+    });
 }

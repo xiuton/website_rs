@@ -3,6 +3,7 @@ use dioxus_router::prelude::Link;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use crate::routes::Route;
+use crate::components::icons::{SunIcon, MoonIcon};
 
 #[component]
 pub fn Navbar(is_dark: Signal<bool>) -> Element {
@@ -191,31 +192,8 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                         class: "theme-toggle",
                         onclick: onclick,
                         match is_dark() {
-                            true => rsx! {
-                                svg {
-                                    xmlns: "http://www.w3.org/2000/svg",
-                                    view_box: "0 0 1024 1024",
-                                    path {
-                                        fill: "currentColor",
-                                        d: "M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"
-                                    }
-                                }
-                            },
-                            false => rsx! {
-                                svg {
-                                    xmlns: "http://www.w3.org/2000/svg",
-                                    fill: "none",
-                                    view_box: "0 0 24 24",
-                                    stroke_width: "1.5",
-                                    stroke: "currentColor",
-                                    class: "size-6", 
-                                    path {
-                                        stroke_linecap: "round",
-                                        stroke_linejoin: "round",
-                                        d: "M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"
-                                    }
-                                }
-                            }
+                            true => rsx! { SunIcon {} },
+                            false => rsx! { MoonIcon {} }
                         }
                     }
                 }

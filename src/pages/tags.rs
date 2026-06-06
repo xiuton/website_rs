@@ -2,9 +2,11 @@ use dioxus::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen::JsCast;
 use serde::{Serialize, Deserialize};
+use std::sync::LazyLock;
 use crate::utils::title;
+use crate::components::icons::{BookmarkIcon, GitHubIcon};
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 struct Bookmark {
     title: String,
     url: String,
@@ -12,44 +14,55 @@ struct Bookmark {
     icon: String,
 }
 
-struct BookmarkManager {
-    bookmarks: Vec<Bookmark>,
-}
+static BOOKMARKS: LazyLock<Vec<Bookmark>> = LazyLock::new(|| {
+    let config = include_str!("../../data/bookmarks.toml");
+    let bookmarks: toml::Value = toml::from_str(config).unwrap_or_else(|_| toml::Value::Table(toml::Table::new()));
 
-impl BookmarkManager {
-    fn new() -> Self {
-        let config = include_str!("../../data/bookmarks.toml");
-        let bookmarks: toml::Value = toml::from_str(config).unwrap_or_else(|_| toml::Value::Table(toml::Table::new()));
-        
-        let bookmarks = bookmarks["bookmark"]
-            .as_array()
-            .unwrap_or(&Vec::new())
-            .iter()
-            .filter_map(|item| {
-                if let (Some(title), Some(url), Some(description)) = (
-                    item.get("title").and_then(|v| v.as_str()),
-                    item.get("url").and_then(|v| v.as_str()),
-                    item.get("description").and_then(|v| v.as_str()),
-                ) {
-                    let icon = item.get("icon")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
+    bookmarks["bookmark"]
+        .as_array()
+        .unwrap_or(&Vec::new())
+        .iter()
+        .filter_map(|item| {
+            if let (Some(title), Some(url), Some(description)) = (
+                item.get("title").and_then(|v| v.as_str()),
+                item.get("url").and_then(|v| v.as_str()),
+                item.get("description").and_then(|v| v.as_str()),
+            ) {
+                let icon = item.get("icon")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
 
-                    Some(Bookmark {
-                        title: title.to_string(),
-                        url: url.to_string(),
-                        description: description.to_string(),
-                        icon,
-                    })
-                } else {
-                    None
+                Some(Bookmark {
+                    title: title.to_string(),
+                    url: url.to_string(),
+                    description: description.to_string(),
+                    icon,
+                })
+            } else {
+                None
+            }
+        })
+        .collect()
+});
+
+fn scroll_to_first_highlight() {
+    spawn_local(async {
+        let closure = wasm_bindgen::closure::Closure::once_into_js(Box::new(move || {
+            if let Some(window) = web_sys::window() {
+                if let Some(document) = window.document() {
+                    if let Some(element) = document.query_selector(".highlight").ok().flatten() {
+                        element.scroll_into_view_with_bool(true);
+                    }
                 }
-            })
-            .collect();
-
-        Self { bookmarks }
-    }
+            }
+        }) as Box<dyn FnOnce()>);
+        let _handle = web_sys::window()
+            .and_then(|w| w.set_timeout_with_callback_and_timeout_and_arguments_0(
+                closure.unchecked_ref(),
+                100
+            ).ok());
+    });
 }
 
 #[component]
@@ -59,32 +72,15 @@ pub fn Tags() -> Element {
         title::set_page_title("书签 - 干徒");
     });
 
-    let bookmark_manager = use_signal(BookmarkManager::new);
+    let bookmark_manager = use_signal(|| BOOKMARKS.clone());
     let mut search_text = use_signal(String::new);
     let mut search_query = use_signal(String::new);  // 实际的搜索关键词
 
     // 处理搜索
     let handle_search = move |_| {
         search_query.set(search_text());
-        // 在搜索后添加滚动到第一个匹配项的逻辑
         if !search_text().is_empty() {
-            spawn_local(async {
-                let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
-                    if let Some(window) = web_sys::window() {
-                        if let Some(document) = window.document() {
-                            if let Some(element) = document.query_selector(".highlight").ok().flatten() {
-                                element.scroll_into_view_with_bool(true);
-                            }
-                        }
-                    }
-                }) as Box<dyn FnMut()>);
-                let _handle = web_sys::window().expect("Failed to get window")
-                    .set_timeout_with_callback_and_timeout_and_arguments_0(
-                        closure.as_ref().unchecked_ref(),
-                        100
-                    ).expect("Failed to set timeout");
-                closure.forget();
-            });
+            scroll_to_first_highlight();
         }
     };
 
@@ -92,34 +88,17 @@ pub fn Tags() -> Element {
     let handle_keydown = move |evt: Event<KeyboardData>| {
         if evt.key() == Key::Enter {
             search_query.set(search_text());
-            // 在回车搜索后也添加滚动到第一个匹配项的逻辑
             if !search_text().is_empty() {
-                spawn_local(async {
-                    let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
-                        if let Some(window) = web_sys::window() {
-                            if let Some(document) = window.document() {
-                                if let Some(element) = document.query_selector(".highlight").ok().flatten() {
-                                    element.scroll_into_view_with_bool(true);
-                                }
-                            }
-                        }
-                    }) as Box<dyn FnMut()>);
-                    let _handle = web_sys::window().expect("Failed to get window")
-                        .set_timeout_with_callback_and_timeout_and_arguments_0(
-                            closure.as_ref().unchecked_ref(),
-                            100
-                        ).expect("Failed to set timeout");
-                    closure.forget();
-                });
+                scroll_to_first_highlight();
             }
         }
     };
 
     let filtered_bookmarks = use_memo(move || {
         let search = search_query().to_lowercase();
-        let manager = bookmark_manager.read();
-        
-        manager.bookmarks.iter()
+        let bookmarks = bookmark_manager.read();
+
+        bookmarks.iter()
             .map(|b| {
                 let matches = if !search.is_empty() {
                     b.title.to_lowercase().contains(&search) ||
@@ -192,44 +171,17 @@ pub fn Tags() -> Element {
 fn get_bookmark_icon(icon_name: &str) -> Element {
     // 如果 icon_name 为空字符串或者没有设置 icon 字段（传入空字符串），显示默认图标
     if icon_name.is_empty() {
-        return rsx! {
-            svg {
-                xmlns: "http://www.w3.org/2000/svg",
-                view_box: "0 0 24 24",
-                fill: "currentColor",
-                path {
-                    d: "M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"
-                }
-            }
-        };
+        return rsx! { BookmarkIcon {} };
     }
 
     match icon_name {
-        "github" => rsx! {
-            svg {
-                xmlns: "http://www.w3.org/2000/svg",
-                view_box: "0 0 24 24",
-                fill: "currentColor",
-                path {
-                    d: "M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.237 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
-                }
-            }
-        },
+        "github" => rsx! { GitHubIcon {} },
         // 如果是完整的URL（以 http:// 或 https:// 开头），则使用图片
         url if url.starts_with("http://") || url.starts_with("https://") => {
             let mut use_default_icon = use_signal(|| false);
             rsx! {
                 {if *use_default_icon.read() {
-                    rsx! {
-                        svg {
-                            xmlns: "http://www.w3.org/2000/svg",
-                            view_box: "0 0 24 24",
-                            fill: "currentColor",
-                            path {
-                                d: "M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"
-                            }
-                        }
-                    }
+                    rsx! { BookmarkIcon {} }
                 } else {
                     rsx! {
                         img {
@@ -244,15 +196,6 @@ fn get_bookmark_icon(icon_name: &str) -> Element {
                 }}
             }
         },
-        _ => rsx! {
-            svg {
-                xmlns: "http://www.w3.org/2000/svg",
-                view_box: "0 0 24 24",
-                fill: "currentColor",
-                path {
-                    d: "M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"
-                }
-            }
-        }
+        _ => rsx! { BookmarkIcon {} }
     }
 } 

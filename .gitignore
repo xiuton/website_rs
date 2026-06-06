@@ -1,2 +1,16 @@
 /target
 /dist
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+
+# Environment
+.env
+.env.local

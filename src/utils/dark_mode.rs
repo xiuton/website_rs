@@ -8,10 +8,10 @@ pub fn use_dark_mode() -> Signal<bool> {
                     if let Some(storage) = window.local_storage().ok().flatten() {
                         if let Ok(Some(theme)) = storage.get_item("theme") {
                             if theme == "dark" {
-                                html.set_attribute("class", "dark").expect("Failed to set dark class on html element");
+                                let _ = html.set_attribute("class", "dark");
                                 return true;
                             } else {
-                                html.remove_attribute("class").expect("Failed to remove class from html element");
+                                let _ = html.remove_attribute("class");
                                 return false;
                             }
                         }

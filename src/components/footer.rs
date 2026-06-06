@@ -2,12 +2,10 @@ use dioxus::prelude::*;
 
 #[component]
 pub fn Footer() -> Element {
-    let is_ganto_domain = use_signal(|| {
-        let host = web_sys::window()
-            .and_then(|window| window.location().host().ok())
-            .unwrap_or_default();
-        host.contains("ganto.cn")
-    });
+    let is_ganto_domain = web_sys::window()
+        .and_then(|window| window.location().host().ok())
+        .unwrap_or_default()
+        .contains("ganto.cn");
 
     rsx! {
         div { class: "footer-content",
@@ -26,7 +24,7 @@ pub fn Footer() -> Element {
                 }
                 span { " 干徒 / Ganto" }
             }
-            if *is_ganto_domain.peek() {
+            if is_ganto_domain {
                 div { class: "icp-info",
                     a {
                         href: "https://beian.miit.gov.cn",

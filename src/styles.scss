@@ -57,44 +57,12 @@ $breakpoint-wide: 1360px;
   --radius-lg: 14px;
   --radius-full: 999px;
 
-  // Keep legacy vars for compatibility
-  --bg-color: var(--bg-base);
-  --bg-secondary: var(--bg-elevated);
-  --bg-primary: var(--bg-elevated);
-  --bg-primary-rgb: 253, 251, 247;
-  --bg-secondary-rgb: 240, 235, 224;
-  --text-color: var(--text-primary);
-  --text-color-anti: #ffffff;
-  --border-color: var(--border-default);
-  --hover-color: #f2ece2;
-  --primary-color: var(--accent);
-  --primary-rgb: var(--accent-rgb);
-  --primary-color-dark: var(--accent-hover);
-  --primary-color-alpha: var(--accent-soft);
-  --link-color: var(--accent-text);
-  --tag-bg: var(--bg-subtle);
-  --card-bg: var(--bg-elevated);
-  --shadow-color: rgba(62, 51, 39, 0.07);
-  --danger-color: #c8484a;
-  --danger-color-dark: #a33a3c;
+  // Legacy variables still in use
   --navbar-bg: rgba(248, 244, 237, 0.8);
-  --main-content-bg: var(--bg-base);
-  --secondary-bg: var(--bg-subtle);
-  --navbar-title: var(--text-primary);
-  --navbar-subtitle: var(--text-tertiary);
-  --navbar-link: var(--text-secondary);
-  --navbar-link-active: var(--text-primary);
-  --navbar-link-hover: var(--text-primary);
-  --navbar-border: var(--border-subtle);
-  --navbar-glow-color-1: var(--accent);
-  --navbar-glow-color-2: var(--accent-text);
   --hole-bg-color: #fdfbf7;
   --hole-border-color: #3e3327;
-  --accent-color: var(--accent);
-  --accent-light: var(--accent-soft);
-  --accent-light-rgb: var(--accent-rgb);
   --programming-language-logotype-bg-color: rgba(122, 108, 90, 0.1);
-  --shadow: var(--shadow-sm);
+  --text-color-anti: #ffffff;
 }
 
 .dark {
@@ -119,44 +87,12 @@ $breakpoint-wide: 1360px;
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.45);
 
-  // Keep legacy vars for compatibility
-  --bg-color: var(--bg-base);
-  --bg-secondary: var(--bg-elevated);
-  --bg-primary: var(--bg-elevated);
-  --bg-primary-rgb: 36, 30, 25;
-  --bg-secondary-rgb: 45, 38, 32;
-  --text-color: var(--text-primary);
-  --text-color-anti: #000000;
-  --border-color: var(--border-default);
-  --hover-color: #2d2620;
-  --primary-color: var(--accent);
-  --primary-rgb: var(--accent-rgb);
-  --primary-color-dark: var(--accent-hover);
-  --primary-color-alpha: var(--accent-soft);
-  --link-color: var(--accent-text);
-  --tag-bg: var(--bg-subtle);
-  --card-bg: var(--bg-elevated);
-  --shadow-color: rgba(0, 0, 0, 0.4);
-  --danger-color: #e06060;
-  --danger-color-dark: #c8484a;
+  // Legacy variables still in use
   --navbar-bg: rgba(27, 22, 18, 0.8);
-  --main-content-bg: var(--bg-base);
-  --secondary-bg: var(--bg-subtle);
-  --navbar-title: var(--text-primary);
-  --navbar-subtitle: var(--text-tertiary);
-  --navbar-link: var(--text-secondary);
-  --navbar-link-active: var(--text-primary);
-  --navbar-link-hover: var(--text-primary);
-  --navbar-border: var(--border-subtle);
-  --navbar-glow-color-1: var(--accent);
-  --navbar-glow-color-2: var(--accent-text);
   --hole-bg-color: #1b1612;
   --hole-border-color: #ede4d6;
-  --accent-color: var(--accent);
-  --accent-light: var(--accent-soft);
-  --accent-light-rgb: var(--accent-rgb);
   --programming-language-logotype-bg-color: rgba(176, 162, 144, 0.08);
-  --shadow: var(--shadow-sm);
+  --text-color-anti: #000000;
 }
 
 // 字体预加载
@@ -169,27 +105,19 @@ $breakpoint-wide: 1360px;
 }
 
 @font-face {
-    font-family: 'JetBrainsMono';
+    font-family: 'JetBrains Mono';
     src: url('/static/fonts/JetBrainsMonoNLNerdFont-Regular.ttf') format('truetype');
     font-display: swap;
     font-weight: normal;
     font-style: normal;
 }
 
-// 字体定义
 @font-face {
-  font-family: SmileySans;
-  src: url(./static/fonts/SmileySans-Oblique.otf)
-}
-
-@font-face {
-  font-family: MiSans;
-  src: url(./static/fonts/MiSans-Regular.otf)
-}
-
-@font-face {
-  font-family: JetBrains Mono;
-  src: url(./static/fonts/JetBrainsMonoNLNerdFont-Regular.ttf)
+    font-family: 'SmileySans';
+    src: url('/static/fonts/SmileySans-Oblique.otf') format('opentype');
+    font-display: swap;
+    font-weight: normal;
+    font-style: normal;
 }
 
 // 基础样式
@@ -204,8 +132,8 @@ html, body {
   min-width: 320px;
   font-family: map.get($font-families, 'mi-sans'), map.get($font-families, 'jetbrains'), map.get($font-families, 'sans'), map.get($font-families, 'serif');
   overflow-x: clip;
-  background: var(--bg-color);
-  color: var(--text-color);
+  background: var(--bg-base);
+  color: var(--text-primary);
   margin: 0;
   padding: 0;
   min-height: 100vh;
@@ -276,7 +204,7 @@ pre {
   margin: 0 1.2rem;
 
   a {
-    color: var(--link-color);
+    color: var(--accent-text);
     text-decoration: none;
     transition: color 0.2s;
 
@@ -349,7 +277,8 @@ pre {
             background: var(--navbar-bg);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            border-radius: var(--radius-md);
+            border-radius: 0 0 var(--radius-md) var(--radius-md);
+            border-top: none;
             box-shadow: var(--shadow-md);
             padding: 0.4rem 0.5rem;
           }
@@ -389,8 +318,6 @@ pre {
           }
 
           .nav-item-with-sub {
-            display: flex;
-            align-items: center;
             position: relative;
 
             &:hover .nav-submenu {
@@ -457,7 +384,6 @@ pre {
 
     .main-content {
       transition: background 0.3s, color 0.3s;
-      margin: 2rem 0;
 
       .about-container {
         max-width: 800px;
@@ -819,7 +745,7 @@ pre {
                 position: relative;
               }
               .middle {
-                color: var(--primary-color);
+                color: var(--accent);
               }
             }
             .header,
@@ -1301,27 +1227,27 @@ pre {
               margin-bottom: 0.75rem;
             }
           }
+        }
 
-          .blog-tags {
+        .blog-tags {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+          margin-bottom: 2rem;
+
+          .blog-tag {
+            background: var(--accent-soft);
+            color: var(--accent-text);
+            padding: 0.2rem 0.65rem;
+            border-radius: var(--radius-full);
+            font-size: 0.75rem;
             display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-            margin-top: 2rem;
+            align-items: center;
+            gap: 0.2rem;
 
-            .blog-tag {
-              background: var(--accent-soft);
-              color: var(--accent-text);
-              padding: 0.2rem 0.65rem;
-              border-radius: var(--radius-full);
-              font-size: 0.75rem;
-              display: flex;
-              align-items: center;
-              gap: 0.2rem;
-
-              svg {
-                width: 0.8rem;
-                height: 0.8rem;
-              }
+            svg {
+              width: 0.8rem;
+              height: 0.8rem;
             }
           }
         }
@@ -1397,10 +1323,6 @@ pre {
             background: var(--accent-soft);
             color: var(--accent-text);
             border: 1px solid var(--border-subtle);
-
-            html.dark & {
-              background: #242424;
-            }
           }
 
           pre {
@@ -1411,10 +1333,6 @@ pre {
             overflow: auto;
             position: relative;
             border: 1px solid var(--border-default);
-
-            html.dark & {
-              background: #242424;
-            }
 
             &::before {
               content: attr(data-lang);
@@ -1477,6 +1395,11 @@ pre {
 
         .dark .blog-preview,
         .dark .blog-post {
+          background: var(--bg-elevated);
+        }
+
+        .dark .blog-content code,
+        .dark .blog-content pre {
           background: var(--bg-elevated);
         }
       }
@@ -1845,7 +1768,7 @@ html.dark::view-transition-new(root) {
                 flex-direction: column;
                 height: 100%;
                 text-decoration: none;
-                color: var(--text-color);
+                color: var(--text-primary);
                 position: relative;
                 z-index: 1;
 
@@ -1865,7 +1788,7 @@ html.dark::view-transition-new(root) {
                   svg {
                     width: 100%;
                     height: 100%;
-                    color: var(--text-color);
+                    color: var(--text-primary);
                   }
   
                   img {
@@ -1938,16 +1861,16 @@ html.dark::view-transition-new(root) {
     z-index: 1000;
 
     .modal-content {
-        background: var(--bg-color);
+        background: var(--bg-base);
         border-radius: 12px;
         padding: 2rem;
         width: 90%;
         max-width: 500px;
-        box-shadow: 0 8px 32px var(--shadow-color);
+        box-shadow: 0 8px 32px var(--shadow-md);
 
         h2 {
             margin: 0 0 1.5rem;
-            color: var(--text-color);
+            color: var(--text-primary);
         }
 
         .modal-form {
@@ -1967,16 +1890,16 @@ html.dark::view-transition-new(root) {
 
                 input, textarea {
                     padding: 0.75rem;
-                    border: 1px solid var(--border-color);
+                    border: 1px solid var(--border-default);
                     border-radius: 6px;
-                    background: var(--bg-color);
-                    color: var(--text-color);
+                    background: var(--bg-base);
+                    color: var(--text-primary);
                     font-size: 1rem;
 
                     &:focus {
                         outline: none;
-                        border-color: var(--primary-color);
-                        box-shadow: 0 0 0 2px var(--primary-color-alpha);
+                        border-color: var(--accent);
+                        box-shadow: 0 0 0 2px var(--accent-soft);
                     }
                 }
 
@@ -2001,20 +1924,20 @@ html.dark::view-transition-new(root) {
                     transition: all 0.2s;
 
                     &.cancel-btn {
-                        background: var(--bg-secondary);
-                        color: var(--text-color);
+                        background: var(--bg-elevated);
+                        color: var(--text-primary);
 
                         &:hover {
-                            background: var(--hover-color);
+                            background: var(--bg-subtle);
                         }
                     }
 
                     &.save-btn {
-                        background: var(--primary-color);
+                        background: var(--accent);
                         color: white;
 
                         &:hover {
-                            background: var(--primary-color-dark);
+                            background: var(--accent-hover);
                         }
                     }
                 }
@@ -2029,48 +1952,21 @@ html.dark::view-transition-new(root) {
       margin: 0 0.75rem;
     }
 
-    #main .app .navbar-content {
-      padding: 1.2rem 0 0.8rem;
+    .app .navbar-content {
+      padding: 2.5rem 0 1.5rem;
 
-      .navbar-ui {
-        gap: 0.4rem;
+      .navbar-ui .navbar-title {
+        font-size: 1.8rem;
+      }
 
-        .navbar-title {
-          font-size: 1.4rem;
-        }
+      .navbar-links {
+        width: fit-content;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
 
-        .navbar-subtitle {
-          font-size: 0.7rem;
-          margin-top: -0.15rem;
-          letter-spacing: 0.1em;
-        }
-
-        .navbar-links {
-          width: 100%;
-          overflow-x: auto;
-          -webkit-overflow-scrolling: touch;
-          flex-wrap: nowrap;
-          scrollbar-width: none;
-
-          &::-webkit-scrollbar {
-            display: none;
-          }
-
-          .nav-link {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.75rem;
-          }
-
-          .theme-toggle {
-            margin-left: auto;
-            padding: 0.25rem 0.4rem;
-            flex-shrink: 0;
-
-            svg {
-              width: 1rem;
-              height: 1rem;
-            }
-          }
+        .nav-link {
+          padding: 0.3rem 0.65rem;
+          font-size: 0.8rem;
         }
       }
     }
@@ -2108,29 +2004,6 @@ html.dark::view-transition-new(root) {
     }
 }
 
-@media (max-width: 380px) {
-    #main .app .navbar-content {
-      padding: 0.8rem 0 0.6rem;
-
-      .navbar-ui {
-        gap: 0.2rem;
-
-        .navbar-title {
-          font-size: 1.2rem;
-        }
-
-        .navbar-subtitle {
-          display: none;
-        }
-
-        .navbar-links .nav-link {
-          padding: 0.2rem 0.4rem;
-          font-size: 0.7rem;
-        }
-      }
-    }
-}
-
 // 测试页面样式
 .test-container {
   max-width: 800px;
@@ -2151,11 +2024,11 @@ html.dark::view-transition-new(root) {
   }
 
   .test-section {
-    background: var(--card-bg);
+    background: var(--bg-elevated);
     border-radius: 12px;
     padding: 2rem;
-    box-shadow: var(--shadow);
-    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-default);
 
     &+.test-section {
       margin-top: 2rem;
@@ -2178,7 +2051,7 @@ html.dark::view-transition-new(root) {
 
       .counter-value {
         font-weight: bold;
-        color: var(--primary-color);
+        color: var(--accent);
         font-size: 1.5rem;
       }
     }
@@ -2192,7 +2065,7 @@ html.dark::view-transition-new(root) {
     // 按钮样式
     .test-btn {
       padding: 0.75rem 1.5rem;
-      background: var(--primary-color);
+      background: var(--accent);
       color: white;
       border: none;
       border-radius: 8px;
@@ -2201,7 +2074,7 @@ html.dark::view-transition-new(root) {
       transition: all 0.3s ease;
 
       &:hover {
-        background: var(--primary-color-dark);
+        background: var(--accent-hover);
         transform: translateY(-2px);
       }
 
@@ -2218,16 +2091,16 @@ html.dark::view-transition-new(root) {
     .test-input {
       width: 100%;
       padding: 0.75rem;
-      border: 2px solid var(--border-color);
+      border: 2px solid var(--border-default);
       border-radius: 8px;
       font-size: 1rem;
-      background: var(--bg-primary);
+      background: var(--bg-elevated);
       color: var(--text-primary);
       transition: border-color 0.3s ease;
 
       &:focus {
         outline: none;
-        border-color: var(--primary-color);
+        border-color: var(--accent);
       }
     }
 
@@ -2236,7 +2109,7 @@ html.dark::view-transition-new(root) {
       color: var(--text-secondary);
 
       .input-value {
-        color: var(--primary-color);
+        color: var(--accent);
         font-weight: bold;
       }
     }
@@ -2249,16 +2122,16 @@ html.dark::view-transition-new(root) {
     .test-select {
       width: 100%;
       padding: 0.75rem;
-      border: 2px solid var(--border-color);
+      border: 2px solid var(--border-default);
       border-radius: 8px;
       font-size: 1rem;
-      background: var(--bg-primary);
+      background: var(--bg-elevated);
       color: var(--text-primary);
       cursor: pointer;
 
       &:focus {
         outline: none;
-        border-color: var(--primary-color);
+        border-color: var(--accent);
       }
     }
 
@@ -2267,7 +2140,7 @@ html.dark::view-transition-new(root) {
       color: var(--text-secondary);
 
       .select-value {
-        color: var(--primary-color);
+        color: var(--accent);
         font-weight: bold;
       }
     }
@@ -2287,7 +2160,7 @@ html.dark::view-transition-new(root) {
       input[type="checkbox"] {
         width: 1.2rem;
         height: 1.2rem;
-        accent-color: var(--primary-color);
+        accent-color: var(--accent);
       }
     }
 
@@ -2296,7 +2169,7 @@ html.dark::view-transition-new(root) {
       color: var(--text-secondary);
 
       .checkbox-value {
-        color: var(--primary-color);
+        color: var(--accent);
         font-weight: bold;
       }
     }
@@ -2310,7 +2183,7 @@ html.dark::view-transition-new(root) {
       width: 100%;
       height: 6px;
       border-radius: 3px;
-      background: var(--border-color);
+      background: var(--border-default);
       outline: none;
       appearance: none;
       -webkit-appearance: none;
@@ -2321,7 +2194,7 @@ html.dark::view-transition-new(root) {
         width: 20px;
         height: 20px;
         border-radius: 50%;
-        background: var(--primary-color);
+        background: var(--accent);
         cursor: pointer;
       }
 
@@ -2329,7 +2202,7 @@ html.dark::view-transition-new(root) {
         width: 20px;
         height: 20px;
         border-radius: 50%;
-        background: var(--primary-color);
+        background: var(--accent);
         cursor: pointer;
         border: none;
       }
@@ -2340,7 +2213,7 @@ html.dark::view-transition-new(root) {
       color: var(--text-secondary);
 
       .slider-value {
-        color: var(--primary-color);
+        color: var(--accent);
         font-weight: bold;
       }
     }
@@ -2365,7 +2238,7 @@ html.dark::view-transition-new(root) {
       justify-content: center;
 
       &.primary {
-        background: var(--primary-color);
+        background: var(--accent);
       }
 
       &.secondary {
@@ -2373,7 +2246,7 @@ html.dark::view-transition-new(root) {
       }
 
       &.accent {
-        background: var(--accent-color);
+        background: var(--accent);
       }
 
       &.text {
@@ -2381,9 +2254,9 @@ html.dark::view-transition-new(root) {
       }
 
       &.background {
-        background: var(--bg-primary);
+        background: var(--bg-elevated);
         color: var(--text-primary);
-        border: 1px solid var(--border-color);
+        border: 1px solid var(--border-default);
       }
     }
 
@@ -2397,7 +2270,7 @@ html.dark::view-transition-new(root) {
 
     .animated-box {
       padding: 1rem;
-      background: var(--primary-color);
+      background: var(--accent);
       color: white;
       border-radius: 8px;
       text-align: center;
@@ -2434,15 +2307,15 @@ html.dark::view-transition-new(root) {
 
     .responsive-item {
       padding: 1rem;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border-color);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
       border-radius: 8px;
       text-align: center;
       color: var(--text-primary);
       transition: all 0.3s ease;
 
       &:hover {
-        background: var(--primary-color);
+        background: var(--accent);
         color: white;
         transform: translateY(-2px);
       }
@@ -2749,8 +2622,8 @@ html.dark::view-transition-new(root) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
   border-radius: 10px;
   font-size: 20px;
   cursor: pointer;
@@ -2761,7 +2634,7 @@ html.dark::view-transition-new(root) {
   line-height: 1;
 
   &:hover {
-    background: var(--bg-secondary);
+    background: var(--bg-elevated);
   }
 }
 
@@ -2924,11 +2797,11 @@ html.dark::view-transition-new(root) {
 }
 
 .cg-card {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
   border-radius: 10px;
   padding: 20px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-sm);
 }
 
 .cg-config-section .cg-card {
@@ -2968,7 +2841,7 @@ html.dark::view-transition-new(root) {
 .cg-spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid var(--border-color);
+  border: 3px solid var(--border-default);
   border-top-color: #4f6ef7;
   border-radius: 50%;
   animation: cg-spin 0.7s linear infinite;
@@ -2990,7 +2863,7 @@ html.dark::view-transition-new(root) {
   align-items: center;
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-default);
   font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
@@ -2999,7 +2872,7 @@ html.dark::view-transition-new(root) {
 .cg-card-actions {
   margin-top: 16px;
   padding-top: 12px;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--border-default);
 
   button {
     width: 100%;
@@ -3027,12 +2900,12 @@ html.dark::view-transition-new(root) {
     width: 100%;
     min-width: 0;
     padding: 8px 10px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border-default);
     border-radius: 6px;
     font-size: 13px;
     outline: none;
     transition: border-color 0.15s;
-    background: var(--bg-primary);
+    background: var(--bg-elevated);
     color: var(--text-primary);
     box-sizing: border-box;
 
@@ -3061,7 +2934,7 @@ html.dark::view-transition-new(root) {
     height: 6px;
     -webkit-appearance: none;
     appearance: none;
-    background: var(--border-color);
+    background: var(--border-default);
     border: none;
     border-radius: 3px;
     outline: none;
@@ -3162,22 +3035,22 @@ html.dark::view-transition-new(root) {
   th {
     position: sticky;
     top: 0;
-    background: var(--bg-secondary);
+    background: var(--bg-elevated);
     text-align: left;
     padding: 8px 10px;
-    border-bottom: 2px solid var(--border-color);
+    border-bottom: 2px solid var(--border-default);
     font-weight: 600;
     color: var(--text-primary);
   }
 
   td {
     padding: 6px 10px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-default);
     font-variant-numeric: tabular-nums;
     color: var(--text-primary);
   }
 
-  tr:hover td { background: var(--bg-secondary); }
+  tr:hover td { background: var(--bg-elevated); }
 }
 
 .cg-btn-picker {
@@ -3204,7 +3077,7 @@ html.dark::view-transition-new(root) {
 }
 
 .cg-modal {
-  background: var(--bg-primary);
+  background: var(--bg-elevated);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
   width: 90%;
@@ -3217,7 +3090,7 @@ html.dark::view-transition-new(root) {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-default);
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
@@ -3233,7 +3106,7 @@ html.dark::view-transition-new(root) {
   border-radius: 4px;
 
   &:hover {
-    background: var(--bg-secondary);
+    background: var(--bg-elevated);
     color: var(--text-primary);
   }
 }
@@ -3253,7 +3126,7 @@ html.dark::view-transition-new(root) {
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: var(--bg-secondary);
+  background: var(--bg-elevated);
   border-radius: 6px;
 }
 
@@ -3274,7 +3147,7 @@ html.dark::view-transition-new(root) {
   justify-content: flex-end;
   gap: 10px;
   padding: 12px 20px;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--border-default);
 }
 
 .cg-btn-primary {

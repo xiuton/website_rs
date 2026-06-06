@@ -10,7 +10,7 @@ pub fn NotFound(route: Vec<String>) -> Element {
     // Set page title
     use_effect(move || {
         title::set_page_title("404 - 页面未找到");
-        ()
+        
     });
 
     rsx! {
