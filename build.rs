@@ -81,6 +81,9 @@ fn main() {
     // 生成 RSS feed
     generate_rss_feed(&posts, out_dir.to_str().unwrap());
 
+    // 生成搜索索引
+    generate_search_index(&posts);
+
     println!("cargo:rerun-if-changed=build.rs");
 }
 
@@ -160,6 +163,126 @@ fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
     // 复制到 static 目录供 Trunk 打包
     let dest_feed = Path::new("static/feed.xml");
     std::fs::write(dest_feed, &xml).expect("Failed to write feed.xml to static/");
+}
+
+/// 简易中文/英文分词
+fn tokenize(text: &str) -> Vec<String> {
+    let mut tokens: Vec<String> = Vec::new();
+    let chars: Vec<char> = text.chars().collect();
+    let mut i = 0;
+
+    while i < chars.len() {
+        let c = chars[i];
+
+        // 跳过标点和空白
+        if c.is_ascii_punctuation() || c.is_whitespace() {
+            i += 1;
+            continue;
+        }
+
+        // 英文单词：连续字母数字
+        if c.is_ascii_alphanumeric() {
+            let mut word = String::new();
+            while i < chars.len() && chars[i].is_ascii_alphanumeric() {
+                word.push(chars[i].to_ascii_lowercase());
+                i += 1;
+            }
+            if word.len() >= 2 && !STOP_WORDS.contains(&word.as_str()) {
+                tokens.push(word);
+            }
+        } else {
+            // CJK 字符：取 bigram
+            if i + 1 < chars.len() && !chars[i + 1].is_ascii_punctuation() && !chars[i + 1].is_whitespace() {
+                let bigram: String = [c, chars[i + 1]].iter().collect();
+                tokens.push(bigram);
+            }
+            // 单字也保留
+            tokens.push(c.to_string());
+            i += 1;
+        }
+    }
+
+    tokens
+}
+
+/// 停用词（常见无意义词）
+const STOP_WORDS: &[&str] = &[
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "could",
+    "should", "may", "might", "can", "shall", "to", "of", "in", "for",
+    "on", "with", "at", "by", "from", "as", "into", "through", "during",
+    "before", "after", "above", "below", "between", "out", "off", "over",
+    "under", "again", "further", "then", "once", "here", "there", "when",
+    "where", "why", "how", "all", "both", "each", "few", "more", "most",
+    "other", "some", "such", "no", "nor", "not", "only", "own", "same",
+    "so", "than", "too", "very", "and", "but", "or", "if", "this", "that",
+    "it", "its", "we", "you", "he", "she", "they", "my", "your", "our",
+    "their", "me", "him", "her", "us", "them", "i", "just", "about",
+    "also", "what", "which", "who", "whom",
+];
+
+fn generate_search_index(posts: &[PostData]) {
+    let mut index = String::from("[\n");
+
+    for (idx, post) in posts.iter().enumerate() {
+        let mut tf: HashMap<String, f64> = HashMap::new();
+
+        // 从标题、摘要、标签中提取关键词
+        let source = format!("{} {} {} {}",
+            post.title, post.summary, post.tags.join(" "), post.category);
+        let tokens = tokenize(&source);
+
+        let total = tokens.len() as f64;
+        for token in &tokens {
+            *tf.entry(token.clone()).or_insert(0.0) += 1.0;
+        }
+
+        // 归一化 TF
+        if total > 0.0 {
+            for v in tf.values_mut() {
+                *v /= total;
+            }
+        }
+
+        // 标题词额外加权
+        let title_tokens = tokenize(&post.title);
+        for t in &title_tokens {
+            *tf.entry(t.clone()).or_insert(0.0) += 0.3;
+        }
+
+        // 标签词额外加权
+        for tag in &post.tags {
+            let tag_tokens = tokenize(tag);
+            for t in &tag_tokens {
+                *tf.entry(t.clone()).or_insert(0.0) += 0.5;
+            }
+        }
+
+        let keywords_json: Vec<String> = tf.iter()
+            .map(|(k, v)| format!(r#"["{}",{:.4}]"#, k, v))
+            .collect();
+
+        index.push_str(&format!(
+            r#"  {{"slug":"{}","title":"{}","summary":"{}","tags":["{}"],"category":"{}","keywords":[{}]}}"#,
+            post.slug,
+            post.title.replace('\\', "\\\\").replace('"', "\\\""),
+            post.summary.replace('\\', "\\\\").replace('"', "\\\""),
+            post.tags.join(r#"",""#),
+            post.category.replace('\\', "\\\\").replace('"', "\\\""),
+            keywords_json.join(","),
+        ));
+
+        if idx < posts.len() - 1 {
+            index.push_str(",\n");
+        } else {
+            index.push('\n');
+        }
+    }
+
+    index.push_str("]\n");
+
+    let dest = Path::new("static/search-index.json");
+    std::fs::write(dest, &index).expect("Failed to write search index");
 }
 
 fn scan_dir(

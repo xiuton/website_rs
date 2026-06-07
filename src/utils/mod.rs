@@ -6,3 +6,4 @@ pub mod circle_generator;
 pub mod constants;
 pub mod dev_helpers;
 pub mod storage;
+pub mod search;
