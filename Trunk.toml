@@ -1,6 +1,6 @@
-[wasm]
-# 启用 wasm-opt 优化
-opt = true
+[build]
+# 使用 release 模式构建
+release = true
 
 [serve]
 # 开发服务器端口

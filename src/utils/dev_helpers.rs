@@ -24,37 +24,40 @@ pub fn create_delayed_hide_timer(
     mut hide_btn_timer: Signal<Option<i32>>,
     mut hide_cursor: Signal<bool>,
     delay_ms: i32,
-) -> i32 {
+) -> Option<i32> {
     let closure = wasm_bindgen::closure::Closure::once_into_js(Box::new(move || {
         show_exit_button.set(false);
         hide_cursor.set(true);
         hide_btn_timer.set(None);
     }) as Box<dyn FnOnce()>);
-    let handle = web_sys::window().expect("Failed to get window")
-        .set_timeout_with_callback_and_timeout_and_arguments_0(
-            closure.unchecked_ref(),
-            delay_ms,
-        )
-        .expect("Failed to set timeout");
-    handle
+    web_sys::window()
+        .and_then(|w| {
+            w.set_timeout_with_callback_and_timeout_and_arguments_0(
+                closure.unchecked_ref(),
+                delay_ms,
+            )
+            .ok()
+        })
 }
 
 pub fn create_carousel_timer(
     background_images: Signal<Vec<String>>,
     mut current_bg_index: Signal<usize>,
-) -> i32 {
+) -> Option<i32> {
     let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
         let len = background_images().len();
         if len > 0 {
             current_bg_index.set((current_bg_index() + 1) % len);
         }
     }) as Box<dyn FnMut()>);
-    let handle = web_sys::window().expect("Failed to get window")
-        .set_interval_with_callback_and_timeout_and_arguments_0(
-            closure.as_ref().unchecked_ref(),
-            CAROUSEL_INTERVAL_MS,
-        )
-        .expect("Failed to set interval");
+    let handle = web_sys::window()
+        .and_then(|w| {
+            w.set_interval_with_callback_and_timeout_and_arguments_0(
+                closure.as_ref().unchecked_ref(),
+                CAROUSEL_INTERVAL_MS,
+            )
+            .ok()
+        });
     closure.forget();
     handle
 }
@@ -62,15 +65,18 @@ pub fn create_carousel_timer(
 pub fn load_single_image(url: &str) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool>>> {
     let url = url.to_string();
     Box::pin(async move {
-        let img = web_sys::HtmlImageElement::new().expect("Failed to create HtmlImageElement");
+        let img = match web_sys::HtmlImageElement::new() {
+            Ok(img) => img,
+            Err(_) => return false,
+        };
         let (tx, rx) = futures_channel::oneshot::channel();
         let tx_success = std::sync::Arc::new(std::sync::Mutex::new(Some(tx)));
         let tx_error = tx_success.clone();
         let success_callback = wasm_bindgen::closure::Closure::once_into_js(
-            Box::new(move || { if let Some(tx) = tx_success.lock().expect("Failed to lock mutex").take() { let _ = tx.send(true); } }) as Box<dyn FnOnce()>
+            Box::new(move || { if let Some(tx) = tx_success.lock().ok().and_then(|mut g| g.take()) { let _ = tx.send(true); } }) as Box<dyn FnOnce()>
         );
         let error_callback = wasm_bindgen::closure::Closure::once_into_js(
-            Box::new(move || { if let Some(tx) = tx_error.lock().expect("Failed to lock mutex").take() { let _ = tx.send(false); } }) as Box<dyn FnOnce()>
+            Box::new(move || { if let Some(tx) = tx_error.lock().ok().and_then(|mut g| g.take()) { let _ = tx.send(false); } }) as Box<dyn FnOnce()>
         );
         img.set_onload(Some(success_callback.unchecked_ref()));
         img.set_onerror(Some(error_callback.unchecked_ref()));
@@ -136,15 +142,15 @@ pub async fn load_background_wall_images(
 
                     if loaded_count == 0 {
                         if let Some(old_handle) = bg_timer_handle() {
-                            web_sys::window()
-                                .expect("Failed to get window")
-                                .clear_interval_with_handle(old_handle);
+                            if let Some(w) = web_sys::window() {
+                                w.clear_interval_with_handle(old_handle);
+                            }
                         }
                         let handle = create_carousel_timer(
                             bg_imgs,
                             current_bg_index,
                         );
-                        bg_timer_handle.set(Some(handle));
+                        bg_timer_handle.set(handle);
                     }
                 }
                 break;

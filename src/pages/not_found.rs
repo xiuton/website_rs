@@ -7,11 +7,7 @@ use crate::utils::title;
 pub fn NotFound(route: Vec<String>) -> Element {
     let route_str = route.join("/");
     
-    // Set page title
-    use_effect(move || {
-        title::set_page_title("404 - 页面未找到");
-        
-    });
+    title::set_page_title("404 - 页面未找到");
 
     rsx! {
         div { class: "not-found",

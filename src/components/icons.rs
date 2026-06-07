@@ -15,6 +15,24 @@ pub fn SunIcon() -> Element {
 }
 
 #[component]
+pub fn WideModeIcon() -> Element {
+    rsx! {
+        svg {
+            xmlns: "http://www.w3.org/2000/svg",
+            view_box: "0 0 24 24",
+            width: "24",
+            height: "24",
+            fill: "none",
+            stroke: "currentColor",
+            stroke_width: "2",
+            stroke_linecap: "round",
+            stroke_linejoin: "round",
+            path { d: "M8 3h8m-8 18h8M4 12h16M4 12l3-3m-3 3l3 3m13-3l-3-3m3 3l-3 3" }
+        }
+    }
+}
+
+#[component]
 pub fn MoonIcon() -> Element {
     rsx! {
         svg {

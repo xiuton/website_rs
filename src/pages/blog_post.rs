@@ -1,14 +1,48 @@
 use dioxus::prelude::*;
 use crate::routes::Route;
-use crate::models::RuntimeBlogPost;
 use crate::BLOG_POSTS;
-use crate::utils::{title, code_highlight};
-use crate::components::icons::{BackArrowIcon, HomeIcon, ScrollTopIcon, TagIcon};
+use crate::utils::{title, code_highlight, storage};
+use crate::components::icons::{BackArrowIcon, HomeIcon, ScrollTopIcon, TagIcon, WideModeIcon};
 
 fn prepare_blog_html(content: &str) -> String {
     let html = crate::utils::markdown::markdown_to_html(content);
     let html = html.replace("<pre><code>", "<pre><code class=\"language-plaintext\">");
-    html.replace("<pre><code class=\"", "<pre><code class=\"language-")
+    let html = html.replace("<pre><code class=\"", "<pre><code class=\"language-");
+    // 为所有图片注入懒加载属性
+    add_lazy_loading(&html)
+}
+
+/// 为 <img> 标签添加 loading="lazy" 属性（如尚未设置）
+fn add_lazy_loading(html: &str) -> String {
+    let mut result = String::with_capacity(html.len());
+    let mut last_end = 0;
+
+    for (start, _) in html.match_indices("<img ") {
+        // 找到 img 标签的结束 >
+        let tag_start = start;
+        let tag_end = if let Some(end) = html[tag_start..].find('>') {
+            tag_start + end
+        } else {
+            continue;
+        };
+
+        result.push_str(&html[last_end..tag_start]);
+
+        let tag = &html[tag_start..tag_end];
+        // 只有尚未包含 loading 属性的才注入
+        if !tag.contains("loading=") {
+            result.push_str(&html[tag_start..tag_start + 5]); // "<img "
+            result.push_str("loading=\"lazy\" ");
+            result.push_str(&html[tag_start + 5..tag_end]);
+        } else {
+            result.push_str(tag);
+        }
+
+        last_end = tag_end;
+    }
+
+    result.push_str(&html[last_end..]);
+    result
 }
 
 #[component]
@@ -17,49 +51,47 @@ pub fn BlogPostView(slug: String) -> Element {
     let post = use_memo(move || {
         BLOG_POSTS.iter()
             .find(|p| p.slug == slug)
-            .map(|p| -> RuntimeBlogPost { RuntimeBlogPost::from_static(p) })
     });
 
-    // Set page title
     use_effect(move || {
+        // 设置页面标题 + 恢复宽屏模式 + SEO meta
         if let Some(post) = post() {
             title::set_page_title(&format!("{} - 干徒", post.title));
-        }
-        
-    });
 
-    // 在页面加载时，读取 localStorage 恢复宽屏状态
-    use_effect(move || {
+            let description = if !post.summary.is_empty() {
+                post.summary[..post.summary.len().min(160)].to_string()
+            } else {
+                crate::utils::markdown::clean_markdown_excerpt(post.content, 150)
+            };
+            title::set_seo(
+                &post.title,
+                &description,
+                &format!("https://ganto.cn/post/{}", post.slug),
+            );
+        }
         if post().is_some() {
-            if let Some(window) = web_sys::window() {
-                if let Some(storage) = window.local_storage().ok().flatten() {
-                    if let Ok(Some(wide_mode)) = storage.get_item("blog_wide_mode") {
-                        is_wide_mode.set(wide_mode == "true");
-                    }
-                }
-            }
+            is_wide_mode.set(storage::get_blog_wide_mode());
         }
-        
     });
 
-    // 初始化代码高亮
     use_effect(move || {
         code_highlight::init_highlight();
     });
 
-    // 监听文章内容变化，重新应用代码高亮
     use_effect(move || {
-        let post = post();
-        if post.is_some() {
+        if post().is_some() {
             code_highlight::reapply_highlight();
         }
     });
 
+    let article_label = post().map(|p| format!("文章：{}", p.title));
+
     rsx! {
         div { class: "blog-container",
             if let Some(post) = post() {
-                div { 
+                article { 
                     class: if is_wide_mode() { "blog-post wide-mode" } else { "blog-post" },
+                    aria_label: article_label.as_deref().unwrap_or("文章"),
                     div { class: "blog-nav",
                         button { 
                             class: "back-button",
@@ -96,51 +128,34 @@ pub fn BlogPostView(slug: String) -> Element {
                             onclick: move |_| {
                                 let new_mode = !is_wide_mode();
                                 is_wide_mode.set(new_mode);
-                                if let Some(window) = web_sys::window() {
-                                    if let Some(storage) = window.local_storage().ok().flatten() {
-                                        let _ = storage.set_item("blog_wide_mode", if new_mode { "true" } else { "false" });
-                                    }
-                                }
+                                storage::set_blog_wide_mode(new_mode);
                             },
                             {
-                                rsx! {
-                                    svg {
-                                        xmlns: "http://www.w3.org/2000/svg",
-                                        view_box: "0 0 24 24",
-                                        width: "24",
-                                        height: "24",
-                                        fill: "none",
-                                        stroke: "currentColor",
-                                        stroke_width: "2",
-                                        stroke_linecap: "round",
-                                        stroke_linejoin: "round",
-                                        path { d: "M8 3h8m-8 18h8M4 12h16M4 12l3-3m-3 3l3 3m13-3l-3-3m3 3l-3 3" }
-                                    }
-                                }
+                                rsx! { WideModeIcon {} }
                             }
                         }
                     }
                     div { class: "blog-title-wrapper",
                         div { class: "blog-title",
-                            h2 { {post.title.clone()} }
+                            h2 { {post.title} }
                             if !post.category.is_empty() {
-                                span { class: "blog-category", {post.category.clone()} }
+                                span { class: "blog-category", {post.category} }
                             }
                         }
                         div { class: "blog-meta",
-                            span { class: "blog-date", {post.date.clone()} }
-                            span { class: "blog-author", {post.author.clone()} }
+                            span { class: "blog-date", {post.date} }
+                            span { class: "blog-author", {post.author} }
                         }
                     }
                     div { 
                         class: "blog-content",
-                        dangerous_inner_html: prepare_blog_html(&post.content)
+                        dangerous_inner_html: prepare_blog_html(post.content)
                     }
                     div { class: "blog-tags",
                         {post.tags.iter().map(|tag| rsx! {
                             span { class: "blog-tag",
                                 TagIcon {}
-                                {tag.clone()}
+                                {tag}
                             }
                         })}
                     }

@@ -1,0 +1,24 @@
+// 字体预加载
+@font-face {
+    font-family: 'MiSans';
+    src: url('/static/fonts/MiSans-Regular.otf') format('opentype');
+    font-display: swap;
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'JetBrains Mono';
+    src: url('/static/fonts/JetBrainsMonoNLNerdFont-Regular.ttf') format('truetype');
+    font-display: swap;
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'SmileySans';
+    src: url('/static/fonts/SmileySans-Oblique.otf') format('opentype');
+    font-display: swap;
+    font-weight: normal;
+    font-style: normal;
+}

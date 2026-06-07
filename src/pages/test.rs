@@ -9,11 +9,7 @@ pub fn Test() -> Element {
     let mut is_checked = use_signal(|| false);
     let mut slider_value = use_signal(|| 50.0);
 
-    // Set page title
-    use_effect(move || {
-        title::set_page_title("测试页面 - 干徒");
-        
-    });
+    title::set_page_title("测试页面 - 干徒");
 
     rsx! {
         div { class: "test-container",

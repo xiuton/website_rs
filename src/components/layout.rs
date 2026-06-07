@@ -9,9 +9,10 @@ pub fn Layout() -> Element {
     let is_dark = dark_mode::use_dark_mode();
 
     rsx! {
+        a { href: "#main-content", class: "skip-to-content", "跳转到主要内容" }
         div { class: "app",
             Navbar { is_dark: is_dark }
-            div { class: "main-content",
+            main { class: "main-content", id: "main-content",
                 Outlet::<Route> {}
             }
             Footer {}

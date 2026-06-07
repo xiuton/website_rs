@@ -11,10 +11,7 @@ use crate::components::icons::{RefreshIcon, FullscreenIcon, CloseIcon};
 
 #[component]
 pub fn Dev() -> Element {
-    use_effect(move || {
-        title::set_page_title("开发 - 干徒");
-        
-    });
+    title::set_page_title("开发 - 干徒");
 
     let img_url = use_signal(|| None::<String>);
     let is_background_mode = use_signal(|| false);
@@ -39,7 +36,7 @@ pub fn Dev() -> Element {
 
             if background_images().len() > 1 {
                 let handle = create_carousel_timer(background_images, current_bg_index);
-                bg_timer_handle.set(Some(handle));
+                bg_timer_handle.set(handle);
                 return;
             }
 
@@ -62,7 +59,9 @@ pub fn Dev() -> Element {
         move || {
             is_background_mode.set(false);
             if let Some(handle) = bg_timer_handle() {
-                web_sys::window().expect("Failed to get window").clear_interval_with_handle(handle);
+                if let Some(window) = web_sys::window() {
+                    window.clear_interval_with_handle(handle);
+                }
                 bg_timer_handle.set(None);
             }
         }
@@ -78,8 +77,9 @@ pub fn Dev() -> Element {
     // 预加载背景墙图片
     use_effect(move || {
         for url in background_images().iter() {
-            let img = web_sys::HtmlImageElement::new().expect("Failed to create HtmlImageElement");
-            img.set_src(url);
+            if let Ok(img) = web_sys::HtmlImageElement::new() {
+                img.set_src(url);
+            }
         }
     });
 
@@ -108,11 +108,13 @@ pub fn Dev() -> Element {
                     class: "dev-btns",
                     button {
                         class: "img-switch-btn",
+                        aria_label: "随机切换图片",
                         onclick: fetch_random_img,
                         RefreshIcon {}
                     }
                     button {
                         class: "background-mode-btn",
+                        aria_label: "全屏背景模式",
                         onclick: move |_| {
                             enter_background_mode();
                         },
@@ -128,7 +130,9 @@ pub fn Dev() -> Element {
                         show_exit_button.set(true);
                         hide_cursor.set(false);
                         if let Some(handle) = hide_btn_timer() {
-                            web_sys::window().expect("Failed to get window").clear_timeout_with_handle(handle);
+                            if let Some(w) = web_sys::window() {
+                                w.clear_timeout_with_handle(handle);
+                            }
                         }
                         let handle = create_delayed_hide_timer(
                             show_exit_button,
@@ -136,13 +140,15 @@ pub fn Dev() -> Element {
                             hide_cursor,
                             HIDE_BTN_DELAY_MS,
                         );
-                        hide_btn_timer.set(Some(handle));
+                        hide_btn_timer.set(handle);
                     },
                     onmouseleave: move |_| {
                         show_exit_button.set(false);
                         hide_cursor.set(true);
                         if let Some(handle) = hide_btn_timer() {
-                            web_sys::window().expect("Failed to get window").clear_timeout_with_handle(handle);
+                            if let Some(w) = web_sys::window() {
+                                w.clear_timeout_with_handle(handle);
+                            }
                             hide_btn_timer.set(None);
                         }
                     },
@@ -162,7 +168,9 @@ pub fn Dev() -> Element {
                             show_exit_button.set(true);
                             hide_cursor.set(false);
                             if let Some(handle) = hide_btn_timer() {
-                                web_sys::window().expect("Failed to get window").clear_timeout_with_handle(handle);
+                                if let Some(w) = web_sys::window() {
+                                    w.clear_timeout_with_handle(handle);
+                                }
                                 hide_btn_timer.set(None);
                             }
                         },
@@ -173,10 +181,11 @@ pub fn Dev() -> Element {
                                 hide_cursor,
                                 HIDE_BTN_DELAY_MS,
                             );
-                            hide_btn_timer.set(Some(handle));
+                            hide_btn_timer.set(handle);
                         },
                         button {
                             class: "exit-background-btn",
+                            aria_label: "退出背景模式",
                             onclick: move |_| {
                                 exit_background_mode();
                             },

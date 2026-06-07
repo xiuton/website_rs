@@ -4,11 +4,7 @@ use crate::components::icons::{GitHubIcon, EmailIcon, BlogIcon};
 
 #[component]
 pub fn About() -> Element {
-    // Set page title
-    use_effect(move || {
-        title::set_page_title("关于 - 干徒");
-        
-    });
+    title::set_page_title("关于 - 干徒");
 
     rsx! {
         div { class: "about-container",
@@ -134,20 +130,25 @@ pub fn About() -> Element {
                     a { 
                         href: "mailto:i@ganto.me",
                         class: "contact-link email-link",
+                        aria_label: "发送邮件",
                         EmailIcon {}
                         span { "i@ganto.me" }
                     }
                     a { 
                         href: "https://github.com/gantoho",
                         target: "_blank",
+                        rel: "noopener noreferrer",
                         class: "contact-link github-link",
+                        aria_label: "GitHub 主页",
                         GitHubIcon {}
                         span { "GitHub" }
                     }
                     a { 
                         href: "https://cnblogs.com/ganto",
                         target: "_blank",
+                        rel: "noopener noreferrer",
                         class: "contact-link blog-link",
+                        aria_label: "博客园主页",
                         BlogIcon {}
                         span { "博客园" }
                     }

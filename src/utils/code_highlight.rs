@@ -8,15 +8,13 @@ pub fn init_highlight() {
 
     if let Ok(link) = document.create_element("link") {
         let _ = link.set_attribute("rel", "stylesheet");
-        let _ = link.set_attribute("href", &format!("{}/styles/github-dark.min.css", super::constants::HIGHLIGHT_JS_CDN));
-        let _ = link.set_attribute("crossorigin", "anonymous");
+        let _ = link.set_attribute("href", "/static/highlight/github-dark.min.css");
         let _ = head.append_child(&link);
     }
 
     if let Ok(script) = document.create_element("script") {
-        let _ = script.set_attribute("src", &format!("{}/highlight.min.js", super::constants::HIGHLIGHT_JS_CDN));
+        let _ = script.set_attribute("src", "/static/highlight/highlight.min.js");
         let _ = script.set_attribute("async", "false");
-        let _ = script.set_attribute("crossorigin", "anonymous");
         let _ = head.append_child(&script);
     }
 

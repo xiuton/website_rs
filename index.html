@@ -4,6 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>干徒 - 开发爱好者</title>
+    <meta name="description" content="干徒 (Ganto) 的个人技术博客，分享 Rust、前端、WebAssembly 等编程技术文章。">
+    <meta name="author" content="干徒">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="干徒 - 开发爱好者">
+    <meta property="og:description" content="干徒 (Ganto) 的个人技术博客，分享 Rust、前端、WebAssembly 等编程技术文章。">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://ganto.cn">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="干徒 - 开发爱好者">
+    <meta name="twitter:description" content="干徒 (Ganto) 的个人技术博客，分享 Rust、前端、WebAssembly 等编程技术文章。">
+
     <script>
         // 在页面加载时立即检查并设置主题，避免闪烁
         (function() {
@@ -14,8 +30,9 @@
         })();
     </script>
     <link rel="shortcut icon" href="/static/favicon.svg" type="image/x-icon">
+    <link rel="alternate" type="application/rss+xml" title="干徒的博客 RSS" href="/static/feed.xml">
     <link data-trunk rel="scss" href="src/styles.scss" data-sass-options='{"style":"compressed","sourceMap":false,"quietDeps":true}' />
-    <link data-trunk rel="rust" data-bin="web-rs" />
+    <link data-trunk rel="rust" data-bin="web-rs" data-wasm-opt="0" />
     <script>
         window.addEventListener('error', function(e) {
             if (e.target && (e.target.tagName === 'LINK' || e.target.tagName === 'IMG' || e.target.tagName === 'SCRIPT')) {

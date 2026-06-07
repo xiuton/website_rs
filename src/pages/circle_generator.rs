@@ -4,7 +4,7 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 use serde::{Deserialize, Serialize};
 use crate::utils::circle_generator::{generate_circles, Circle, GenerationConfig};
-use crate::utils::title;
+use crate::utils::{title, storage};
 
 type AnimRc = std::rc::Rc<std::cell::RefCell<Option<wasm_bindgen::prelude::Closure<dyn FnMut()>>>>;
 
@@ -36,25 +36,15 @@ impl Default for PageConfig {
 }
 
 fn save_config(config: &PageConfig) {
-    if let Ok(Some(storage)) = web_sys::window()
-        .map(|w| w.local_storage())
-        .unwrap_or(Err("no window".into()))
-    {
-        if let Ok(json) = serde_json::to_string(config) {
-            let _ = storage.set_item("circle_generator_config", &json);
-        }
+    if let Ok(json) = serde_json::to_string(config) {
+        storage::set_circle_generator_config(&json);
     }
 }
 
 fn load_config() -> PageConfig {
-    if let Ok(Some(storage)) = web_sys::window()
-        .map(|w| w.local_storage())
-        .unwrap_or(Err("no window".into()))
-    {
-        if let Ok(Some(json)) = storage.get_item("circle_generator_config") {
-            if let Ok(config) = serde_json::from_str(&json) {
-                return config;
-            }
+    if let Some(json) = storage::get_circle_generator_config() {
+        if let Ok(config) = serde_json::from_str(&json) {
+            return config;
         }
     }
     PageConfig::default()
@@ -88,14 +78,15 @@ fn render_canvas(cfg: &RenderConfig) {
 }
 
 fn render_canvas_inner(cfg: &RenderConfig) {
-    let window = web_sys::window().expect("Failed to get window");
-    let document = window.document().expect("Failed to get document");
+    let Some(window) = web_sys::window() else { return };
+    let Some(document) = window.document() else { return };
 
-    let canvas = document
+    let Some(canvas) = document
         .get_element_by_id("circle-canvas")
-        .expect("Failed to get canvas element")
-        .dyn_into::<web_sys::HtmlCanvasElement>()
-        .expect("Failed to cast to HtmlCanvasElement");
+        .and_then(|el| el.dyn_into::<web_sys::HtmlCanvasElement>().ok())
+    else {
+        return;
+    };
 
     let dpr = window.device_pixel_ratio();
 
@@ -112,20 +103,21 @@ fn render_canvas_inner(cfg: &RenderConfig) {
         (display_width, dh)
     };
 
-    let ctx = canvas
+    let Some(ctx) = canvas
         .get_context("2d")
-        .expect("Failed to get 2d context")
-        .expect("Context is null")
-        .dyn_into::<web_sys::CanvasRenderingContext2d>()
-        .expect("Failed to cast to CanvasRenderingContext2d");
+        .ok()
+        .flatten()
+        .and_then(|ctx| ctx.dyn_into::<web_sys::CanvasRenderingContext2d>().ok())
+    else {
+        return;
+    };
 
     let is_dark = document
         .document_element()
         .map(|el| el.matches(".dark").unwrap_or(false))
         .unwrap_or(false);
 
-    ctx.set_transform(dpr, 0.0, 0.0, dpr, 0.0, 0.0)
-        .expect("Failed to set transform");
+    let _ = ctx.set_transform(dpr, 0.0, 0.0, dpr, 0.0, 0.0);
     ctx.clear_rect(0.0, 0.0, final_w, final_h);
 
     let bg_color = if is_dark { "#1a1a1a" } else { "#f8f9fa" };
@@ -143,8 +135,7 @@ fn render_canvas_inner(cfg: &RenderConfig) {
         let cr = circle.radius * scale_x;
 
         ctx.begin_path();
-        ctx.arc(cx, cy, cr, 0.0, std::f64::consts::PI * 2.0)
-            .expect("Failed to create arc");
+        let _ = ctx.arc(cx, cy, cr, 0.0, std::f64::consts::PI * 2.0);
         ctx.set_fill_style_str(&color);
         ctx.set_global_alpha(if is_dark { 0.6 } else { 0.5 });
         ctx.fill();
@@ -179,7 +170,7 @@ fn render_canvas_inner(cfg: &RenderConfig) {
                 let dash = js_sys::Array::new();
                 dash.push(&wasm_bindgen::JsValue::from_f64(6.0));
                 dash.push(&wasm_bindgen::JsValue::from_f64(4.0));
-                ctx.set_line_dash(&dash).expect("Failed to set line dash");
+                let _ = ctx.set_line_dash(&dash);
 
                 ctx.begin_path();
                 ctx.move_to(px, py);
@@ -188,7 +179,7 @@ fn render_canvas_inner(cfg: &RenderConfig) {
 
                 ctx.set_shadow_blur(0.0);
                 ctx.set_global_alpha(1.0);
-                ctx.set_line_dash(&js_sys::Array::new()).expect("Failed to clear line dash");
+                ctx.set_line_dash(&js_sys::Array::new()).ok();
                 ctx.restore();
             }
         }
@@ -219,8 +210,7 @@ fn render_canvas_inner(cfg: &RenderConfig) {
             let cr = circle.radius * scale_x + 4.0;
 
             ctx.begin_path();
-            ctx.arc(cx, cy, cr, 0.0, std::f64::consts::PI * 2.0)
-                .expect("Failed to create arc");
+            let _ = ctx.arc(cx, cy, cr, 0.0, std::f64::consts::PI * 2.0);
             ctx.set_fill_style_str("#ffd700");
             ctx.set_global_alpha(0.9);
             ctx.fill();
@@ -240,10 +230,7 @@ fn render_canvas_inner(cfg: &RenderConfig) {
 
 #[component]
 pub fn CircleGenerator() -> Element {
-    use_effect(move || {
-        title::set_page_title("圆形生成器 - 干徒");
-        
-    });
+    title::set_page_title("圆形生成器 - 干徒");
 
     let cfg = load_config();
     let mut circles = use_signal(Vec::<Circle>::new);
@@ -276,9 +263,12 @@ pub fn CircleGenerator() -> Element {
         if entering {
             pre_fs_width.set(config_width());
             pre_fs_height.set(config_height());
-            let window = web_sys::window().expect("Failed to get window");
-            let ww = window.inner_width().expect("Failed to get width").as_f64().unwrap();
-            let wh = window.inner_height().expect("Failed to get height").as_f64().unwrap();
+            let window = match web_sys::window() {
+                Some(w) => w,
+                None => return,
+            };
+            let ww = window.inner_width().ok().and_then(|w| w.as_f64()).unwrap_or(0.0);
+            let wh = window.inner_height().ok().and_then(|h| h.as_f64()).unwrap_or(0.0);
             config_width.set(ww);
             config_height.set(wh);
             fullscreen_mode.set(true);
@@ -302,7 +292,7 @@ pub fn CircleGenerator() -> Element {
             let hl = *highlight_index.peek();
             let fs = *fullscreen_mode.peek();
 
-            let window = web_sys::window().expect("Failed to get window");
+            let Some(window) = web_sys::window() else { return; };
             let window2 = window.clone();
             let closure = Closure::once(move || {
                 let closure2 = Closure::once(move || {
@@ -324,12 +314,12 @@ pub fn CircleGenerator() -> Element {
                         closure2.as_ref().unchecked_ref(),
                         0,
                     )
-                    .expect("Failed to set timeout");
+                    .ok();
                 closure2.forget();
             });
             window
                 .request_animation_frame(closure.as_ref().unchecked_ref())
-                .expect("Failed to request animation frame");
+                .ok();
             closure.forget();
         }
     });
@@ -338,7 +328,7 @@ pub fn CircleGenerator() -> Element {
         let fs = fullscreen_mode();
         if fs {
             resize_pending.set(false);
-            let window = web_sys::window().expect("Failed to get window");
+            let Some(window) = web_sys::window() else { return; };
             let window_for_listener = window.clone();
             let resize_handle = std::rc::Rc::new(std::cell::Cell::new(None::<i32>));
             let resize_handle_clone = resize_handle.clone();
@@ -352,13 +342,13 @@ pub fn CircleGenerator() -> Element {
                             resize_pending.set(true);
                         }).as_ref().unchecked_ref(),
                         400,
-                    )
-                    .expect("Failed to set timeout");
-                resize_handle_clone.set(Some(handle));
+                )
+                .ok();
+                resize_handle_clone.set(handle);
             }) as Box<dyn FnMut()>);
             window_for_listener
                 .add_event_listener_with_callback("resize", closure.as_ref().unchecked_ref())
-                .expect("Failed to add resize listener");
+                .ok();
             closure.forget();
         }
     });
@@ -379,7 +369,7 @@ pub fn CircleGenerator() -> Element {
         let min_r = min_radius();
         let max_r = max_radius();
 
-        let window = web_sys::window().expect("Failed to get window");
+        let Some(window) = web_sys::window() else { return; };
         let window2 = window.clone();
         let closure = Closure::once(move || {
             let closure2 = Closure::once(move || {
@@ -401,12 +391,14 @@ pub fn CircleGenerator() -> Element {
                     closure2.as_ref().unchecked_ref(),
                     0,
                 )
-                .expect("Failed to set timeout");
+                .ok();
             closure2.forget();
         });
         window
-            .request_animation_frame(closure.as_ref().unchecked_ref())
-            .expect("Failed to request animation frame");
+            .request_animation_frame(
+                closure.as_ref().unchecked_ref(),
+            )
+            .ok();
         closure.forget();
     };
 
@@ -442,7 +434,7 @@ pub fn CircleGenerator() -> Element {
             selected_circle.set(None);
             show_modal.set(false);
 
-            let window = web_sys::window().expect("Failed to get window");
+            let Some(window) = web_sys::window() else { return; };
             let window_for_interval = window.clone();
             let prev_idx = std::cell::Cell::new(highlight_index());
             let interval_closure = Closure::wrap(Box::new(move || {
@@ -515,8 +507,8 @@ pub fn CircleGenerator() -> Element {
                                     *rc.borrow_mut() = Some(c);
                                 }
                             });
-                            let h = window2.request_animation_frame(next.as_ref().unchecked_ref()).expect("Failed to request animation frame");
-                            anim_frame_handle.set(Some(h));
+                            let h = window2.request_animation_frame(next.as_ref().unchecked_ref()).ok();
+                            anim_frame_handle.set(h);
                             next.forget();
                         } else {
                             highlight_index.set(Some(target_idx));
@@ -531,8 +523,8 @@ pub fn CircleGenerator() -> Element {
                         let borrowed = anim_rc.borrow();
                         if let Some(c) = borrowed.as_ref() {
                             let func: &js_sys::Function = c.as_ref().unchecked_ref();
-                            let handle = window_for_interval.request_animation_frame(func).expect("Failed to request animation frame");
-                            anim_frame_handle.set(Some(handle));
+                            let handle = window_for_interval.request_animation_frame(func).ok();
+                            anim_frame_handle.set(handle);
                         }
                     }
                 } else {
@@ -545,9 +537,9 @@ pub fn CircleGenerator() -> Element {
                     interval_closure.as_ref().unchecked_ref(),
                     (anim_duration() + dwell_time() + picker_speed()) as i32,
                 )
-                .expect("Failed to set interval");
+                .ok(); // set_interval
             interval_closure.forget();
-            timer_handle.set(Some(handle));
+            timer_handle.set(handle);
         }
     };
 
@@ -747,7 +739,7 @@ pub fn CircleGenerator() -> Element {
                                                 let w = config_width();
                                                 let h = config_height();
                                                 render_canvas(&RenderConfig { circles: &circles_snapshot, config_width: w, config_height: h, fullscreen: fullscreen_mode(), highlight: last_picked_idx(), prev_highlight: None, mask_hole: None });
-                                                let window = web_sys::window().expect("Failed to get window");
+                                                let Some(window) = web_sys::window() else { return; };
                                                 let window_for_interval = window.clone();
                                                 let prev_idx = std::cell::Cell::new(last_picked_idx());
                                                 let interval_closure = Closure::wrap(Box::new(move || {
@@ -820,8 +812,8 @@ pub fn CircleGenerator() -> Element {
                                                                         *rc.borrow_mut() = Some(c);
                                                                     }
                                                                 });
-                                                                let h = window2.request_animation_frame(next.as_ref().unchecked_ref()).expect("Failed to request animation frame");
-                                                                anim_frame_handle.set(Some(h));
+                                                                let h = window2.request_animation_frame(next.as_ref().unchecked_ref()).ok();
+                                                                anim_frame_handle.set(h);
                                                                 next.forget();
                                                             } else {
                                                                 highlight_index.set(Some(target_idx));
@@ -836,8 +828,8 @@ pub fn CircleGenerator() -> Element {
                                                             let borrowed = anim_rc.borrow();
                                                             if let Some(c) = borrowed.as_ref() {
                                                                 let func: &js_sys::Function = c.as_ref().unchecked_ref();
-                                                                let handle = window_for_interval.request_animation_frame(func).expect("Failed to request animation frame");
-                                                                anim_frame_handle.set(Some(handle));
+                                                                let handle = window_for_interval.request_animation_frame(func).ok();
+                                                                anim_frame_handle.set(handle);
                                                             }
                                                         }
                                                     } else {
@@ -850,9 +842,9 @@ pub fn CircleGenerator() -> Element {
                                                         interval_closure.as_ref().unchecked_ref(),
                                                         (anim_duration() + dwell_time() + picker_speed()) as i32,
                                                     )
-                                                    .expect("Failed to set interval");
+                                                    .ok(); // set_interval
                                                 interval_closure.forget();
-                                                timer_handle.set(Some(handle));
+                                                timer_handle.set(handle);
                                             }
                                         }
                                     }
@@ -887,7 +879,7 @@ pub fn CircleGenerator() -> Element {
                                                 let w = config_width();
                                                 let h = config_height();
                                                 render_canvas(&RenderConfig { circles: &circles_snapshot, config_width: w, config_height: h, fullscreen: fullscreen_mode(), highlight: last_picked_idx(), prev_highlight: None, mask_hole: None });
-                                                let window = web_sys::window().expect("Failed to get window");
+                                                let Some(window) = web_sys::window() else { return; };
                                                 let window_for_interval = window.clone();
                                                 let prev_idx = std::cell::Cell::new(last_picked_idx());
                                                 let interval_closure = Closure::wrap(Box::new(move || {
@@ -960,8 +952,8 @@ pub fn CircleGenerator() -> Element {
                                                                         *rc.borrow_mut() = Some(c);
                                                                     }
                                                                 });
-                                                                let h = window2.request_animation_frame(next.as_ref().unchecked_ref()).expect("Failed to request animation frame");
-                                                                anim_frame_handle.set(Some(h));
+                                                                let h = window2.request_animation_frame(next.as_ref().unchecked_ref()).ok();
+                                                                anim_frame_handle.set(h);
                                                                 next.forget();
                                                             } else {
                                                                 highlight_index.set(Some(target_idx));
@@ -976,8 +968,8 @@ pub fn CircleGenerator() -> Element {
                                                             let borrowed = anim_rc.borrow();
                                                             if let Some(c) = borrowed.as_ref() {
                                                                 let func: &js_sys::Function = c.as_ref().unchecked_ref();
-                                                                let handle = window_for_interval.request_animation_frame(func).expect("Failed to request animation frame");
-                                                                anim_frame_handle.set(Some(handle));
+                                                                let handle = window_for_interval.request_animation_frame(func).ok();
+                                                                anim_frame_handle.set(handle);
                                                             }
                                                         }
                                                     } else {
@@ -990,9 +982,9 @@ pub fn CircleGenerator() -> Element {
                                                         interval_closure.as_ref().unchecked_ref(),
                                                         (anim_duration() + dwell_time() + picker_speed()) as i32,
                                                     )
-                                                    .expect("Failed to set interval");
+                                                    .ok(); // set_interval
                                                 interval_closure.forget();
-                                                timer_handle.set(Some(handle));
+                                                timer_handle.set(handle);
                                             }
                                         }
                                     }
@@ -1031,7 +1023,7 @@ pub fn CircleGenerator() -> Element {
                                                 let w = config_width();
                                                 let h = config_height();
                                                 render_canvas(&RenderConfig { circles: &circles_snapshot, config_width: w, config_height: h, fullscreen: fullscreen_mode(), highlight: last_picked_idx(), prev_highlight: None, mask_hole: None });
-                                                let window = web_sys::window().expect("Failed to get window");
+                                                let Some(window) = web_sys::window() else { return; };
                                                 let window_for_interval = window.clone();
                                                 let prev_idx = std::cell::Cell::new(last_picked_idx());
                                                 let interval_closure = Closure::wrap(Box::new(move || {
@@ -1104,8 +1096,8 @@ pub fn CircleGenerator() -> Element {
                                                                         *rc.borrow_mut() = Some(c);
                                                                     }
                                                                 });
-                                                                let h = window2.request_animation_frame(next.as_ref().unchecked_ref()).expect("Failed to request animation frame");
-                                                                anim_frame_handle.set(Some(h));
+                                                                let h = window2.request_animation_frame(next.as_ref().unchecked_ref()).ok();
+                                                                anim_frame_handle.set(h);
                                                                 next.forget();
                                                             } else {
                                                                 highlight_index.set(Some(target_idx));
@@ -1120,8 +1112,8 @@ pub fn CircleGenerator() -> Element {
                                                             let borrowed = anim_rc.borrow();
                                                             if let Some(c) = borrowed.as_ref() {
                                                                 let func: &js_sys::Function = c.as_ref().unchecked_ref();
-                                                                let handle = window_for_interval.request_animation_frame(func).expect("Failed to request animation frame");
-                                                                anim_frame_handle.set(Some(handle));
+                                                                let handle = window_for_interval.request_animation_frame(func).ok();
+                                                                anim_frame_handle.set(handle);
                                                             }
                                                         }
                                                     } else {
@@ -1134,9 +1126,9 @@ pub fn CircleGenerator() -> Element {
                                                         interval_closure.as_ref().unchecked_ref(),
                                                         (anim_duration() + dwell_time() + picker_speed()) as i32,
                                                     )
-                                                    .expect("Failed to set interval");
+                                                    .ok(); // set_interval
                                                 interval_closure.forget();
-                                                timer_handle.set(Some(handle));
+                                                timer_handle.set(handle);
                                             }
                                         }
                                     }
@@ -1269,9 +1261,9 @@ pub fn CircleGenerator() -> Element {
                                 class: "cg-btn cg-btn-primary",
                                 onclick: move |_| {
                                     resize_pending.set(false);
-                                    let window = web_sys::window().expect("Failed to get window");
-                                    let ww = window.inner_width().expect("Failed to get width").as_f64().unwrap();
-                                    let wh = window.inner_height().expect("Failed to get height").as_f64().unwrap();
+                                    let Some(window) = web_sys::window() else { return; };
+                                    let ww = window.inner_width().ok().and_then(|w| w.as_f64()).unwrap_or(0.0);
+                                    let wh = window.inner_height().ok().and_then(|h| h.as_f64()).unwrap_or(0.0);
                                     config_width.set(ww);
                                     config_height.set(wh);
                                     generate();

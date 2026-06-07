@@ -67,10 +67,7 @@ fn scroll_to_first_highlight() {
 
 #[component]
 pub fn Tags() -> Element {
-    // Set page title
-    use_effect(move || {
-        title::set_page_title("书签 - 干徒");
-    });
+    title::set_page_title("书签 - 干徒");
 
     let bookmark_manager = use_signal(|| BOOKMARKS.clone());
     let mut search_text = use_signal(String::new);
@@ -113,8 +110,7 @@ pub fn Tags() -> Element {
 
     rsx! {
         div { class: "bookmarks-container",
-            // 搜索栏
-            div { class: "search-bar",
+            div { role: "search", class: "search-bar",
                 div { class: "search-input-wrapper",
                 input {
                         class: "search-input",
@@ -125,6 +121,7 @@ pub fn Tags() -> Element {
                     }
                     button {
                         class: "search-button",
+                        aria_label: "搜索书签",
                         onclick: handle_search,
                         SearchIcon {}
                     }
@@ -140,6 +137,7 @@ pub fn Tags() -> Element {
                         a {
                             href: "{bookmark.url}",
                             target: "_blank",
+                            rel: "noopener noreferrer",
                                 class: "bookmark-link",
                             div { class: "bookmark-icon",
                                 {get_bookmark_icon(&bookmark.icon)}

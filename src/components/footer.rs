@@ -8,7 +8,7 @@ pub fn Footer() -> Element {
         .contains("ganto.cn");
 
     rsx! {
-        div { class: "footer-content",
+        footer { class: "footer-content",
             div { class: "copyright",
                 span { "2019-2026 " }
                 svg {

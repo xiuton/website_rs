@@ -1,0 +1,28 @@
+@use "sass:map";
+
+// 变量定义
+$font-families: (
+  'mi-sans': 'MiSans',
+  'jetbrains': 'JetBrains Mono',
+  'smiley-sans': 'SmileySans',
+  'sans': 'sans-serif',
+  'serif': 'serif',
+  'consolas': 'Consolas',
+  'monospace': 'monospace'
+);
+
+// 响应式断点
+$breakpoint-mobile: 768px;
+$breakpoint-wide: 1360px;
+
+@mixin mobile {
+  @media (max-width: #{$breakpoint-mobile}) {
+    @content;
+  }
+}
+
+@mixin wide {
+  @media screen and (max-width: #{$breakpoint-wide}) {
+    @content;
+  }
+}

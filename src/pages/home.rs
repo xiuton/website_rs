@@ -3,10 +3,11 @@ use dioxus_router::prelude::{Link, use_route};
 use web_sys::UrlSearchParams;
 use std::collections::BTreeSet;
 
-use crate::models::RuntimeBlogPost;
+use crate::models::BlogPost;
 use crate::routes::Route;
 use crate::BLOG_POSTS;
 use crate::utils::title;
+use crate::utils::storage;
 use crate::components::icons::{TagIcon, ChevronLeftIcon, ChevronRightIcon};
 
 const ALL_CATEGORY: &str = "全部";
@@ -15,27 +16,15 @@ fn get_page_size(size_from_url: Option<usize>) -> usize {
     if let Some(size) = size_from_url {
         return size;
     }
-    if let Some(window) = web_sys::window() {
-        if let Some(storage) = window.local_storage().ok().flatten() {
-            if let Ok(Some(size)) = storage.get_item("blog_page_size") {
-                if let Ok(size) = size.parse::<usize>() {
-                    return size;
-                }
-            }
-        }
-    }
-    10
+    storage::get_blog_page_size()
 }
 
 #[component]
 pub fn Home() -> Element {
-    let mut posts = use_signal(Vec::<RuntimeBlogPost>::new);
+    let posts = use_signal(|| BLOG_POSTS.iter().collect::<Vec<&BlogPost>>());
     let mut selected_category = use_signal(|| ALL_CATEGORY.to_string());
 
-    use_effect(move || {
-        title::set_page_title("首页 - 干徒");
-        
-    });
+    title::set_page_title("首页 - 干徒");
 
     let mut current_page = use_signal(|| 1);
     let mut page_size = use_signal(|| 10);
@@ -81,16 +70,11 @@ pub fn Home() -> Element {
         update_url(current_page(), page_size(), &selected_category());
     });
 
-    use_effect(move || {
-        let loaded_posts = BLOG_POSTS.iter().map(RuntimeBlogPost::from_static).collect();
-        posts.set(loaded_posts);
-    });
-
     let categories: BTreeSet<String> = {
         let mut cats = BTreeSet::new();
         for post in posts.read().iter() {
             if !post.category.is_empty() {
-                cats.insert(post.category.clone());
+                cats.insert(post.category.to_string());
             }
         }
         cats
@@ -103,7 +87,7 @@ pub fn Home() -> Element {
         } else {
             posts.read().iter()
                 .filter(|p| p.category == cat)
-                .cloned()
+                .copied()
                 .collect::<Vec<_>>()
         }
     });
@@ -155,26 +139,25 @@ pub fn Home() -> Element {
                 } else {
                     div { class: "blog-posts",
                         {current_page_posts().iter().map(|post| {
-                            let post = post.clone();
                             rsx! {
                                 div { class: "blog-preview",
-                                    Link { to: Route::BlogPostView { slug: post.slug.clone() },
+                                    Link { to: Route::BlogPostView { slug: post.slug.to_string() },
                                         div { class: "preview-header",
-                                            h2 { class: "preview-title", {post.title.clone()} }
+                                            h2 { class: "preview-title", {post.title} }
                                             if !post.category.is_empty() {
-                                                span { class: "preview-category", {post.category.clone()} }
+                                                span { class: "preview-category", {post.category} }
                                             }
                                         }
                                         div { class: "preview-meta",
-                                            span { class: "preview-date", {post.date.clone()} }
-                                            span { class: "preview-author", {post.author.clone()} }
+                                            span { class: "preview-date", {post.date} }
+                                            span { class: "preview-author", {post.author} }
                                         }
                                         div { class: "preview-content",
                                             p { class: "preview-excerpt",
                                                 {if !post.summary.is_empty() {
-                                                    post.summary.clone()
+                                                    post.summary.to_string()
                                                 } else {
-                                                    crate::utils::markdown::clean_markdown_excerpt(&post.content, 150)
+                                                    crate::utils::markdown::clean_markdown_excerpt(post.content, 150)
                                                 }}
                                             }
                                         }
@@ -183,7 +166,7 @@ pub fn Home() -> Element {
                                                 rsx! {
                                                     span { class: "preview-tag",
                                                         TagIcon {}
-                                                        {tag.clone()}
+                                                        {tag}
                                                     }
                                                 }
                                             })}
@@ -226,11 +209,7 @@ pub fn Home() -> Element {
                                 if let Ok(new_size) = value.parse::<usize>() {
                                     page_size.set(new_size);
                                     current_page.set(1);
-                                    if let Some(window) = web_sys::window() {
-                                        if let Some(storage) = window.local_storage().ok().flatten() {
-                                            let _ = storage.set_item("blog_page_size", &new_size.to_string());
-                                        }
-                                    }
+                                    storage::set_blog_page_size(new_size);
                                 }
                             },
                             option { value: "5", "5条/页" }
