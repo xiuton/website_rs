@@ -4,13 +4,13 @@ use crate::BLOG_POSTS;
 use crate::utils::{title, code_highlight, storage};
 use crate::components::icons::{BackArrowIcon, HomeIcon, ScrollTopIcon, TagIcon, WideModeIcon};
 use crate::utils::search::SearchEngine;
+use crate::utils::knowledge_graph::{self, ArticleNode};
 use dioxus_router::prelude::{Link, use_route};
 
 fn prepare_blog_html(content: &str) -> String {
     let html = crate::utils::markdown::markdown_to_html(content);
+    // 给无语言标记的代码块加上 plaintext
     let html = html.replace("<pre><code>", "<pre><code class=\"language-plaintext\">");
-    let html = html.replace("<pre><code class=\"", "<pre><code class=\"language-");
-    // 为所有图片注入懒加载属性
     add_lazy_loading(&html)
 }
 
@@ -90,6 +90,21 @@ pub fn BlogPostView(slug: String) -> Element {
                             .collect();
                         related_results.set(items);
                     }
+                }
+            }
+        });
+    });
+
+    // 加载知识图谱
+    let mut article_node = use_signal(|| Option::<ArticleNode>::None);
+
+    use_effect(move || {
+        let slug = current_slug();
+        spawn(async move {
+            article_node.set(None);
+            if let Some(graph) = knowledge_graph::load_graph().await {
+                if let Some(node) = graph.articles.get(&slug) {
+                    article_node.set(Some(node.clone()));
                 }
             }
         });
@@ -204,7 +219,25 @@ pub fn BlogPostView(slug: String) -> Element {
                     // 相关文章推荐
                     {(!related_results.read().is_empty()).then(|| rsx! {
                         div { class: "related-articles",
-                            h3 { class: "related-title", "相关文章" }
+                            h3 { class: "related-title",
+                            svg {
+                                xmlns: "http://www.w3.org/2000/svg",
+                                view_box: "0 0 24 24",
+                                width: "16", height: "16",
+                                fill: "none",
+                                stroke: "currentColor",
+                                stroke_width: "2",
+                                stroke_linecap: "round",
+                                stroke_linejoin: "round",
+                                class: "section-icon",
+                                path { d: "M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" }
+                                polyline { points: "14 2 14 8 20 8" }
+                                line { x1: "16", y1: "13", x2: "8", y2: "13" }
+                                line { x1: "16", y1: "17", x2: "8", y2: "17" }
+                                line { x1: "10", y1: "9", x2: "8", y2: "9" }
+                            }
+                            "相关文章"
+                        }
                             div { class: "related-list",
                                 {related_results.read().iter().map(|(slug, title, category)| {
                                     let to = Route::BlogPostView { slug: slug.clone() };
@@ -217,6 +250,169 @@ pub fn BlogPostView(slug: String) -> Element {
                                         }
                                     }
                                 })}
+                            }
+                        }
+                    })}
+                    // 知识图谱关联面板
+                    {article_node.read().as_ref().map(|node| {
+                        let community = node.community.clone();
+                        let pr = knowledge_graph::pct_str(&node.pagerank);
+                        let related = node.related.clone();
+                        let exp = node.explore_data.clone();
+
+                        rsx! {
+                            div { class: "kg-panel",
+                                h3 { class: "kg-title", "知识关联" }
+                                // 图统计栏
+                                div { class: "kg-stats",
+                                    div { class: "kg-stat",
+                                        span { class: "kg-stat-label", "社区" }
+                                        span { class: "kg-stat-value", "{community}" }
+                                    }
+                                    div { class: "kg-stat",
+                                        span { class: "kg-stat-label", "PageRank" }
+                                        span { class: "kg-stat-value", "{pr}" }
+                                    }
+                                }
+                                // RWR 关联文章
+                                if !related.articles.is_empty() {
+                                    div { class: "kg-section",
+                                        div { class: "kg-section-header",
+                                            span { class: "kg-section-icon",
+                                                    svg {
+                                                        xmlns: "http://www.w3.org/2000/svg",
+                                                        view_box: "0 0 24 24",
+                                                        width: "16", height: "16",
+                                                        fill: "none",
+                                                        stroke: "currentColor",
+                                                        stroke_width: "2",
+                                                        stroke_linecap: "round",
+                                                        stroke_linejoin: "round",
+                                                        path { d: "M9 17H7A5 5 0 0 1 7 7h2" }
+                                                        path { d: "M15 7h2a5 5 0 1 1 0 10h-2" }
+                                                        line { x1: "8", y1: "12", x2: "16", y2: "12" }
+                                                    }
+                                                }
+                                                span { class: "kg-section-title", "关联文章" }
+                                            span { class: "kg-section-count", "({related.articles.len()})" }
+                                        }
+                                        div { class: "kg-link-list",
+                                            {related.articles.iter().map(|a| {
+                                                let to = Route::BlogPostView { slug: a.slug.clone() };
+                                                let score = knowledge_graph::pct_str(&a.score);
+                                                let reason = a.reason.clone();
+                                                rsx! {
+                                                    Link { to, class: "kg-link-item",
+                                                        span { class: "kg-link-score", "{score} · {reason}" }
+                                                        span { class: "kg-link-text",
+                                                            "{BLOG_POSTS.iter().find(|p| p.slug == a.slug).map(|p| p.title).unwrap_or(&a.slug)}"
+                                                        }
+                                                    }
+                                                }
+                                            })}
+                                        }
+                                    }
+                                }
+                                // 关联标签
+                                if !related.tags.is_empty() {
+                                    div { class: "kg-section",
+                                        div { class: "kg-section-header",
+                                            span { class: "kg-section-icon",
+                                                    svg {
+                                                        xmlns: "http://www.w3.org/2000/svg",
+                                                        view_box: "0 0 24 24",
+                                                        width: "16", height: "16",
+                                                        fill: "none",
+                                                        stroke: "currentColor",
+                                                        stroke_width: "2",
+                                                        stroke_linecap: "round",
+                                                        stroke_linejoin: "round",
+                                                        path { d: "M12 2H2v10l9.28 9.29a2 2 0 0 0 2.83 0l6.89-6.89a2 2 0 0 0 0-2.83L12 2z" }
+                                                        path { d: "M7 7h.01" }
+                                                    }
+                                                }
+                                                span { class: "kg-section-title", "关联标签" }
+                                        }
+                                        div { class: "kg-tag-cloud",
+                                            {related.tags.iter().map(|t| {
+                                                let score = knowledge_graph::pct_str(&t.score);
+                                                rsx! {
+                                                    span { class: "kg-tag",
+                                                        span { class: "kg-tag-name", "{t.name}" }
+                                                        span { class: "kg-tag-score", "{score}" }
+                                                    }
+                                                }
+                                            })}
+                                        }
+                                    }
+                                }
+                                // 探索式导航: 1-hop
+                                if !exp.hop1.tags.is_empty() {
+                                    div { class: "kg-section",
+                                        div { class: "kg-section-header",
+                                            span { class: "kg-section-icon",
+                                                    svg {
+                                                        xmlns: "http://www.w3.org/2000/svg",
+                                                        view_box: "0 0 24 24",
+                                                        width: "16", height: "16",
+                                                        fill: "none",
+                                                        stroke: "currentColor",
+                                                        stroke_width: "2",
+                                                        stroke_linecap: "round",
+                                                        stroke_linejoin: "round",
+                                                        circle { cx: "12", cy: "12", r: "10" }
+                                                        polygon { points: "16.24 7.76 14 14 7.76 16.24 10 10 16.24 7.76" }
+                                                    }
+                                                }
+                                                span { class: "kg-section-title", "探索发现" }
+                                        }
+                                        div { class: "kg-explore",
+                                            if !exp.hop1.tags.is_empty() {
+                                                div { class: "kg-explore-row",
+                                                    span { class: "kg-explore-label", "直达标签" }
+                                                    div { class: "kg-tag-cloud",
+                                                        {exp.hop1.tags.iter().map(|t| {
+                                                            rsx! { span { class: "kg-tag kg-tag-plain", "{t}" } }
+                                                        })}
+                                                    }
+                                                }
+                                            }
+                                            if !exp.hop2.articles.is_empty() {
+                                                div { class: "kg-explore-row",
+                                                    span { class: "kg-explore-label",
+                                                        svg {
+                                                            xmlns: "http://www.w3.org/2000/svg",
+                                                            view_box: "0 0 24 24",
+                                                            width: "14", height: "14",
+                                                            fill: "none",
+                                                            stroke: "currentColor",
+                                                            stroke_width: "2",
+                                                            stroke_linecap: "round",
+                                                            stroke_linejoin: "round",
+                                                            line { x1: "6", y1: "3", x2: "6", y2: "15" }
+                                                            circle { cx: "18", cy: "6", r: "3" }
+                                                            circle { cx: "6", cy: "18", r: "3" }
+                                                            path { d: "M18 9a9 9 0 0 1-9 9" }
+                                                        }
+                                                        "二度关联"
+                                                    }
+                                                    div { class: "kg-link-list",
+                                                        {exp.hop2.articles.iter().map(|s| {
+                                                            let to = Route::BlogPostView { slug: s.clone() };
+                                                            rsx! {
+                                                                Link { to, class: "kg-link-item kg-link-sub",
+                                                                    span { class: "kg-link-text",
+                                                                        "{BLOG_POSTS.iter().find(|p| p.slug == s.as_str()).map(|p| p.title).unwrap_or(s)}"
+                                                                    }
+                                                                }
+                                                            }
+                                                        })}
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     })}

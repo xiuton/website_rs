@@ -7,3 +7,4 @@ pub mod constants;
 pub mod dev_helpers;
 pub mod storage;
 pub mod search;
+pub mod knowledge_graph;

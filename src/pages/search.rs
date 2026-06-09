@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 use crate::utils::title;
 use crate::utils::search::{SearchEngine, SearchResult, highlight_matches};
+use crate::utils::knowledge_graph::{self, KnowledgeGraph};
 use dioxus_router::prelude::use_navigator;
 use crate::routes::Route;
 
@@ -42,8 +43,9 @@ fn get_initial_query() -> String {
 pub fn Search() -> Element {
     title::set_page_title("搜索 - 干徒");
 
-    let mut index_loaded = use_signal(|| false);
-    let mut engine_ref = use_signal(|| SearchEngine::new());
+    let index_loaded = use_signal(|| false);
+    let engine_ref = use_signal(|| SearchEngine::new());
+    let mut kg_data = use_signal(|| Option::<KnowledgeGraph>::None);
 
     // 一次性加载搜索索引
     use_effect(move || {
@@ -65,18 +67,31 @@ pub fn Search() -> Element {
         });
     });
 
+    // 加载知识图谱
+    use_effect(move || {
+        spawn(async move {
+            if let Some(graph) = knowledge_graph::load_graph().await {
+                kg_data.set(Some(graph));
+            }
+        });
+    });
+
     let mut query = use_signal(|| get_initial_query());
     let mut results = use_signal(|| Vec::<SearchResult>::new());
+    const PAGE_SIZE: usize = 15;
+    let mut visible_count = use_signal(|| PAGE_SIZE);
 
     // 防抖搜索
     use_effect(move || {
         let q = query();
         if q.is_empty() {
             results.set(Vec::new());
+            visible_count.set(PAGE_SIZE);
             update_url("");
             return;
         }
         update_url(&q);
+        visible_count.set(PAGE_SIZE);
         spawn(async move {
             delay(300).await;
             if query() != q { return; }
@@ -99,6 +114,27 @@ pub fn Search() -> Element {
     let result_count = result_list.len();
     let is_loaded = index_loaded();
     let query_str = query.read().clone();
+
+    // 预计算探索式导航数据（在 RSX 外，避免 Dioxus 宏解析冲突）
+    let top_slug = result_list.first().map(|r: &SearchResult| r.slug.clone());
+    let kg_ref = kg_data.read();
+    let explore = match (&top_slug, kg_ref.as_ref()) {
+        (Some(slug), Some(kg)) => kg.articles.get(slug).map(|n| n.explore_data.clone()),
+        _ => None,
+    };
+    drop(kg_ref);
+
+    // 预计算 hop2 文章 slug → title 映射
+    let engine = engine_ref.read();
+    let hop2_titles: std::collections::HashMap<String, String> = explore
+        .as_ref()
+        .map(|e| {
+            e.hop2.articles.iter().filter_map(|s| {
+                engine.get_by_slug(s).map(|entry| (s.clone(), entry.title.clone()))
+            }).collect()
+        })
+        .unwrap_or_default();
+    drop(engine);
 
     rsx! {
         div { class: "search-container",
@@ -156,7 +192,7 @@ pub fn Search() -> Element {
                     " 篇相关文章"
                 }
                 div { class: "search-results",
-                    {result_list.iter().map(|r| {
+                    {result_list.iter().take(visible_count()).map(|r| {
                         let slug = r.slug.clone();
                         let title = r.title.clone();
                         let summary = r.summary.clone();
@@ -226,6 +262,118 @@ pub fn Search() -> Element {
                         }
                     })}
                 }
+
+                // 加载更多按钮
+                if visible_count() < result_count {
+                    div { class: "search-load-more",
+                        button {
+                            class: "search-load-more-btn",
+                            onclick: move |_| { visible_count.set(visible_count() + PAGE_SIZE); },
+                            "加载更多（已显示 {visible_count()} / 共 {result_count} 篇）"
+                        }
+                    }
+                }
+
+                // 探索式导航：基于预计算的 explore 数据
+                if let Some(ref data) = explore {
+                    if !data.hop1.tags.is_empty() || !data.hop2.articles.is_empty() {
+                        div { class: "search-explore",
+                                div { class: "search-explore-header",
+                                    svg {
+                                        width: "16", height: "16", view_box: "0 0 24 24",
+                                        fill: "none", stroke: "currentColor", stroke_width: "2",
+                                        stroke_linecap: "round", stroke_linejoin: "round",
+                                        class: "search-explore-icon",
+                                        circle { cx: "12", cy: "12", r: "3" }
+                                        path { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" }
+                                    }
+                                    span { "探索式导航" }
+                                    span { class: "search-explore-sub", "基于知识图谱的智能关联" }
+                                }
+                                // 标签维度
+                                if !data.hop1.tags.is_empty() {
+                                    div { class: "search-explore-section",
+                                        div { class: "search-explore-label",
+                                            svg {
+                                                xmlns: "http://www.w3.org/2000/svg",
+                                                view_box: "0 0 24 24",
+                                                width: "14", height: "14",
+                                                fill: "none",
+                                                stroke: "currentColor",
+                                                stroke_width: "2",
+                                                stroke_linecap: "round",
+                                                stroke_linejoin: "round",
+                                                class: "search-explore-label-icon",
+                                                path { d: "M12 2H2v10l9.28 9.29a2 2 0 0 0 2.83 0l6.89-6.89a2 2 0 0 0 0-2.83L12 2z" }
+                                                path { d: "M7 7h.01" }
+                                            }
+                                            "关联标签"
+                                        }
+                                        div { class: "search-explore-tags",
+                                            {data.hop1.tags.iter().map(|t| {
+                                                rsx! { span { class: "search-explore-tag", "{t}" } }
+                                            })}
+                                        }
+                                    }
+                                }
+                                // 二度关联文章
+                                if !data.hop2.articles.is_empty() {
+                                    div { class: "search-explore-section",
+                                        div { class: "search-explore-label",
+                                            svg {
+                                                xmlns: "http://www.w3.org/2000/svg",
+                                                view_box: "0 0 24 24",
+                                                width: "14", height: "14",
+                                                fill: "none",
+                                                stroke: "currentColor",
+                                                stroke_width: "2",
+                                                stroke_linecap: "round",
+                                                stroke_linejoin: "round",
+                                                class: "search-explore-label-icon",
+                                                line { x1: "6", y1: "3", x2: "6", y2: "15" }
+                                                circle { cx: "18", cy: "6", r: "3" }
+                                                circle { cx: "6", cy: "18", r: "3" }
+                                                path { d: "M18 9a9 9 0 0 1-9 9" }
+                                            }
+                                            "二度关联文章"
+                                        }
+                                        div { class: "search-explore-links",
+                                            {data.hop2.articles.iter().map(|s| {
+                                                let nav = nav.clone();
+                                                let slug = s.clone();
+                                                let title = hop2_titles.get(s).cloned().unwrap_or_else(|| s.clone());
+                                                rsx! {
+                                                    div {
+                                                        class: "search-explore-link",
+                                                        onclick: move |_| { nav.push(Route::BlogPostView { slug: slug.clone() }); },
+                                                        svg {
+                                                            width: "12", height: "12", view_box: "0 0 24 24",
+                                                            fill: "none", stroke: "currentColor", stroke_width: "2",
+                                                            stroke_linecap: "round", stroke_linejoin: "round",
+                                                            path { d: "M5 12h14" }
+                                                            path { d: "M12 5l7 7-7 7" }
+                                                        }
+                                                        "{title}"
+                                                    }
+                                                }
+                                            })}
+                                        }
+                                    }
+                                }
+                                // 直达分类
+                                if !data.hop1.categories.is_empty() {
+                                    div { class: "search-explore-section",
+                                        div { class: "search-explore-label", "相关分类" }
+                                        div { class: "search-explore-tags",
+                                            {data.hop1.categories.iter().map(|c| {
+                                                rsx! { span { class: "search-explore-tag search-explore-tag--cat", "{c}" } }
+                                            })}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
             }
 
             // ── 搜索无结果 ──
