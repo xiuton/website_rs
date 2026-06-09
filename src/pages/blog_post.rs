@@ -4,7 +4,7 @@ use crate::BLOG_POSTS;
 use crate::utils::{title, code_highlight, storage};
 use crate::components::icons::{BackArrowIcon, HomeIcon, ScrollTopIcon, TagIcon, WideModeIcon};
 use crate::utils::search::SearchEngine;
-use dioxus_router::prelude::Link;
+use dioxus_router::prelude::{Link, use_route};
 
 fn prepare_blog_html(content: &str) -> String {
     let html = crate::utils::markdown::markdown_to_html(content);
@@ -49,40 +49,51 @@ fn add_lazy_loading(html: &str) -> String {
 
 #[component]
 pub fn BlogPostView(slug: String) -> Element {
-    let slug_for_memo = slug.clone();
+    // 用信号包裹 slug，通过 use_route() 监听路由变化（prop 本身不触发 effect 重新执行）
+    let mut current_slug = use_signal(|| slug.clone());
+    use_effect(move || {
+        // use_route() 是响应式的，路由变化时 effect 会重新执行
+        if let Route::BlogPostView { slug } = use_route::<Route>() {
+            if current_slug() != slug {
+                current_slug.set(slug);
+            }
+        }
+    });
+
     let mut is_wide_mode = use_signal(|| false);
+
     let post = use_memo(move || {
+        let s = current_slug();
         BLOG_POSTS.iter()
-            .find(|p| p.slug == slug_for_memo)
+            .find(|p| p.slug == s)
     });
 
     // 加载搜索引擎以获取相关文章推荐
     let mut related_results = use_signal(|| Vec::<(String, String, String)>::new()); // (slug, title, category)
 
-    {
-        let slug = slug.clone();
-        use_effect(move || {
-            let slug = slug.clone();
-            spawn(async move {
-                if let Ok(resp) = gloo_net::http::Request::get("/static/search-index.json")
-                    .send()
-                    .await
-                {
-                    if let Ok(text) = resp.text().await {
-                        let mut engine = SearchEngine::new();
-                        if engine.load(&text).is_ok() {
-                            let related = engine.get_related(&slug, 5);
-                            let items: Vec<_> = related
-                                .iter()
-                                .map(|r| (r.slug.clone(), r.title.clone(), r.category.clone()))
-                                .collect();
-                            related_results.set(items);
-                        }
+    use_effect(move || {
+        let slug = current_slug();
+        spawn(async move {
+            // 重置相关文章
+            related_results.set(Vec::new());
+            if let Ok(resp) = gloo_net::http::Request::get("/static/search-index.json")
+                .send()
+                .await
+            {
+                if let Ok(text) = resp.text().await {
+                    let mut engine = SearchEngine::new();
+                    if engine.load(&text).is_ok() {
+                        let related = engine.get_related(&slug, 5);
+                        let items: Vec<_> = related
+                            .iter()
+                            .map(|r| (r.slug.clone(), r.title.clone(), r.category.clone()))
+                            .collect();
+                        related_results.set(items);
                     }
                 }
-            });
+            }
         });
-    }
+    });
 
     use_effect(move || {
         // 设置页面标题 + 恢复宽屏模式 + SEO meta

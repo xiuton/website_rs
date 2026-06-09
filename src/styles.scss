@@ -1142,7 +1142,7 @@ pre {
 
         .blog-post {
           position: relative;
-          margin: 0 auto;
+          margin: 2rem auto 0;
           transition: max-width 0.3s ease;
 
           .blog-nav {
@@ -1330,7 +1330,7 @@ pre {
           }
 
           .related-articles {
-            margin-top: 3rem;
+            margin-top: 2rem;
             padding-top: 2rem;
             border-top: 1px solid var(--border-subtle);
 
