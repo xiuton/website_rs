@@ -3,6 +3,8 @@ use crate::routes::Route;
 use crate::BLOG_POSTS;
 use crate::utils::{title, code_highlight, storage};
 use crate::components::icons::{BackArrowIcon, HomeIcon, ScrollTopIcon, TagIcon, WideModeIcon};
+use crate::utils::search::SearchEngine;
+use dioxus_router::prelude::Link;
 
 fn prepare_blog_html(content: &str) -> String {
     let html = crate::utils::markdown::markdown_to_html(content);
@@ -47,11 +49,40 @@ fn add_lazy_loading(html: &str) -> String {
 
 #[component]
 pub fn BlogPostView(slug: String) -> Element {
+    let slug_for_memo = slug.clone();
     let mut is_wide_mode = use_signal(|| false);
     let post = use_memo(move || {
         BLOG_POSTS.iter()
-            .find(|p| p.slug == slug)
+            .find(|p| p.slug == slug_for_memo)
     });
+
+    // 加载搜索引擎以获取相关文章推荐
+    let mut related_results = use_signal(|| Vec::<(String, String, String)>::new()); // (slug, title, category)
+
+    {
+        let slug = slug.clone();
+        use_effect(move || {
+            let slug = slug.clone();
+            spawn(async move {
+                if let Ok(resp) = gloo_net::http::Request::get("/static/search-index.json")
+                    .send()
+                    .await
+                {
+                    if let Ok(text) = resp.text().await {
+                        let mut engine = SearchEngine::new();
+                        if engine.load(&text).is_ok() {
+                            let related = engine.get_related(&slug, 5);
+                            let items: Vec<_> = related
+                                .iter()
+                                .map(|r| (r.slug.clone(), r.title.clone(), r.category.clone()))
+                                .collect();
+                            related_results.set(items);
+                        }
+                    }
+                }
+            });
+        });
+    }
 
     use_effect(move || {
         // 设置页面标题 + 恢复宽屏模式 + SEO meta
@@ -159,6 +190,25 @@ pub fn BlogPostView(slug: String) -> Element {
                             }
                         })}
                     }
+                    // 相关文章推荐
+                    {(!related_results.read().is_empty()).then(|| rsx! {
+                        div { class: "related-articles",
+                            h3 { class: "related-title", "相关文章" }
+                            div { class: "related-list",
+                                {related_results.read().iter().map(|(slug, title, category)| {
+                                    let to = Route::BlogPostView { slug: slug.clone() };
+                                    rsx! {
+                                        Link { to, class: "related-item",
+                                            span { class: "related-item-title", "{title}" }
+                                            if !category.is_empty() {
+                                                span { class: "related-item-category", "{category}" }
+                                            }
+                                        }
+                                    }
+                                })}
+                            }
+                        }
+                    })}
                 }
             } else {
                 div { class: "not-found",

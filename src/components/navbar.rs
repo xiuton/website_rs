@@ -3,8 +3,6 @@ use dioxus_router::prelude::Link;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use crate::routes::Route;
-use crate::utils::storage;
-use crate::components::icons::{SunIcon, MoonIcon};
 
 #[component]
 pub fn Navbar(is_dark: Signal<bool>) -> Element {
@@ -21,41 +19,33 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
     ];
 
     let onclick = move |e: Event<MouseData>| {
-        let Some(window) = web_sys::window() else {
-            web_sys::console::error_1(&"Navbar: window not available".into());
-            return;
-        };
-        let Some(document) = window.document() else {
-            web_sys::console::error_1(&"Navbar: document not available".into());
-            return;
-        };
-        let Some(html) = document.document_element() else {
-            web_sys::console::error_1(&"Navbar: document element not available".into());
-            return;
-        };
+        let window = web_sys::window().expect("Failed to get window");
+        let document = window.document().expect("Failed to get document");
+        let html = document.document_element().expect("Failed to get document element");
         let coords = e.client_coordinates();
         let x = coords.x;
         let y = coords.y;
-        let width = window.inner_width().ok().and_then(|w| w.as_f64()).unwrap_or(0.0);
-        let height = window.inner_height().ok().and_then(|h| h.as_f64()).unwrap_or(0.0);
+        let width = window.inner_width().expect("Failed to get inner width").as_f64().expect("Failed to convert width to f64");
+        let height = window.inner_height().expect("Failed to get inner height").as_f64().expect("Failed to convert height to f64");
         let end_radius = ((x.max(width - x)).powi(2) + (y.max(height - y)).powi(2)).sqrt();
-        let _ = html.set_attribute("style", &format!("--x: {}px; --y: {}px; --r: {}px", x, y, end_radius));
-        let supports_transition = js_sys::eval("Boolean(document.startViewTransition)")
-            .ok()
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+        html.set_attribute("style", &format!("--x: {}px; --y: {}px; --r: {}px", x, y, end_radius)).expect("Failed to set style attribute");
+        let supports_transition = js_sys::eval("Boolean(document.startViewTransition)").expect("Failed to eval startViewTransition").as_bool().unwrap_or(false);
         if supports_transition {
             let _ = js_sys::eval("document.startViewTransition(() => { document.documentElement.classList.toggle('dark'); })");
         } else {
             let class = html.class_name();
             if class.contains("dark") {
-                let _ = html.set_attribute("class", "");
+                html.set_attribute("class", "").expect("Failed to remove dark class");
             } else {
-                let _ = html.set_attribute("class", "dark");
+                html.set_attribute("class", "dark").expect("Failed to set dark class");
             }
         }
         is_dark.set(!is_dark());
-        storage::set_theme(is_dark());
+        if let Some(window) = web_sys::window() {
+            if let Some(storage) = window.local_storage().ok().flatten() {
+                let _ = storage.set_item("theme", if is_dark() { "dark" } else { "light" });
+            }
+        }
     };
 
     let route = use_route::<Route>();
@@ -75,101 +65,37 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
     };
 
     use_effect(move || {
-        let window = web_sys::window();
-        let document = window.as_ref().and_then(|w| w.document());
+        let window = web_sys::window().expect("Failed to get window");
+        let document = window.document().expect("Failed to get document");
 
-        let (Some(window), Some(document)) = (window, document) else { return };
-
-        let trigger_y = std::rc::Rc::new(std::cell::Cell::new(0.0));
-        let is_stuck = std::rc::Rc::new(std::cell::Cell::new(false));
-        let raf_id = std::rc::Rc::new(std::cell::Cell::new(0));
-
-        // requestAnimationFrame 更新吸顶位置，仅在被 stuck 时执行
-        let update_sticky_position = std::rc::Rc::new({
-            let raf_id = raf_id.clone();
-            let document = document.clone();
-            Closure::<dyn FnMut()>::new(move || {
-                raf_id.set(0);
-                if let (Some(app), Some(nl)) = (
-                    document.query_selector(".app").ok().flatten(),
-                    document.query_selector(".navbar-links").ok().flatten(),
-                ) {
-                    let r = app.get_bounding_client_rect();
-                    let _ = nl.set_attribute(
-                        "style",
-                        &format!("position:fixed;top:0.5rem;left:{}px;width:{}px;", r.left(), r.width()),
-                    );
+        let scroll_closure = Closure::<dyn FnMut()>::new(move || {
+            if let Some(wrap) = document.query_selector(".navbar-sticky-wrap").ok().flatten() {
+                let rect = wrap.get_bounding_client_rect();
+                let is_stuck = rect.top() <= 1.0;
+                if is_stuck {
+                    let _ = wrap.set_attribute("data-stuck", "true");
+                } else {
+                    let _ = wrap.remove_attribute("data-stuck");
                 }
-            })
+            }
         });
 
-        let scroll_handler = {
-            let trigger_y = trigger_y.clone();
-            let is_stuck = is_stuck.clone();
-            let raf_id = raf_id.clone();
-            let document = document.clone();
-            let window = window.clone();
-            let updater = update_sticky_position.clone();
-
-            Closure::<dyn FnMut()>::new(move || {
-                let nav_links = match document.query_selector(".navbar-links").ok().flatten() {
-                    Some(el) => el,
-                    None => return,
-                };
-
-                if trigger_y.get() == 0.0 {
-                    let rect = nav_links.get_bounding_client_rect();
-                    trigger_y.set(rect.top() + window.scroll_y().unwrap_or(0.0));
-                }
-
-                let scroll_y = window.scroll_y().unwrap_or(0.0);
-                let should_stick = scroll_y >= trigger_y.get();
-
-                if should_stick {
-                    if !is_stuck.get() {
-                        is_stuck.set(true);
-                    }
-                    let _ = nav_links.set_attribute("data-stuck", "true");
-
-                    // 用 rAF 节流位置更新
-                    if raf_id.get() == 0 {
-                        if let Ok(id) = window.request_animation_frame(
-                            (&*updater).as_ref().unchecked_ref(),
-                        ) {
-                            raf_id.set(id);
-                        }
-                    }
-                } else {
-                    if is_stuck.get() {
-                        if raf_id.get() != 0 {
-                            let _ = window.cancel_animation_frame(raf_id.get());
-                            raf_id.set(0);
-                        }
-                        let _ = nav_links.remove_attribute("style");
-                        let _ = nav_links.remove_attribute("data-stuck");
-                        is_stuck.set(false);
-                    }
-                }
-            })
-        };
-
-        let _ = window.add_event_listener_with_callback(
-            "scroll",
-            scroll_handler.as_ref().unchecked_ref(),
-        );
-
-        scroll_handler.forget();
+        let _ = window.add_event_listener_with_callback("scroll", scroll_closure.as_ref().unchecked_ref());
+        scroll_closure.forget();
     });
 
     rsx! {
-        nav { class: "navbar-content", aria_label: "主导航",
+        div { class: "navbar-content",
             div { class: "navbar-ui",
                 div { class: "navbar-title-wrapper",
                     h1 { class: "navbar-title", "干徒" }
                     div { class: "navbar-glow" }
                 }
                 div { class: "navbar-subtitle", "这很酷" }
-                div { class: "navbar-links",
+            }
+        }
+        div { class: "navbar-sticky-wrap",
+            div { class: "navbar-links",
                     {nav_items.iter().map(|(href, label)| {
                         let active = is_active(href);
                         if *href == "/dev" {
@@ -201,15 +127,36 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                     })}
                     button {
                         class: "theme-toggle",
-                        aria_label: if is_dark() { "切换到浅色模式" } else { "切换到深色模式" },
                         onclick: onclick,
                         match is_dark() {
-                            true => rsx! { SunIcon {} },
-                            false => rsx! { MoonIcon {} }
+                            true => rsx! {
+                                svg {
+                                    xmlns: "http://www.w3.org/2000/svg",
+                                    view_box: "0 0 1024 1024",
+                                    path {
+                                        fill: "currentColor",
+                                        d: "M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"
+                                    }
+                                }
+                            },
+                            false => rsx! {
+                                svg {
+                                    xmlns: "http://www.w3.org/2000/svg",
+                                    fill: "none",
+                                    view_box: "0 0 24 24",
+                                    stroke_width: "1.5",
+                                    stroke: "currentColor",
+                                    class: "size-6", 
+                                    path {
+                                        stroke_linecap: "round",
+                                        stroke_linejoin: "round",
+                                        d: "M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
     }
-}
