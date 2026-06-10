@@ -17,5 +17,4 @@ tags: ["Rust", "技术"]
 replace-with = 'aliyun'
 [source.aliyun]
 registry = "sparse+https://mirrors.aliyun.com/crates.io-index/"
-
 ```

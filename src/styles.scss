@@ -95,6 +95,9 @@ $breakpoint-wide: 1360px;
   --accent-light-rgb: var(--accent-rgb);
   --programming-language-logotype-bg-color: rgba(122, 108, 90, 0.1);
   --shadow: var(--shadow-sm);
+  --code-bg: #ece3d2;
+  --code-text: var(--text-primary);
+  --code-lang-color: var(--text-tertiary);
 }
 
 .dark {
@@ -157,6 +160,9 @@ $breakpoint-wide: 1360px;
   --accent-light-rgb: var(--accent-rgb);
   --programming-language-logotype-bg-color: rgba(176, 162, 144, 0.08);
   --shadow: var(--shadow-sm);
+  --code-bg: #14110e;
+  --code-text: #c9d1d9;
+  --code-lang-color: #8b949e;
 }
 
 // 字体预加载
@@ -268,7 +274,13 @@ pre::-webkit-scrollbar-thumb:hover {
 }
 
 pre {
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  scrollbar-color: var(--border-default) transparent;
+}
+
+// Override highlight.js hardcoded colors to support theme switching
+pre code.hljs {
+  background: var(--code-bg) !important;
+  color: var(--code-text) !important;
 }
 
 // 布局
@@ -1634,7 +1646,7 @@ pre {
           }
 
           pre {
-            background: #0d1117;
+            background: var(--code-bg);
             border-radius: var(--radius-md);
             padding: 0;
             margin: 1.25rem 0;
@@ -1642,16 +1654,12 @@ pre {
             position: relative;
             border: 1px solid var(--border-default);
 
-            html.dark & {
-              background: #242424;
-            }
-
             &::before {
               content: attr(data-lang);
               position: absolute;
               top: 0;
               right: 0;
-              color: #8b949e;
+              color: var(--code-lang-color);
               font-size: 0.7rem;
               font-weight: 600;
               letter-spacing: 0.05em;
@@ -1667,7 +1675,7 @@ pre {
               font-family: map.get($font-families, 'jetbrains'), map.get($font-families, 'mi-sans'), map.get($font-families, 'sans'), map.get($font-families, 'consolas'), map.get($font-families, 'monospace');
               font-size: 0.88rem;
               line-height: 1.6;
-              color: #c9d1d9;
+              color: var(--code-text);
             }
           }
 

@@ -65,7 +65,6 @@ impl Compute</description>
 replace-with = &apos;aliyun&apos;
 [source.aliyun]
 registry = &quot;sparse+https://mirrors.aliyun.com/crates.io-index/&quot;
-
 ```
 </description>
   <category>Rust</category>
