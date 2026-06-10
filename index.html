@@ -30,6 +30,15 @@
         })();
     </script>
     <link rel="shortcut icon" href="/static/favicon.svg" type="image/x-icon">
+    <script>
+        // 非指定域名自动跳转
+        (function() {
+            var host = window.location.hostname;
+            if (host !== 'localhost' && host !== '127.0.0.1' && host !== 'ganto.netlify.app') {
+                window.location.href = 'https://ganto.netlify.app' + window.location.pathname + window.location.search + window.location.hash;
+            }
+        })();
+    </script>
     <link rel="alternate" type="application/rss+xml" title="干徒的博客 RSS" href="/static/feed.xml">
     <link data-trunk rel="scss" href="src/styles.scss" data-sass-options='{"style":"compressed","sourceMap":false,"quietDeps":true}' />
     <link data-trunk rel="rust" data-bin="web-rs" data-wasm-opt="0" />
