@@ -6,19 +6,27 @@ pub fn init_highlight() {
     let Some(head) = document.head() else { return };
     let Some(body) = document.body() else { return };
 
+    // 避免重复注入
+    if document.get_element_by_id("hljs-css").is_some() {
+        return;
+    }
+
     if let Ok(link) = document.create_element("link") {
+        let _ = link.set_attribute("id", "hljs-css");
         let _ = link.set_attribute("rel", "stylesheet");
         let _ = link.set_attribute("href", "/static/highlight/github-dark.min.css");
         let _ = head.append_child(&link);
     }
 
     if let Ok(script) = document.create_element("script") {
+        let _ = script.set_attribute("id", "hljs-core");
         let _ = script.set_attribute("src", "/static/highlight/highlight.min.js");
         let _ = script.set_attribute("async", "false");
         let _ = head.append_child(&script);
     }
 
     if let Ok(init_script) = document.create_element("script") {
+        let _ = init_script.set_attribute("id", "hljs-init");
         init_script.set_text_content(Some(HIGHLIGHT_JS));
         let _ = body.append_child(&init_script);
     }
@@ -33,13 +41,6 @@ pub fn reapply_highlight() {
         script.set_text_content(Some(r#"
         function applyHighlight() {
             if (typeof hljs !== 'undefined') {
-                document.querySelectorAll('pre code').forEach((block) => {
-                    const languageClass = block.className.split(' ').find(cls => cls.startsWith('language-'));
-                    if (languageClass) {
-                        const language = languageClass.replace('language-', '');
-                        block.parentElement.setAttribute('data-lang', language);
-                    }
-                });
                 hljs.highlightAll();
             } else {
                 setTimeout(applyHighlight, 100);

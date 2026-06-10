@@ -11,7 +11,28 @@ fn prepare_blog_html(content: &str) -> String {
     let html = crate::utils::markdown::markdown_to_html(content);
     // 给无语言标记的代码块加上 plaintext
     let html = html.replace("<pre><code>", "<pre><code class=\"language-plaintext\">");
+    // 从 language-* 类名提取语言标识，写入 data-lang 到 <pre>
+    let html = inject_data_lang(&html);
     add_lazy_loading(&html)
+}
+
+/// 扫描 `<pre lang="XXX">`（comrak 输出），注入 `data-lang="XXX"`。
+/// 无 `lang` 属性的 `<pre>`（plaintext 块）不设标签。
+fn inject_data_lang(html: &str) -> String {
+    let mut result = String::with_capacity(html.len());
+    let mut rest = html;
+
+    while let Some(pos) = rest.find("<pre lang=\"") {
+        result.push_str(&rest[..pos]);
+        let after = &rest[pos + "<pre lang=\"".len()..];
+        let end = after.find('"').unwrap_or(0);
+        let lang = &after[..end];
+        use std::fmt::Write;
+        let _ = write!(result, "<pre lang=\"{lang}\" data-lang=\"{lang}\"");
+        rest = &after[end + 1..];
+    }
+    result.push_str(rest);
+    result
 }
 
 /// 为 <img> 标签添加 loading="lazy" 属性（如尚未设置）

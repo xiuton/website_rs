@@ -4,59 +4,57 @@ function loadHighlightLanguages() {
         return;
     }
 
-    const languages = [
-        { name: "rust", file: "rust.min.js" },
-        { name: "javascript", file: "javascript.min.js" },
-        { name: "typescript", file: "typescript.min.js" },
-        { name: "python", file: "python.min.js" },
-        { name: "go", file: "go.min.js" },
-        { name: "java", file: "java.min.js" },
-        { name: "cpp", file: "cpp.min.js" },
-        { name: "csharp", file: "csharp.min.js" },
-        { name: "php", file: "php.min.js" },
-        { name: "ruby", file: "ruby.min.js" },
-        { name: "swift", file: "swift.min.js" },
-        { name: "kotlin", file: "kotlin.min.js" },
-        { name: "scala", file: "scala.min.js" },
-        { name: "bash", file: "bash.min.js" },
-        { name: "shell", file: "shell.min.js" },
-        { name: "sql", file: "sql.min.js" },
-        { name: "xml", file: "xml.min.js" },
-        { name: "yaml", file: "yaml.min.js" },
-        { name: "json", file: "json.min.js" },
-        { name: "markdown", file: "markdown.min.js" },
-        { name: "html", file: "xml.min.js" }
-    ];
-
-    const loadPromises = languages.map(lang => {
-        return new Promise((resolve) => {
-            const script = document.createElement('script');
-            script.src = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/${lang.file}`;
-            script.async = true;
-            script.onload = () => resolve();
-            document.head.appendChild(script);
-        });
+    // Scan the page for actually used language-* classes
+    const used = new Set();
+    document.querySelectorAll('pre code[class*="language-"]').forEach((block) => {
+        const cls = block.className.split(' ').find(c => c.startsWith('language-'));
+        if (cls) used.add(cls.replace('language-', ''));
     });
 
-    Promise.all(loadPromises).then(() => {
-        applyCodeHighlight();
-    });
-}
-
-function applyCodeHighlight() {
-    if (typeof hljs === 'undefined') {
-        setTimeout(applyCodeHighlight, 100);
+    if (used.size === 0) {
+        applyHighlight();
         return;
     }
 
-    document.querySelectorAll('pre code').forEach((block) => {
-        const languageClass = block.className.split(' ').find(cls => cls.startsWith('language-'));
-        if (languageClass) {
-            const language = languageClass.replace('language-', '');
-            block.parentElement.setAttribute('data-lang', language);
-        }
-    });
+    // Alias some language names to their CDN filename
+    const alias = {
+        'html': 'xml',
+        'js': 'javascript',
+        'ts': 'typescript',
+        'sh': 'bash',
+        'cs': 'csharp',
+        'c++': 'cpp',
+        'c#': 'csharp',
+        'yml': 'yaml',
+    };
 
+    // Only load language files that are NOT already in the common bundle
+    const needed = Array.from(used)
+        .map(lang => alias[lang] || lang)
+        .filter(name => !hljs.getLanguage(name));
+
+    if (needed.length === 0) {
+        applyHighlight();
+        return;
+    }
+
+    const promises = needed.map(name => new Promise((resolve) => {
+        const script = document.createElement('script');
+        script.src = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/${name}.min.js`;
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => resolve();
+        document.head.appendChild(script);
+    }));
+
+    Promise.all(promises).then(() => applyHighlight());
+}
+
+function applyHighlight() {
+    if (typeof hljs === 'undefined') {
+        setTimeout(applyHighlight, 100);
+        return;
+    }
     hljs.highlightAll();
 }
 
