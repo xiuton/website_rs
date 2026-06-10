@@ -68,14 +68,40 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
         let window = web_sys::window().expect("Failed to get window");
         let document = window.document().expect("Failed to get document");
 
+        let window_for_closure = window.clone();
+        let was_stuck = std::cell::Cell::new(false);
         let scroll_closure = Closure::<dyn FnMut()>::new(move || {
             if let Some(wrap) = document.query_selector(".navbar-sticky-wrap").ok().flatten() {
                 let rect = wrap.get_bounding_client_rect();
-                let is_stuck = rect.top() <= 1.0;
-                if is_stuck {
+                let scroll_top = window_for_closure.scroll_y().unwrap_or(0.0);
+                let is_stuck = scroll_top > 10.0 && rect.top() <= 10.0;
+
+                if is_stuck && !was_stuck.get() {
+                    // Entering sticky: freeze width at content size, then let CSS animate to 100%
+                    if let Some(links) = document.query_selector(".navbar-links").ok().flatten() {
+                        let w = links.client_width();
+                        let _ = links.set_attribute("style", &format!("width:{}px", w));
+                    }
                     let _ = wrap.set_attribute("data-stuck", "true");
-                } else {
+                    // Next tick: remove inline style → [data-stuck] width:100% takes over, transition kicks in
+                    let doc = document.clone();
+                    let timeout = Closure::once(move || {
+                        if let Some(l) = doc.query_selector(".navbar-links").ok().flatten() {
+                            let _ = l.remove_attribute("style");
+                        }
+                    });
+                    let _ = window_for_closure.set_timeout_with_callback_and_timeout_and_arguments_0(
+                        timeout.as_ref().unchecked_ref(),
+                        0,
+                    );
+                    timeout.forget();
+                    was_stuck.set(true);
+                } else if !is_stuck && was_stuck.get() {
                     let _ = wrap.remove_attribute("data-stuck");
+                    if let Some(links) = document.query_selector(".navbar-links").ok().flatten() {
+                        let _ = links.remove_attribute("style");
+                    }
+                    was_stuck.set(false);
                 }
             }
         });
