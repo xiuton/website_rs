@@ -5,9 +5,6 @@ author: 干徒
 link: https://www.cnblogs.com/ganto/articles/18111472
 tags: ["JavaScript", "React", "TypeScript", "Vue", "前端", "技术"]
 ---
-
-# 5分钟快速入门Taro
-
 ## Taro介绍
 
 Taro是由凹凸实验室开发的一个开放式跨端跨框架，支持使用 React/Vue/Nerv 等框架来开发 [微信](https://mp.weixin.qq.com/) / [京东](https://mp.jd.com/?entrance=taro) / [百度](https://smartprogram.baidu.com/) / [支付宝](https://mini.open.alipay.com/) / [字节跳动](https://developer.open-douyin.com/) / [QQ](https://q.qq.com/) / [飞书](https://open.feishu.cn/document/uYjL24iN/ucDOzYjL3gzM24yN4MjN) 小程序 / H5 / RN 等应用

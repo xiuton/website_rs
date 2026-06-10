@@ -4,9 +4,6 @@ date: 2021-01-05 15:59:00
 author: 干徒
 link: https://www.cnblogs.com/ganto/articles/14236348.html
 ---
-
-# hexo-theme-heri主题开发简记
-
 # Heri介绍：
 
 究极简洁的Hexo主题  

@@ -4,9 +4,6 @@ date: 2023-08-31 21:50:00
 author: 干徒
 link: https://www.cnblogs.com/ganto/articles/17670486.html
 ---
-
-# 自定义Typora主题分享
-
 Typora主题的开发主要就是编写css样式，将Typora的默认样式进行覆盖
 
 # 介绍

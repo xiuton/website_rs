@@ -5,9 +5,6 @@ author: 干徒
 link: https://www.cnblogs.com/ganto/articles/18136552
 tags: ["Golang", "后端", "技术"]
 ---
-
-# Gin中间件上下文中的Set、Get函数的用法
-
 ## Code
 
 如下代码所示，中间件`middlewareA`内部通过`c.Set("middlewareA_key", str)`将参数设置到上下文中  

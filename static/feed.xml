@@ -27,10 +27,7 @@ Dioxus 是用于构建全栈 Web、桌面和移动应用程序的 Rust 框架。
   <guid isPermaLink="true">https://ganto.cn/post/20250410</guid>
   <pubDate>2025-04-10 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# Rust 案例 - 计算器
-
-```rust
+  <description>```rust
 use std::io;
 use std::io::Write;
 
@@ -44,7 +41,9 @@ trait Computer {
     fn compute(&amp;self, expr: &amp;str) -&gt; i32;
 }
 
-struct CommandLineCompu</description>
+struct CommandLineComputer;
+
+impl Compute</description>
   <category>Rust</category>
   <category>技术</category>
 </item>
@@ -54,10 +53,7 @@ struct CommandLineCompu</description>
   <guid isPermaLink="true">https://ganto.cn/post/20250313</guid>
   <pubDate>2025-03-13 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# Rust镜像源
-
-## 配置Rust镜像源
+  <description>## 配置Rust镜像源
 
 配置文件位置  
 `~/.cargo/config.toml`
@@ -81,10 +77,7 @@ registry = &quot;sparse+https://mirrors.aliyun.com/crates.io-index/&quot;
   <guid isPermaLink="true">https://ganto.cn/post/20250220-2</guid>
   <pubDate>2025-02-20 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# Rust所有权
-
-所有权系统是Rust中的一大特点  
+  <description>所有权系统是Rust中的一大特点  
 今日靓仔我啊，就来体验一番
 
 我们先来看一段代码
@@ -102,7 +95,7 @@ fn main() {
 
 代码中先定义了一个String字符串类型的变量 `s1`
 
-然后紧接着定义了一个变量 `s2`，</description>
+然后紧接着定义了一个变量 `s2`，此时需要注意，`s2` </description>
   <category>Rust</category>
   <category>后端</category>
   <category>技术</category>
@@ -113,17 +106,15 @@ fn main() {
   <guid isPermaLink="true">https://ganto.cn/post/20250220</guid>
   <pubDate>2025-02-20 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# JavaScript 高阶函数之 reduce
-
-&gt; MDN：[https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global\_Objects/Array/reduce](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce)
+  <description>&gt; MDN：[https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global\_Objects/Array/reduce](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce)
 
 关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为**累加器**
 
 reduce常见用例如下：
 
 ```js
-let g</description>
+let goods = [
+  { name: &quot;T恤&quot;, pri</description>
   <category>JavaScript</category>
   <category>Vue</category>
   <category>前端</category>
@@ -135,10 +126,7 @@ let g</description>
   <guid isPermaLink="true">https://ganto.cn/post/20241220</guid>
   <pubDate>2024-12-20 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# JavaScript中的&quot;事件冒泡&quot;与&quot;事件捕获&quot;
-
-## 前言
+  <description>## 前言
 
 Capture：事件捕获  
 Bubble：事件冒泡
@@ -156,7 +144,8 @@ Bubble：事件冒泡
 &lt;div class=&quot;div1&quot;&gt;
     &lt;p&gt;div1&lt;/p&gt;
     &lt;div class=&quot;div2&quot;&gt;
-   </description>
+        &lt;p&gt;div2&lt;/p&gt;
+        &lt;butt</description>
   <category>JavaScript</category>
   <category>技术</category>
 </item>
@@ -166,10 +155,7 @@ Bubble：事件冒泡
   <guid isPermaLink="true">https://ganto.cn/post/20240511</guid>
   <pubDate>2024-05-11 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# 今天，学习Web Component
-
-[Web Component MDN](https://developer.mozilla.org/zh-CN/docs/Web/API/Web_components)  
+  <description>[Web Component MDN](https://developer.mozilla.org/zh-CN/docs/Web/API/Web_components)  
 [阮一峰 web components](https://www.ruanyifeng.com/blog/2019/08/web_components.html)
 
 ## 例子1：
@@ -179,7 +165,7 @@ Bubble：事件冒泡
 &lt;html lang=&quot;en&quot;&gt;
 &lt;head&gt;
   &lt;meta charset=&quot;UTF-8&quot;&gt;
-  &lt;meta name=&quot;viewport&quot; c</description>
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-wi</description>
   <category>JavaScript</category>
   <category>技术</category>
 </item>
@@ -189,10 +175,7 @@ Bubble：事件冒泡
   <guid isPermaLink="true">https://ganto.cn/post/20240415</guid>
   <pubDate>2024-04-15 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# Gin中间件上下文中的Set、Get函数的用法
-
-## Code
+  <description>## Code
 
 如下代码所示，中间件`middlewareA`内部通过`c.Set(&quot;middlewareA_key&quot;, str)`将参数设置到上下文中  
 所以中间件`middlewareB`可以通过`c.Get(&quot;middlewareA_key&quot;)`获取到上下文中传递的值，并将值进行了修改，然后继续通过上下文进行了传递  
@@ -203,7 +186,11 @@ package main
 
 import (
 	&quot;fmt&quot;
-	&quot;github.com/gin-gon</description>
+	&quot;github.com/gin-gonic/gin&quot;
+)
+
+func main() {
+	ro</description>
   <category>Golang</category>
   <category>后端</category>
   <category>技术</category>
@@ -214,10 +201,7 @@ import (
   <guid isPermaLink="true">https://ganto.cn/post/20240412</guid>
   <pubDate>2024-04-12 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# React中forwardRef的用法
-
-&gt; 官网文档：[https://zh-hans.react.dev/reference/react/forwardRef](https://zh-hans.react.dev/reference/react/forwardRef)
+  <description>&gt; 官网文档：[https://zh-hans.react.dev/reference/react/forwardRef](https://zh-hans.react.dev/reference/react/forwardRef)
 
 今天我们就一起学习一下React中的ref怎么获取组件实例，只讨论函数式组件中的ref
 
@@ -225,7 +209,7 @@ import (
 
 细心的同学可能已经发现控制台报错了，提示我们应该使用forwardRef，并且编辑器也提示`ref={footRef}`类型不对
 
-这是因为Rea</description>
+这是因为React不会默认暴露组件中的东西，如果开发者想要从组</description>
   <category>JavaScript</category>
   <category>React</category>
   <category>TypeScript</category>
@@ -238,12 +222,9 @@ import (
   <guid isPermaLink="true">https://ganto.cn/post/20240402</guid>
   <pubDate>2024-04-02 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# 5分钟快速入门Taro
+  <description>## Taro介绍
 
-## Taro介绍
-
-Taro是由凹凸实验室开发的一个开放式跨端跨框架，支持使用 React/Vue/Nerv 等框架来开发 [微信](https://mp.weixin.qq.com/) / [京东](https://mp.jd.com/?entrance=taro) / [百度](https://smartprogram.baidu.com/) / [支付宝](https://mini.open.alipay.com/) / [字节跳动](https://developer.open-douyin.com/) / [QQ](https://q.qq.com/</description>
+Taro是由凹凸实验室开发的一个开放式跨端跨框架，支持使用 React/Vue/Nerv 等框架来开发 [微信](https://mp.weixin.qq.com/) / [京东](https://mp.jd.com/?entrance=taro) / [百度](https://smartprogram.baidu.com/) / [支付宝](https://mini.open.alipay.com/) / [字节跳动](https://developer.open-douyin.com/) / [QQ](https://q.qq.com/) / [飞书](https:/</description>
   <category>JavaScript</category>
   <category>React</category>
   <category>TypeScript</category>
@@ -257,10 +238,7 @@ Taro是由凹凸实验室开发的一个开放式跨端跨框架，支持使用 
   <guid isPermaLink="true">https://ganto.cn/post/20240328</guid>
   <pubDate>2024-03-28 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# React中使用Immer编写简洁的更新逻辑
-
-在 [浅谈React中的mutation](https://www.cnblogs.com/ganto/articles/18098638) 一文中，突出表达了对象和数组类型的state，不宜直接修改原对象和数组，直接修改会制造一个mutation，并且无法触发React的重新渲染
+  <description>在 [浅谈React中的mutation](https://www.cnblogs.com/ganto/articles/18098638) 一文中，突出表达了对象和数组类型的state，不宜直接修改原对象和数组，直接修改会制造一个mutation，并且无法触发React的重新渲染
 
 在官方文档中提到一个库 [Immer](https://github.com/immerjs/use-immer) ，Immer 可以让我们直接修改对象和数组。
 
@@ -269,7 +247,12 @@ Taro是由凹凸实验室开发的一个开放式跨端跨框架，支持使用 
 需要先安装use-immer库
 
 ```sh
-pnpm add use</description>
+pnpm add use-immer -D
+
+```
+
+```jsx
+impo</description>
   <category>JavaScript</category>
   <category>React</category>
   <category>前端</category>
@@ -281,10 +264,7 @@ pnpm add use</description>
   <guid isPermaLink="true">https://ganto.cn/post/20240327</guid>
   <pubDate>2024-03-27 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# 浅谈React中的mutation
-
-&gt; 官方文档：[保持组件纯粹](https://zh-hans.react.dev/learn/keeping-components-pure)、[更新 state 中的对象](https://zh-hans.react.dev/learn/updating-objects-in-state)、[更新 state 中的数组](https://zh-hans.react.dev/learn/updating-arrays-in-state)
+  <description>&gt; 官方文档：[保持组件纯粹](https://zh-hans.react.dev/learn/keeping-components-pure)、[更新 state 中的对象](https://zh-hans.react.dev/learn/updating-objects-in-state)、[更新 state 中的数组](https://zh-hans.react.dev/learn/updating-arrays-in-state)
 
 # 保持组件纯粹
 
@@ -292,7 +272,9 @@ pnpm add use</description>
 
 那么，什么是纯函数？
 
-纯函数 通常具有如下特征（摘自</description>
+纯函数 通常具有如下特征（摘自React官网）：
+
+*   **只负责自己</description>
   <category>JavaScript</category>
   <category>React</category>
   <category>技术</category>
@@ -303,14 +285,13 @@ pnpm add use</description>
   <guid isPermaLink="true">https://ganto.cn/post/20240326</guid>
   <pubDate>2024-03-26 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# Go语言高并发编程初探
-
-在当今这个数据爆炸的时代，高并发编程已成为开发者们必须掌握的技能之一。Go语言，由于其出色的并发支持和简洁的语法，正逐渐成为高并发编程领域的热门选择。本文将带您走进Go语言高并发编程的世界，探索其中的奥秘。
+  <description>在当今这个数据爆炸的时代，高并发编程已成为开发者们必须掌握的技能之一。Go语言，由于其出色的并发支持和简洁的语法，正逐渐成为高并发编程领域的热门选择。本文将带您走进Go语言高并发编程的世界，探索其中的奥秘。
 
 **一、Go语言的并发模型**
 
-Go语言采用了CSP（Communicating Sequential Processes）并发模型，即通过通道（channel）在协程（goroutine）之间进行通信。协程是Go语言实现并发的基本单位，它们比线程更轻量级，可以创建成千上万个而不会给系统带来太大负担。通道则用于协程之间的数据传递，使得并发编程更加安全、高</description>
+Go语言采用了CSP（Communicating Sequential Processes）并发模型，即通过通道（channel）在协程（goroutine）之间进行通信。协程是Go语言实现并发的基本单位，它们比线程更轻量级，可以创建成千上万个而不会给系统带来太大负担。通道则用于协程之间的数据传递，使得并发编程更加安全、高效。
+
+**二、创建与管理协程*</description>
   <category>AI</category>
   <category>Golang</category>
   <category>后端</category>
@@ -323,10 +304,7 @@ Go语言采用了CSP（Communicating Sequential Processes）并发模型，即�
   <guid isPermaLink="true">https://ganto.cn/post/20240315</guid>
   <pubDate>2024-03-15 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# windows终端命令受限
-
-在windows系统上，通过以下命令安装pnpm包管理工具，然后在终端执行`pnpm -v`会报错
+  <description>在windows系统上，通过以下命令安装pnpm包管理工具，然后在终端执行`pnpm -v`会报错
 
 ```sh
 npm install -g pnpm
@@ -351,7 +329,9 @@ set-ExecutionPolicy RemoteSigned
 ```
 
 再次查看
-</description>
+
+```sh
+get-Executi</description>
   <category>Windows</category>
   <category>技术</category>
 </item>
@@ -361,10 +341,7 @@ set-ExecutionPolicy RemoteSigned
   <guid isPermaLink="true">https://ganto.cn/post/20240313</guid>
   <pubDate>2024-03-13 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# TypeScript类型取反
-
-读码见意
+  <description>读码见意
 
 ```ts
 function func(arg: number) {}
@@ -377,7 +354,7 @@ func(&quot;zs&quot;) // ERROR Argument of type &apos;string&apos; is not assigna
 
 ```ts
 function func&lt;T&gt;(arg: T extends number ? never : T) {}
-func(1) // ERROR Argument of type &apos;num</description>
+func(1) // ERROR Argument of type &apos;number&apos; is not assigna</description>
   <category>TypeScript</category>
   <category>技术</category>
 </item>
@@ -387,14 +364,11 @@ func(1) // ERROR Argument of type &apos;num</description>
   <guid isPermaLink="true">https://ganto.cn/post/20240102</guid>
   <pubDate>2024-01-02 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# 实现一个丝滑的暗黑模式切换动画
-
-&gt; 体验：[https://ganto.me](https://ganto.me)
+  <description>&gt; 体验：[https://ganto.me](https://ganto.me)
 
 &gt; 参考内容：  
 &gt; 参考文章：[https://juejin.cn/post/7269388083342082107](https://juejin.cn/post/7269388083342082107)  
-&gt; MDN：[https://developer.mozilla.org/zh-CN/docs/Web/API/View\_Transitions\_API](https://developer.mozilla.org/zh-CN/docs/Web/API/</description>
+&gt; MDN：[https://developer.mozilla.org/zh-CN/docs/Web/API/View\_Transitions\_API](https://developer.mozilla.org/zh-CN/docs/Web/API/View_Transitions_API</description>
   <category>Vue</category>
   <category>前端</category>
   <category>技术</category>
@@ -405,10 +379,7 @@ func(1) // ERROR Argument of type &apos;num</description>
   <guid isPermaLink="true">https://ganto.cn/post/20231221</guid>
   <pubDate>2023-12-21 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# Vue3.3+ 新特性 defineOptions
-
-`defineOptions`是一个宏，是在Vue3.3+中新增的新特性
+  <description>`defineOptions`是一个宏，是在Vue3.3+中新增的新特性
 
 # defineOptions配置项
 
@@ -428,7 +399,8 @@ export default {
 }
 &lt;/script&gt;
 
-&lt;t</description>
+&lt;template&gt;
+  &lt;div&gt;Com Component&lt;</description>
   <category>JavaScript</category>
   <category>Vue</category>
   <category>前端</category>
@@ -440,10 +412,7 @@ export default {
   <guid isPermaLink="true">https://ganto.cn/post/20231221-2</guid>
   <pubDate>2023-12-21 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# Vue3 实验性特性 defineModel
-
-&gt; 在Vue3.4中，defineModel宏已经被正式启用，无需配置，直接可用
+  <description>&gt; 在Vue3.4中，defineModel宏已经被正式启用，无需配置，直接可用
 
 # 启用defineModel
 
@@ -462,7 +431,9 @@ export default defineConfig({
 
 ```
 
-因为是实验性功能，在运行项</description>
+因为是实验性功能，在运行项目时，会有提示
+
+&gt; \[@vue/compiler-</description>
   <category>JavaScript</category>
   <category>Vue</category>
   <category>前端</category>
@@ -474,10 +445,7 @@ export default defineConfig({
   <guid isPermaLink="true">https://ganto.cn/post/20231117</guid>
   <pubDate>2023-11-17 00:00:00 +0800</pubDate>
   <author>干徒</author>
-  <description>
-# JavaScript闭包直接修改内部属性
-
-## 事例代码
+  <description>## 事例代码
 
 ```js
 var o = (function() {
@@ -500,7 +468,8 @@ var o = (function() {
 
 ## 分析
 
-代码使用了闭包，返回一个对象，对象中有一个get函数，这个get函数只能通过`o.get(</description>
+代码使用了闭包，返回一个对象，对象中有一个get函数，这个get函数只能通过`o.get(&apos;a&apos;)`的方式查看obj中的属性  
+如果想要直</description>
   <category>JavaScript</category>
   <category>技术</category>
 </item>

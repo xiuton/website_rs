@@ -5,9 +5,6 @@ author: 干徒
 link: https://www.cnblogs.com/ganto/articles/18631613
 tags: ["Rust", "后端", "技术"]
 ---
-
-# Rust所有权
-
 所有权系统是Rust中的一大特点  
 今日靓仔我啊，就来体验一番
 

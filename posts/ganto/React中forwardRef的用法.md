@@ -5,9 +5,6 @@ author: 干徒
 link: https://www.cnblogs.com/ganto/articles/18131098
 tags: ["JavaScript", "React", "TypeScript", "前端", "技术"]
 ---
-
-# React中forwardRef的用法
-
 > 官网文档：[https://zh-hans.react.dev/reference/react/forwardRef](https://zh-hans.react.dev/reference/react/forwardRef)
 
 今天我们就一起学习一下React中的ref怎么获取组件实例，只讨论函数式组件中的ref

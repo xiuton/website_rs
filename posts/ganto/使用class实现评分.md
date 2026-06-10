@@ -4,9 +4,6 @@ date: 2023-11-17 02:07:00
 author: 干徒
 link: https://www.cnblogs.com/ganto/articles/17837740.html
 ---
-
-# 使用class实现评分
-
 # 创建Star类
 
 ```js

@@ -3,6 +3,7 @@ title: "Web Component"
 date: "2023-04-12 15:35:44"
 author: "干徒"
 tags: ["JavaScript", "Web Component"]
+summary: 原生Web Component的使用
 ---
 
 [Web Component MDN](https://developer.mozilla.org/zh-CN/docs/Web/API/Web_components)

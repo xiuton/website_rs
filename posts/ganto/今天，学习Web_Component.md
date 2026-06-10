@@ -5,9 +5,6 @@ author: 干徒
 link: https://www.cnblogs.com/ganto/articles/17865387.html
 tags: ["JavaScript", "技术"]
 ---
-
-# 今天，学习Web Component
-
 [Web Component MDN](https://developer.mozilla.org/zh-CN/docs/Web/API/Web_components)  
 [阮一峰 web components](https://www.ruanyifeng.com/blog/2019/08/web_components.html)
 

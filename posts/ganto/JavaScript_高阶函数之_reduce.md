@@ -5,9 +5,6 @@ author: 干徒
 link: https://www.cnblogs.com/ganto/articles/18727942
 tags: ["JavaScript", "Vue", "前端", "技术"]
 ---
-
-# JavaScript 高阶函数之 reduce
-
 > MDN：[https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global\_Objects/Array/reduce](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce)
 
 关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为**累加器**

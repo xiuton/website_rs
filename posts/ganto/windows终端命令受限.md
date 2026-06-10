@@ -5,9 +5,6 @@ author: 干徒
 link: https://www.cnblogs.com/ganto/articles/18074472
 tags: ["Windows", "技术"]
 ---
-
-# windows终端命令受限
-
 在windows系统上，通过以下命令安装pnpm包管理工具，然后在终端执行`pnpm -v`会报错
 
 ```sh

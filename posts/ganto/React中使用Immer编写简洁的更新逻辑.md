@@ -5,9 +5,6 @@ author: 干徒
 link: https://www.cnblogs.com/ganto/articles/18100748
 tags: ["JavaScript", "React", "前端", "技术"]
 ---
-
-# React中使用Immer编写简洁的更新逻辑
-
 在 [浅谈React中的mutation](https://www.cnblogs.com/ganto/articles/18098638) 一文中，突出表达了对象和数组类型的state，不宜直接修改原对象和数组，直接修改会制造一个mutation，并且无法触发React的重新渲染
 
 在官方文档中提到一个库 [Immer](https://github.com/immerjs/use-immer) ，Immer 可以让我们直接修改对象和数组。

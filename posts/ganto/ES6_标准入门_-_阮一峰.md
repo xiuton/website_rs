@@ -4,9 +4,6 @@ date: 2023-02-20 12:58:00
 author: 干徒
 link: https://www.cnblogs.com/ganto/articles/17136991.html
 ---
-
-# ES6 标准入门 - 阮一峰
-
 # Object.assign()
 
 ```js

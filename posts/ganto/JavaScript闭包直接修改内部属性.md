@@ -5,9 +5,6 @@ author: 干徒
 link: https://www.cnblogs.com/ganto/articles/17837785.html
 tags: ["JavaScript", "技术"]
 ---
-
-# JavaScript闭包直接修改内部属性
-
 ## 事例代码
 
 ```js

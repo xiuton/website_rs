@@ -5,9 +5,6 @@ author: 干徒
 link: https://www.cnblogs.com/ganto/articles/17917902.html
 tags: ["JavaScript", "Vue", "前端", "技术"]
 ---
-
-# Vue3 实验性特性 defineModel
-
 > 在Vue3.4中，defineModel宏已经被正式启用，无需配置，直接可用
 
 # 启用defineModel

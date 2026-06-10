@@ -4,9 +4,6 @@ date: 2023-02-20 13:03:00
 author: 干徒
 link: https://www.cnblogs.com/ganto/articles/17136967.html
 ---
-
-# TypeScript学习笔记
-
 # TypeScript
 
 ## 准备

@@ -5,9 +5,6 @@ author: 干徒
 link: https://www.cnblogs.com/ganto/articles/18071774
 tags: ["TypeScript", "技术"]
 ---
-
-# TypeScript类型取反
-
 读码见意
 
 ```ts

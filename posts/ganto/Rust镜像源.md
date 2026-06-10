@@ -5,9 +5,6 @@ author: 干徒
 link: https://www.cnblogs.com/ganto/articles/18769264
 tags: ["Rust", "技术"]
 ---
-
-# Rust镜像源
-
 ## 配置Rust镜像源
 
 配置文件位置  

@@ -4,9 +4,6 @@ date: 2023-08-16 17:20:00
 author: 干徒
 link: https://www.cnblogs.com/ganto/articles/17635693.html
 ---
-
-# Golang学习笔记
-
 # Hello Golang
 
 ```go

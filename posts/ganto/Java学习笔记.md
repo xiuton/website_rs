@@ -4,9 +4,6 @@ date: 2023-03-01 01:21:00
 author: 干徒
 link: https://www.cnblogs.com/ganto/articles/17166660.html
 ---
-
-# Java学习笔记
-
 # 基础👇
 
 # 简单Java类

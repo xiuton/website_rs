@@ -5,9 +5,6 @@ author: 干徒
 link: https://www.cnblogs.com/ganto/articles/18619588
 tags: ["JavaScript", "技术"]
 ---
-
-# JavaScript中的"事件冒泡"与"事件捕获"
-
 ## 前言
 
 Capture：事件捕获  

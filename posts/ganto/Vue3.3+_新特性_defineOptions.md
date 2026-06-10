@@ -5,9 +5,6 @@ author: 干徒
 link: https://www.cnblogs.com/ganto/articles/17917868.html
 tags: ["JavaScript", "Vue", "前端", "技术"]
 ---
-
-# Vue3.3+ 新特性 defineOptions
-
 `defineOptions`是一个宏，是在Vue3.3+中新增的新特性
 
 # defineOptions配置项

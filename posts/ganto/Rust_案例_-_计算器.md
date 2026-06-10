@@ -5,9 +5,6 @@ author: 干徒
 link: https://www.cnblogs.com/ganto/articles/18819665
 tags: ["Rust", "技术"]
 ---
-
-# Rust 案例 - 计算器
-
 ```rust
 use std::io;
 use std::io::Write;

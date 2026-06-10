@@ -5,9 +5,6 @@ author: 干徒
 link: https://www.cnblogs.com/ganto/articles/18098638
 tags: ["JavaScript", "React", "技术"]
 ---
-
-# 浅谈React中的mutation
-
 > 官方文档：[保持组件纯粹](https://zh-hans.react.dev/learn/keeping-components-pure)、[更新 state 中的对象](https://zh-hans.react.dev/learn/updating-objects-in-state)、[更新 state 中的数组](https://zh-hans.react.dev/learn/updating-arrays-in-state)
 
 # 保持组件纯粹

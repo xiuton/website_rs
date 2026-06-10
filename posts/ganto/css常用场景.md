@@ -5,9 +5,6 @@ author: 干徒
 link: https://www.cnblogs.com/ganto/articles/17136988.html
 tags: ["前端"]
 ---
-
-# css常用场景
-
 # 初始化样式
 
 ```css
