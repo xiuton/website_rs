@@ -11,6 +11,7 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
         ("/about", "关于"),
         ("/tags", "书签"),
         ("/search", "搜索"),
+        ("/knowledge-graph", "图谱"),
         ("/dev", "开发"),
         #[cfg(feature = "dev-pages")]
         ("/playground", "操场"),
