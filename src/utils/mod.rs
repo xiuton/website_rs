@@ -9,3 +9,4 @@ pub mod storage;
 pub mod search;
 pub mod knowledge_graph;
 pub mod summaries;
+pub mod markov;

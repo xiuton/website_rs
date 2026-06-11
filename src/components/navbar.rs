@@ -57,6 +57,9 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
             "/" => matches!(route, Route::Home | Route::BlogPostView { slug: _ }),
             "/about" => matches!(route, Route::About),
             "/tags" => matches!(route, Route::Tags),
+            "/search" => matches!(route, Route::Search),
+            "/knowledge-graph" => matches!(route, Route::KnowledgeGraphView),
+            "/ai-summary" => matches!(route, Route::AiSummaryView),
             "/dev" => matches!(route, Route::Dev),
             #[cfg(feature = "dev-pages")]
             "/playground" => matches!(route, Route::Playground),

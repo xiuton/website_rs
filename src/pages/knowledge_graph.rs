@@ -6,7 +6,7 @@ use dioxus_router::prelude::use_navigator;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use std::cell::RefCell;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::routes::Route;
@@ -41,6 +41,17 @@ fn community_color(community: &str) -> &'static str {
         s if s.contains("React") => "#61dafb",
         _ => "#9ca3af",
     }
+}
+
+/// 根据背景色计算对比度合适的文字颜色（深色背景用浅色字，浅色背景用深色字）
+fn text_color_for_bg(hex: &str) -> &'static str {
+    let hex = hex.trim_start_matches('#');
+    let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);
+    let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(0);
+    let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(0);
+    // 相对亮度公式 (sRGB)
+    let luminance = 0.299 * r as f64 + 0.587 * g as f64 + 0.114 * b as f64;
+    if luminance > 180.0 { "#1f2937" } else { "#e5e7eb" }
 }
 
 #[derive(Clone)]
@@ -79,10 +90,16 @@ struct ForceGraph {
     mouse_y: f64,
     pan_start: Option<(f64, f64)>,
     offset_start: Option<(f64, f64)>,
+    /// 从搜索结果来的高亮节点 slug 集合
+    highlighted_slugs: HashSet<String>,
+    /// 拖拽起始屏幕坐标（用于区分点击与拖拽）
+    drag_start: Option<(f64, f64)>,
+    /// 是否发生了有效拖拽（鼠标移动超过阈值）
+    was_dragged: bool,
 }
 
 impl ForceGraph {
-    fn new(kg: &KnowledgeGraph, width: f64, height: f64) -> Self {
+    fn new(kg: &KnowledgeGraph, width: f64, height: f64, highlighted_slugs: HashSet<String>) -> Self {
         let cx = width / 2.0;
         let cy = height / 2.0;
         let mut nodes = Vec::new();
@@ -165,6 +182,9 @@ impl ForceGraph {
             mouse_y: 0.0,
             pan_start: None,
             offset_start: None,
+            highlighted_slugs,
+            drag_start: None,
+            was_dragged: false,
         }
     }
 
@@ -319,6 +339,25 @@ impl CanvasRenderer {
                 ctx.set_global_alpha(1.0);
             }
 
+            // 搜索结果高亮：绘制金色光环
+            let is_highlighted = graph.highlighted_slugs.contains(&node.slug);
+            if is_highlighted {
+                ctx.set_stroke_style_str("#f59e0b");
+                ctx.set_line_width(2.5 / graph.scale);
+                ctx.set_global_alpha(0.8);
+                ctx.begin_path();
+                let _ = ctx.arc(node.x, node.y, r + 4.0, 0.0, std::f64::consts::TAU);
+                ctx.stroke();
+                // 外圈更大光晕
+                ctx.set_stroke_style_str("#fbbf24");
+                ctx.set_line_width(1.5 / graph.scale);
+                ctx.set_global_alpha(0.35);
+                ctx.begin_path();
+                let _ = ctx.arc(node.x, node.y, r + 8.0, 0.0, std::f64::consts::TAU);
+                ctx.stroke();
+                ctx.set_global_alpha(1.0);
+            }
+
             ctx.set_fill_style_str(color);
             ctx.begin_path();
             let _ = ctx.arc(node.x, node.y, r, 0.0, std::f64::consts::TAU);
@@ -328,13 +367,16 @@ impl CanvasRenderer {
             ctx.set_line_width(1.5 / graph.scale);
             ctx.stroke();
 
-            ctx.set_fill_style_str("#e5e7eb");
-            let font_size = (r * 0.55).max(4.0);
+            ctx.set_fill_style_str(text_color_for_bg(color));
+            let font_size = (r * 0.28).max(3.0);
             ctx.set_font(&format!("{:.1}px 'MiSans', sans-serif", font_size));
             ctx.set_text_align("center");
             ctx.set_text_baseline("middle");
             ctx.set_global_alpha(0.9);
-            let display_title = if node.title.chars().count() > 6 {
+            // 悬停或拖拽时显示完整标题，否则截断
+            let display_title = if is_hovered || is_dragging {
+                node.title.clone()
+            } else if node.title.chars().count() > 6 {
                 format!("{}…", &node.title.chars().take(5).collect::<String>())
             } else {
                 node.title.clone()
@@ -387,11 +429,24 @@ pub fn KnowledgeGraphView() -> Element {
         if let Some(ref kg) = *kg_data.read() {
             let window = web_sys::window().unwrap();
             let document = window.document().unwrap();
+
+            // 读取 ?highlight= 查询参数
+            let highlighted_slugs: HashSet<String> = window
+                .location()
+                .search()
+                .ok()
+                .and_then(|s| {
+                    web_sys::UrlSearchParams::new_with_str(&s).ok()
+                })
+                .and_then(|params| params.get("highlight"))
+                .map(|s| s.split(',').map(|slug| slug.trim().to_string()).filter(|s| !s.is_empty()).collect())
+                .unwrap_or_default();
+
             if let Some(canvas_el) = document.get_element_by_id(canvas_id) {
                 let canvas: web_sys::HtmlCanvasElement = canvas_el.dyn_into().unwrap();
                 let w = canvas.client_width() as f64;
                 let h = canvas.client_height() as f64;
-                let g = ForceGraph::new(kg, w, h);
+                let g = ForceGraph::new(kg, w, h, highlighted_slugs);
 
                 // 提取社区列表
                 let mut set = BTreeSet::new();
@@ -468,6 +523,8 @@ pub fn KnowledgeGraphView() -> Element {
                 let sy = e.client_y() as f64 - rect.top();
                 if let Some(idx) = graph.hit_test(sx, sy) {
                     graph.dragging = Some(idx);
+                    graph.drag_start = Some((sx, sy));
+                    graph.was_dragged = false;
                 } else {
                     graph.pan_start = Some((e.client_x() as f64, e.client_y() as f64));
                     graph.offset_start = Some((graph.offset_x, graph.offset_y));
@@ -489,6 +546,12 @@ pub fn KnowledgeGraphView() -> Element {
                 graph.mouse_y = sy;
 
                 if let Some(idx) = graph.dragging {
+                    // 检测拖拽位移（超过 5px 才算有效拖拽，避免松手后跳转文章）
+                    let dx = sx - graph.drag_start.map_or(sx, |(sx, _)| sx);
+                    let dy = sy - graph.drag_start.map_or(sy, |(_, sy)| sy);
+                    if dx * dx + dy * dy > 25.0 {
+                        graph.was_dragged = true;
+                    }
                     let (cx, cy) = graph.screen_to_canvas(sx, sy);
                     graph.nodes[idx].x = cx;
                     graph.nodes[idx].y = cy;
@@ -568,7 +631,7 @@ pub fn KnowledgeGraphView() -> Element {
     let nav_for_click = nav;
     let handle_node_click = move |_: Event<MouseData>| {
         if let Some(ref g) = *graph_for_click.read().borrow() {
-            if g.pan_start.is_some() {
+            if g.pan_start.is_some() || g.was_dragged {
                 return;
             }
             if let Some(idx) = g.hovered {

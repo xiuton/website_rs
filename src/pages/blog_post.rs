@@ -163,6 +163,8 @@ pub fn BlogPostView(slug: String) -> Element {
     });
 
     let article_label = post().map(|p| format!("文章：{}", p.title));
+    // 保存 slug 备用（避免在 if-let 内部被 post 绑定屏蔽）
+    let post_slug = current_slug();
 
     rsx! {
         div { class: "blog-container",
@@ -422,6 +424,13 @@ pub fn BlogPostView(slug: String) -> Element {
                                                             let to = Route::BlogPostView { slug: s.clone() };
                                                             rsx! {
                                                                 Link { to, class: "kg-link-item kg-link-sub",
+                                                                    svg {
+                                                                        width: "12", height: "12", view_box: "0 0 24 24",
+                                                                        fill: "none", stroke: "currentColor", stroke_width: "2",
+                                                                        stroke_linecap: "round", stroke_linejoin: "round",
+                                                                        path { d: "M5 12h14" }
+                                                                        path { d: "M12 5l7 7-7 7" }
+                                                                    }
                                                                     span { class: "kg-link-text",
                                                                         "{BLOG_POSTS.iter().find(|p| p.slug == s.as_str()).map(|p| p.title).unwrap_or(s)}"
                                                                     }
@@ -437,11 +446,97 @@ pub fn BlogPostView(slug: String) -> Element {
                             }
                         }
                     })}
+                    // 马尔可夫链 AI 续写（在 article 外，if-let 内）
+                    MarkovContinuation { slug: post_slug.clone() }
                 }
             } else {
                 div { class: "not-found",
                     h2 { "文章未找到" }
                     p { "抱歉，找不到请求的文章。" }
+                }
+            }
+        }
+    }
+}
+
+/// 马尔可夫链 AI 续写组件
+#[component]
+fn MarkovContinuation(slug: String) -> Element {
+    let mut data_loaded = use_signal(|| false);
+    let mut generator = use_signal(|| None::<crate::utils::markov::MarkovGenerator>);
+    let generating = use_signal(|| false);
+    let output = use_signal(|| String::new());
+
+    // 只加载一次（slug 在组件声明期 clone 后使用）
+    let slug_for_load = slug.clone();
+    use_effect(move || {
+        if *data_loaded.read() { return; }
+        let s = slug_for_load.clone();
+        spawn(async move {
+            match crate::utils::markov::load_markov().await {
+                Ok(data) => {
+                    if data.contains_key(&s) {
+                        let gen = crate::utils::markov::MarkovGenerator::new(data);
+                        generator.set(Some(gen));
+                    }
+                }
+                Err(e) => {
+                    web_sys::console::error_1(&format!("加载 markov.json 失败: {:?}", e).into());
+                }
+            }
+            data_loaded.set(true);
+        });
+    });
+
+    let gen = generator.clone();
+    let out = output;
+    let mut gen_state = generating;
+
+    let handle_generate = move |_| {
+        if *gen_state.read() { return; }
+        gen_state.set(true);
+        let g = gen.cloned();
+        let mut out_w = out.clone();
+        let mut gs = gen_state.clone();
+        let s = slug.clone();
+        spawn(async move {
+            if let Some(ref gen) = g {
+                let text = gen.generate(&s, Some(""), 100);
+                out_w.set(text);
+            } else {
+                out_w.set("暂无该文章的续写模型。".into());
+            }
+            gs.set(false);
+        });
+    };
+
+    rsx! {
+        div { class: "markov-section",
+            div { class: "markov-header",
+                svg {
+                    xmlns: "http://www.w3.org/2000/svg",
+                    view_box: "0 0 24 24",
+                    width: "16", height: "16",
+                    fill: "none", stroke: "currentColor",
+                    stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round",
+                    path { d: "M12 2a10 10 0 1 0 10 10" }
+                    polyline { points: "12 12 18 12 18 6" }
+                }
+                span { "AI 续写" }
+                span { class: "markov-badge", "马尔可夫链" }
+            }
+            p { class: "markov-desc", "基于本文内容训练的 tri-gram 语言模型，自动生成下文片段。" }
+            div { class: "markov-actions",
+                button {
+                    class: "markov-btn",
+                    disabled: *generating.read() || !*data_loaded.read(),
+                    onclick: handle_generate,
+                    if *generating.read() { "生成中…" } else { "生成续写" }
+                }
+            }
+            if !output.read().is_empty() {
+                div { class: "markov-output",
+                    {output.read().as_str()}
                 }
             }
         }

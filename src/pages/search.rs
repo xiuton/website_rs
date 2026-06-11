@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 use crate::utils::title;
-use crate::utils::search::{SearchEngine, SearchResult, highlight_matches};
+use crate::utils::search::{SearchEngine, SearchResult, Suggestion, highlight_matches};
 use crate::utils::knowledge_graph::{self, KnowledgeGraph};
 use dioxus_router::prelude::use_navigator;
 use crate::routes::Route;
@@ -68,16 +68,39 @@ pub fn Search() -> Element {
     });
 
     // 加载知识图谱
+    let mut kg_data_loaded = use_signal(|| false);
     use_effect(move || {
         spawn(async move {
             if let Some(graph) = knowledge_graph::load_graph().await {
                 kg_data.set(Some(graph));
+                kg_data_loaded.set(true);
+            }
+        });
+    });
+
+    // 加载语义索引（词共现 + 自动补全）
+    let mut semantic_loaded = use_signal(|| false);
+    let mut engine_for_semantic = engine_ref.clone();
+    use_effect(move || {
+        spawn(async move {
+            let resp = gloo_net::http::Request::get("/static/semantic.json")
+                .send()
+                .await;
+            if let Ok(resp) = resp {
+                if let Ok(text) = resp.text().await {
+                    engine_for_semantic.write().load_semantic(&text).ok();
+                    semantic_loaded.set(true);
+                }
             }
         });
     });
 
     let mut query = use_signal(|| get_initial_query());
     let mut results = use_signal(|| Vec::<SearchResult>::new());
+    let mut suggestions = use_signal(Vec::<Suggestion>::new);
+    let mut show_suggestions = use_signal(|| false);
+    // 标记用户刚点击了建议（非响应式使用：effect 只读不写，避免二次触发）
+    let mut suggestion_clicked = use_signal(|| false);
     const PAGE_SIZE: usize = 15;
     let mut visible_count = use_signal(|| PAGE_SIZE);
 
@@ -106,6 +129,35 @@ pub fn Search() -> Element {
             if !index_loaded() { return; }
             let engine = engine_ref.read();
             results.set(engine.search(&q));
+        });
+    });
+
+    // 自动补全
+    let engine_for_ac = engine_ref.clone();
+    use_effect(move || {
+        let q = query();
+        if q.is_empty() || q.len() < 1 {
+            suggestions.set(Vec::new());
+            show_suggestions.set(false);
+            return;
+        }
+        // 用户刚点击了建议 → 不弹窗（标志由 oninput 自动清零）
+        if *suggestion_clicked.read() {
+            show_suggestions.set(false);
+            return;
+        }
+        spawn(async move {
+            delay(150).await;
+            if query() != q { return; }
+            if !semantic_loaded() { return; }
+            let engine = engine_for_ac.read();
+            let ac = engine.autocomplete(&q);
+            if !ac.is_empty() {
+                suggestions.set(ac);
+                show_suggestions.set(true);
+            } else {
+                show_suggestions.set(false);
+            }
         });
     });
 
@@ -156,14 +208,28 @@ pub fn Search() -> Element {
                         placeholder: "输入关键词搜索文章...",
                         aria_label: "搜索文章",
                         autofocus: true,
-                        oninput: move |evt| { query.set(evt.data.value()); },
+                        oninput: move |evt| { suggestion_clicked.set(false); query.set(evt.data.value()); },
+                        onfocus: move |_| {
+                            suggestion_clicked.set(false);
+                            // 重新触发自动补全 effect
+                            let q = query();
+                            if !q.is_empty() {
+                                query.set(q);
+                            }
+                        },
+                        onblur: move |_| {
+                            spawn(async move {
+                                delay(200).await;
+                                show_suggestions.set(false);
+                            });
+                        },
                         value: "{query}"
                     }
                     if !query_str.is_empty() {
                         button {
                             class: "search-box-clear",
                             aria_label: "清除搜索",
-                            onclick: move |_| { query.set(String::new()); },
+                            onclick: move |_| { suggestion_clicked.set(false); query.set(String::new()); show_suggestions.set(false); },
                             svg {
                                 width: "16", height: "16", view_box: "0 0 24 24",
                                 fill: "none", stroke: "currentColor", stroke_width: "2",
@@ -173,10 +239,40 @@ pub fn Search() -> Element {
                             }
                         }
                     }
+                    // 自动补全下拉
+                    if show_suggestions() {
+                        div {
+                            class: "search-autocomplete",
+                            {
+                                let items = suggestions.read().clone();
+                                items.into_iter().enumerate().map(|(idx, s)| {
+                                    let text = s.text;
+                                    let kind_class = if s.kind == "title" { "search-ac-kind search-ac-kind--title" } else { "search-ac-kind" };
+                                    let kind_label = if s.kind == "title" { "文章" } else { "标签" };
+                                    rsx! {
+                                        div {
+                                            class: "search-ac-item",
+                                            key: "{text}-{idx}",
+                                            onclick: {
+                                                let text = text.clone();
+                                                move |_| {
+                                                    suggestion_clicked.set(true);
+                                                    query.set(text.clone());
+                                                    show_suggestions.set(false);
+                                                }
+                                            },
+                                            span { class: "search-ac-text", "{text}" }
+                                            span { class: "{kind_class}", "{kind_label}" }
+                                        }
+                                    }
+                                })
+                            }
+                        }
+                    }
                 }
             }
 
-            // ── 加载中 ──
+            // 加载 / 无结果状态
             if !is_loaded && query_str.is_empty() {
                 div { class: "search-status",
                     div { class: "search-status-spinner" }
@@ -190,6 +286,36 @@ pub fn Search() -> Element {
                     "共找到 "
                     span { class: "search-meta-count", "{result_count}" }
                     " 篇相关文章"
+
+                    // 在知识图谱中查看搜索结果
+                    span { class: "search-meta-sep", "·" }
+                    button {
+                        class: "search-kg-link",
+                        onclick: {
+                            let slugs: Vec<String> = result_list.iter().take(20).map(|r| r.slug.clone()).collect();
+                            let nav = nav.clone();
+                            move |_| {
+                                let highlight = slugs.join(",");
+                                // 先导航到 KG 页面，再通过 replaceState 设置查询参数
+                                nav.push(Route::KnowledgeGraphView);
+                                if let Some(window) = web_sys::window() {
+                                    let _ = window.history().unwrap()
+                                        .replace_state_with_url(
+                                            &wasm_bindgen::JsValue::NULL, "",
+                                            Some(&format!("/knowledge-graph?highlight={}", &highlight)),
+                                        );
+                                }
+                            }
+                        },
+                        svg {
+                            width: "14", height: "14", view_box: "0 0 24 24",
+                            fill: "none", stroke: "currentColor", stroke_width: "2",
+                            stroke_linecap: "round", stroke_linejoin: "round",
+                            circle { cx: "12", cy: "12", r: "3" }
+                            path { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" }
+                        }
+                        "在知识图谱中查看"
+                    }
                 }
                 div { class: "search-results",
                     {result_list.iter().take(visible_count()).map(|r| {
