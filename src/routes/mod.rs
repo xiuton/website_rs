@@ -4,7 +4,7 @@ use dioxus_router::prelude::{Routable};
 use crate::components::Layout;
 use crate::components::TestLayout;
 use crate::pages::{
-    About, Dev, Home, BlogPostView, Tags, NotFound, CircleGenerator, KnowledgeGraphView, Search,
+    About, Dev, Home, BlogPostView, Tags, NotFound, CircleGenerator, KnowledgeGraphView, Search, AiSummaryView,
 };
 #[cfg(feature = "dev-pages")]
 use crate::pages::{Playground, Test};
@@ -24,6 +24,8 @@ pub enum Route {
     Search,
     #[route("/knowledge-graph")]
     KnowledgeGraphView,
+    #[route("/ai-summary")]
+    AiSummaryView,
     #[route("/post/:slug")]
     BlogPostView { slug: String },
     #[cfg(feature = "dev-pages")]

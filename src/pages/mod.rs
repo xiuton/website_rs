@@ -7,6 +7,7 @@ pub mod not_found;
 pub mod circle_generator;
 pub mod knowledge_graph;
 pub mod search;
+pub mod ai_summary;
 #[cfg(feature = "dev-pages")]
 pub mod playground;
 #[cfg(feature = "dev-pages")]
@@ -21,6 +22,7 @@ pub use not_found::NotFound;
 pub use circle_generator::CircleGenerator;
 pub use knowledge_graph::KnowledgeGraphView;
 pub use search::Search;
+pub use ai_summary::AiSummaryView;
 #[cfg(feature = "dev-pages")]
 pub use playground::Playground;
 #[cfg(feature = "dev-pages")]
