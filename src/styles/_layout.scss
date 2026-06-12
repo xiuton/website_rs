@@ -196,7 +196,12 @@
               height: 1rem;
             }
           }
-        }
+    }
+
+    &:has(.wide-mode) {
+      max-width: 1200px;
+    }
+
     .main-content {
       transition: background 0.3s, color 0.3s;
 
@@ -2028,7 +2033,6 @@
     }
 
     &:has(.wide-mode) {
-      max-width: 1200px;
       .blog-post {
         &.wide-mode {
           .blog-nav {

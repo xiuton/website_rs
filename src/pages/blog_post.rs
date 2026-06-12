@@ -384,10 +384,9 @@ pub fn BlogPostView(slug: String) -> Element {
                                 div { class: "topic-radar-chart",
                                     svg {
                                         xmlns: "http://www.w3.org/2000/svg",
-                                        view_box: "0 0 200 200",
+                                        view_box: "-30 -30 260 260",
                                         width: "100%",
-                                        height: "auto",
-                                        style: "max-width: 360px;",
+                                        style: "max-width: 360px; overflow: visible; aspect-ratio: 1;",
                                         dangerous_inner_html: svg_content
                                     }
                                 }

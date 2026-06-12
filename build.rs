@@ -2155,14 +2155,37 @@ impl LdaModel {
             .collect()
     }
 
-    /// 为主题命名（基于 top words）
+    /// 为主题命名（基于 top meaningful words）
     fn topic_name(&self, t: usize) -> String {
-        let top_words = self.topic_words(t, 5);
-        top_words
+        let top_words = self.topic_words(t, 10);
+        // 过滤掉标点、单字虚词等无意义的 token，取前 3 个有意义的词
+        let meaningful: Vec<&str> = top_words
             .iter()
             .map(|(w, _)| w.as_str())
-            .collect::<Vec<_>>()
-            .join("")
+            .filter(|w| {
+                let is_single_char = w.chars().count() == 1;
+                if is_single_char {
+                    let c = w.chars().next().unwrap();
+                    let cjk_punct = ['，', '。', '、', '！', '？', '；', '：', '（', '）', '【', '】', '《', '》', '—', '…', '·', '～'];
+                    if cjk_punct.contains(&c) { return false; }
+                    if c.is_ascii_punctuation() { return false; }
+                }
+                let stop: &[&str] = &["的", "了", "是", "在", "有", "和", "与", "这", "那", "上", "下", "中", "个", "以", "就", "不", "也", "都", "而", "之", "其", "中", "或", "将", "被", "能"];
+                !stop.contains(w)
+            })
+            .take(3)
+            .collect();
+        if meaningful.is_empty() {
+            // fallback: 直接用 top 2 词
+            top_words
+                .iter()
+                .take(2)
+                .map(|(w, _)| w.as_str())
+                .collect::<Vec<_>>()
+                .join("")
+        } else {
+            meaningful.join(" / ")
+        }
     }
 }
 

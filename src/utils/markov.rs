@@ -19,7 +19,7 @@ pub type MarkovData = HashMap<String, ArticleChain>;
 
 /// 加载 markov.json
 pub async fn load_markov() -> Result<MarkovData, JsValue> {
-    let resp = gloo_net::http::Request::get("/markov.json")
+    let resp = gloo_net::http::Request::get("/static/markov.json")
         .send()
         .await
         .map_err(|e| JsValue::from_str(&format!("请求失败: {}", e)))?;
