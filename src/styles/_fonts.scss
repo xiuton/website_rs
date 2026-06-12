@@ -8,17 +8,25 @@
 }
 
 @font-face {
-    font-family: 'JetBrains Mono';
+    font-family: 'JetBrainsMono';
     src: url('/static/fonts/JetBrainsMonoNLNerdFont-Regular.ttf') format('truetype');
     font-display: swap;
     font-weight: normal;
     font-style: normal;
 }
 
+// 字体定义
 @font-face {
-    font-family: 'SmileySans';
-    src: url('/static/fonts/SmileySans-Oblique.otf') format('opentype');
-    font-display: swap;
-    font-weight: normal;
-    font-style: normal;
+  font-family: SmileySans;
+  src: url(./static/fonts/SmileySans-Oblique.otf)
+}
+
+@font-face {
+  font-family: MiSans;
+  src: url(./static/fonts/MiSans-Regular.otf)
+}
+
+@font-face {
+  font-family: JetBrains Mono;
+  src: url(./static/fonts/JetBrainsMonoNLNerdFont-Regular.ttf)
 }

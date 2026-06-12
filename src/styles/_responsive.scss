@@ -1,0 +1,110 @@
+@use "sass:map";
+@use 'variables' as *;
+
+// 响应式设计
+@include mobile {
+    #main {
+      margin: 0 0.75rem;
+    }
+
+    #main .app .navbar-content {
+      padding: 2.5rem 0 0.8rem;
+
+      .navbar-ui {
+        gap: 0.4rem;
+
+        .navbar-title {
+          font-size: 1.4rem;
+        }
+
+        .navbar-subtitle {
+          font-size: 0.7rem;
+          margin-top: -0.15rem;
+          letter-spacing: 0.1em;
+        }
+      }
+    }
+
+    #main .app .navbar-sticky-wrap .navbar-links {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      flex-wrap: nowrap;
+      scrollbar-width: none;
+
+      &::-webkit-scrollbar {
+        display: none;
+      }
+
+      .nav-link {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+      }
+
+      .theme-toggle {
+        margin-left: auto;
+        padding: 0.25rem 0.4rem;
+        flex-shrink: 0;
+
+        svg {
+          width: 1rem;
+          height: 1rem;
+        }
+      }
+    }
+
+    .app .main-content .blog-list {
+      .blog-preview {
+        padding: 1.1rem;
+
+        .preview-title {
+          font-size: 1.1rem;
+        }
+      }
+
+      .pagination {
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+
+        .page-size-select {
+          margin-left: 0;
+        }
+      }
+    }
+
+    .bookmarks-container {
+        .bookmarks-list {
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 0.75rem;
+        }
+    }
+
+    .modal-content {
+        width: 95%;
+        padding: 16px;
+    }
+}
+
+@media (max-width: 380px) {
+    #main .app .navbar-content {
+      padding: 1.8rem 0 0.6rem;
+
+      .navbar-ui {
+        gap: 0.2rem;
+
+        .navbar-title {
+          font-size: 1.2rem;
+        }
+
+        .navbar-subtitle {
+          display: none;
+        }
+      }
+    }
+
+    #main .app .navbar-sticky-wrap .navbar-links .nav-link {
+      padding: 0.2rem 0.4rem;
+      font-size: 0.7rem;
+    }
+}

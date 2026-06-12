@@ -1,0 +1,137 @@
+// ============================================================
+// Design Tokens — Kraft Paper / Dark Wood
+// ============================================================
+:root {
+  --bg-base: #f8f4ed;
+  --bg-elevated: #fdfbf7;
+  --bg-subtle: #f0ebe0;
+
+  --text-primary: #3e3327;
+  --text-secondary: #7a6c5a;
+  --text-tertiary: #a49480;
+
+  --border-default: #e0d6c5;
+  --border-subtle: #ede4d5;
+
+  --accent: #6a9b50;
+  --accent-rgb: 106, 155, 80;
+  --accent-soft: rgba(106, 155, 80, 0.1);
+  --accent-hover: #55833e;
+  --accent-text: #4d7638;
+
+  --shadow-sm: 0 1px 2px rgba(62, 51, 39, 0.05);
+  --shadow-md: 0 4px 16px rgba(62, 51, 39, 0.07);
+  --shadow-lg: 0 12px 40px rgba(62, 51, 39, 0.09);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 999px;
+
+  // Keep legacy vars for compatibility
+  --bg-color: var(--bg-base);
+  --bg-secondary: var(--bg-elevated);
+  --bg-primary: var(--bg-elevated);
+  --bg-primary-rgb: 253, 251, 247;
+  --bg-secondary-rgb: 240, 235, 224;
+  --text-color: var(--text-primary);
+  --text-color-anti: #ffffff;
+  --border-color: var(--border-default);
+  --hover-color: #f2ece2;
+  --primary-color: var(--accent);
+  --primary-rgb: var(--accent-rgb);
+  --primary-color-dark: var(--accent-hover);
+  --primary-color-alpha: var(--accent-soft);
+  --link-color: var(--accent-text);
+  --tag-bg: var(--bg-subtle);
+  --card-bg: var(--bg-elevated);
+  --shadow-color: rgba(62, 51, 39, 0.07);
+  --danger-color: #c8484a;
+  --danger-color-dark: #a33a3c;
+  --navbar-bg: rgba(248, 244, 237, 0.8);
+  --main-content-bg: var(--bg-base);
+  --secondary-bg: var(--bg-subtle);
+  --navbar-title: var(--text-primary);
+  --navbar-subtitle: var(--text-tertiary);
+  --navbar-link: var(--text-secondary);
+  --navbar-link-active: var(--text-primary);
+  --navbar-link-hover: var(--text-primary);
+  --navbar-border: var(--border-subtle);
+  --navbar-glow-color-1: var(--accent);
+  --navbar-glow-color-2: var(--accent-text);
+  --hole-bg-color: #fdfbf7;
+  --hole-border-color: #3e3327;
+  --accent-color: var(--accent);
+  --accent-light: var(--accent-soft);
+  --accent-light-rgb: var(--accent-rgb);
+  --programming-language-logotype-bg-color: rgba(122, 108, 90, 0.1);
+  --shadow: var(--shadow-sm);
+  --code-bg: #ece3d2;
+  --code-text: var(--text-primary);
+  --code-lang-color: var(--text-tertiary);
+}
+
+.dark {
+  --bg-base: #1b1612;
+  --bg-elevated: #241e19;
+  --bg-subtle: #2d2620;
+
+  --text-primary: #ede4d6;
+  --text-secondary: #b0a290;
+  --text-tertiary: #7d7060;
+
+  --border-default: #3a3229;
+  --border-subtle: #2a241f;
+
+  --accent: #78b860;
+  --accent-rgb: 120, 184, 96;
+  --accent-soft: rgba(120, 184, 96, 0.12);
+  --accent-hover: #8fc97a;
+  --accent-text: #8fc97a;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.45);
+
+  // Keep legacy vars for compatibility
+  --bg-color: var(--bg-base);
+  --bg-secondary: var(--bg-elevated);
+  --bg-primary: var(--bg-elevated);
+  --bg-primary-rgb: 36, 30, 25;
+  --bg-secondary-rgb: 45, 38, 32;
+  --text-color: var(--text-primary);
+  --text-color-anti: #000000;
+  --border-color: var(--border-default);
+  --hover-color: #2d2620;
+  --primary-color: var(--accent);
+  --primary-rgb: var(--accent-rgb);
+  --primary-color-dark: var(--accent-hover);
+  --primary-color-alpha: var(--accent-soft);
+  --link-color: var(--accent-text);
+  --tag-bg: var(--bg-subtle);
+  --card-bg: var(--bg-elevated);
+  --shadow-color: rgba(0, 0, 0, 0.4);
+  --danger-color: #e06060;
+  --danger-color-dark: #c8484a;
+  --navbar-bg: rgba(27, 22, 18, 0.8);
+  --main-content-bg: var(--bg-base);
+  --secondary-bg: var(--bg-subtle);
+  --navbar-title: var(--text-primary);
+  --navbar-subtitle: var(--text-tertiary);
+  --navbar-link: var(--text-secondary);
+  --navbar-link-active: var(--text-primary);
+  --navbar-link-hover: var(--text-primary);
+  --navbar-border: var(--border-subtle);
+  --navbar-glow-color-1: var(--accent);
+  --navbar-glow-color-2: var(--accent-text);
+  --hole-bg-color: #1b1612;
+  --hole-border-color: #ede4d6;
+  --accent-color: var(--accent);
+  --accent-light: var(--accent-soft);
+  --accent-light-rgb: var(--accent-rgb);
+  --programming-language-logotype-bg-color: rgba(176, 162, 144, 0.08);
+  --shadow: var(--shadow-sm);
+  --code-bg: #14110e;
+  --code-text: #c9d1d9;
+  --code-lang-color: #8b949e;
+}
