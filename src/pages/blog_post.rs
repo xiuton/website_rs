@@ -316,7 +316,7 @@ pub fn BlogPostView(slug: String) -> Element {
                                 let y = cy + level_r * angle.sin();
                                 format!("{:.1},{:.1}", x, y)
                             }).collect();
-                            grid_lines.push_str(&format!("<polygon points=\"{}\" fill=\"none\" stroke=\"var(--border-subtle)\" stroke-width=\"0.5\"/>", level_points.join(" ")));
+                            grid_lines.push_str(&format!("<polygon points=\"{}\" fill=\"none\" stroke=\"var(--border-default)\" stroke-width=\"0.6\"/>", level_points.join(" ")));
                         }
 
                         // 生成轴线
@@ -325,7 +325,7 @@ pub fn BlogPostView(slug: String) -> Element {
                             let angle = -std::f64::consts::PI / 2.0 + 2.0 * std::f64::consts::PI * i as f64 / n as f64;
                             let x = cx + r * angle.cos();
                             let y = cy + r * angle.sin();
-                            axis_lines.push_str(&format!("<line x1=\"{:.1}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"var(--border-subtle)\" stroke-width=\"0.5\"/>", cx, cy, x, y));
+                            axis_lines.push_str(&format!("<line x1=\"{:.1}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"var(--border-default)\" stroke-width=\"0.5\"/>", cx, cy, x, y));
                         }
 
                         // 生成数据区域
