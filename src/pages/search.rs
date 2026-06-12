@@ -95,6 +95,23 @@ pub fn Search() -> Element {
         });
     });
 
+    // 加载 RAKE 关键词
+    let mut rake_loaded = use_signal(|| false);
+    let mut engine_for_rake = engine_ref.clone();
+    use_effect(move || {
+        spawn(async move {
+            let resp = gloo_net::http::Request::get("/static/rake-keywords.json")
+                .send()
+                .await;
+            if let Ok(resp) = resp {
+                if let Ok(text) = resp.text().await {
+                    engine_for_rake.write().load_rake(&text).ok();
+                    rake_loaded.set(true);
+                }
+            }
+        });
+    });
+
     let mut query = use_signal(|| get_initial_query());
     let mut results = use_signal(|| Vec::<SearchResult>::new());
     let mut suggestions = use_signal(Vec::<Suggestion>::new);
@@ -247,8 +264,8 @@ pub fn Search() -> Element {
                                 let items = suggestions.read().clone();
                                 items.into_iter().enumerate().map(|(idx, s)| {
                                     let text = s.text;
-                                    let kind_class = if s.kind == "title" { "search-ac-kind search-ac-kind--title" } else { "search-ac-kind" };
-                                    let kind_label = if s.kind == "title" { "文章" } else { "标签" };
+                                    let kind_class = if s.kind == "title" { "search-ac-kind search-ac-kind--title" } else if s.kind == "keyword" { "search-ac-kind search-ac-kind--keyword" } else { "search-ac-kind" };
+                                    let kind_label = if s.kind == "title" { "文章" } else if s.kind == "keyword" { "关键词" } else { "标签" };
                                     rsx! {
                                         div {
                                             class: "search-ac-item",

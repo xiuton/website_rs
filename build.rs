@@ -96,6 +96,12 @@ fn main() {
     // 生成马尔可夫链续写数据
     generate_markov_chain(&posts);
 
+    // RAKE 关键词提取
+    generate_rake_keywords(&posts);
+
+    // LDA 主题模型
+    generate_lda_topics(&posts);
+
     println!("cargo:rerun-if-changed=build.rs");
 }
 
@@ -1761,4 +1767,484 @@ fn generate_markov_chain(posts: &[PostData]) {
     let dest = Path::new("static/markov.json");
     std::fs::write(dest, &json).expect("Failed to write markov json");
     println!("markov.json written with {} articles", entries.len());
+}
+
+// ══════════════════════════════════════════════════════════
+// RAKE 关键词提取
+// ══════════════════════════════════════════════════════════
+
+/// RAKE 短语分隔符（英文标点 + 中文句读 + 常见停用词）
+const RAKE_DELIMITERS: &[&str] = &[
+    ",", ".", ":", ";", "!", "?", "(", ")", "[", "]", "{", "}", "\"", "'",
+    "，", "。", "：", "；", "！", "？", "（", "）", "【", "】", "《", "》",
+    "—", "…", "、", "”", "“", "‘", "’",
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "could",
+    "should", "may", "might", "can", "shall", "to", "of", "in", "for",
+    "on", "with", "at", "by", "from", "as", "into", "through", "during",
+    "before", "after", "above", "below", "between", "out", "off", "over",
+    "under", "again", "further", "then", "once", "here", "there", "when",
+    "where", "why", "how", "all", "both", "each", "few", "more", "most",
+    "other", "some", "such", "no", "nor", "not", "only", "own", "same",
+    "so", "than", "too", "very", "and", "but", "or", "if", "this", "that",
+    "it", "its", "we", "you", "he", "she", "they", "my", "your", "our",
+    "their", "me", "him", "her", "us", "them", "i", "just", "about",
+    "also", "what", "which", "who", "whom", "的", "了", "在", "是",
+    "我", "有", "和", "就", "不", "人", "都", "一", "一个", "上",
+    "也", "很", "到", "说", "要", "去", "你", "会", "着", "没有",
+    "看", "好", "自己", "这", "他", "她", "它", "们", "那", "些",
+    "所", "被", "把", "让", "用", "对", "与", "或", "及", "但",
+    "而", "且", "因为", "所以", "如果", "虽然", "然而", "因此",
+    "然后", "可以", "已经", "还是", "比较", "非常", "之后", "之前",
+    "这个", "那个", "这些", "那些", "什么", "怎么", "怎样", "如何",
+    "为什么", "是不是", "这样", "那样", "一样", "时候", "现在",
+    "一种", "其中", "其他", "很多", "需要", "可能", "一定", "必须",
+    "应该", "能够", "不能", "不会", "不断", "通过", "进行", "使用",
+    "实现", "问题", "方式", "情况", "方法", "过程", "结果", "不同",
+    "主要", "基本", "重要", "一般", "目前", "我们", "他们", "表示",
+    "处理", "提供", "支持", "包括", "开发", "运行", "相关", "存在",
+    "直接", "得到", "发生", "成为", "开始", "继续", "作用", "利用",
+    "考虑", "完成", "工作", "系统", "技术", "内容", "数据", "信息",
+    "产生", "具有", "这里", "觉得", "知道", "真的", "喜欢", "帮助",
+    "影响", "来说", "东西", "全部", "完全", "变化", "理解", "还有",
+];
+
+/// 检查一个 token 是否为 RAKE 分隔符
+fn is_rake_delimiter(token: &str) -> bool {
+    RAKE_DELIMITERS.contains(&token.to_lowercase().as_str())
+}
+
+/// RAKE 关键词提取
+/// 返回 (关键词, 分数) 列表，按分数降序排列
+fn rake_extract(text: &str, max_keywords: usize) -> Vec<(String, f64)> {
+    if text.trim().is_empty() {
+        return Vec::new();
+    }
+
+    // 1. 分词
+    let tokens = markov_tokenize(text);
+
+    // 2. 按分隔符切分成候选短语
+    let mut phrases: Vec<Vec<String>> = Vec::new();
+    let mut current_phrase: Vec<String> = Vec::new();
+
+    for token in &tokens {
+        if is_rake_delimiter(token) {
+            if !current_phrase.is_empty() {
+                // 过滤掉只有一个字的短语（对中文）
+                let phrase_text: String = current_phrase.iter().map(|s| s.as_str()).collect();
+                if phrase_text.chars().count() >= 2 {
+                    phrases.push(std::mem::take(&mut current_phrase));
+                } else {
+                    current_phrase.clear();
+                }
+            }
+        } else {
+            current_phrase.push(token.clone());
+        }
+    }
+    if !current_phrase.is_empty() {
+        let phrase_text: String = current_phrase.iter().map(|s| s.as_str()).collect();
+        if phrase_text.chars().count() >= 2 {
+            phrases.push(current_phrase);
+        }
+    }
+
+    if phrases.is_empty() {
+        return Vec::new();
+    }
+
+    // 3. 构建词频和词共现度
+    let mut word_freq: HashMap<String, f64> = HashMap::new();
+    let mut word_degree: HashMap<String, f64> = HashMap::new();
+
+    for phrase in &phrases {
+        let len = phrase.len() as f64;
+        for word in phrase {
+            *word_freq.entry(word.clone()).or_insert(0.0) += 1.0;
+            *word_degree.entry(word.clone()).or_insert(0.0) += len - 1.0; // 与其他词的共现
+        }
+    }
+
+    // 4. 计算词分数：degree / frequency
+    let mut word_score: HashMap<String, f64> = HashMap::new();
+    for (word, &freq) in &word_freq {
+        let degree = word_degree.get(word).copied().unwrap_or(0.0);
+        word_score.insert(word.clone(), degree / freq.max(1.0));
+    }
+
+    // 5. 计算候选短语分数：sum of word scores
+    let mut phrase_scores: Vec<(String, f64)> = phrases
+        .iter()
+        .map(|phrase| {
+            let text: String = phrase.join("");
+            let score: f64 = phrase.iter().map(|w| word_score.get(w).copied().unwrap_or(0.0)).sum();
+            // 短短语有额外加分（避免长短语过于占优）
+            let len_bonus = 1.0 / (phrase.len() as f64).sqrt();
+            (text, score * len_bonus)
+        })
+        .collect();
+
+    // 6. 去重，保留最高分
+    phrase_scores.sort_by(|(t1, s1), (t2, s2)| {
+        t1.cmp(t2).then_with(|| s2.partial_cmp(s1).unwrap_or(std::cmp::Ordering::Equal))
+    });
+    phrase_scores.dedup_by(|(t1, _), (t2, _)| t1 == t2);
+
+    // 7. 按分数排序取 top-N
+    phrase_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    phrase_scores.truncate(max_keywords);
+
+    // 过滤掉常见噪声词（长度太短且分数低的）
+    phrase_scores.retain(|(t, s)| {
+        let char_count = t.chars().count();
+        char_count >= 2 || (char_count == 1 && *s > 2.0)
+    });
+
+    phrase_scores
+}
+
+/// 生成 RAKE 关键词 JSON
+fn generate_rake_keywords(posts: &[PostData]) {
+    if posts.is_empty() {
+        let dest = Path::new("static/rake-keywords.json");
+        std::fs::write(dest, "{}").expect("Failed to write rake keywords");
+        return;
+    }
+
+    let mut json = String::from("{\n");
+
+    for (idx, post) in posts.iter().enumerate() {
+        let source = format!(
+            "{} {} {}",
+            post.title,
+            truncate_utf8_safe(&post.content, 3000),
+            post.tags.join(" ")
+        );
+
+        let keywords = rake_extract(&source, 15);
+
+        let kw_json: Vec<String> = keywords
+            .iter()
+            .map(|(k, s)| format!(r#"["{}",{:.4}]"#, escape_json_string(k), s))
+            .collect();
+
+        json.push_str(&format!(
+            r#"  "{}": [{}]"#,
+            post.slug,
+            kw_json.join(",")
+        ));
+
+        if idx < posts.len() - 1 {
+            json.push_str(",\n");
+        } else {
+            json.push('\n');
+        }
+    }
+
+    json.push_str("}\n");
+
+    let dest = Path::new("static/rake-keywords.json");
+    std::fs::write(dest, &json).expect("Failed to write rake keywords");
+    println!("rake-keywords.json generated");
+}
+
+// ══════════════════════════════════════════════════════════
+// LDA 主题模型（Collapsed Gibbs Sampling）
+// ══════════════════════════════════════════════════════════
+
+/// 对文章进行中文分词（用于 LDA 输入）
+fn lda_tokenize(text: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let chars: Vec<char> = text.chars().collect();
+    let mut i = 0;
+
+    while i < chars.len() {
+        let c = chars[i];
+
+        if c.is_whitespace() || c.is_ascii_punctuation() {
+            i += 1;
+            continue;
+        }
+
+        // 英文单词
+        if c.is_ascii_alphanumeric() {
+            let mut word = String::new();
+            while i < chars.len() && chars[i].is_ascii_alphanumeric() {
+                word.push(chars[i].to_ascii_lowercase());
+                i += 1;
+            }
+            if word.len() >= 2 && !STOP_WORDS.contains(&word.as_str()) {
+                tokens.push(word);
+            }
+        } else {
+            // CJK bigram
+            if i + 1 < chars.len() && !chars[i + 1].is_ascii_punctuation() && !chars[i + 1].is_whitespace() {
+                let bigram: String = [c, chars[i + 1]].iter().collect();
+                tokens.push(bigram);
+            }
+            tokens.push(c.to_string());
+            i += 1;
+        }
+    }
+
+    tokens
+}
+
+/// LDA Collapsed Gibbs Sampling
+struct LdaModel {
+    /// 主题数
+    topics: usize,
+    /// 词汇表 (word → index)
+    vocab: HashMap<String, usize>,
+    /// 词汇表逆映射
+    idx_to_word: Vec<String>,
+    /// 每篇文档的 token 列表（词索引）
+    doc_tokens: Vec<Vec<usize>>,
+    /// 每个 token 当前分配的主题
+    topic_assignments: Vec<Vec<usize>>,
+    /// n_dt[d][t]: 文档 d 中分配给主题 t 的 token 数
+    n_dt: Vec<Vec<f64>>,
+    /// n_wt[w][t]: 词 w 分配给主题 t 的次数
+    n_wt: Vec<Vec<f64>>,
+    /// n_t[t]: 主题 t 的总 token 数
+    n_t: Vec<f64>,
+    alpha: f64,
+    beta: f64,
+}
+
+impl LdaModel {
+    fn new(
+        docs: &[Vec<String>],
+        topics: usize,
+        alpha: f64,
+        beta: f64,
+    ) -> Self {
+        // 构建词汇表
+        let mut vocab: HashMap<String, usize> = HashMap::new();
+        let mut idx_to_word: Vec<String> = Vec::new();
+        for doc in docs {
+            for word in doc {
+                if !vocab.contains_key(word) {
+                    vocab.insert(word.clone(), idx_to_word.len());
+                    idx_to_word.push(word.clone());
+                }
+            }
+        }
+
+        let vocab_size = vocab.len();
+        let n_docs = docs.len();
+        let mut rng = Rng::new();
+
+        // 将文档 token 转为词索引
+        let doc_tokens: Vec<Vec<usize>> = docs
+            .iter()
+            .map(|doc| {
+                doc.iter()
+                    .filter_map(|w| vocab.get(w).copied())
+                    .collect()
+            })
+            .collect();
+
+        // 初始化随机主题分配
+        let mut topic_assignments: Vec<Vec<usize>> = Vec::with_capacity(n_docs);
+        let mut n_dt: Vec<Vec<f64>> = vec![vec![0.0; topics]; n_docs];
+        let mut n_wt: Vec<Vec<f64>> = vec![vec![0.0; topics]; vocab_size];
+        let mut n_t = vec![0.0; topics];
+
+        for (d, tokens) in doc_tokens.iter().enumerate() {
+            let mut assigns = Vec::with_capacity(tokens.len());
+            for &w in tokens {
+                let t = rng.next_usize(topics);
+                assigns.push(t);
+                n_dt[d][t] += 1.0;
+                n_wt[w][t] += 1.0;
+                n_t[t] += 1.0;
+            }
+            topic_assignments.push(assigns);
+        }
+
+        LdaModel {
+            topics,
+            vocab,
+            idx_to_word,
+            doc_tokens,
+            topic_assignments,
+            n_dt,
+            n_wt,
+            n_t,
+            alpha,
+            beta,
+        }
+    }
+
+    /// 运行 Gibbs Sampling
+    fn train(&mut self, iterations: usize) {
+        let vocab_size = self.vocab.len();
+        let mut rng = Rng::new();
+
+        for _ in 0..iterations {
+            for d in 0..self.doc_tokens.len() {
+                for (i, &w) in self.doc_tokens[d].iter().enumerate() {
+                    let old_t = self.topic_assignments[d][i];
+
+                    // 移除当前 token 的计数
+                    self.n_dt[d][old_t] -= 1.0;
+                    self.n_wt[w][old_t] -= 1.0;
+                    self.n_t[old_t] -= 1.0;
+
+                    // 计算每个主题的条件概率
+                    let mut probs = vec![0.0; self.topics];
+                    let mut total = 0.0;
+                    for t in 0..self.topics {
+                        let p_dt = (self.n_dt[d][t] + self.alpha)
+                            / (self.doc_tokens[d].len() as f64 + self.alpha * self.topics as f64);
+                        let p_wt = (self.n_wt[w][t] + self.beta)
+                            / (self.n_t[t] + self.beta * vocab_size as f64);
+                        probs[t] = p_dt * p_wt;
+                        total += probs[t];
+                    }
+
+                    // 采样新主题
+                    let mut r = rng.next_f64() * total;
+                    let mut new_t = 0;
+                    for t in 0..self.topics {
+                        r -= probs[t];
+                        if r <= 0.0 {
+                            new_t = t;
+                            break;
+                        }
+                    }
+
+                    // 分配新主题
+                    self.topic_assignments[d][i] = new_t;
+                    self.n_dt[d][new_t] += 1.0;
+                    self.n_wt[w][new_t] += 1.0;
+                    self.n_t[new_t] += 1.0;
+                }
+            }
+        }
+    }
+
+    /// 获取每篇文档的主题分布
+    fn doc_topic_distribution(&self, d: usize) -> Vec<(usize, f64)> {
+        let total = self.n_dt[d].iter().sum::<f64>() + self.alpha * self.topics as f64;
+        let mut dist: Vec<(usize, f64)> = self.n_dt[d]
+            .iter()
+            .enumerate()
+            .map(|(t, &count)| (t, (count + self.alpha) / total))
+            .collect();
+        dist.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        dist
+    }
+
+    /// 获取每个主题的 top-N 词汇
+    fn topic_words(&self, t: usize, n: usize) -> Vec<(String, f64)> {
+        let vocab_size = self.vocab.len();
+        let total = self.n_t[t] + self.beta * vocab_size as f64;
+
+        let mut word_probs: Vec<(usize, f64)> = (0..vocab_size)
+            .map(|w| (w, (self.n_wt[w][t] + self.beta) / total))
+            .collect();
+        word_probs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        word_probs.truncate(n);
+
+        word_probs
+            .into_iter()
+            .map(|(w, p)| (self.idx_to_word[w].clone(), p))
+            .collect()
+    }
+
+    /// 为主题命名（基于 top words）
+    fn topic_name(&self, t: usize) -> String {
+        let top_words = self.topic_words(t, 5);
+        top_words
+            .iter()
+            .map(|(w, _)| w.as_str())
+            .collect::<Vec<_>>()
+            .join("")
+    }
+}
+
+/// 生成 LDA 主题模型 JSON
+fn generate_lda_topics(posts: &[PostData]) {
+    if posts.len() < 3 {
+        let dest = Path::new("static/lda-topics.json");
+        std::fs::write(dest, "{}").expect("Failed to write lda topics");
+        return;
+    }
+
+    // 为每篇文章分词
+    let docs: Vec<Vec<String>> = posts
+        .iter()
+        .map(|post| {
+            let source = format!(
+                "{} {} {} {}",
+                post.title,
+                post.title, // 标题加权
+                post.tags.join(" "),
+                truncate_utf8_safe(&post.content, 3000)
+            );
+            lda_tokenize(&source)
+        })
+        .collect();
+
+    // 主题数：取文章数 / 2 和 8 的较小值，至少 3
+    let num_topics = (posts.len() / 2).max(3).min(8);
+
+    let mut lda = LdaModel::new(&docs, num_topics, 0.1, 0.01);
+    lda.train(200);
+
+    // 输出 JSON
+    let mut json = String::from("{\n");
+
+    // 主题 → 词汇
+    json.push_str(r#"  "topics": {"#);
+    for t in 0..num_topics {
+        let words = lda.topic_words(t, 8);
+        let words_json: Vec<String> = words
+            .iter()
+            .map(|(w, p)| format!(r#"["{}",{:.4}]"#, escape_json_string(w), p))
+            .collect();
+        json.push_str(&format!(r#""{}": [{}]"#, t, words_json.join(",")));
+        if t < num_topics - 1 {
+            json.push(',');
+        }
+    }
+    json.push_str("},\n");
+
+    // 主题名称
+    json.push_str(r#"  "topic_names": ["#);
+    for t in 0..num_topics {
+        if t > 0 { json.push(','); }
+        json.push('"');
+        json.push_str(&escape_json_string(&lda.topic_name(t)));
+        json.push('"');
+    }
+    json.push_str("],\n");
+
+    // 每篇文章的主题分布
+    json.push_str(r#"  "articles": {"#);
+    for (idx, post) in posts.iter().enumerate() {
+        let dist = lda.doc_topic_distribution(idx);
+        let dist_json: Vec<String> = dist
+            .iter()
+            .map(|(t, p)| format!(r#""{}":{:.4}"#, t, p))
+            .collect();
+        json.push_str(&format!(
+            r#""{}":{{{}}}"#,
+            post.slug,
+            dist_json.join(",")
+        ));
+        if idx < posts.len() - 1 {
+            json.push(',');
+        }
+    }
+    json.push_str("}\n");
+
+    json.push_str("}\n");
+
+    let dest = Path::new("static/lda-topics.json");
+    std::fs::write(dest, &json).expect("Failed to write lda topics");
+    println!("lda-topics.json generated with {} topics", num_topics);
 }

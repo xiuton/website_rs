@@ -75,6 +75,8 @@ pub struct SearchEngine {
     tag_relations: HashMap<String, Vec<String>>,
     /// 语义数据是否已加载
     semantic_loaded: bool,
+    /// RAKE 关键词: slug → [(keyword, score)]
+    rake_keywords: HashMap<String, Vec<(String, f64)>>,
 }
 
 impl SearchEngine {
@@ -87,6 +89,7 @@ impl SearchEngine {
             suggestions: Vec::new(),
             tag_relations: HashMap::new(),
             semantic_loaded: false,
+            rake_keywords: HashMap::new(),
         }
     }
 
@@ -118,6 +121,12 @@ impl SearchEngine {
         self.suggestions = data.suggestions;
         self.tag_relations = data.tag_relations;
         self.semantic_loaded = true;
+        Ok(())
+    }
+
+    /// 加载 RAKE 关键词
+    pub fn load_rake(&mut self, json: &str) -> Result<(), serde_json::Error> {
+        self.rake_keywords = serde_json::from_str(json)?;
         Ok(())
     }
 
@@ -358,6 +367,32 @@ impl SearchEngine {
             // 达到上限
             if results.len() >= 8 {
                 break;
+            }
+        }
+
+        // 添加 RAKE 关键词到自动补全建议
+        if results.len() < 8 && !self.rake_keywords.is_empty() {
+            let mut rake_suggestions: Vec<(&str, f64)> = Vec::new();
+            for kws in self.rake_keywords.values() {
+                for (kw, score) in kws {
+                    let kw_lower = kw.to_lowercase();
+                    if kw_lower.starts_with(&prefix_lower) || kw_lower.contains(&prefix_lower) {
+                        rake_suggestions.push((kw.as_str(), *score));
+                    }
+                }
+            }
+            // 按分数排序取 top
+            rake_suggestions.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            for (kw, _) in rake_suggestions {
+                if results.len() >= 8 {
+                    break;
+                }
+                if seen.insert(kw.to_string()) {
+                    results.push(Suggestion {
+                        text: kw.to_string(),
+                        kind: "keyword",
+                    });
+                }
             }
         }
 

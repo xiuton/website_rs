@@ -5,6 +5,7 @@ use crate::utils::{title, code_highlight, storage};
 use crate::components::icons::{BackArrowIcon, HomeIcon, ScrollTopIcon, TagIcon, WideModeIcon};
 use crate::utils::search::SearchEngine;
 use crate::utils::knowledge_graph::{self, ArticleNode};
+use crate::utils::topics::{self, LdaData};
 use dioxus_router::prelude::{Link, use_route};
 
 fn prepare_blog_html(content: &str) -> String {
@@ -127,6 +128,18 @@ pub fn BlogPostView(slug: String) -> Element {
                 if let Some(node) = graph.articles.get(&slug) {
                     article_node.set(Some(node.clone()));
                 }
+            }
+        });
+    });
+
+    // 加载 LDA 主题数据
+    let mut lda_data = use_signal(|| Option::<LdaData>::None);
+
+    use_effect(move || {
+        spawn(async move {
+            lda_data.set(None);
+            if let Some(data) = topics::load_lda().await {
+                lda_data.set(Some(data));
             }
         });
     });
@@ -273,6 +286,123 @@ pub fn BlogPostView(slug: String) -> Element {
                                         }
                                     }
                                 })}
+                            }
+                        }
+                    })}
+                    // 主题雷达图
+                    {lda_data.read().as_ref().map(|lda| {
+                        let topics = lda.article_topics(&post_slug, 6);
+                        if topics.is_empty() {
+                            return rsx! {};
+                        }
+                        let n = topics.len();
+                        let cx = 100.0;
+                        let cy = 100.0;
+                        let r = 80.0;
+                        let levels = 4;
+
+                        // 生成网格线
+                        let mut grid_lines = String::new();
+                        for level in 1..=levels {
+                            let level_r = r * level as f64 / levels as f64;
+                            let level_points: Vec<String> = topics.iter().enumerate().map(|(i, _)| {
+                                let angle = -std::f64::consts::PI / 2.0 + 2.0 * std::f64::consts::PI * i as f64 / n as f64;
+                                let x = cx + level_r * angle.cos();
+                                let y = cy + level_r * angle.sin();
+                                format!("{:.1},{:.1}", x, y)
+                            }).collect();
+                            grid_lines.push_str(&format!("<polygon points=\"{}\" fill=\"none\" stroke=\"var(--border-subtle)\" stroke-width=\"0.5\"/>", level_points.join(" ")));
+                        }
+
+                        // 生成轴线
+                        let mut axis_lines = String::new();
+                        for (i, _) in topics.iter().enumerate() {
+                            let angle = -std::f64::consts::PI / 2.0 + 2.0 * std::f64::consts::PI * i as f64 / n as f64;
+                            let x = cx + r * angle.cos();
+                            let y = cy + r * angle.sin();
+                            axis_lines.push_str(&format!("<line x1=\"{:.1}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"var(--border-subtle)\" stroke-width=\"0.5\"/>", cx, cy, x, y));
+                        }
+
+                        // 生成数据区域
+                        let data_points: Vec<String> = topics.iter().enumerate().map(|(i, t)| {
+                            let angle = -std::f64::consts::PI / 2.0 + 2.0 * std::f64::consts::PI * i as f64 / n as f64;
+                            let data_r = r * t.probability;
+                            let x = cx + data_r * angle.cos();
+                            let y = cy + data_r * angle.sin();
+                            format!("{:.1},{:.1}", x, y)
+                        }).collect();
+
+                        let data_polygon = format!("<polygon points=\"{}\" fill=\"var(--accent-soft)\" fill-opacity=\"0.35\" stroke=\"var(--accent)\" stroke-width=\"1.5\" stroke-linejoin=\"round\"/>", data_points.join(" "));
+
+                        // 生成数据点
+                        let mut data_dots = String::new();
+                        for (i, t) in topics.iter().enumerate() {
+                            let angle = -std::f64::consts::PI / 2.0 + 2.0 * std::f64::consts::PI * i as f64 / n as f64;
+                            let data_r = r * t.probability;
+                            let x = cx + data_r * angle.cos();
+                            let y = cy + data_r * angle.sin();
+                            data_dots.push_str(&format!("<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"3\" fill=\"var(--accent)\"/>", x, y));
+                        }
+
+                        // 生成标签
+                        let mut labels = String::new();
+                        for (i, t) in topics.iter().enumerate() {
+                            let angle = -std::f64::consts::PI / 2.0 + 2.0 * std::f64::consts::PI * i as f64 / n as f64;
+                            let label_r = r + 14.0;
+                            let x = cx + label_r * angle.cos();
+                            let y = cy + label_r * angle.sin();
+                            let anchor = if x > cx + 2.0 { "start" } else if x < cx - 2.0 { "end" } else { "middle" };
+                            let pct = format!("{:.0}%", t.probability * 100.0);
+                            labels.push_str(&format!("<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"{}\" dominant-baseline=\"middle\" font-size=\"9\" fill=\"var(--text-secondary)\" font-family=\"system-ui, sans-serif\">{}</text>", x, y, anchor, t.topic_name));
+                            labels.push_str(&format!("<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"{}\" dominant-baseline=\"middle\" font-size=\"7\" fill=\"var(--text-tertiary)\" font-family=\"system-ui, sans-serif\">{}</text>", x, y + 11.0, anchor, pct));
+                        }
+
+                        let svg_content = format!(
+                            "{}{}{}{}{}",
+                            grid_lines, axis_lines, data_polygon, data_dots, labels
+                        );
+
+                        rsx! {
+                            div { class: "topic-radar",
+                                h3 { class: "topic-radar-title",
+                                    svg {
+                                        xmlns: "http://www.w3.org/2000/svg",
+                                        view_box: "0 0 24 24",
+                                        width: "16", height: "16",
+                                        fill: "none",
+                                        stroke: "currentColor",
+                                        stroke_width: "2",
+                                        stroke_linecap: "round",
+                                        stroke_linejoin: "round",
+                                        class: "section-icon",
+                                        circle { cx: "12", cy: "12", r: "10" }
+                                        path { d: "M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" }
+                                        path { d: "M2 12h20" }
+                                    }
+                                    "主题分布"
+                                }
+                                div { class: "topic-radar-chart",
+                                    svg {
+                                        xmlns: "http://www.w3.org/2000/svg",
+                                        view_box: "0 0 200 200",
+                                        width: "100%",
+                                        height: "auto",
+                                        style: "max-width: 360px;",
+                                        dangerous_inner_html: svg_content
+                                    }
+                                }
+                                div { class: "topic-radar-legend",
+                                    {topics.iter().map(|t| {
+                                        let pct = format!("{:.0}%", t.probability * 100.0);
+                                        rsx! {
+                                            span { class: "topic-radar-legend-item",
+                                                span { class: "topic-radar-legend-dot", style: "background: var(--accent);" }
+                                                span { class: "topic-radar-legend-name", "{t.topic_name}" }
+                                                span { class: "topic-radar-legend-pct", "{pct}" }
+                                            }
+                                        }
+                                    })}
+                                }
                             }
                         }
                     })}

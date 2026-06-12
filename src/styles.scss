@@ -1399,6 +1399,60 @@ pre code.hljs {
             }
           }
 
+          // ═══ 主题雷达图 ═══
+          .topic-radar {
+            margin-top: 2rem;
+            padding-top: 1.75rem;
+            border-top: 1px solid var(--border-subtle);
+
+            .topic-radar-title {
+              font-size: 1.1rem;
+              font-weight: 600;
+              color: var(--text-primary);
+              margin-bottom: 1rem;
+              display: flex;
+              align-items: center;
+              gap: 0.4rem;
+            }
+
+            .topic-radar-chart {
+              display: flex;
+              justify-content: center;
+              margin-bottom: 1rem;
+            }
+
+            .topic-radar-legend {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 0.5rem 1rem;
+              justify-content: center;
+
+              .topic-radar-legend-item {
+                display: flex;
+                align-items: center;
+                gap: 0.35rem;
+                font-size: 0.8rem;
+                color: var(--text-secondary);
+              }
+
+              .topic-radar-legend-dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                flex-shrink: 0;
+              }
+
+              .topic-radar-legend-name {
+                font-weight: 500;
+              }
+
+              .topic-radar-legend-pct {
+                color: var(--text-tertiary);
+                font-size: 0.75rem;
+              }
+            }
+          }
+
           // ═══ 知识图谱面板 ═══
           .kg-panel {
             margin-top: 2rem;
@@ -1888,6 +1942,11 @@ pre code.hljs {
             &--title {
               background: var(--accent-soft);
               color: var(--accent);
+            }
+
+            &--keyword {
+              background: rgba(139, 92, 246, 0.12);
+              color: #8b5cf6;
             }
           }
         }
@@ -2435,6 +2494,7 @@ pre code.hljs {
         from { opacity: 0; transform: translateY(4px); }
         to { opacity: 1; transform: translateY(0); }
       }
+    }
     }
 
     .footer-content {
@@ -4445,5 +4505,4 @@ html.dark::view-transition-new(root) {
       padding: 1rem;
     }
   }
-} 
 }
