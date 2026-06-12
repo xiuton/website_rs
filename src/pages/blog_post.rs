@@ -7,6 +7,8 @@ use crate::utils::search::SearchEngine;
 use crate::utils::knowledge_graph::{self, ArticleNode};
 use crate::utils::topics::{self, LdaData};
 use dioxus_router::prelude::{Link, use_route};
+use std::collections::HashMap;
+use serde::Deserialize;
 
 fn prepare_blog_html(content: &str) -> String {
     let html = crate::utils::markdown::markdown_to_html(content);
@@ -90,13 +92,12 @@ pub fn BlogPostView(slug: String) -> Element {
             .find(|p| p.slug == s)
     });
 
-    // 加载搜索引擎以获取相关文章推荐
-    let mut related_results = use_signal(|| Vec::<(String, String, String)>::new()); // (slug, title, category)
+    // 加载搜索引擎（关键词匹配相关文章）
+    let mut related_results = use_signal(|| Vec::<(String, String, String)>::new());
 
     use_effect(move || {
         let slug = current_slug();
         spawn(async move {
-            // 重置相关文章
             related_results.set(Vec::new());
             if let Ok(resp) = gloo_net::http::Request::get("/static/search-index.json")
                 .send()
@@ -252,7 +253,7 @@ pub fn BlogPostView(slug: String) -> Element {
                             }
                         })}
                     }
-                    // 相关文章推荐
+                    // 相关文章推荐（关键词匹配）
                     {(!related_results.read().is_empty()).then(|| rsx! {
                         div { class: "related-articles",
                             h3 { class: "related-title",
@@ -272,7 +273,7 @@ pub fn BlogPostView(slug: String) -> Element {
                                 line { x1: "16", y1: "17", x2: "8", y2: "17" }
                                 line { x1: "10", y1: "9", x2: "8", y2: "9" }
                             }
-                            "相关文章"
+                            "关键词相关"
                         }
                             div { class: "related-list",
                                 {related_results.read().iter().map(|(slug, title, category)| {
@@ -289,6 +290,10 @@ pub fn BlogPostView(slug: String) -> Element {
                             }
                         }
                     })}
+                    // 马尔可夫链 AI 续写（紧挨文章正文底部）
+                    MarkovContinuation { slug: post_slug.clone() }
+                    // 相关文章推荐（语义相似度）
+                    RelatedArticles { slug: post_slug.clone() }
                     // 主题雷达图
                     {lda_data.read().as_ref().map(|lda| {
                         let topics = lda.article_topics(&post_slug, 6);
@@ -414,7 +419,23 @@ pub fn BlogPostView(slug: String) -> Element {
 
                         rsx! {
                             div { class: "kg-panel",
-                                h3 { class: "kg-title", "知识关联" }
+                                h3 { class: "kg-title",
+                                    svg {
+                                        xmlns: "http://www.w3.org/2000/svg",
+                                        view_box: "0 0 24 24",
+                                        width: "16", height: "16",
+                                        fill: "none",
+                                        stroke: "currentColor",
+                                        stroke_width: "2",
+                                        stroke_linecap: "round",
+                                        stroke_linejoin: "round",
+                                        class: "section-icon",
+                                        path { d: "M12 2L2 7l10 5 10-5-10-5z" }
+                                        path { d: "M2 17l10 5 10-5" }
+                                        path { d: "M2 12l10 5 10-5" }
+                                    }
+                                    "知识关联"
+                                }
                                 // 图统计栏
                                 div { class: "kg-stats",
                                     div { class: "kg-stat",
@@ -575,8 +596,6 @@ pub fn BlogPostView(slug: String) -> Element {
                             }
                         }
                     })}
-                    // 马尔可夫链 AI 续写（在 article 外，if-let 内）
-                    MarkovContinuation { slug: post_slug.clone() }
                 }
             } else {
                 div { class: "not-found",
@@ -667,6 +686,90 @@ fn MarkovContinuation(slug: String) -> Element {
                 div { class: "markov-output",
                     {output.read().as_str()}
                 }
+            }
+        }
+    }
+}
+
+/// 嵌入数据结构
+#[derive(Debug, Clone, Deserialize)]
+struct RelatedEntry {
+    slug: String,
+    score: f64,
+}
+
+/// 相关文章推荐组件（基于 TF-IDF 余弦相似度）
+#[component]
+fn RelatedArticles(slug: String) -> Element {
+    let mut loaded = use_signal(|| false);
+    let mut related = use_signal(|| Vec::<(String, f64)>::new());
+
+    use_effect(move || {
+        if *loaded.read() {
+            return;
+        }
+        let s = slug.clone();
+        spawn(async move {
+            let resp = gloo_net::http::Request::get("/static/embeddings.json")
+                .send()
+                .await;
+            if let Ok(resp) = resp {
+                if let Ok(text) = resp.text().await {
+                    if let Ok(data) = serde_json::from_str::<HashMap<String, Vec<RelatedEntry>>>(&text) {
+                        if let Some(entries) = data.get(&s) {
+                            let mut items: Vec<(String, f64)> = entries
+                                .iter()
+                                .take(5)
+                                .map(|e| (e.slug.clone(), e.score))
+                                .collect();
+                            items.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                            related.set(items);
+                        }
+                    }
+                }
+            }
+            loaded.set(true);
+        });
+    });
+
+    let items = related.read().clone();
+
+    if items.is_empty() {
+        return rsx! {};
+    }
+
+    rsx! {
+        div { class: "related-articles-semantic",
+            h3 { class: "related-articles-semantic-title",
+                svg {
+                    xmlns: "http://www.w3.org/2000/svg",
+                    view_box: "0 0 24 24",
+                    width: "18", height: "18",
+                    fill: "none", stroke: "currentColor",
+                    stroke_width: "2",
+                    stroke_linecap: "round", stroke_linejoin: "round",
+                    path { d: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20" }
+                    path { d: "M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" }
+                }
+                "相关文章"
+            }
+            div { class: "related-articles-semantic-list",
+                {items.iter().map(|(related_slug, score)| {
+                    let title = BLOG_POSTS.iter()
+                        .find(|p| p.slug == *related_slug)
+                        .map(|p| &p.title[..])
+                        .unwrap_or(related_slug);
+                    let pct = (score * 100.0) as u8;
+                    let to = Route::BlogPostView { slug: related_slug.clone() };
+                    rsx! {
+                        Link {
+                            to,
+                            class: "related-articles-semantic-item",
+                            span { class: "related-articles-semantic-item-title", "{title}" }
+                            span { class: "related-articles-semantic-item-score", "{pct}%" }
+                        }
+                    }
+                })}
             }
         }
     }
