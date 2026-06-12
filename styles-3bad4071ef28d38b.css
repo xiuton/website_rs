@@ -810,6 +810,9 @@ pre code.hljs {
   width: 1rem;
   height: 1rem;
 }
+#main .app:has(.wide-mode) {
+  max-width: 1200px;
+}
 #main .app .main-content {
   transition: background 0.3s, color 0.3s;
 }
@@ -2405,9 +2408,6 @@ html.dark #main .app .main-content .blog-container .blog-post .blog-content code
 }
 #main .app .main-content .search-container .search-explore .search-explore-link:hover svg {
   color: var(--accent);
-}
-#main .app .main-content:has(.wide-mode) {
-  max-width: 1200px;
 }
 #main .app .main-content:has(.wide-mode) .blog-post.wide-mode .blog-nav {
   position: fixed;
