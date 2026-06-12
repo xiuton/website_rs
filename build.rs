@@ -1653,6 +1653,7 @@ fn generate_ai_summaries(posts: &[PostData]) {
 
 /// 为马尔可夫链对文本进行分词（保留标点，中文逐字）
 fn markov_tokenize(text: &str) -> Vec<String> {
+    let disallowed = ['#', '`', '~', '|', '>', '*'];
     let mut tokens = Vec::new();
     let chars: Vec<char> = text.chars().collect();
     let mut i = 0;
@@ -1662,6 +1663,12 @@ fn markov_tokenize(text: &str) -> Vec<String> {
 
         // 跳过空白
         if c.is_whitespace() {
+            i += 1;
+            continue;
+        }
+
+        // 跳过纯 markdown 语法符号（不是正文内容）
+        if disallowed.contains(&c) {
             i += 1;
             continue;
         }
@@ -1718,19 +1725,13 @@ fn generate_markov_chain(posts: &[PostData]) {
                 let nexts = &mut chain[pos].1;
                 if let Some(npos) = nexts.iter().position(|(n, _)| *n == next) {
                     nexts[npos].1 += 1;
-                } else if nexts.len() < 10 {  // 最多保留 10 个后继
+                } else if nexts.len() < 20 {  // 最多保留 20 个后继
                     nexts.push((next, 1));
                 }
             } else {
                 chain.push((key, vec![(next, 1)]));
             }
         }
-
-        // 只保留至少出现 2 次的条目（去噪声）
-        chain.retain(|(_, nexts)| {
-            let total: u32 = nexts.iter().map(|(_, c)| c).sum();
-            total >= 2
-        });
 
         if chain.is_empty() {
             continue;

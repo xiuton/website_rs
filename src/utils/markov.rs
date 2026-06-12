@@ -32,6 +32,19 @@ pub async fn load_markov() -> Result<MarkovData, JsValue> {
     serde_json::from_str(&text).map_err(|e| JsValue::from_str(&format!("JSON 解析失败: {}", e)))
 }
 
+/// 需要过滤的 markdown 语法符号
+const DISALLOWED_CHARS: [char; 6] = ['#', '`', '~', '|', '>', '*'];
+
+/// 判断 token 是否为无用符号
+fn is_disallowed(token: &str) -> bool {
+    if token.len() == 1 {
+        let c = token.chars().next().unwrap();
+        DISALLOWED_CHARS.contains(&c)
+    } else {
+        false
+    }
+}
+
 /// 马尔可夫链生成器
 #[derive(Debug, Clone)]
 pub struct MarkovGenerator {
@@ -71,10 +84,21 @@ impl MarkovGenerator {
         };
 
         let (mut prev1, mut prev2) = match start_pair.clone().or_else(|| {
-            // 从 starters 中随机选一个
-            let idx = (js_sys::Math::random() * chain.s.len() as f64) as usize;
-            let pair = &chain.s[idx.min(chain.s.len() - 1)];
-            Self::split_pair(pair)
+            // 从 starters 中随机选一个（跳过含语法符号的起始对）
+            let mut attempts = 0;
+            loop {
+                let idx = (js_sys::Math::random() * chain.s.len() as f64) as usize;
+                let pair = &chain.s[idx.min(chain.s.len() - 1)];
+                if let Some(p) = Self::split_pair(pair) {
+                    if !is_disallowed(&p.0) && !is_disallowed(&p.1) {
+                        break Some(p);
+                    }
+                }
+                attempts += 1;
+                if attempts > 20 {
+                    break Self::split_pair(pair);
+                }
+            }
         }) {
             Some(p) => p,
             None => return String::new(),
@@ -82,20 +106,33 @@ impl MarkovGenerator {
 
         let mut output_tokens: Vec<String> = if start_pair.is_some() {
             Vec::new()
-        } else {
+        } else if !is_disallowed(&prev1) && !is_disallowed(&prev2) {
             vec![prev1.clone(), prev2.clone()]
+        } else {
+            Vec::new()
         };
 
-        for _ in 0..max_tokens {
+        let mut skipped = 0;
+        for _ in 0..(max_tokens * 2) {
+            if output_tokens.len() >= max_tokens {
+                break;
+            }
             let key = format!("{}||{}", prev1, prev2);
             let nexts = match chain.c.get(&key) {
                 Some(n) => n,
-                None => break, // 无后续，停止生成
+                None => break,
             };
 
             let next = self.weighted_pick(nexts);
             match next {
                 Some(token) => {
+                    if is_disallowed(&token) {
+                        skipped += 1;
+                        if skipped > 20 {
+                            break;
+                        }
+                        continue;
+                    }
                     output_tokens.push(token.clone());
                     prev1 = prev2;
                     prev2 = token;
@@ -157,6 +194,11 @@ fn tokenize_seed(text: &str) -> Vec<String> {
     while i < chars.len() {
         let c = chars[i];
         if c.is_whitespace() {
+            i += 1;
+            continue;
+        }
+        // 跳过 markdown 语法符号（与 build.rs 一致）
+        if DISALLOWED_CHARS.contains(&c) {
             i += 1;
             continue;
         }

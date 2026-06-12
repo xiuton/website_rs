@@ -630,7 +630,7 @@ fn MarkovContinuation(slug: String) -> Element {
         let s = slug.clone();
         spawn(async move {
             if let Some(ref gen) = g {
-                let text = gen.generate(&s, Some(""), 100);
+                let text = gen.generate(&s, Some(""), 300);
                 out_w.set(text);
             } else {
                 out_w.set("暂无该文章的续写模型。".into());
