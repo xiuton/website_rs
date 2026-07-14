@@ -1,6 +1,18 @@
 /target
 /dist
 
+# Build generated files in static/
+/static/embeddings.json
+/static/posts.json
+/static/search-index.json
+/static/semantic.json
+/static/summaries.json
+/static/markov.json
+/static/rake-keywords.json
+/static/lda-topics.json
+/static/knowledge-graph.json
+/static/feed.xml
+
 # OS generated files
 .DS_Store
 Thumbs.db
