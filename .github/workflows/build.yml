@@ -16,7 +16,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4.2.0
+      uses: actions/checkout@v4
       
     - name: Setup Rust toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -44,8 +44,8 @@ jobs:
         trunk build --release
 
     - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v4.0.0
+      uses: JamesIves/github-pages-deploy-action@v4
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: dist
-        publish_branch: gh-pages 
+        token: ${{ secrets.GITHUB_TOKEN }}
+        folder: dist
+        branch: gh-pages 
