@@ -2536,6 +2536,7 @@ dependencies = [
  "futures-channel",
  "gloo-net 0.5.0",
  "js-sys",
+ "regex",
  "serde",
  "serde_json",
  "toml",
