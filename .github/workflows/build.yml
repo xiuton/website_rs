@@ -40,9 +40,23 @@ jobs:
       run: |
         cargo clean
         
+    - name: List posts directory
+      run: |
+        echo "=== Posts directory contents ==="
+        ls -la posts/
+        echo "=== Static directory before build ==="
+        ls -la static/
+        
     - name: Build the project
       run: |
         trunk build --release
+        
+    - name: List static directory after build
+      run: |
+        echo "=== Static directory after build ==="
+        ls -la static/
+        echo "=== Dist static directory ==="
+        ls -la dist/static/
 
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
