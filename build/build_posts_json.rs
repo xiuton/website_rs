@@ -90,11 +90,22 @@ fn sanitize_for_mini_program(html: &str) -> String {
     result = result.replace("<hr>", "<hr/>");
     result = result.replace("<br>", "<br/>");
 
+    let a_tag = Regex::new(r#"<a([^>]*)>(.*?)</a>"#).unwrap();
+    result = a_tag.replace_all(&result, |caps: &regex::Captures| {
+        let attrs = &caps[1];
+        let content = &caps[2];
+        if attrs.contains("href=") {
+            format!("<navigator{}>{}</navigator>", attrs.replace("href=", "url="), content)
+        } else {
+            format!("<span>{}</span>", content)
+        }
+    }).to_string();
+
     let img_tag = Regex::new(r#"<img([^>]*)>"#).unwrap();
     result = img_tag.replace_all(&result, |caps: &regex::Captures| {
         let attrs = &caps[1];
         if attrs.contains("src=") {
-            format!("<img{} style=\"max-width:100%;height:auto;display:block;\"/>", attrs)
+            format!("<img{} mode=\"widthFix\"/>", attrs)
         } else {
             "".to_string()
         }
@@ -109,39 +120,44 @@ fn sanitize_for_mini_program(html: &str) -> String {
     let th_tag = Regex::new(r#"<th([^>]*)>"#).unwrap();
     result = th_tag.replace_all(&result, "<th$1 style=\"border:1px solid #e0e0e0;padding:8px;box-sizing:border-box;background:#f5f5f5;\">").to_string();
 
+    result = result.replace("<div", "<view");
+    result = result.replace("</div>", "</view>");
+    result = result.replace("<span", "<text");
+    result = result.replace("</span>", "</text>");
+
+    result = result.replace("<strong>", "<text style=\"font-weight:bold;\">");
+    result = result.replace("</strong>", "</text>");
+    result = result.replace("<b>", "<text style=\"font-weight:bold;\">");
+    result = result.replace("</b>", "</text>");
+    result = result.replace("<em>", "<text style=\"font-style:italic;\">");
+    result = result.replace("</em>", "</text>");
+    result = result.replace("<i>", "<text style=\"font-style:italic;\">");
+    result = result.replace("</i>", "</text>");
+    result = result.replace("<del>", "<text style=\"text-decoration:line-through;\">");
+    result = result.replace("</del>", "</text>");
+    result = result.replace("<s>", "<text style=\"text-decoration:line-through;\">");
+    result = result.replace("</s>", "</text>");
+
     let code_tag = Regex::new(r#"<code([^>]*)>(.*?)</code>"#).unwrap();
     result = code_tag.replace_all(&result, |caps: &regex::Captures| {
         let attrs = &caps[1];
         let content = &caps[2];
-        format!("<span{} style=\"font-family:monospace;background:#f4f4f4;padding:2px 4px;border-radius:3px;\">{}</span>", attrs, content)
+        format!("<text{} style=\"font-family:monospace;background:#f4f4f4;padding:2px 4px;border-radius:3px;\">{}</text>", attrs, content)
     }).to_string();
 
     let pre_tag = Regex::new(r#"<pre([^>]*)>(.*?)</pre>"#).unwrap();
     result = pre_tag.replace_all(&result, |caps: &regex::Captures| {
         let attrs = &caps[1];
         let content = &caps[2];
-        format!("<div{} style=\"font-family:monospace;background:#f4f4f4;padding:12px;border-radius:8px;overflow-x:auto;\">{}</div>", attrs, content)
+        format!("<view{} style=\"font-family:monospace;background:#f4f4f4;padding:12px;border-radius:8px;overflow-x:auto;\">{}</view>", attrs, content)
     }).to_string();
 
     let blockquote_tag = Regex::new(r#"<blockquote([^>]*)>(.*?)</blockquote>"#).unwrap();
     result = blockquote_tag.replace_all(&result, |caps: &regex::Captures| {
         let attrs = &caps[1];
         let content = &caps[2];
-        format!("<div{} style=\"border-left:4px solid #6a9b50;padding-left:16px;background:#f5f5f5;padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0;\">{}</div>", attrs, content)
+        format!("<view{} style=\"border-left:4px solid #6a9b50;padding-left:16px;background:#f5f5f5;padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0;\">{}</view>", attrs, content)
     }).to_string();
-
-    result = result.replace("<strong>", "<span style=\"font-weight:bold;\">");
-    result = result.replace("</strong>", "</span>");
-    result = result.replace("<b>", "<span style=\"font-weight:bold;\">");
-    result = result.replace("</b>", "</span>");
-    result = result.replace("<em>", "<span style=\"font-style:italic;\">");
-    result = result.replace("</em>", "</span>");
-    result = result.replace("<i>", "<span style=\"font-style:italic;\">");
-    result = result.replace("</i>", "</span>");
-    result = result.replace("<del>", "<span style=\"text-decoration:line-through;\">");
-    result = result.replace("</del>", "</span>");
-    result = result.replace("<s>", "<span style=\"text-decoration:line-through;\">");
-    result = result.replace("</s>", "</span>");
 
     result
 }
