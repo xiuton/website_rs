@@ -48,13 +48,24 @@ jobs:
         echo "=== Static directory before build ==="
         ls -la static/
         
-    - name: Build the project
+    - name: Run build.rs to generate static files
       run: |
-        trunk build --release
+        echo "=== Running build.rs ==="
+        cargo build --release --target wasm32-unknown-unknown 2>&1 | tail -20
         
-    - name: List static directory after build
+    - name: List static directory after build.rs
       run: |
-        echo "=== Static directory after build ==="
+        echo "=== Static directory after build.rs ==="
+        ls -la static/
+        
+    - name: Build the project with trunk
+      run: |
+        echo "=== Running trunk build ==="
+        trunk build --release 2>&1 | tail -20
+        
+    - name: List static directory after trunk
+      run: |
+        echo "=== Static directory after trunk ==="
         ls -la static/
         echo "=== Dist static directory ==="
         ls -la dist/static/
