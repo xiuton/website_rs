@@ -3,6 +3,7 @@ use dioxus_router::prelude::Link;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use crate::routes::Route;
+use crate::components::icons::RssIcon;
 
 #[component]
 pub fn Navbar(is_dark: Signal<bool>) -> Element {
@@ -157,7 +158,17 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                         }
                     })}
                     button {
-                        class: "theme-toggle",
+                        class: "nav-icon-btn rss-toggle",
+                        title: "RSS 订阅",
+                        onclick: move |_| {
+                            if let Some(window) = web_sys::window() {
+                                let _ = window.open_with_url_and_target("/static/feed.xml", "_blank");
+                            }
+                        },
+                        RssIcon {}
+                    }
+                    button {
+                        class: "nav-icon-btn theme-toggle",
                         onclick: onclick,
                         match is_dark() {
                             true => rsx! {

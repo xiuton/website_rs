@@ -1,5 +1,6 @@
 use crate::build_common::*;
 use std::path::Path;
+use comrak::ComrakOptions;
 
 fn format_rfc2822(date_str: &str) -> String {
     // 尝试解析 YYYY-MM-DD 格式的日期，转为 RFC 2822
@@ -35,10 +36,39 @@ fn format_rfc2822(date_str: &str) -> String {
     format!("{}, {:02} {} {:04} 00:00:00 +0800", weekdays[h as usize], day, month_abbr, year)
 }
 
+fn md_to_html(md: &str) -> String {
+    let mut options = ComrakOptions::default();
+    options.extension.table = true;
+    options.extension.strikethrough = true;
+    options.extension.tasklist = true;
+    options.extension.autolink = true;
+    options.extension.footnotes = true;
+    comrak::markdown_to_html(md, &options)
+}
+
+fn date_key(date: &str) -> &str {
+    if date.len() >= 10 { &date[..10] } else { date }
+}
+
 pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
+    // 找到第 3 个不同日期作为全文输出的分界线
+    let mut distinct_dates: Vec<&str> = Vec::new();
+    for post in posts.iter() {
+        let dk = date_key(&post.date);
+        if distinct_dates.last() != Some(&dk) {
+            distinct_dates.push(dk);
+        }
+    }
+    // 不足 3 个不同日期 → 全部全文；否则第 3 个日期及之后的都是全文
+    let full_cutoff: Option<&str> = if distinct_dates.len() > 3 {
+        Some(distinct_dates[2])
+    } else {
+        None
+    };
+
     let mut xml = String::from(concat!(
         r#"<?xml version="1.0" encoding="UTF-8"?>"#,
-        r#"<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">"#,
+        r#"<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">"#,
         r#"<channel>"#,
         r#"<title>干徒的博客</title>"#,
         r#"<link>https://ganto.cn</link>"#,
@@ -47,7 +77,13 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
         r#"<atom:link href="https://ganto.cn/feed.xml" rel="self" type="application/rss+xml"/>"#,
     ));
 
-    for post in posts.iter().take(20) {
+    let total = posts.len().min(50);
+    for post in posts.iter().take(total) {
+        let is_full = match full_cutoff {
+            Some(cutoff) => date_key(&post.date) >= cutoff,
+            None => true,
+        };
+
         xml.push_str("<item>\n");
         xml.push_str(&format!(
             "  <title>{}</title>\n",
@@ -87,6 +123,15 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
             xml.push_str(&format!(
                 "  <description>{}</description>\n",
                 escape_xml(&excerpt)
+            ));
+        }
+
+        // 全文输出：用 content:encoded 包裹 CDATA
+        if is_full {
+            let html = md_to_html(&post.content);
+            xml.push_str(&format!(
+                "  <content:encoded><![CDATA[{}]]></content:encoded>\n",
+                html
             ));
         }
 

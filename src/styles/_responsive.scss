@@ -41,8 +41,7 @@
         font-size: 0.75rem;
       }
 
-      .theme-toggle {
-        margin-left: auto;
+      .nav-icon-btn {
         padding: 0.25rem 0.4rem;
         flex-shrink: 0;
 
@@ -50,6 +49,10 @@
           width: 1rem;
           height: 1rem;
         }
+      }
+
+      .theme-toggle {
+        margin-left: auto;
       }
     }
 
