@@ -1,5 +1,39 @@
-﻿use crate::build_common::*;
+use crate::build_common::*;
 use std::path::Path;
+
+fn format_rfc2822(date_str: &str) -> String {
+    // 尝试解析 YYYY-MM-DD 格式的日期，转为 RFC 2822
+    if date_str.len() < 10 {
+        return date_str.to_string();
+    }
+
+    let parts: Vec<&str> = date_str[..10].split('-').collect();
+    if parts.len() != 3 {
+        return date_str.to_string();
+    }
+
+    let year: i32 = match parts[0].parse() { Ok(y) => y, Err(_) => return date_str.to_string() };
+    let month: u32 = match parts[1].parse() { Ok(m) => m, Err(_) => return date_str.to_string() };
+    let day: u32 = match parts[2].parse() { Ok(d) => d, Err(_) => return date_str.to_string() };
+
+    let month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let month_abbr = if month >= 1 && month <= 12 {
+        month_names[(month - 1) as usize]
+    } else {
+        return date_str.to_string();
+    };
+
+    // 计算星期几（Zeller 公式简化版）
+    let (m, y) = if month <= 2 { (month + 12, year - 1) } else { (month, year) };
+    let q = day;
+    let k = (y % 100) as u32;
+    let j = (y / 100) as u32;
+    let h = (q + (13 * (m + 1)) / 5 + k + k / 4 + j / 4 + 5 * j) % 7;
+    let weekdays = ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"];
+
+    format!("{}, {:02} {} {:04} 00:00:00 +0800", weekdays[h as usize], day, month_abbr, year)
+}
 
 pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
     let mut xml = String::from(concat!(
@@ -30,12 +64,8 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
         ));
         xml.push_str("</guid>\n");
 
-        // RSS pubDate 格式: RFC 2822
-        let pub_date = if post.date.len() >= 10 {
-            format!("{} 00:00:00 +0800", &post.date[..10])
-        } else {
-            post.date.clone()
-        };
+        // RSS pubDate 格式: RFC 2822（如 Mon, 29 Jan 2026 00:00:00 +0800）
+        let pub_date = format_rfc2822(&post.date);
         xml.push_str(&format!("  <pubDate>{}</pubDate>\n", escape_xml(&pub_date)));
 
         xml.push_str(&format!(
