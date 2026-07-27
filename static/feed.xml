@@ -1,10 +1,94 @@
-<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>干徒的博客</title><link>https://ganto.cn</link><description>干徒 (Ganto) 的个人技术博客，分享 Rust、前端、WebAssembly 等编程技术文章。</description><language>zh-CN</language><atom:link href="https://ganto.cn/feed.xml" rel="self" type="application/rss+xml"/><item>
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>干徒的博客</title><link>https://ganto.cn</link><description>干徒 (Ganto) 的个人技术博客，分享 Rust、前端、WebAssembly 等编程技术文章。</description><language>zh-CN</language><atom:link href="https://ganto.cn/feed.xml" rel="self" type="application/rss+xml"/><item>
   <title>人工智能（AI）基础解析</title>
   <link>https://ganto.cn/post/20260129</link>
   <guid isPermaLink="true">https://ganto.cn/post/20260129</guid>
   <pubDate>Thu, 29 Jan 2026 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>人工智能（AI）已经越来越融入我们的生活，从智能助手到智能机器人，从智能交通到智能医疗，AI正在改变我们的世界。</description>
+  <content:encoded><![CDATA[<h2>一、AI的定义</h2>
+<p>人工智能（Artificial Intelligence，简称AI）是一门研究、开发用于<strong>模拟、延伸和扩展人类智能</strong>的理论、方法、技术及应用系统的技术科学，核心目标是让机器具备类似人类的感知、推理、学习、决策、创造等智能行为，能够自主处理问题并适应不同场景。</p>
+<p>AI并非单一技术，而是一门交叉学科，融合了计算机科学、数学、统计学、神经科学、语言学、心理学等多个领域的知识，是现代科技发展的核心方向之一。</p>
+<h2>二、AI的核心特征</h2>
+<ol>
+<li><strong>感知能力</strong>：机器通过传感器、算法识别和接收外界信息，如视觉（图像识别、计算机视觉）、听觉（语音识别）、触觉（传感器感知）等，模拟人类的五官感知。</li>
+<li><strong>学习能力</strong>：机器从数据、经验中自动总结规律，优化自身性能，无需人工手动修改代码，是AI的核心能力之一，也是实现智能的基础。</li>
+<li><strong>推理与决策能力</strong>：机器根据已学知识和感知到的信息，进行逻辑分析、归纳演绎，进而做出判断和决策，解决实际问题。</li>
+<li><strong>自适应能力</strong>：面对不同的输入、环境变化，机器能调整自身的算法和策略，保持处理问题的有效性，如智能机器人适应不同的行走场景。</li>
+<li><strong>交互能力</strong>：通过自然语言处理、情感识别等技术，实现机器与人类、机器与机器之间的高效沟通，如智能音箱、聊天机器人。</li>
+</ol>
+<h2>三、AI的主要分类</h2>
+<p>从<strong>智能程度</strong>和<strong>应用场景</strong>出发，AI可分为三大类，也是行业内公认的分类方式，三者代表了AI发展的不同阶段：</p>
+<h3>1. 弱人工智能（Narrow AI）</h3>
+<p>也叫<strong>专用人工智能</strong>，是目前技术发展的主流，指仅能在<strong>特定领域</strong>完成单一任务的AI，其智能局限于预设的场景和任务范围，不具备通用的自主思考能力。<br />
+<strong>典型应用</strong>：人脸识别、语音助手（Siri、小爱同学）、推荐算法（电商/视频平台）、自动驾驶（L2-L4级）、ChatGPT等大语言模型、图像生成工具（Midjourney、Stable Diffusion）。</p>
+<h3>2. 强人工智能（General AI）</h3>
+<p>也叫<strong>通用人工智能</strong>，是理想中的AI形态，指具备与<strong>人类同等水平</strong>的通用智能，能够理解、学习人类可掌握的任何知识和技能，在任意领域完成复杂任务，拥有自主意识、情感和独立思考能力，能像人类一样适应不同的未知场景。<br />
+目前强人工智能仍处于理论研究阶段，尚未实现。</p>
+<h3>3. 超人工智能（Super AI）</h3>
+<p>指在<strong>所有领域</strong>的智能表现都远超人类的AI，不仅具备人类的智能和意识，还能在科学研究、创造、决策等方面做出超越人类极限的判断和成果。<br />
+超人工智能属于未来的假想形态，其发展可能性和潜在影响仍是学术界的探讨话题。</p>
+<h2>四、AI的核心技术领域</h2>
+<p>AI的实现依赖于多个核心技术的协同发展，主要关键领域包括：</p>
+<ol>
+<li><strong>机器学习（Machine Learning, ML）</strong>：AI的核心技术，让机器通过数据自动学习规律，无需人工编程设定规则。下分监督学习、无监督学习、强化学习等主流方法，是后续各类AI技术的基础。</li>
+<li><strong>深度学习（Deep Learning, DL）</strong>：机器学习的一个分支，基于多层神经网络模拟人类大脑的神经元连接方式，处理复杂的海量数据，是推动现代AI爆发式发展的核心，广泛应用于图像、语音、自然语言处理。</li>
+<li><strong>自然语言处理（Natural Language Processing, NLP）</strong>：让机器理解、处理、生成人类的自然语言，实现人机语言交互，核心应用包括机器翻译、聊天机器人、文本摘要、情感分析等，大语言模型（LLM）是其现阶段的高级形态。</li>
+<li><strong>计算机视觉（Computer Vision, CV）</strong>：让机器“看懂”图像和视频，实现对视觉信息的识别、检测、分割、生成，应用包括人脸识别、车牌识别、图像分类、目标检测、自动驾驶视觉感知等。</li>
+<li><strong>语音识别与合成</strong>：属于NLP和CV的交叉领域，实现语音到文字的转换（识别）和文字到语音的转换（合成），应用包括语音助手、实时语音翻译、有声书生成等。</li>
+<li><strong>强化学习（Reinforcement Learning, RL）</strong>：让机器通过“试错”学习，在与环境的交互中通过奖励和惩罚优化行为策略，广泛应用于智能机器人、游戏AI、自动驾驶决策等场景。</li>
+<li><strong>知识图谱</strong>：以图形化结构描述事物之间的关联关系，让机器具备“知识储备”，提升推理和决策的准确性，应用于智能搜索、推荐系统、金融风控等。</li>
+</ol>
+<h2>五、AI的主要应用场景</h2>
+<p>如今AI已渗透到社会生产和生活的各个领域，成为推动产业升级和生活便捷化的重要力量，核心应用场景包括：</p>
+<h3>1. 日常生活</h3>
+<p>智能语音助手、智能家电、人脸识别解锁、短视频/电商推荐算法、聊天机器人、地图导航的路径规划等。</p>
+<h3>2. 工业与制造业</h3>
+<p>工业机器人（焊接、装配、分拣）、智能制造的质量检测、生产流程优化、预测性维护（通过数据预判设备故障）等。</p>
+<h3>3. 金融领域</h3>
+<p>智能风控（识别欺诈交易）、算法交易、智能投顾、信用评级、客服机器人等。</p>
+<h3>4. 医疗健康</h3>
+<p>医学影像诊断（AI识别肿瘤、病灶）、辅助临床决策、药物研发（加速分子筛选）、个性化诊疗方案制定、智能养老设备等。</p>
+<h3>5. 交通出行</h3>
+<p>自动驾驶、智能交通调度（红绿灯优化、拥堵疏导）、网约车智能派单、物流路径优化等。</p>
+<h3>6. 教育领域</h3>
+<p>个性化学习（根据学生情况推送学习内容）、AI作业批改、智能答疑机器人、教育大数据分析等。</p>
+<h3>7. 文创与娱乐</h3>
+<p>AI绘画、AI生成文案/音乐/视频、游戏AI（智能NPC）、影视特效制作优化等。</p>
+<h3>8. 公共安全与政务</h3>
+<p>人脸识别安防、视频监控智能分析、疫情防控数据统计、政务智能审批、智能客服等。</p>
+<h2>六、AI的发展历程</h2>
+<p>AI的发展并非一帆风顺，经历了多次起伏，至今已有70余年的历史，核心阶段可概括为：</p>
+<ol>
+<li><strong>诞生期（1950s）</strong>：1950年，图灵发表《计算机器与智能》，提出“图灵测试”，成为AI的理论基础；1956年，达特茅斯会议召开，正式提出“人工智能”概念，AI作为一门学科诞生。</li>
+<li><strong>第一次繁荣期（1956-1970s）</strong>：早期AI算法取得突破，实现了简单的定理证明、语言翻译，人们对AI充满期待，政府和企业加大投入。</li>
+<li><strong>第一次寒冬（1970s-1980s）</strong>：受限于计算机算力和数据量，早期AI无法实现复杂任务，理论和技术遇到瓶颈，资金投入大幅减少。</li>
+<li><strong>第二次繁荣期（1980s-1990s）</strong>：专家系统、机器学习算法发展，AI在商业领域开始应用，同时神经网络技术初步探索。</li>
+<li><strong>第二次寒冬（1990s-2000s）</strong>：专家系统维护成本高、通用性差，神经网络技术发展缓慢，AI再次陷入低谷。</li>
+<li><strong>现代AI爆发期（2010s至今）</strong>：随着大数据、云计算、算力的爆发式增长，深度学习算法取得重大突破，AlphaGo（2016）击败人类围棋冠军，大语言模型（ChatGPT2022）、多模态AI相继出现，AI进入工业化应用阶段，渗透到各个领域。</li>
+</ol>
+<h2>七、AI的争议与挑战</h2>
+<p>AI在推动科技和社会发展的同时，也带来了一系列伦理、社会和技术层面的挑战，成为全球关注的焦点：</p>
+<ol>
+<li><strong>就业结构调整</strong>：部分重复性、标准化的工作（如流水线工人、传统客服、数据录入员）可能被AI替代，导致相关岗位人员失业，需要社会进行就业转型和技能培训。</li>
+<li><strong>伦理与道德问题</strong>：AI的决策黑箱（无法解释决策原因）、算法偏见（如人脸识别对特定人群的误判）、隐私泄露（AI收集和分析海量个人数据）、深度伪造（AI生成虚假图像/视频/语音）带来的信息造假问题。</li>
+<li><strong>技术安全风险</strong>：AI系统的漏洞可能被恶意利用，如自动驾驶被黑客攻击、军用AI武器的潜在风险，以及强人工智能实现后的失控风险。</li>
+<li><strong>人类能力退化</strong>：过度依赖AI的辅助功能（如导航、翻译、计算），可能导致人类自身的记忆、推理、动手能力逐渐退化。</li>
+<li><strong>全球发展不平衡</strong>：发达国家掌握AI核心技术和算力资源，发展中国家可能面临“数字鸿沟”，加剧全球科技和经济发展的不平衡。</li>
+</ol>
+<h2>八、AI的未来发展趋势</h2>
+<ol>
+<li><strong>多模态AI成为主流</strong>：从单一的文本/图像/语音AI，向融合文本、图像、语音、视频、触觉的多模态AI发展，实现更自然的人机交互。</li>
+<li><strong>大模型向轻量化、定制化发展</strong>：通用大模型的算力成本高，未来将向轻量化的端侧AI（运行在手机、机器人等终端设备）、针对特定行业的定制化大模型发展。</li>
+<li><strong>AI与实体经济深度融合</strong>：AI将不再是独立的技术工具，而是与制造业、农业、医疗、金融等实体经济深度结合，推动产业数字化、智能化升级。</li>
+<li><strong>AI治理体系逐步完善</strong>：全球各国将加强AI的立法和监管，建立统一的AI伦理和安全标准，规范AI的研发和应用，防范技术风险。</li>
+<li><strong>脑科学与AI的交叉融合</strong>：通过研究人类大脑的工作机制，推动类脑智能的发展，让AI更接近人类的自然智能，而非单纯的算法模拟。</li>
+<li><strong>人机协同成为常态</strong>：AI并非替代人类，而是成为人类的“智能助手”，实现人类与AI的优势互补，如医生+AI影像诊断、设计师+AI创意生成。</li>
+</ol>
+<h2>九、总结</h2>
+<p>人工智能是人类科技发展的重要里程碑，其本质是用机器模拟人类智能，解决人类难以完成的复杂任务，推动社会生产效率的提升和生活方式的变革。</p>
+<p>目前的AI仍处于<strong>弱人工智能阶段</strong>，虽已实现诸多领域的应用，但远未达到具备自主意识的强人工智能。未来，AI的发展将是技术突破、产业应用和治理体系完善的协同过程，如何在利用AI推动发展的同时，规避其潜在风险，实现AI与人类社会的和谐共生，是全球需要共同面对的课题。</p>
+<p>AI的核心价值并非替代人类，而是<strong>延伸人类的能力边界</strong>，让人类从重复性的工作中解放出来，专注于创意、创新、情感交流等人类独有的领域。</p>
+]]></content:encoded>
   <category>Artificial Intelligence</category>
 </item>
 <item>
@@ -18,6 +102,9 @@
 
 Dioxus 是用于构建全栈 Web、桌面和移动应用程序的 Rust 框架。使用实时热重载进行迭代，添加服务器函数，并在创纪录的时间内进行部署。
 </description>
+  <content:encoded><![CDATA[<p>官网：<a href="https://dioxuslabs.com/">https://dioxuslabs.com/</a></p>
+<p>Dioxus 是用于构建全栈 Web、桌面和移动应用程序的 Rust 框架。使用实时热重载进行迭代，添加服务器函数，并在创纪录的时间内进行部署。</p>
+]]></content:encoded>
   <category>Rust</category>
   <category>Dioxus</category>
 </item>
@@ -44,6 +131,84 @@ trait Computer {
 struct CommandLineComputer;
 
 impl Compute</description>
+  <content:encoded><![CDATA[<pre><code class="language-rust">use std::io;
+use std::io::Write;
+
+fn main() {
+    let mut user_typer = UserTyper::new(CommandLineComputer);
+    user_typer.type_expr();
+    println!(&quot;Result: {}&quot;, user_typer.compute());
+}
+
+trait Computer {
+    fn compute(&amp;self, expr: &amp;str) -&gt; i32;
+}
+
+struct CommandLineComputer;
+
+impl Computer for CommandLineComputer {
+    fn compute(&amp;self, expr: &amp;str) -&gt; i32 {
+        let mut num1 = String::new();
+        let mut num2 = String::new();
+        let mut op: Option&lt;char&gt; = None;
+
+        for c in expr.trim().chars() {
+            if c.is_digit(10) {
+                if op.is_none() {
+                    num1.push(c);
+                } else {
+                    num2.push(c);
+                }
+                continue;
+            }
+            match c {
+                '+' | '-' | '*' | '/' if op.is_none() =&gt; op = Some(c),
+                _ if c.is_whitespace() =&gt; continue,
+                _ =&gt; panic!(&quot;Invalid character: {}&quot;, c),
+            }
+        }
+
+        if num1.is_empty() || num2.is_empty() || op.is_none() {
+            panic!(&quot;Invalid expression: {}&quot;, expr);
+        }
+
+        let num1 = num1.parse::&lt;i32&gt;().unwrap();
+        let num2: i32 = num2.parse().unwrap();
+        let op = op.unwrap();
+
+        match op {
+            '+' =&gt; num1 + num2,
+            '-' =&gt; num1 - num2,
+            '*' =&gt; num1 * num2,
+            '/' =&gt; num1 / num2,
+            _ =&gt; unreachable!(),
+        }
+    }
+}
+
+struct UserTyper&lt;T: Computer&gt; {
+    computer: T,
+    expr: String,
+}
+
+impl&lt;T: Computer&gt; UserTyper&lt;T&gt; {
+    fn new(computer: T) -&gt; Self {
+        Self { computer, expr: String::new() }
+    }
+
+    fn type_expr(&amp;mut self) {
+        println!(&quot;Please type an expression: {}&quot;, self.expr);
+        io::stdout().flush().expect(&quot;Unable to flush stdout&quot;);
+        io::stdin().read_line(&amp;mut self.expr).unwrap();
+    }
+
+    fn compute(&amp;self) -&gt; i32 {
+        self.computer.compute(&amp;self.expr)
+    }
+}
+
+</code></pre>
+]]></content:encoded>
   <category>Rust</category>
   <category>技术</category>
 </item>
@@ -471,6 +636,546 @@ var o = (function() {
 如果想要直</description>
   <category>JavaScript</category>
   <category>技术</category>
+</item>
+<item>
+  <title>使用class实现评分</title>
+  <link>https://ganto.cn/post/20231117-2</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20231117-2</guid>
+  <pubDate>Fri, 17 Nov 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description># 创建Star类
+
+```js
+class Star {
+  constructor(will, score, dom) {
+    this.will = will;
+    this.score = score;
+    this.dom = dom;
+  }
+  init() {
+    const that = this;
+    this.dom.forEach(element =&gt; {
+      element.onmouseover = e =&gt; {
+        that.point(Number(e.target.innerText));
+      }
+      e</description>
+</item>
+<item>
+  <title>函数柯里化</title>
+  <link>https://ganto.cn/post/20231117</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20231117</guid>
+  <pubDate>Fri, 17 Nov 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description>柯里化就是将多参函数变成单参函数
+
+```js
+// 实现函数柯里化
+function currying() {
+  
+}
+
+// 测试柯里化函数
+const sum = (a, b, c, d) =&gt; a + b + c + d;
+
+console.log(currying(sum)(1)(2)(3)(4)); // 10
+console.log(currying(sum, 1)(2, 3)(4)); // 10
+console.log(currying(sum, 1, 2)(3)(4)); // 10
+console.log(currying(sum, 1, 2)(3, 4)); // 1</description>
+</item>
+<item>
+  <title>自定义Typora主题分享</title>
+  <link>https://ganto.cn/post/20230831</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230831</guid>
+  <pubDate>Thu, 31 Aug 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description>Typora主题的开发主要就是编写css样式，将Typora的默认样式进行覆盖
+
+# 介绍
+
+Toxic主题没有特别之处，使用了`MiSans`字体，看着比较工整
+
+# 预览
+
+![](https://img2023.cnblogs.com/blog/2229842/202308/2229842-20230831214029753-586461364.png)  
+![](https://img2023.cnblogs.com/blog/2229842/202308/2229842-20230831213436571-419322600.png)  
+![](https://img2023.c</description>
+</item>
+<item>
+  <title>git学习教程</title>
+  <link>https://ganto.cn/post/20230829</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230829</guid>
+  <pubDate>Tue, 29 Aug 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description># 网址一：Learn Git Branching!
+
+[https://learngitbranching.js.org/?locale=zh\_CN](https://learngitbranching.js.org/?locale=zh_CN)
+
+另外粘贴一篇详细介绍的链接：  
+[https://zhuanlan.zhihu.com/p/383960650](https://zhuanlan.zhihu.com/p/383960650)
+
+# 《为你自己学git》一书的练习场
+
+[https://gitbook.tw/playground](https://gitbook.tw/pla</description>
+</item>
+<item>
+  <title>博客园自定义主题</title>
+  <link>https://ganto.cn/post/20230827</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230827</guid>
+  <pubDate>Sun, 27 Aug 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description>&gt; 最新主题仓库：[Gitee@ganto/cnblogs-theme](https://gitee.com/ganto/cnblogs-theme.git)
+
+# 博客园默认皮肤选择
+
+将博客园主题切换为：`Custom`
+
+# 博客侧边栏公告
+
+这里是定义公告栏目的地方
+
+# 页面定制 CSS 代码
+
+**先将`禁用模版默认CSS`勾选上**
+
+源代码提供的css为scss格式，要将scss代码编译为css代码，再拷贝到 **页面定制css代码** 中
+
+&gt; 编译scss文件，可以利用vscode插件 ***Live Sass Compiler*** 进行编译  
+&gt; 首先安装 ***Li</description>
+  <category>JavaScript</category>
+  <category>前端</category>
+  <category>技术</category>
+</item>
+<item>
+  <title>Golang学习笔记</title>
+  <link>https://ganto.cn/post/20230816</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230816</guid>
+  <pubDate>Wed, 16 Aug 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description># Hello Golang
+
+```go
+// Hello Golang
+package main
+
+import &quot;fmt&quot;
+
+func main() {
+  	fmt.Println(&quot;Hello Golang&quot;)
+}
+
+```
+
+Gogs是unknwon无闻主导开发的git管理平台，类似于gitlab，可以本地部署，采用Go语言开发，要比gitlab更加轻量。
+
+[Gogs官网](//gogs.io)
+
+Gitea是Gogs的克隆项目，是属于Gogs的一个分支项目。
+
+gitea.com gitea.io
+
+# Golang
+
+天生支持高并发
+
+```go
+package main
+
+</description>
+</item>
+<item>
+  <title>Web Component</title>
+  <link>https://ganto.cn/post/20230412</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230412</guid>
+  <pubDate>Wed, 12 Apr 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description>原生Web Component的使用</description>
+  <category>JavaScript</category>
+  <category>Web Component</category>
+</item>
+<item>
+  <title>Java学习笔记</title>
+  <link>https://ganto.cn/post/20230301</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230301</guid>
+  <pubDate>Wed, 01 Mar 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description># 基础👇
+
+# 简单Java类
+
+### 第一种开发要求
+
+*   类名称必须存在有意义，例如：Book、Emp；
+*   类之中所有的属性必须private封装，封装后的属性必须提供有setter、getter方法；
+*   类之中可以提供有任意多个构造方法，但是必须保留有一个无参构造方法；
+*   类之中不允许出现任何的输出语句，所有的信息输出必须交给被调用处输出；
+*   类之中需要提供有一个取得对象完整信息的方法，暂定为：getInfo()，而且返回String型数据；
+
+### 范例
+
+```java
+class Emp{ // 定义一个有意义的类
+
+    // 用private</description>
+</item>
+<item>
+  <title>规范和快捷键</title>
+  <link>https://ganto.cn/post/20230220-3</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230220-3</guid>
+  <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description>
+# 规范和快捷键
+
+&gt; 前端代码缩进2格
+&gt; 
+&gt; Java代码缩进4格
+&gt; 
+&gt; Golang代码缩进4格
+
+# 通用快捷方式
+
+| 快捷键 | 说明 |
+| --- | --- |
+| Alt+/ | 代码提示 |
+| Shift+Alt+↑ 或 Shift+Alt+↓ | 复制整行 |
+| Alt+↑ 或 Alt+↓ | 移动代码 |
+| Ctrl+/ | 单行注释 |
+| Ctrl+Shift+/ | 多行注释 |
+| Ctrl+c | 复制（不选中任何字符，则复制整行） |
+| Ctrl+v | 粘贴 |
+| Ctrl+x | 剪切（不选中任何字符，则剪切整行） |
+| Ctrl+</description>
+</item>
+<item>
+  <title>黑苹果</title>
+  <link>https://ganto.cn/post/20230220</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230220</guid>
+  <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description># VMWare
+
+【VMware安装原版macOS虚拟机，从此告别第三方封装镜像】 [https://www.bilibili.com/video/BV1TP4y1i7kh/?share\_source=copy\_web&amp;vd\_source=e5014f57b96061a4d1009d47c32b74e8](https://www.bilibili.com/video/BV1TP4y1i7kh/?share_source=copy_web&amp;vd_source=e5014f57b96061a4d1009d47c32b74e8)
+
+虚拟机利用苹果官方恢复工具自动下载安装官方最新MacOS13</description>
+</item>
+<item>
+  <title>防抖函数debounce</title>
+  <link>https://ganto.cn/post/20230220-4</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230220-4</guid>
+  <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description># 防抖函数
+
+防抖函数
+
+## 封装
+
+```js
+// 防抖函数的封装
+export default function debounce(func, delay){
+  let timer = null
+  return function () {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() =&gt; {
+      func.apply()
+    }, delay)
+  }
+}
+
+```
+
+## 使用
+
+```jsx
+getHomeDataList = debounce(() =&gt; {
+  getHomeData</description>
+</item>
+<item>
+  <title>TypeScript学习笔记</title>
+  <link>https://ganto.cn/post/20230220-6</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230220-6</guid>
+  <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description># TypeScript
+
+## 准备
+
+安装node.js
+
+## 安装
+
+```shell
+npm install -g typescript
+
+```
+
+## 查看版本
+
+```shell
+tsc -v
+
+```
+
+在编写ts代码时，有时虽然没有写错，但是依然有报错信息 如：`无法重新声明块范围变量`，只需要执行`tsc --init`生成tsconfig.json文件即可解决
+
+# 第一个TS程序
+
+***app.ts***
+
+```typescript
+var message:string = &quot;Hello TypeScript!&quot;
+console.log(message)
+
+```</description>
+</item>
+<item>
+  <title>ES6 标准入门 - 阮一峰</title>
+  <link>https://ganto.cn/post/20230220-2</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230220-2</guid>
+  <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description># Object.assign()
+
+```js
+const a = {name: &apos;小华&apos;, age: 19, sex: &apos;女&apos;}
+const b = {name: &apos;小华&apos;, age: 20}
+const c = Object.assign(a, b)
+console.log(a)
+console.log(b)
+console.log(c)
+// {name: &apos;小华&apos;, age: 20, sex: &apos;女&apos;}
+// {name: &apos;小华&apos;, age: 20}
+// {name: &apos;小华&apos;, age: 20, sex: &apos;女&apos;}
+
+```
+
+通过上方代码可以看出，通过`Object.assi</description>
+</item>
+<item>
+  <title>css常用场景</title>
+  <link>https://ganto.cn/post/20230220-5</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230220-5</guid>
+  <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description># 初始化样式
+
+```css
+body,
+html,
+div,
+p,
+span,
+i,
+b,
+ul,
+ol
+li,
+input,
+img,
+video {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+img {
+ vertical-align: bottom;
+ object-fit: cover;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+i {
+  font-style: normal;
+}
+
+.container {
+  width: 1200px;
+  margin: auto;
+  po</description>
+  <category>前端</category>
+</item>
+<item>
+  <title>JavaScript中的事件冒泡与事件捕获</title>
+  <link>https://ganto.cn/post/20230119</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230119</guid>
+  <pubDate>Thu, 19 Jan 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description>
+## 前言
+Capture：事件捕获
+Bubble：事件冒泡
+
+![](/static/blog-images/JavaScript中的事件冒泡与事件捕获_images/2229842-20241220165118171-411205481.png)
+如图所示，大致展示了事件冒泡和事件捕获的流程
+
+可能还有点迷惑，无妨，继续往下看
+
+## 事件冒泡展示
+
+我们先创建一个嵌套的HTML结构
+```html
+&lt;div class=&quot;div1&quot;&gt;
+    &lt;p&gt;div1&lt;/p&gt;
+    &lt;div class=&quot;div2&quot;&gt;
+        &lt;p&gt;div2&lt;/p&gt;
+        &lt;button&gt;C</description>
+  <category>JavaScript</category>
+</item>
+<item>
+  <title>React组件ref</title>
+  <link>https://ganto.cn/post/20230117</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230117</guid>
+  <pubDate>Tue, 17 Jan 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description>
+# React中forwardRef的用法
+
+&gt; 官网文档：https://zh-hans.react.dev/reference/react/forwardRef
+
+
+
+今天我们就一起学习一下React中的ref怎么获取组件实例，只讨论函数式组件中的ref
+
+如下代码，我们直接在App根组件中，意图只使用ref就获取Footer组件实例
+
+细心的同学可能已经发现控制台报错了，提示我们应该使用forwardRef，并且编辑器也提示`ref={footRef}`类型不对
+
+这是因为React不会默认暴露组件中的东西，如果开发者想要从组件中暴露出来东西，需要手动挡进行操作，这也是为了组件数据安全</description>
+  <category>JavaScript</category>
+  <category>React</category>
+</item>
+<item>
+  <title>JavaScript 高阶函数之 reduce</title>
+  <link>https://ganto.cn/post/20230116</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230116</guid>
+  <pubDate>Mon, 16 Jan 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description>
+&gt; MDN：https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce
+
+
+
+关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为**累加器**
+
+reduce常见用例如下：
+
+```js
+let goods = [
+  { name: &quot;T恤&quot;, price: 99, count: 2 },
+  { name: &quot;polo衫&quot;, price: 120, count: 1 },
+  { name: &quot;牛仔裤&quot;, price: 197, cou</description>
+  <category>JavaScript</category>
+</item>
+<item>
+  <title>Taro快速体验</title>
+  <link>https://ganto.cn/post/20230112</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230112</guid>
+  <pubDate>Thu, 12 Jan 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description>
+# 5分钟快速入门Taro
+
+## Taro介绍
+
+Taro是由凹凸实验室开发的一个开放式跨端跨框架，支持使用 React/Vue/Nerv 等框架来开发 [微信](https://mp.weixin.qq.com/) / [京东](https://mp.jd.com/?entrance=taro) / [百度](https://smartprogram.baidu.com/) / [支付宝](https://mini.open.alipay.com/) / [字节跳动](https://developer.open-douyin.com/) / [QQ](https://q.qq.com/</description>
+  <category>Taro</category>
+</item>
+<item>
+  <title>Rust中的所有权初体验</title>
+  <link>https://ganto.cn/post/20230111</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230111</guid>
+  <pubDate>Wed, 11 Jan 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description>
+所有权系统是Rust中的一大特点
+今日靓仔我啊，就来体验一番  
+
+我们先来看一段代码
+```rust
+fn main() {
+    let s1 = String::from(&quot;hello&quot;);
+    let s2 = s1; // s1 的所有权转移给了 s2
+    println!(&quot;s1: {}, s2: {}&quot;, s1, s2); // 报错，s1 已经被移动了
+}
+```
+***你可能不了解rust代码，那么按照你熟悉的语言去理解他，大同小异***
+
+代码中先定义了一个String字符串类型的变量 `s1`  
+
+然后紧接着定义了一个变量 `s2`，此时需要注意，`s2` </description>
+  <category>Rust</category>
+</item>
+<item>
+  <title>Gin中间件上下文的Set、Get用法</title>
+  <link>https://ganto.cn/post/20230110</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20230110</guid>
+  <pubDate>Tue, 10 Jan 2023 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description>
+## Code
+
+如上代码所示，中间件`middlewareA`内部通过`c.Set(&quot;middlewareA_key&quot;, str)`将参数设置到上下文中
+所以中间件`middlewareB`可以通过`c.Get(&quot;middlewareA_key&quot;)`获取到上下文中传递的值，并将值进行了修改，然后继续通过上下文进行了传递
+然后在控制器函数中可以通过上下文`c.Keys[&quot;middlewareB_key&quot;]`的方式获取
+
+```go
+package main
+
+import (
+	&quot;fmt&quot;
+	&quot;github.com/gin-gonic/gin&quot;
+)
+
+func main() {
+	route</description>
+  <category>Golang</category>
+  <category>Gin</category>
+</item>
+<item>
+  <title>hexo-theme-heri主题开发简记</title>
+  <link>https://ganto.cn/post/20210105</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20210105</guid>
+  <pubDate>Tue, 05 Jan 2021 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description># Heri介绍：
+
+究极简洁的Hexo主题  
+![预览图](https://heri.ganto.cn/ArticleResources/Hexo-Theme-Heri/heri.png)
+
+## 展示站点
+
+[展示站点](https://heri.ganto.cn)
+
+# 下载Heri
+
+[hexo-theme-heri](https://github.com/ganto-cn/hexo-theme-heri/releases)
+
+下载完整的Heri主题，拷贝到Hexo的主题文件夹下
+
+# 引用Heri
+
+在Hexo根配置文件中这样引用即可
+
+```makefile
+theme: her</description>
+</item>
+<item>
+  <title>测试文章</title>
+  <link>https://ganto.cn/post/20201222</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20201222</guid>
+  <pubDate>Tue, 22 Dec 2020 00:00:00 +0800</pubDate>
+  <author>干徒</author>
+  <description>
+# 测试文章
+
+测试文章
+
+\`\`\`js nihao \`\`\`
+</description>
 </item>
 </channel>
 </rss>

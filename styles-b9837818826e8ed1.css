@@ -789,7 +789,7 @@ pre code.hljs {
   background: var(--accent-soft);
   color: var(--accent-text);
 }
-#main .app .navbar-sticky-wrap .theme-toggle {
+#main .app .navbar-sticky-wrap .nav-icon-btn {
   background: none;
   border: none;
   cursor: pointer;
@@ -797,18 +797,24 @@ pre code.hljs {
   align-items: center;
   justify-content: center;
   padding: 0.35rem 0.5rem;
-  margin-left: 0.5rem;
+  margin-left: 0.15rem;
   border-radius: calc(var(--radius-md) - 4px);
   color: var(--text-secondary);
   transition: all 0.2s ease;
 }
-#main .app .navbar-sticky-wrap .theme-toggle:hover {
+#main .app .navbar-sticky-wrap .nav-icon-btn:hover {
   color: var(--text-primary);
   background: var(--bg-subtle);
 }
-#main .app .navbar-sticky-wrap .theme-toggle svg {
+#main .app .navbar-sticky-wrap .nav-icon-btn svg {
   width: 1rem;
   height: 1rem;
+}
+#main .app .navbar-sticky-wrap .rss-toggle:hover {
+  color: #f26522;
+}
+#main .app .navbar-sticky-wrap .theme-toggle {
+  margin-left: 0.35rem;
 }
 #main .app:has(.wide-mode) {
   max-width: 1200px;
@@ -3065,14 +3071,16 @@ html.dark::view-transition-new(root) {
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
   }
-  #main .app .navbar-sticky-wrap .navbar-links .theme-toggle {
-    margin-left: auto;
+  #main .app .navbar-sticky-wrap .navbar-links .nav-icon-btn {
     padding: 0.25rem 0.4rem;
     flex-shrink: 0;
   }
-  #main .app .navbar-sticky-wrap .navbar-links .theme-toggle svg {
+  #main .app .navbar-sticky-wrap .navbar-links .nav-icon-btn svg {
     width: 1rem;
     height: 1rem;
+  }
+  #main .app .navbar-sticky-wrap .navbar-links .theme-toggle {
+    margin-left: auto;
   }
   .app .main-content .blog-list .blog-preview {
     padding: 1.1rem;
