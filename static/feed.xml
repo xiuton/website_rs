@@ -2,7 +2,7 @@
   <title>人工智能（AI）基础解析</title>
   <link>https://ganto.cn/post/20260129</link>
   <guid isPermaLink="true">https://ganto.cn/post/20260129</guid>
-  <pubDate>2026-01-29 00:00:00 +0800</pubDate>
+  <pubDate>Thu, 29 Jan 2026 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>人工智能（AI）已经越来越融入我们的生活，从智能助手到智能机器人，从智能交通到智能医疗，AI正在改变我们的世界。</description>
   <category>Artificial Intelligence</category>
@@ -11,7 +11,7 @@
   <title>Dioxus基于Rust的多平台开发框架</title>
   <link>https://ganto.cn/post/20250609</link>
   <guid isPermaLink="true">https://ganto.cn/post/20250609</guid>
-  <pubDate>2025-06-09 00:00:00 +0800</pubDate>
+  <pubDate>Mon, 09 Jun 2025 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>
 官网：https://dioxuslabs.com/
@@ -25,7 +25,7 @@ Dioxus 是用于构建全栈 Web、桌面和移动应用程序的 Rust 框架。
   <title>Rust 案例 - 计算器</title>
   <link>https://ganto.cn/post/20250410</link>
   <guid isPermaLink="true">https://ganto.cn/post/20250410</guid>
-  <pubDate>2025-04-10 00:00:00 +0800</pubDate>
+  <pubDate>Thu, 10 Apr 2025 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>```rust
 use std::io;
@@ -51,7 +51,7 @@ impl Compute</description>
   <title>Rust镜像源</title>
   <link>https://ganto.cn/post/20250313</link>
   <guid isPermaLink="true">https://ganto.cn/post/20250313</guid>
-  <pubDate>2025-03-13 00:00:00 +0800</pubDate>
+  <pubDate>Thu, 13 Mar 2025 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>## 配置Rust镜像源
 
@@ -72,9 +72,9 @@ registry = &quot;sparse+https://mirrors.aliyun.com/crates.io-index/&quot;
 </item>
 <item>
   <title>Rust所有权</title>
-  <link>https://ganto.cn/post/20250220-2</link>
-  <guid isPermaLink="true">https://ganto.cn/post/20250220-2</guid>
-  <pubDate>2025-02-20 00:00:00 +0800</pubDate>
+  <link>https://ganto.cn/post/20250220</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20250220</guid>
+  <pubDate>Thu, 20 Feb 2025 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>所有权系统是Rust中的一大特点  
 今日靓仔我啊，就来体验一番
@@ -101,9 +101,9 @@ fn main() {
 </item>
 <item>
   <title>JavaScript 高阶函数之 reduce</title>
-  <link>https://ganto.cn/post/20250220</link>
-  <guid isPermaLink="true">https://ganto.cn/post/20250220</guid>
-  <pubDate>2025-02-20 00:00:00 +0800</pubDate>
+  <link>https://ganto.cn/post/20250220-2</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20250220-2</guid>
+  <pubDate>Thu, 20 Feb 2025 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>&gt; MDN：[https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global\_Objects/Array/reduce](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce)
 
@@ -123,7 +123,7 @@ let goods = [
   <title>JavaScript中的&quot;事件冒泡&quot;与&quot;事件捕获&quot;</title>
   <link>https://ganto.cn/post/20241220</link>
   <guid isPermaLink="true">https://ganto.cn/post/20241220</guid>
-  <pubDate>2024-12-20 00:00:00 +0800</pubDate>
+  <pubDate>Fri, 20 Dec 2024 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>## 前言
 
@@ -152,7 +152,7 @@ Bubble：事件冒泡
   <title>今天，学习Web Component</title>
   <link>https://ganto.cn/post/20240511</link>
   <guid isPermaLink="true">https://ganto.cn/post/20240511</guid>
-  <pubDate>2024-05-11 00:00:00 +0800</pubDate>
+  <pubDate>Sat, 11 May 2024 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>[Web Component MDN](https://developer.mozilla.org/zh-CN/docs/Web/API/Web_components)  
 [阮一峰 web components](https://www.ruanyifeng.com/blog/2019/08/web_components.html)
@@ -172,7 +172,7 @@ Bubble：事件冒泡
   <title>Gin中间件上下文中的Set、Get函数的用法</title>
   <link>https://ganto.cn/post/20240415</link>
   <guid isPermaLink="true">https://ganto.cn/post/20240415</guid>
-  <pubDate>2024-04-15 00:00:00 +0800</pubDate>
+  <pubDate>Mon, 15 Apr 2024 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>## Code
 
@@ -198,7 +198,7 @@ func main() {
   <title>React中forwardRef的用法</title>
   <link>https://ganto.cn/post/20240412</link>
   <guid isPermaLink="true">https://ganto.cn/post/20240412</guid>
-  <pubDate>2024-04-12 00:00:00 +0800</pubDate>
+  <pubDate>Fri, 12 Apr 2024 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>&gt; 官网文档：[https://zh-hans.react.dev/reference/react/forwardRef](https://zh-hans.react.dev/reference/react/forwardRef)
 
@@ -219,7 +219,7 @@ func main() {
   <title>5分钟快速入门Taro</title>
   <link>https://ganto.cn/post/20240402</link>
   <guid isPermaLink="true">https://ganto.cn/post/20240402</guid>
-  <pubDate>2024-04-02 00:00:00 +0800</pubDate>
+  <pubDate>Tue, 02 Apr 2024 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>## Taro介绍
 
@@ -235,7 +235,7 @@ Taro是由凹凸实验室开发的一个开放式跨端跨框架，支持使用 
   <title>React中使用Immer编写简洁的更新逻辑</title>
   <link>https://ganto.cn/post/20240328</link>
   <guid isPermaLink="true">https://ganto.cn/post/20240328</guid>
-  <pubDate>2024-03-28 00:00:00 +0800</pubDate>
+  <pubDate>Thu, 28 Mar 2024 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>在 [浅谈React中的mutation](https://www.cnblogs.com/ganto/articles/18098638) 一文中，突出表达了对象和数组类型的state，不宜直接修改原对象和数组，直接修改会制造一个mutation，并且无法触发React的重新渲染
 
@@ -261,7 +261,7 @@ impo</description>
   <title>浅谈React中的mutation</title>
   <link>https://ganto.cn/post/20240327</link>
   <guid isPermaLink="true">https://ganto.cn/post/20240327</guid>
-  <pubDate>2024-03-27 00:00:00 +0800</pubDate>
+  <pubDate>Wed, 27 Mar 2024 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>&gt; 官方文档：[保持组件纯粹](https://zh-hans.react.dev/learn/keeping-components-pure)、[更新 state 中的对象](https://zh-hans.react.dev/learn/updating-objects-in-state)、[更新 state 中的数组](https://zh-hans.react.dev/learn/updating-arrays-in-state)
 
@@ -282,7 +282,7 @@ impo</description>
   <title>Go语言高并发编程初探</title>
   <link>https://ganto.cn/post/20240326</link>
   <guid isPermaLink="true">https://ganto.cn/post/20240326</guid>
-  <pubDate>2024-03-26 00:00:00 +0800</pubDate>
+  <pubDate>Tue, 26 Mar 2024 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>在当今这个数据爆炸的时代，高并发编程已成为开发者们必须掌握的技能之一。Go语言，由于其出色的并发支持和简洁的语法，正逐渐成为高并发编程领域的热门选择。本文将带您走进Go语言高并发编程的世界，探索其中的奥秘。
 
@@ -301,7 +301,7 @@ Go语言采用了CSP（Communicating Sequential Processes）并发模型，即�
   <title>windows终端命令受限</title>
   <link>https://ganto.cn/post/20240315</link>
   <guid isPermaLink="true">https://ganto.cn/post/20240315</guid>
-  <pubDate>2024-03-15 00:00:00 +0800</pubDate>
+  <pubDate>Fri, 15 Mar 2024 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>在windows系统上，通过以下命令安装pnpm包管理工具，然后在终端执行`pnpm -v`会报错
 
@@ -338,7 +338,7 @@ get-Executi</description>
   <title>TypeScript类型取反</title>
   <link>https://ganto.cn/post/20240313</link>
   <guid isPermaLink="true">https://ganto.cn/post/20240313</guid>
-  <pubDate>2024-03-13 00:00:00 +0800</pubDate>
+  <pubDate>Wed, 13 Mar 2024 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>读码见意
 
@@ -361,7 +361,7 @@ func(1) // ERROR Argument of type &apos;number&apos; is not assigna</description
   <title>实现一个丝滑的暗黑模式切换动画</title>
   <link>https://ganto.cn/post/20240102</link>
   <guid isPermaLink="true">https://ganto.cn/post/20240102</guid>
-  <pubDate>2024-01-02 00:00:00 +0800</pubDate>
+  <pubDate>Tue, 02 Jan 2024 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>&gt; 体验：[https://ganto.me](https://ganto.me)
 
@@ -374,9 +374,9 @@ func(1) // ERROR Argument of type &apos;number&apos; is not assigna</description
 </item>
 <item>
   <title>Vue3.3+ 新特性 defineOptions</title>
-  <link>https://ganto.cn/post/20231221</link>
-  <guid isPermaLink="true">https://ganto.cn/post/20231221</guid>
-  <pubDate>2023-12-21 00:00:00 +0800</pubDate>
+  <link>https://ganto.cn/post/20231221-2</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20231221-2</guid>
+  <pubDate>Thu, 21 Dec 2023 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>`defineOptions`是一个宏，是在Vue3.3+中新增的新特性
 
@@ -407,9 +407,9 @@ export default {
 </item>
 <item>
   <title>Vue3 实验性特性 defineModel</title>
-  <link>https://ganto.cn/post/20231221-2</link>
-  <guid isPermaLink="true">https://ganto.cn/post/20231221-2</guid>
-  <pubDate>2023-12-21 00:00:00 +0800</pubDate>
+  <link>https://ganto.cn/post/20231221</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20231221</guid>
+  <pubDate>Thu, 21 Dec 2023 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>&gt; 在Vue3.4中，defineModel宏已经被正式启用，无需配置，直接可用
 
@@ -440,9 +440,9 @@ export default defineConfig({
 </item>
 <item>
   <title>JavaScript闭包直接修改内部属性</title>
-  <link>https://ganto.cn/post/20231117-2</link>
-  <guid isPermaLink="true">https://ganto.cn/post/20231117-2</guid>
-  <pubDate>2023-11-17 00:00:00 +0800</pubDate>
+  <link>https://ganto.cn/post/20231117-3</link>
+  <guid isPermaLink="true">https://ganto.cn/post/20231117-3</guid>
+  <pubDate>Fri, 17 Nov 2023 00:00:00 +0800</pubDate>
   <author>干徒</author>
   <description>## 事例代码
 
