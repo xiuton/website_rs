@@ -49,13 +49,13 @@ fn md_to_html(md: &str) -> String {
 pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
     let mut xml = String::from(concat!(
         r#"<?xml version="1.0" encoding="UTF-8"?>"#,
-        r#"<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">"#,
+        r#"<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">"#,
         r#"<channel>"#,
         r#"<title>干徒的博客</title>"#,
-        r#"<link>https://ganto.cn</link>"#,
+        r#"<link>https://ganto.me</link>"#,
         r#"<description>干徒 (Ganto) 的个人技术博客，分享 Rust、前端、WebAssembly 等编程技术文章。</description>"#,
         r#"<language>zh-CN</language>"#,
-        r#"<atom:link href="https://ganto.cn/feed.xml" rel="self" type="application/rss+xml"/>"#,
+        r#"<atom:link href="https://ganto.me/feed.xml" rel="self" type="application/rss+xml"/>"#,
     ));
 
     let total = posts.len().min(50);
@@ -66,12 +66,12 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
             escape_xml(&post.title)
         ));
         xml.push_str(&format!(
-            "  <link>https://ganto.cn/post/{}</link>\n",
+            "  <link>https://ganto.me/post/{}</link>\n",
             escape_xml(&post.slug)
         ));
         xml.push_str("  <guid isPermaLink=\"true\">");
         xml.push_str(&format!(
-            "https://ganto.cn/post/{}",
+            "https://ganto.me/post/{}",
             escape_xml(&post.slug)
         ));
         xml.push_str("</guid>\n");
@@ -85,27 +85,10 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
             escape_xml(&post.author)
         ));
 
-        if !post.summary.is_empty() {
-            xml.push_str(&format!(
-                "  <description>{}</description>\n",
-                escape_xml(&post.summary)
-            ));
-        } else {
-            // 截取正文前 300 字作摘要
-            let excerpt: String = post.content
-                .chars()
-                .take(300)
-                .collect();
-            xml.push_str(&format!(
-                "  <description>{}</description>\n",
-                escape_xml(&excerpt)
-            ));
-        }
-
-        // 全文输出：用 content:encoded 包裹 CDATA
+        // 全文 HTML 放在 description 中，兼容所有 RSS 阅读器
         let html = md_to_html(&post.content);
         xml.push_str(&format!(
-            "  <content:encoded><![CDATA[{}]]></content:encoded>\n",
+            "  <description><![CDATA[{}]]></description>\n",
             html
         ));
 

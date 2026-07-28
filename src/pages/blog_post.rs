@@ -158,7 +158,7 @@ pub fn BlogPostView(slug: String) -> Element {
             title::set_seo(
                 &post.title,
                 &description,
-                &format!("https://ganto.cn/post/{}", post.slug),
+                &format!("https://ganto.me/post/{}", post.slug),
             );
         }
         if post().is_some() {
