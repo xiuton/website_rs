@@ -1,9 +1,11 @@
-<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>干徒的博客</title><link>https://ganto.me</link><description>干徒 (Ganto) 的个人技术博客，分享 Rust、前端、WebAssembly 等编程技术文章。</description><language>zh-CN</language><atom:link href="https://ganto.me/feed.xml" rel="self" type="application/rss+xml"/><item>
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>干徒的博客</title><link>https://ganto.me</link><description>干徒 (Ganto) 的个人技术博客，分享 Rust、前端、WebAssembly 等编程技术文章。</description><language>zh-CN</language><docs>https://www.rssboard.org/rss-specification</docs><generator>website-rs</generator>  <lastBuildDate>Thu, 29 Jan 2026 00:00:00 +0800</lastBuildDate>
+  <pubDate>Thu, 29 Jan 2026 00:00:00 +0800</pubDate>
+<atom:link href="https://ganto.me/static/feed.xml" rel="self" type="application/rss+xml"/><item>
   <title>人工智能（AI）基础解析</title>
   <link>https://ganto.me/post/20260129</link>
   <guid isPermaLink="true">https://ganto.me/post/20260129</guid>
   <pubDate>Thu, 29 Jan 2026 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h2>一、AI的定义</h2>
 <p>人工智能（Artificial Intelligence，简称AI）是一门研究、开发用于<strong>模拟、延伸和扩展人类智能</strong>的理论、方法、技术及应用系统的技术科学，核心目标是让机器具备类似人类的感知、推理、学习、决策、创造等智能行为，能够自主处理问题并适应不同场景。</p>
 <p>AI并非单一技术，而是一门交叉学科，融合了计算机科学、数学、统计学、神经科学、语言学、心理学等多个领域的知识，是现代科技发展的核心方向之一。</p>
@@ -95,7 +97,7 @@
   <link>https://ganto.me/post/20250609</link>
   <guid isPermaLink="true">https://ganto.me/post/20250609</guid>
   <pubDate>Mon, 09 Jun 2025 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<p>官网：<a href="https://dioxuslabs.com/">https://dioxuslabs.com/</a></p>
 <p>Dioxus 是用于构建全栈 Web、桌面和移动应用程序的 Rust 框架。使用实时热重载进行迭代，添加服务器函数，并在创纪录的时间内进行部署。</p>
 ]]></description>
@@ -107,7 +109,7 @@
   <link>https://ganto.me/post/20250410</link>
   <guid isPermaLink="true">https://ganto.me/post/20250410</guid>
   <pubDate>Thu, 10 Apr 2025 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<pre><code class="language-rust">use std::io;
 use std::io::Write;
 
@@ -194,7 +196,7 @@ impl&lt;T: Computer&gt; UserTyper&lt;T&gt; {
   <link>https://ganto.me/post/20250313</link>
   <guid isPermaLink="true">https://ganto.me/post/20250313</guid>
   <pubDate>Thu, 13 Mar 2025 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h2>配置Rust镜像源</h2>
 <p>配置文件位置<br />
 <code>~/.cargo/config.toml</code></p>
@@ -213,7 +215,7 @@ registry = &quot;sparse+https://mirrors.aliyun.com/crates.io-index/&quot;
   <link>https://ganto.me/post/20250220</link>
   <guid isPermaLink="true">https://ganto.me/post/20250220</guid>
   <pubDate>Thu, 20 Feb 2025 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<p>所有权系统是Rust中的一大特点<br />
 今日靓仔我啊，就来体验一番</p>
 <p>我们先来看一段代码</p>
@@ -252,7 +254,7 @@ registry = &quot;sparse+https://mirrors.aliyun.com/crates.io-index/&quot;
   <link>https://ganto.me/post/20250220-2</link>
   <guid isPermaLink="true">https://ganto.me/post/20250220-2</guid>
   <pubDate>Thu, 20 Feb 2025 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<blockquote>
 <p>MDN：<a href="https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce">https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce</a></p>
 </blockquote>
@@ -332,7 +334,7 @@ console.log(ret)
   <link>https://ganto.me/post/20241220</link>
   <guid isPermaLink="true">https://ganto.me/post/20241220</guid>
   <pubDate>Fri, 20 Dec 2024 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h2>前言</h2>
 <p>Capture：事件捕获<br />
 Bubble：事件冒泡</p>
@@ -562,7 +564,7 @@ DIV 1
   <link>https://ganto.me/post/20240511</link>
   <guid isPermaLink="true">https://ganto.me/post/20240511</guid>
   <pubDate>Sat, 11 May 2024 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<p><a href="https://developer.mozilla.org/zh-CN/docs/Web/API/Web_components">Web Component MDN</a><br />
 <a href="https://www.ruanyifeng.com/blog/2019/08/web_components.html">阮一峰 web components</a></p>
 <h2>例子1：</h2>
@@ -875,7 +877,7 @@ customElements.define(&quot;my-com&quot;, MyCom);
   <link>https://ganto.me/post/20240415</link>
   <guid isPermaLink="true">https://ganto.me/post/20240415</guid>
   <pubDate>Mon, 15 Apr 2024 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h2>Code</h2>
 <p>如下代码所示，中间件<code>middlewareA</code>内部通过<code>c.Set(&quot;middlewareA_key&quot;, str)</code>将参数设置到上下文中<br />
 所以中间件<code>middlewareB</code>可以通过<code>c.Get(&quot;middlewareA_key&quot;)</code>获取到上下文中传递的值，并将值进行了修改，然后继续通过上下文进行了传递<br />
@@ -945,7 +947,7 @@ func middlewareB() gin.HandlerFunc {
   <link>https://ganto.me/post/20240412</link>
   <guid isPermaLink="true">https://ganto.me/post/20240412</guid>
   <pubDate>Fri, 12 Apr 2024 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<blockquote>
 <p>官网文档：<a href="https://zh-hans.react.dev/reference/react/forwardRef">https://zh-hans.react.dev/reference/react/forwardRef</a></p>
 </blockquote>
@@ -1073,7 +1075,7 @@ export const Footer = ({props, ref}) =&gt; {
   <link>https://ganto.me/post/20240402</link>
   <guid isPermaLink="true">https://ganto.me/post/20240402</guid>
   <pubDate>Tue, 02 Apr 2024 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h2>Taro介绍</h2>
 <p>Taro是由凹凸实验室开发的一个开放式跨端跨框架，支持使用 React/Vue/Nerv 等框架来开发 <a href="https://mp.weixin.qq.com/">微信</a> / <a href="https://mp.jd.com/?entrance=taro">京东</a> / <a href="https://smartprogram.baidu.com/">百度</a> / <a href="https://mini.open.alipay.com/">支付宝</a> / <a href="https://developer.open-douyin.com/">字节跳动</a> / <a href="https://q.qq.com/">QQ</a> / <a href="https://open.feishu.cn/document/uYjL24iN/ucDOzYjL3gzM24yN4MjN">飞书</a> 小程序 / H5 / RN 等应用</p>
 <p>Taro类似于uniapp，都是跨端框架，一次开发多端部署</p>
@@ -1126,7 +1128,7 @@ pnpm i
   <link>https://ganto.me/post/20240328</link>
   <guid isPermaLink="true">https://ganto.me/post/20240328</guid>
   <pubDate>Thu, 28 Mar 2024 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<p>在 <a href="https://www.cnblogs.com/ganto/articles/18098638">浅谈React中的mutation</a> 一文中，突出表达了对象和数组类型的state，不宜直接修改原对象和数组，直接修改会制造一个mutation，并且无法触发React的重新渲染</p>
 <p>在官方文档中提到一个库 <a href="https://github.com/immerjs/use-immer">Immer</a> ，Immer 可以让我们直接修改对象和数组。</p>
 <h2>useImmer</h2>
@@ -1197,7 +1199,7 @@ export default function App() {
   <link>https://ganto.me/post/20240327</link>
   <guid isPermaLink="true">https://ganto.me/post/20240327</guid>
   <pubDate>Wed, 27 Mar 2024 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<blockquote>
 <p>官方文档：<a href="https://zh-hans.react.dev/learn/keeping-components-pure">保持组件纯粹</a>、<a href="https://zh-hans.react.dev/learn/updating-objects-in-state">更新 state 中的对象</a>、<a href="https://zh-hans.react.dev/learn/updating-arrays-in-state">更新 state 中的数组</a></p>
 </blockquote>
@@ -1328,7 +1330,7 @@ const changeObj = () =&gt; {
   <link>https://ganto.me/post/20240326</link>
   <guid isPermaLink="true">https://ganto.me/post/20240326</guid>
   <pubDate>Tue, 26 Mar 2024 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<p>在当今这个数据爆炸的时代，高并发编程已成为开发者们必须掌握的技能之一。Go语言，由于其出色的并发支持和简洁的语法，正逐渐成为高并发编程领域的热门选择。本文将带您走进Go语言高并发编程的世界，探索其中的奥秘。</p>
 <p><strong>一、Go语言的并发模型</strong></p>
 <p>Go语言采用了CSP（Communicating Sequential Processes）并发模型，即通过通道（channel）在协程（goroutine）之间进行通信。协程是Go语言实现并发的基本单位，它们比线程更轻量级，可以创建成千上万个而不会给系统带来太大负担。通道则用于协程之间的数据传递，使得并发编程更加安全、高效。</p>
@@ -1412,7 +1414,7 @@ func main() {
   <link>https://ganto.me/post/20240315</link>
   <guid isPermaLink="true">https://ganto.me/post/20240315</guid>
   <pubDate>Fri, 15 Mar 2024 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<p>在windows系统上，通过以下命令安装pnpm包管理工具，然后在终端执行<code>pnpm -v</code>会报错</p>
 <pre><code class="language-sh">npm install -g pnpm
 
@@ -1442,7 +1444,7 @@ RemoteSigned
   <link>https://ganto.me/post/20240313</link>
   <guid isPermaLink="true">https://ganto.me/post/20240313</guid>
   <pubDate>Wed, 13 Mar 2024 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<p>读码见意</p>
 <pre><code class="language-ts">function func(arg: number) {}
 func(1)
@@ -1479,7 +1481,7 @@ func(() =&gt; {})
   <link>https://ganto.me/post/20240102</link>
   <guid isPermaLink="true">https://ganto.me/post/20240102</guid>
   <pubDate>Tue, 02 Jan 2024 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<blockquote>
 <p>体验：<a href="https://ganto.me">https://ganto.me</a></p>
 </blockquote>
@@ -1702,7 +1704,7 @@ document.startViewTransition(() =&gt; {
   <link>https://ganto.me/post/20231221-2</link>
   <guid isPermaLink="true">https://ganto.me/post/20231221-2</guid>
   <pubDate>Thu, 21 Dec 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<p><code>defineOptions</code>是一个宏，是在Vue3.3+中新增的新特性</p>
 <h1>defineOptions配置项</h1>
 <h2>name</h2>
@@ -1815,7 +1817,7 @@ defineOptions({
   <link>https://ganto.me/post/20231221</link>
   <guid isPermaLink="true">https://ganto.me/post/20231221</guid>
   <pubDate>Thu, 21 Dec 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<blockquote>
 <p>在Vue3.4中，defineModel宏已经被正式启用，无需配置，直接可用</p>
 </blockquote>
@@ -1961,7 +1963,7 @@ const handleClick = () =&gt; {
   <link>https://ganto.me/post/20231117-3</link>
   <guid isPermaLink="true">https://ganto.me/post/20231117-3</guid>
   <pubDate>Fri, 17 Nov 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h2>事例代码</h2>
 <pre><code class="language-js">var o = (function() {
     var obj = {
@@ -2117,7 +2119,7 @@ console.log(o.get('a'), o.get('b'));
   <link>https://ganto.me/post/20231117-2</link>
   <guid isPermaLink="true">https://ganto.me/post/20231117-2</guid>
   <pubDate>Fri, 17 Nov 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h1>创建Star类</h1>
 <pre><code class="language-js">class Star {
   constructor(will, score, dom) {
@@ -2307,7 +2309,7 @@ star_1.init();
   <link>https://ganto.me/post/20231117</link>
   <guid isPermaLink="true">https://ganto.me/post/20231117</guid>
   <pubDate>Fri, 17 Nov 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<p>柯里化就是将多参函数变成单参函数</p>
 <pre><code class="language-js">// 实现函数柯里化
 function currying() {
@@ -2353,7 +2355,7 @@ console.log(currying(sum, 1, 2)(3, 4)); // 10
   <link>https://ganto.me/post/20230831</link>
   <guid isPermaLink="true">https://ganto.me/post/20230831</guid>
   <pubDate>Thu, 31 Aug 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<p>Typora主题的开发主要就是编写css样式，将Typora的默认样式进行覆盖</p>
 <h1>介绍</h1>
 <p>Toxic主题没有特别之处，使用了<code>MiSans</code>字体，看着比较工整</p>
@@ -2382,7 +2384,7 @@ console.log(currying(sum, 1, 2)(3, 4)); // 10
   <link>https://ganto.me/post/20230829</link>
   <guid isPermaLink="true">https://ganto.me/post/20230829</guid>
   <pubDate>Tue, 29 Aug 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h1>网址一：Learn Git Branching!</h1>
 <p><a href="https://learngitbranching.js.org/?locale=zh_CN">https://learngitbranching.js.org/?locale=zh_CN</a></p>
 <p>另外粘贴一篇详细介绍的链接：<br />
@@ -2407,7 +2409,7 @@ console.log(currying(sum, 1, 2)(3, 4)); // 10
   <link>https://ganto.me/post/20230827</link>
   <guid isPermaLink="true">https://ganto.me/post/20230827</guid>
   <pubDate>Sun, 27 Aug 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<blockquote>
 <p>最新主题仓库：<a href="https://gitee.com/ganto/cnblogs-theme.git">Gitee@ganto/cnblogs-theme</a></p>
 </blockquote>
@@ -2437,7 +2439,7 @@ console.log(currying(sum, 1, 2)(3, 4)); // 10
   <link>https://ganto.me/post/20230816</link>
   <guid isPermaLink="true">https://ganto.me/post/20230816</guid>
   <pubDate>Wed, 16 Aug 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h1>Hello Golang</h1>
 <pre><code class="language-go">// Hello Golang
 package main
@@ -6130,7 +6132,7 @@ func main() {
   <link>https://ganto.me/post/20230412</link>
   <guid isPermaLink="true">https://ganto.me/post/20230412</guid>
   <pubDate>Wed, 12 Apr 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<p><a href="https://developer.mozilla.org/zh-CN/docs/Web/API/Web_components">Web Component MDN</a></p>
 <h2>例子1：</h2>
 <pre><code class="language-html">&lt;!DOCTYPE html&gt;
@@ -6437,7 +6439,7 @@ customElements.define(&quot;my-com&quot;, MyCom);
   <link>https://ganto.me/post/20230301</link>
   <guid isPermaLink="true">https://ganto.me/post/20230301</guid>
   <pubDate>Wed, 01 Mar 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h1>基础👇</h1>
 <h1>简单Java类</h1>
 <h3>第一种开发要求</h3>
@@ -12416,7 +12418,7 @@ public class Main {
   <link>https://ganto.me/post/20230220-3</link>
   <guid isPermaLink="true">https://ganto.me/post/20230220-3</guid>
   <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h1>规范和快捷键</h1>
 <blockquote>
 <p>前端代码缩进2格</p>
@@ -12544,7 +12546,7 @@ public class Main {
   <link>https://ganto.me/post/20230220</link>
   <guid isPermaLink="true">https://ganto.me/post/20230220</guid>
   <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h1>VMWare</h1>
 <p>【VMware安装原版macOS虚拟机，从此告别第三方封装镜像】 <a href="https://www.bilibili.com/video/BV1TP4y1i7kh/?share_source=copy_web&amp;vd_source=e5014f57b96061a4d1009d47c32b74e8">https://www.bilibili.com/video/BV1TP4y1i7kh/?share_source=copy_web&amp;vd_source=e5014f57b96061a4d1009d47c32b74e8</a></p>
 <p>虚拟机利用苹果官方恢复工具自动下载安装官方最新MacOS13系统</p>
@@ -12658,7 +12660,7 @@ python3 macrecovery.py -b Mac-4B682C642B45593E -m 00000000000000000 download
   <link>https://ganto.me/post/20230220-4</link>
   <guid isPermaLink="true">https://ganto.me/post/20230220-4</guid>
   <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h1>防抖函数</h1>
 <p>防抖函数</p>
 <h2>封装</h2>
@@ -12693,7 +12695,7 @@ export default function debounce(func, delay){
   <link>https://ganto.me/post/20230220-6</link>
   <guid isPermaLink="true">https://ganto.me/post/20230220-6</guid>
   <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h1>TypeScript</h1>
 <h2>准备</h2>
 <p>安装node.js</p>
@@ -14623,7 +14625,7 @@ console.log(mc,mc1);
   <link>https://ganto.me/post/20230220-2</link>
   <guid isPermaLink="true">https://ganto.me/post/20230220-2</guid>
   <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h1>Object.assign()</h1>
 <pre><code class="language-js">const a = {name: '小华', age: 19, sex: '女'}
 const b = {name: '小华', age: 20}
@@ -14755,7 +14757,7 @@ console.log('4',x); // 1
   <link>https://ganto.me/post/20230220-5</link>
   <guid isPermaLink="true">https://ganto.me/post/20230220-5</guid>
   <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h1>初始化样式</h1>
 <pre><code class="language-css">body,
 html,
@@ -15727,7 +15729,7 @@ div.xxx_box { container-name: xxx; }
   <link>https://ganto.me/post/20230119</link>
   <guid isPermaLink="true">https://ganto.me/post/20230119</guid>
   <pubDate>Thu, 19 Jan 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h2>前言</h2>
 <p>Capture：事件捕获
 Bubble：事件冒泡</p>
@@ -15945,7 +15947,7 @@ DIV 1
   <link>https://ganto.me/post/20230117</link>
   <guid isPermaLink="true">https://ganto.me/post/20230117</guid>
   <pubDate>Tue, 17 Jan 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h1>React中forwardRef的用法</h1>
 <blockquote>
 <p>官网文档：<a href="https://zh-hans.react.dev/reference/react/forwardRef">https://zh-hans.react.dev/reference/react/forwardRef</a></p>
@@ -16048,7 +16050,7 @@ export const Footer = forwardRef&lt;object&gt;((props, ref) =&gt; {
   <link>https://ganto.me/post/20230116</link>
   <guid isPermaLink="true">https://ganto.me/post/20230116</guid>
   <pubDate>Mon, 16 Jan 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<blockquote>
 <p>MDN：<a href="https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce">https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce</a></p>
 </blockquote>
@@ -16120,7 +16122,7 @@ console.log(ret)
   <link>https://ganto.me/post/20230112</link>
   <guid isPermaLink="true">https://ganto.me/post/20230112</guid>
   <pubDate>Thu, 12 Jan 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h1>5分钟快速入门Taro</h1>
 <h2>Taro介绍</h2>
 <p>Taro是由凹凸实验室开发的一个开放式跨端跨框架，支持使用 React/Vue/Nerv 等框架来开发 <a href="https://mp.weixin.qq.com/">微信</a> / <a href="https://mp.jd.com/?entrance=taro">京东</a> / <a href="https://smartprogram.baidu.com/">百度</a> / <a href="https://mini.open.alipay.com/">支付宝</a> / <a href="https://developer.open-douyin.com/">字节跳动</a> / <a href="https://q.qq.com/">QQ</a> / <a href="https://open.feishu.cn/document/uYjL24iN/ucDOzYjL3gzM24yN4MjN">飞书</a> 小程序 / H5 / RN 等应用</p>
@@ -16163,7 +16165,7 @@ pnpm i
   <link>https://ganto.me/post/20230111</link>
   <guid isPermaLink="true">https://ganto.me/post/20230111</guid>
   <pubDate>Wed, 11 Jan 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<p>所有权系统是Rust中的一大特点
 今日靓仔我啊，就来体验一番</p>
 <p>我们先来看一段代码</p>
@@ -16198,7 +16200,7 @@ pnpm i
   <link>https://ganto.me/post/20230110</link>
   <guid isPermaLink="true">https://ganto.me/post/20230110</guid>
   <pubDate>Tue, 10 Jan 2023 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h2>Code</h2>
 <p>如上代码所示，中间件<code>middlewareA</code>内部通过<code>c.Set(&quot;middlewareA_key&quot;, str)</code>将参数设置到上下文中
 所以中间件<code>middlewareB</code>可以通过<code>c.Get(&quot;middlewareA_key&quot;)</code>获取到上下文中传递的值，并将值进行了修改，然后继续通过上下文进行了传递
@@ -16265,7 +16267,7 @@ func middlewareB() gin.HandlerFunc {
   <link>https://ganto.me/post/20210105</link>
   <guid isPermaLink="true">https://ganto.me/post/20210105</guid>
   <pubDate>Tue, 05 Jan 2021 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h1>Heri介绍：</h1>
 <p>究极简洁的Hexo主题<br />
 <img src="https://heri.ganto.cn/ArticleResources/Hexo-Theme-Heri/heri.png" alt="预览图" /></p>
@@ -16325,7 +16327,7 @@ website_notice:
   <link>https://ganto.me/post/20201222</link>
   <guid isPermaLink="true">https://ganto.me/post/20201222</guid>
   <pubDate>Tue, 22 Dec 2020 00:00:00 +0800</pubDate>
-  <author>干徒</author>
+  <author>i@ganto.me (干徒)</author>
   <description><![CDATA[<h1>测试文章</h1>
 <p>测试文章</p>
 <p>```js nihao ```</p>
