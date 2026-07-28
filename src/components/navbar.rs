@@ -186,9 +186,8 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                                     xmlns: "http://www.w3.org/2000/svg",
                                     fill: "none",
                                     view_box: "0 0 24 24",
-                                    stroke_width: "1.5",
+                                    stroke_width: "2",
                                     stroke: "currentColor",
-                                    class: "size-6", 
                                     path {
                                         stroke_linecap: "round",
                                         stroke_linejoin: "round",
