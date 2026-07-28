@@ -60,7 +60,7 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
 
     let mut xml = String::from(concat!(
         r#"<?xml version="1.0" encoding="UTF-8"?>"#,
-        r#"<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">"#,
+        r#"<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">"#,
         r#"<channel>"#,
         r#"<title>干徒的博客</title>"#,
         r#"<link>https://ganto.me</link>"#,
@@ -111,21 +111,10 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
             escape_xml(&post.author)
         ));
 
-        // description: 优先使用 summary，否则取正文前 500 字符
-        let description_text = if !post.summary.is_empty() {
-            post.summary.clone()
-        } else {
-            post.content.chars().take(500).collect()
-        };
-        xml.push_str(&format!(
-            "  <description>{}</description>\n",
-            escape_xml(&description_text)
-        ));
-
-        // content:encoded: 全文 HTML，CDATA 包裹
+        // 全文 HTML 放在 description 中，CDATA 包裹
         let html = md_to_html(&post.content);
         xml.push_str(&format!(
-            "  <content:encoded><![CDATA[{}]]></content:encoded>\n",
+            "  <description><![CDATA[{}]]></description>\n",
             escape_cdata(&html)
         ));
 
