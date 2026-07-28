@@ -111,7 +111,7 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
             escape_xml(&post.author)
         ));
 
-        // 全文 HTML 放在 description 中，CDATA 包裹
+        // description: 全文 HTML，CDATA 包裹
         let html = md_to_html(&post.content);
         xml.push_str(&format!(
             "  <description><![CDATA[{}]]></description>\n",
