@@ -46,7 +46,18 @@ fn md_to_html(md: &str) -> String {
     comrak::markdown_to_html(md, &options)
 }
 
+fn escape_cdata(content: &str) -> String {
+    // 如果内容包含 ]]>，拆分为 ]]]]><![CDATA[> 避免提前关闭 CDATA
+    content.replace("]]>", "]]]]><![CDATA[>")
+}
+
 pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
+    let last_build_date = if let Some(latest) = posts.first() {
+        format_rfc2822(&latest.date)
+    } else {
+        format_rfc2822("2024-01-01")
+    };
+
     let mut xml = String::from(concat!(
         r#"<?xml version="1.0" encoding="UTF-8"?>"#,
         r#"<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">"#,
@@ -55,7 +66,21 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
         r#"<link>https://ganto.me</link>"#,
         r#"<description>干徒 (Ganto) 的个人技术博客，分享 Rust、前端、WebAssembly 等编程技术文章。</description>"#,
         r#"<language>zh-CN</language>"#,
-        r#"<atom:link href="https://ganto.me/feed.xml" rel="self" type="application/rss+xml"/>"#,
+        r#"<docs>https://www.rssboard.org/rss-specification</docs>"#,
+        r#"<generator>website-rs</generator>"#,
+    ));
+
+    xml.push_str(&format!(
+        "  <lastBuildDate>{}</lastBuildDate>\n",
+        escape_xml(&last_build_date)
+    ));
+    xml.push_str(&format!(
+        "  <pubDate>{}</pubDate>\n",
+        escape_xml(&last_build_date)
+    ));
+
+    xml.push_str(concat!(
+        r#"<atom:link href="https://ganto.me/static/feed.xml" rel="self" type="application/rss+xml"/>"#,
     ));
 
     let total = posts.len().min(50);
@@ -80,16 +105,17 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
         let pub_date = format_rfc2822(&post.date);
         xml.push_str(&format!("  <pubDate>{}</pubDate>\n", escape_xml(&pub_date)));
 
+        // RSS 2.0 规范要求 author 使用 email 格式: email@domain (Name)
         xml.push_str(&format!(
-            "  <author>{}</author>\n",
+            "  <author>i@ganto.me ({})</author>\n",
             escape_xml(&post.author)
         ));
 
-        // 全文 HTML 放在 description 中，兼容所有 RSS 阅读器
+        // 全文 HTML 放在 description 中，CDATA 包裹，并转义内部的 ]]> 序列
         let html = md_to_html(&post.content);
         xml.push_str(&format!(
             "  <description><![CDATA[{}]]></description>\n",
-            html
+            escape_cdata(&html)
         ));
 
         for tag in &post.tags {
