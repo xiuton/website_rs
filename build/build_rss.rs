@@ -48,11 +48,9 @@ fn escape_html_code(html: &str) -> String {
             if i + 5 < bytes.len() && &bytes[i..i+5] == b"<code" {
                 // 把开标签 <code ...> 完整复制出来，跳过其内部 > 再开始转义
                 in_code = true;
-                result.push(bytes[i] as char);
-                i += 1;
+                i += push_utf8(&mut result, bytes, i);
                 while i < bytes.len() && bytes[i] != b'>' {
-                    result.push(bytes[i] as char);
-                    i += 1;
+                    i += push_utf8(&mut result, bytes, i);
                 }
                 if i < bytes.len() {
                     result.push('>');
@@ -89,10 +87,48 @@ fn escape_html_code(html: &str) -> String {
                 }
             }
         }
-        result.push(bytes[i] as char);
-        i += 1;
+        let (ch, len) = char_at(bytes, i);
+        result.push(ch);
+        i += len;
     }
     result
+}
+
+/// 从字节数组当前位置解码一个 UTF-8 字符，返回 (char, 字节数)
+fn char_at(bytes: &[u8], i: usize) -> (char, usize) {
+    let c = bytes[i];
+    match c {
+        _ if c < 0x80 => (c as char, 1),
+        _ if c < 0xE0 => {
+            if i + 1 < bytes.len() && (bytes[i+1] & 0xC0) == 0x80 {
+                if let Ok(s) = std::str::from_utf8(&bytes[i..i+2]) {
+                    if let Some(ch) = s.chars().next() { return (ch, 2); }
+                }
+            }
+            ('\u{FFFD}', 1)
+        }
+        _ if c < 0xF0 => {
+            let end = std::cmp::min(i + 3, bytes.len());
+            if let Ok(s) = std::str::from_utf8(&bytes[i..end]) {
+                if let Some(ch) = s.chars().next() { return (ch, s.len()); }
+            }
+            ('\u{FFFD}', 1)
+        }
+        _ => {
+            let end = std::cmp::min(i + 4, bytes.len());
+            if let Ok(s) = std::str::from_utf8(&bytes[i..end]) {
+                if let Some(ch) = s.chars().next() { return (ch, s.len()); }
+            }
+            ('\u{FFFD}', 1)
+        }
+    }
+}
+
+/// 解码一个 UTF-8 字符并追加到 String，返回消耗的字节数
+fn push_utf8(result: &mut String, bytes: &[u8], i: usize) -> usize {
+    let (ch, len) = char_at(bytes, i);
+    result.push(ch);
+    len
 }
 
 fn strip_html_tags(html: &str) -> String {
