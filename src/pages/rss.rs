@@ -48,10 +48,6 @@ pub fn Rss() -> Element {
                     }
                 }
             }
-
-            p { class: "rss-tip",
-                "将上方链接复制到你的 RSS 阅读器中即可订阅。大多数阅读器支持自动识别，直接输入 blog.ganto.me 也可以。"
-            }
         }
     }
 }
