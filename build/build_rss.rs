@@ -83,7 +83,7 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
         r#"<atom:link href="https://ganto.me/static/feed.xml" rel="self" type="application/rss+xml"/>"#,
     ));
 
-    let total = posts.len().min(20);
+    let total = posts.len().min(50);
     for post in posts.iter().take(total) {
         xml.push_str("<item>\n");
         xml.push_str(&format!(
