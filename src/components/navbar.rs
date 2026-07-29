@@ -62,6 +62,7 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
             "/knowledge-graph" => matches!(route, Route::KnowledgeGraphView),
             "/ai-summary" => matches!(route, Route::AiSummaryView),
             "/dev" => matches!(route, Route::Dev),
+            "/rss" => matches!(route, Route::Rss),
             #[cfg(feature = "dev-pages")]
             "/playground" => matches!(route, Route::Playground),
             #[cfg(feature = "dev-pages")]
@@ -157,14 +158,14 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                             }
                         }
                     })}
-                    button {
-                        class: "nav-icon-btn rss-toggle",
-                        title: "RSS 订阅",
-                        onclick: move |_| {
-                            if let Some(window) = web_sys::window() {
-                                let _ = window.open_with_url_and_target("/static/feed.xml", "_blank");
-                            }
+                    Link {
+                        class: if is_active("/rss") {
+                            "nav-icon-btn rss-toggle active"
+                        } else {
+                            "nav-icon-btn rss-toggle"
                         },
+                        title: "RSS 订阅",
+                        to: Route::Rss,
                         RssIcon {}
                     }
                     button {

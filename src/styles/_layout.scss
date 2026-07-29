@@ -201,6 +201,11 @@
             &:hover {
               color: #f26522;
             }
+
+            &.active {
+              color: #f26522;
+              background: var(--accent-soft);
+            }
           }
 
           .theme-toggle {
@@ -2744,5 +2749,105 @@ html.dark::view-transition-new(root) {
                 }
             }
         }
+    }
+}
+
+// RSS 订阅页面（显式选择器避免 SCSS 嵌套歧义）
+#main .app .main-content .rss-page {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 2rem 0rem;
+
+    .rss-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 1.5rem;
+        color: var(--text-primary);
+        margin-bottom: 0.75rem;
+
+        svg {
+            width: 1.5rem;
+            height: 1.5rem;
+            color: #f26522;
+        }
+    }
+
+    .rss-intro {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        line-height: 1.6;
+        margin-bottom: 2rem;
+    }
+
+    .rss-feeds {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        margin-bottom: 2rem;
+    }
+
+    .rss-card {
+        padding: 1.5rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--card-bg);
+        transition: border-color 0.2s;
+
+        &:hover {
+            border-color: var(--accent);
+        }
+
+        h2 {
+            font-size: 1.15rem;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .rss-card-desc {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            line-height: 1.5;
+            margin-bottom: 1rem;
+        }
+
+        .rss-link-btn {
+            display: inline-block;
+            padding: 0.4rem 1.25rem;
+            background: #f26522;
+            color: #fff;
+            text-decoration: none;
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: background 0.2s;
+
+            &:hover {
+                background: #d4551c;
+            }
+        }
+
+        .rss-url {
+            margin-top: 1rem;
+            padding: 0.5rem 0.75rem;
+            background: var(--code-bg);
+            border-radius: var(--radius-sm);
+            font-size: 0.78rem;
+            overflow-x: auto;
+
+            code {
+                color: var(--text-secondary);
+                word-break: break-all;
+            }
+        }
+    }
+
+    .rss-tip {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        line-height: 1.5;
+        padding: 0.75rem 1rem;
+        background: var(--code-bg);
+        border-radius: var(--radius-sm);
     }
 }

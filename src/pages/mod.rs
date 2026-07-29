@@ -8,6 +8,7 @@ pub mod circle_generator;
 pub mod knowledge_graph;
 pub mod search;
 pub mod ai_summary;
+pub mod rss;
 #[cfg(feature = "dev-pages")]
 pub mod playground;
 #[cfg(feature = "dev-pages")]
@@ -23,6 +24,7 @@ pub use circle_generator::CircleGenerator;
 pub use knowledge_graph::KnowledgeGraphView;
 pub use search::Search;
 pub use ai_summary::AiSummaryView;
+pub use rss::Rss;
 #[cfg(feature = "dev-pages")]
 pub use playground::Playground;
 #[cfg(feature = "dev-pages")]
