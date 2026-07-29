@@ -65,7 +65,7 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
         escape_xml(&last_build_date)
     ));
 
-    let total = posts.len().min(50);
+    let total = posts.len().min(20);
     for post in posts.iter().take(total) {
         xml.push_str("<item>\n");
         xml.push_str(&format!(
