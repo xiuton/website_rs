@@ -813,6 +813,10 @@ pre code.hljs {
 #main .app .navbar-sticky-wrap .rss-toggle:hover {
   color: #f26522;
 }
+#main .app .navbar-sticky-wrap .rss-toggle.active {
+  color: #f26522;
+  background: var(--accent-soft);
+}
 #main .app .navbar-sticky-wrap .theme-toggle {
   margin-left: 0.35rem;
 }
@@ -3039,6 +3043,92 @@ html.dark::view-transition-new(root) {
   background: var(--primary-color-dark);
 }
 
+#main .app .main-content .rss-page {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 2rem 0rem;
+}
+#main .app .main-content .rss-page .rss-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+}
+#main .app .main-content .rss-page .rss-title svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: #f26522;
+}
+#main .app .main-content .rss-page .rss-intro {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+}
+#main .app .main-content .rss-page .rss-feeds {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+#main .app .main-content .rss-page .rss-card {
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  transition: border-color 0.2s;
+}
+#main .app .main-content .rss-page .rss-card:hover {
+  border-color: var(--accent);
+}
+#main .app .main-content .rss-page .rss-card h2 {
+  font-size: 1.15rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+#main .app .main-content .rss-page .rss-card .rss-card-desc {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+#main .app .main-content .rss-page .rss-card .rss-link-btn {
+  display: inline-block;
+  padding: 0.4rem 1.25rem;
+  background: #f26522;
+  color: #fff;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+#main .app .main-content .rss-page .rss-card .rss-link-btn:hover {
+  background: #d4551c;
+}
+#main .app .main-content .rss-page .rss-card .rss-url {
+  margin-top: 1rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--code-bg);
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  overflow-x: auto;
+}
+#main .app .main-content .rss-page .rss-card .rss-url code {
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+#main .app .main-content .rss-page .rss-tip {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  padding: 0.75rem 1rem;
+  background: var(--code-bg);
+  border-radius: var(--radius-sm);
+}
+
 @media (max-width: 768px) {
   #main {
     margin: 0 0.75rem;
@@ -4454,7 +4544,7 @@ html.dark::view-transition-new(root) {
 .ai-summary-container {
   max-width: 800px;
   margin: 0 auto;
-  padding: 1rem 1.5rem 2rem;
+  padding: 1rem 0rem 2rem;
 }
 .ai-summary-container .ai-summary-header {
   text-align: center;
@@ -4566,7 +4656,7 @@ html.dark::view-transition-new(root) {
 
 @media (max-width: 768px) {
   .ai-summary-container {
-    padding: 0.5rem 1rem 1.5rem;
+    padding: 0.5rem 0 1.5rem;
   }
   .ai-summary-container .ai-summary-header {
     padding: 1rem 0 1.2rem;
