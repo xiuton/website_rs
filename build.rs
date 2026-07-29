@@ -2,6 +2,8 @@
 mod build_common;
 #[path = "build/build_rss.rs"]
 mod build_rss;
+#[path = "build/build_atom.rs"]
+mod build_atom;
 #[path = "build/build_search.rs"]
 mod build_search;
 #[path = "build/build_semantic.rs"]
@@ -23,6 +25,7 @@ mod build_posts_json;
 
 use build_common::*;
 use build_rss::generate_rss_feed;
+use build_atom::generate_atom_feed;
 use build_search::generate_search_index;
 use build_semantic::generate_semantic_index;
 use build_embeddings::generate_article_embeddings;
@@ -82,6 +85,7 @@ fn main() {
     fs::write(dest_path, output).expect("Failed to write blog posts");
 
     generate_rss_feed(&posts, out_dir.to_str().unwrap());
+    generate_atom_feed(&posts, out_dir.to_str().unwrap());
     generate_search_index(&posts);
     generate_semantic_index(&posts);
     generate_article_embeddings(&posts);

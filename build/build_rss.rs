@@ -1,9 +1,8 @@
 use crate::build_common::*;
 use std::path::Path;
-use comrak::ComrakOptions;
 
 fn format_rfc2822(date_str: &str) -> String {
-    // 尝试解析 YYYY-MM-DD 格式的日期，转为 RFC 2822
+    // 解析 YYYY-MM-DD 格式的日期，转为 RFC 2822
     if date_str.len() < 10 {
         return date_str.to_string();
     }
@@ -36,128 +35,6 @@ fn format_rfc2822(date_str: &str) -> String {
     format!("{}, {:02} {} {:04} 00:00:00 +0800", weekdays[h as usize], day, month_abbr, year)
 }
 
-fn escape_html_code(html: &str) -> String {
-    // 转义 <code>...</code> 内的 < > &，防止代码片段被 RSS 校验器误判为 HTML 标签
-    let mut result = String::with_capacity(html.len());
-    let mut in_code = false;
-    let bytes = html.as_bytes();
-    let mut i = 0;
-
-    while i < bytes.len() {
-        if !in_code {
-            if i + 5 < bytes.len() && &bytes[i..i+5] == b"<code" {
-                // 把开标签 <code ...> 完整复制出来，跳过其内部 > 再开始转义
-                in_code = true;
-                i += push_utf8(&mut result, bytes, i);
-                while i < bytes.len() && bytes[i] != b'>' {
-                    i += push_utf8(&mut result, bytes, i);
-                }
-                if i < bytes.len() {
-                    result.push('>');
-                    i += 1;
-                }
-                continue;
-            }
-        } else {
-            if i + 7 < bytes.len() && &bytes[i..i+7] == b"</code>" {
-                result.push_str("</code>");
-                i += 7;
-                in_code = false;
-                continue;
-            } else {
-                match bytes[i] {
-                    b'<' => { result.push_str("&lt;"); i += 1; continue; }
-                    b'>' => { result.push_str("&gt;"); i += 1; continue; }
-                    b'&' => {
-                        let rest = &bytes[i..];
-                        let min_len = rest.len().min(6);
-                        let slice = std::str::from_utf8(&rest[..min_len]).unwrap_or("");
-                        if slice.starts_with("&lt;") || slice.starts_with("&gt;")
-                            || slice.starts_with("&amp;") || slice.starts_with("&quot;")
-                            || slice.starts_with("&apos;") || slice.starts_with("&#")
-                        {
-                            // 已有实体，原样保留
-                        } else {
-                            result.push_str("&amp;");
-                            i += 1;
-                            continue;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-        let (ch, len) = char_at(bytes, i);
-        result.push(ch);
-        i += len;
-    }
-    result
-}
-
-/// 从字节数组当前位置解码一个 UTF-8 字符，返回 (char, 字节数)
-fn char_at(bytes: &[u8], i: usize) -> (char, usize) {
-    let c = bytes[i];
-    match c {
-        _ if c < 0x80 => (c as char, 1),
-        _ if c < 0xE0 => {
-            if i + 1 < bytes.len() && (bytes[i+1] & 0xC0) == 0x80 {
-                if let Ok(s) = std::str::from_utf8(&bytes[i..i+2]) {
-                    if let Some(ch) = s.chars().next() { return (ch, 2); }
-                }
-            }
-            ('\u{FFFD}', 1)
-        }
-        _ if c < 0xF0 => {
-            let end = std::cmp::min(i + 3, bytes.len());
-            if let Ok(s) = std::str::from_utf8(&bytes[i..end]) {
-                if let Some(ch) = s.chars().next() { return (ch, s.len()); }
-            }
-            ('\u{FFFD}', 1)
-        }
-        _ => {
-            let end = std::cmp::min(i + 4, bytes.len());
-            if let Ok(s) = std::str::from_utf8(&bytes[i..end]) {
-                if let Some(ch) = s.chars().next() { return (ch, s.len()); }
-            }
-            ('\u{FFFD}', 1)
-        }
-    }
-}
-
-/// 解码一个 UTF-8 字符并追加到 String，返回消耗的字节数
-fn push_utf8(result: &mut String, bytes: &[u8], i: usize) -> usize {
-    let (ch, len) = char_at(bytes, i);
-    result.push(ch);
-    len
-}
-
-fn strip_html_tags(html: &str) -> String {
-    // 去掉 HTML 标签，保留实体编码（如 &lt;），不解码
-    let mut result = String::new();
-    let mut in_tag = false;
-    for c in html.chars() {
-        match c {
-            '<' => in_tag = true,
-            '>' => in_tag = false,
-            _ if !in_tag => result.push(c),
-            _ => {}
-        }
-    }
-    // 压缩连续空白
-    result.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
-fn md_to_html(md: &str) -> String {
-    let mut options = ComrakOptions::default();
-    options.extension.table = true;
-    options.extension.strikethrough = true;
-    options.extension.tasklist = true;
-    options.extension.autolink = true;
-    options.extension.footnotes = true;
-    let raw = comrak::markdown_to_html(md, &options);
-    escape_html_code(&raw)
-}
-
 pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
     let last_build_date = if let Some(latest) = posts.first() {
         format_rfc2822(&latest.date)
@@ -167,7 +44,7 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
 
     let mut xml = String::from(concat!(
         r#"<?xml version="1.0" encoding="UTF-8"?>"#,
-        r#"<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">"#,
+        r#"<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">"#,
         r#"<channel>"#,
         r#"<title>干徒的博客</title>"#,
         r#"<link>https://ganto.me</link>"#,
@@ -177,7 +54,6 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
         r#"<docs>https://www.rssboard.org/rss-specification</docs>"#,
         r#"<generator>website-rs</generator>"#,
         r#"<ttl>60</ttl>"#,
-        r#"<atom:link href="https://ganto.me/static/feed.xml" rel="self" type="application/rss+xml"/>"#,
     ));
 
     xml.push_str(&format!(

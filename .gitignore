@@ -12,6 +12,7 @@
 /static/lda-topics.json
 /static/knowledge-graph.json
 /static/feed.xml
+/static/atom.xml
 
 # OS generated files
 .DS_Store
