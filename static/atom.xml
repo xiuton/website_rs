@@ -1,13 +1,16 @@
-<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>干徒的博客</title><link>https://ganto.me</link><description>干徒 (Ganto) 的个人技术博客，分享 Rust、前端、WebAssembly 等编程技术文章。</description><language>zh-CN</language><copyright>Copyright 2024-2026 干徒 (Ganto)</copyright><docs>https://www.rssboard.org/rss-specification</docs><generator>website-rs</generator><ttl>60</ttl><lastBuildDate>Thu, 29 Jan 2026 00:00:00 +0800</lastBuildDate>
-<pubDate>Thu, 29 Jan 2026 00:00:00 +0800</pubDate>
-<item>
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom"><title>干徒的博客</title><link href="https://ganto.me"/><id>https://ganto.me</id><link rel="self" href="https://ganto.me/static/atom.xml"/>
+<updated>2026-01-29T00:00:00+08:00</updated>
+<author><name>干徒</name></author>
+<generator uri="https://ganto.me">website-rs</generator>
+<entry>
   <title>人工智能（AI）基础解析</title>
-  <link>https://ganto.me/post/20260129</link>
-  <guid isPermaLink="true">https://ganto.me/post/20260129</guid>
-  <pubDate>Thu, 29 Jan 2026 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[人工智能（AI）已经越来越融入我们的生活，从智能助手到智能机器人，从智能交通到智能医疗，AI正在改变我们的世界。]]></description>
-  <content:encoded><![CDATA[<h2>一、AI的定义</h2>
+  <link href="https://ganto.me/post/20260129"/>
+  <id>https://ganto.me/post/20260129</id>
+  <updated>2026-01-29T00:00:00+08:00</updated>
+  <published>2026-01-29T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[人工智能（AI）已经越来越融入我们的生活，从智能助手到智能机器人，从智能交通到智能医疗，AI正在改变我们的世界。]]></summary>
+  <content type="html"><![CDATA[<h2>一、AI的定义</h2>
 <p>人工智能（Artificial Intelligence，简称AI）是一门研究、开发用于<strong>模拟、延伸和扩展人类智能</strong>的理论、方法、技术及应用系统的技术科学，核心目标是让机器具备类似人类的感知、推理、学习、决策、创造等智能行为，能够自主处理问题并适应不同场景。</p>
 <p>AI并非单一技术，而是一门交叉学科，融合了计算机科学、数学、统计学、神经科学、语言学、心理学等多个领域的知识，是现代科技发展的核心方向之一。</p>
 <h2>二、AI的核心特征</h2>
@@ -90,30 +93,32 @@
 <p>人工智能是人类科技发展的重要里程碑，其本质是用机器模拟人类智能，解决人类难以完成的复杂任务，推动社会生产效率的提升和生活方式的变革。</p>
 <p>目前的AI仍处于<strong>弱人工智能阶段</strong>，虽已实现诸多领域的应用，但远未达到具备自主意识的强人工智能。未来，AI的发展将是技术突破、产业应用和治理体系完善的协同过程，如何在利用AI推动发展的同时，规避其潜在风险，实现AI与人类社会的和谐共生，是全球需要共同面对的课题。</p>
 <p>AI的核心价值并非替代人类，而是<strong>延伸人类的能力边界</strong>，让人类从重复性的工作中解放出来，专注于创意、创新、情感交流等人类独有的领域。</p>
-]]></content:encoded>
-  <category>Artificial Intelligence</category>
-</item>
-<item>
+]]></content>
+  <category term="Artificial Intelligence"/>
+</entry>
+<entry>
   <title>Dioxus基于Rust的多平台开发框架</title>
-  <link>https://ganto.me/post/20250609</link>
-  <guid isPermaLink="true">https://ganto.me/post/20250609</guid>
-  <pubDate>Mon, 09 Jun 2025 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[官网：https://dioxuslabs.com/ Dioxus 是用于构建全栈 Web、桌面和移动应用程序的 Rust 框架。使用实时热重载进行迭代，添加服务器函数，并在创纪录的时间内进行部署。]]></description>
-  <content:encoded><![CDATA[<p>官网：<a href="https://dioxuslabs.com/">https://dioxuslabs.com/</a></p>
+  <link href="https://ganto.me/post/20250609"/>
+  <id>https://ganto.me/post/20250609</id>
+  <updated>2025-06-09T00:00:00+08:00</updated>
+  <published>2025-06-09T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[官网：https://dioxuslabs.com/ Dioxus 是用于构建全栈 Web、桌面和移动应用程序的 Rust 框架。使用实时热重载进行迭代，添加服务器函数，并在创纪录的时间内进行部署。]]></summary>
+  <content type="html"><![CDATA[<p>官网：<a href="https://dioxuslabs.com/">https://dioxuslabs.com/</a></p>
 <p>Dioxus 是用于构建全栈 Web、桌面和移动应用程序的 Rust 框架。使用实时热重载进行迭代，添加服务器函数，并在创纪录的时间内进行部署。</p>
-]]></content:encoded>
-  <category>Rust</category>
-  <category>Dioxus</category>
-</item>
-<item>
+]]></content>
+  <category term="Rust"/>
+  <category term="Dioxus"/>
+</entry>
+<entry>
   <title>Rust 案例 - 计算器</title>
-  <link>https://ganto.me/post/20250410</link>
-  <guid isPermaLink="true">https://ganto.me/post/20250410</guid>
-  <pubDate>Thu, 10 Apr 2025 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[use std::io; use std::io::Write; fn main() { let mut user_typer = UserTyper::new(CommandLineComputer); user_typer.type_expr(); println!(&quot;Result: {}&quot;, user_typer.compute()); } trait Computer { fn compute(&amp;self, expr: &amp;str) -&gt; i32; } struct CommandLineComputer; impl Computer for CommandLineComputer { fn compute(&amp;self, expr: &amp;str) -&gt; i32 { let mut num1 = String::new(); let mut num2 = String::new(); let mut op: Option&lt;char&gt; = None; for c in expr.trim().chars() {]]></description>
-  <content:encoded><![CDATA[<pre><code class="language-rust">use std::io;
+  <link href="https://ganto.me/post/20250410"/>
+  <id>https://ganto.me/post/20250410</id>
+  <updated>2025-04-10T00:00:00+08:00</updated>
+  <published>2025-04-10T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[use std::io; use std::io::Write; fn main() { let mut user_typer = UserTyper::new(CommandLineComputer); user_typer.type_expr(); println!(&quot;Result: {}&quot;, user_typer.compute()); } trait Computer { fn compute(&amp;self, expr: &amp;str) -&gt; i32; } struct CommandLineComputer; impl Computer for CommandLineComputer { fn compute(&amp;self, expr: &amp;str) -&gt; i32 { let mut num1 = String::new(); let mut num2 = String::new(); let mut op: Option&lt;char&gt; = None; for c in expr.trim().chars() {]]></summary>
+  <content type="html"><![CDATA[<pre><code class="language-rust">use std::io;
 use std::io::Write;
 
 fn main() {
@@ -190,18 +195,19 @@ impl&lt;T: Computer&gt; UserTyper&lt;T&gt; {
 }
 
 </code></pre>
-]]></content:encoded>
-  <category>Rust</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="Rust"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>Rust镜像源</title>
-  <link>https://ganto.me/post/20250313</link>
-  <guid isPermaLink="true">https://ganto.me/post/20250313</guid>
-  <pubDate>Thu, 13 Mar 2025 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[配置Rust镜像源 配置文件位置 ~/.cargo/config.toml 修改 config.toml [source.crates-io] replace-with = 'aliyun' [source.aliyun] registry = &quot;sparse+https://mirrors.aliyun.com/crates.io-index/&quot;]]></description>
-  <content:encoded><![CDATA[<h2>配置Rust镜像源</h2>
+  <link href="https://ganto.me/post/20250313"/>
+  <id>https://ganto.me/post/20250313</id>
+  <updated>2025-03-13T00:00:00+08:00</updated>
+  <published>2025-03-13T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[配置Rust镜像源 配置文件位置 ~/.cargo/config.toml 修改 config.toml [source.crates-io] replace-with = 'aliyun' [source.aliyun] registry = &quot;sparse+https://mirrors.aliyun.com/crates.io-index/&quot;]]></summary>
+  <content type="html"><![CDATA[<h2>配置Rust镜像源</h2>
 <p>配置文件位置<br />
 <code>~/.cargo/config.toml</code></p>
 <p>修改 config.toml</p>
@@ -210,18 +216,19 @@ replace-with = 'aliyun'
 [source.aliyun]
 registry = &quot;sparse+https://mirrors.aliyun.com/crates.io-index/&quot;
 </code></pre>
-]]></content:encoded>
-  <category>Rust</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="Rust"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>Rust所有权</title>
-  <link>https://ganto.me/post/20250220</link>
-  <guid isPermaLink="true">https://ganto.me/post/20250220</guid>
-  <pubDate>Thu, 20 Feb 2025 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[所有权系统是Rust中的一大特点 今日靓仔我啊，就来体验一番 我们先来看一段代码 fn main() { let s1 = String::from(&quot;hello&quot;); let s2 = s1; // s1 的所有权转移给了 s2 println!(&quot;s1: {}, s2: {}&quot;, s1, s2); // 报错，s1 已经被移动了 } 你可能不了解rust代码，那么按照你熟悉的语言去理解他，大同小异 代码中先定义了一个String字符串类型的变量 s1 然后紧接着定义了一个变量 s2，此时需要注意，s2 的值是由 s1 赋值所得（可以先简单理解为赋值） 然后打印出 s1，s2 发现报错了 问题就出现在 let s2 = s1; 这段代码，这里其实发生了所有权转移，也就是 s1 的所有权发生了向 s2 转移 那么 s1 变量在所有权发生转移后，再进行访问，那么在rust中将是不合法的访问 如果不需要所有权转移，而只是简单的拷贝，则可以使用clone函数 fn main() { let mut s1 = String::from(&quot;hel]]></description>
-  <content:encoded><![CDATA[<p>所有权系统是Rust中的一大特点<br />
+  <link href="https://ganto.me/post/20250220"/>
+  <id>https://ganto.me/post/20250220</id>
+  <updated>2025-02-20T00:00:00+08:00</updated>
+  <published>2025-02-20T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[所有权系统是Rust中的一大特点 今日靓仔我啊，就来体验一番 我们先来看一段代码 fn main() { let s1 = String::from(&quot;hello&quot;); let s2 = s1; // s1 的所有权转移给了 s2 println!(&quot;s1: {}, s2: {}&quot;, s1, s2); // 报错，s1 已经被移动了 } 你可能不了解rust代码，那么按照你熟悉的语言去理解他，大同小异 代码中先定义了一个String字符串类型的变量 s1 然后紧接着定义了一个变量 s2，此时需要注意，s2 的值是由 s1 赋值所得（可以先简单理解为赋值） 然后打印出 s1，s2 发现报错了 问题就出现在 let s2 = s1; 这段代码，这里其实发生了所有权转移，也就是 s1 的所有权发生了向 s2 转移 那么 s1 变量在所有权发生转移后，再进行访问，那么在rust中将是不合法的访问 如果不需要所有权转移，而只是简单的拷贝，则可以使用clone函数 fn main() { let mut s1 = String::from(&quot;hel]]></summary>
+  <content type="html"><![CDATA[<p>所有权系统是Rust中的一大特点<br />
 今日靓仔我啊，就来体验一番</p>
 <p>我们先来看一段代码</p>
 <pre><code class="language-rust">fn main() {
@@ -249,19 +256,20 @@ registry = &quot;sparse+https://mirrors.aliyun.com/crates.io-index/&quot;
 </code></pre>
 <p>以上代码，通过对 <code>s1</code> 进行修改，会发现 <code>s2</code> 没有被一同修改，说明 <code>clone()</code> 函数是深拷贝</p>
 <p>体验了rust中的所有权，很奇妙，像进了米奇妙妙屋...</p>
-]]></content:encoded>
-  <category>Rust</category>
-  <category>后端</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="Rust"/>
+  <category term="后端"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>JavaScript 高阶函数之 reduce</title>
-  <link>https://ganto.me/post/20250220-2</link>
-  <guid isPermaLink="true">https://ganto.me/post/20250220-2</guid>
-  <pubDate>Thu, 20 Feb 2025 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[MDN：https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce 关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为累加器 reduce常见用例如下： let goods = [ { name: &quot;T恤&quot;, price: 99, count: 2 }, { name: &quot;polo衫&quot;, price: 120, count: 1 }, { name: &quot;牛仔裤&quot;, price: 197, count: 11 } ] const goodsSum = goods.reduce((sum, item) =&gt; { return sum + item.price * item.count; }, initSum = 0) console.log(goodsSum) // 2485 以上代码，我相信对于你那真是信手捏来... 但是还是需要解释一下，reduce就是对goods数组]]></description>
-  <content:encoded><![CDATA[<blockquote>
+  <link href="https://ganto.me/post/20250220-2"/>
+  <id>https://ganto.me/post/20250220-2</id>
+  <updated>2025-02-20T00:00:00+08:00</updated>
+  <published>2025-02-20T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[MDN：https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce 关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为累加器 reduce常见用例如下： let goods = [ { name: &quot;T恤&quot;, price: 99, count: 2 }, { name: &quot;polo衫&quot;, price: 120, count: 1 }, { name: &quot;牛仔裤&quot;, price: 197, count: 11 } ] const goodsSum = goods.reduce((sum, item) =&gt; { return sum + item.price * item.count; }, initSum = 0) console.log(goodsSum) // 2485 以上代码，我相信对于你那真是信手捏来... 但是还是需要解释一下，reduce就是对goods数组]]></summary>
+  <content type="html"><![CDATA[<blockquote>
 <p>MDN：<a href="https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce">https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce</a></p>
 </blockquote>
 <p>关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为<strong>累加器</strong></p>
@@ -329,20 +337,21 @@ console.log(ret)
 <p>结束reduce</p>
 <p>返回 <code>&quot;你好&quot;</code></p>
 <p>啊？reduce函数还能这么用！</p>
-]]></content:encoded>
-  <category>JavaScript</category>
-  <category>Vue</category>
-  <category>前端</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="JavaScript"/>
+  <category term="Vue"/>
+  <category term="前端"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>JavaScript中的&quot;事件冒泡&quot;与&quot;事件捕获&quot;</title>
-  <link>https://ganto.me/post/20241220</link>
-  <guid isPermaLink="true">https://ganto.me/post/20241220</guid>
-  <pubDate>Fri, 20 Dec 2024 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[前言 Capture：事件捕获 Bubble：事件冒泡 如图所示，大致展示了事件冒泡和事件捕获的流程 可能还有点迷惑，无妨，继续往下看 事件冒泡展示 我们先创建一个嵌套的HTML结构 &lt;div class=&quot;div1&quot;&gt; &lt;p&gt;div1&lt;/p&gt; &lt;div class=&quot;div2&quot;&gt; &lt;p&gt;div2&lt;/p&gt; &lt;button&gt;CLICK ME!&lt;/button&gt; &lt;/div&gt; &lt;/div&gt; 并且为他们各自添加点击事件，并给window和document也添加上点击事件 window.addEventListener(&quot;click&quot;, () =&gt; { console.log('Window'); }); document.addEventListener(&quot;click&quot;, () =&gt; { console.log('Document'); }); document.querySelec]]></description>
-  <content:encoded><![CDATA[<h2>前言</h2>
+  <link href="https://ganto.me/post/20241220"/>
+  <id>https://ganto.me/post/20241220</id>
+  <updated>2024-12-20T00:00:00+08:00</updated>
+  <published>2024-12-20T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[前言 Capture：事件捕获 Bubble：事件冒泡 如图所示，大致展示了事件冒泡和事件捕获的流程 可能还有点迷惑，无妨，继续往下看 事件冒泡展示 我们先创建一个嵌套的HTML结构 &lt;div class=&quot;div1&quot;&gt; &lt;p&gt;div1&lt;/p&gt; &lt;div class=&quot;div2&quot;&gt; &lt;p&gt;div2&lt;/p&gt; &lt;button&gt;CLICK ME!&lt;/button&gt; &lt;/div&gt; &lt;/div&gt; 并且为他们各自添加点击事件，并给window和document也添加上点击事件 window.addEventListener(&quot;click&quot;, () =&gt; { console.log('Window'); }); document.addEventListener(&quot;click&quot;, () =&gt; { console.log('Document'); }); document.querySelec]]></summary>
+  <content type="html"><![CDATA[<h2>前言</h2>
 <p>Capture：事件捕获<br />
 Bubble：事件冒泡</p>
 <p><img src="https://img2024.cnblogs.com/blog/2229842/202412/2229842-20241220165118171-411205481.png" alt="" /><br />
@@ -562,18 +571,19 @@ DIV 1
 
 </code></pre>
 <p>优先依次执行事件捕获，再从最内部开始依次事件冒泡</p>
-]]></content:encoded>
-  <category>JavaScript</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="JavaScript"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>今天，学习Web Component</title>
-  <link>https://ganto.me/post/20240511</link>
-  <guid isPermaLink="true">https://ganto.me/post/20240511</guid>
-  <pubDate>Sat, 11 May 2024 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[Web Component MDN 阮一峰 web components 例子1： &lt;!DOCTYPE html&gt; &lt;html lang=&quot;en&quot;&gt; &lt;head&gt; &lt;meta charset=&quot;UTF-8&quot;&gt; &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt; &lt;title&gt;Document&lt;/title&gt; &lt;/head&gt; &lt;body&gt; &lt;popup-info text=&quot;web components&quot; style=&quot;background-color: 50px;&quot;/&gt; &lt;script&gt; // Create a class for the element class PopUpInfo extends HTMLElement { constructo]]></description>
-  <content:encoded><![CDATA[<p><a href="https://developer.mozilla.org/zh-CN/docs/Web/API/Web_components">Web Component MDN</a><br />
+  <link href="https://ganto.me/post/20240511"/>
+  <id>https://ganto.me/post/20240511</id>
+  <updated>2024-05-11T00:00:00+08:00</updated>
+  <published>2024-05-11T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[Web Component MDN 阮一峰 web components 例子1： &lt;!DOCTYPE html&gt; &lt;html lang=&quot;en&quot;&gt; &lt;head&gt; &lt;meta charset=&quot;UTF-8&quot;&gt; &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt; &lt;title&gt;Document&lt;/title&gt; &lt;/head&gt; &lt;body&gt; &lt;popup-info text=&quot;web components&quot; style=&quot;background-color: 50px;&quot;/&gt; &lt;script&gt; // Create a class for the element class PopUpInfo extends HTMLElement { constructo]]></summary>
+  <content type="html"><![CDATA[<p><a href="https://developer.mozilla.org/zh-CN/docs/Web/API/Web_components">Web Component MDN</a><br />
 <a href="https://www.ruanyifeng.com/blog/2019/08/web_components.html">阮一峰 web components</a></p>
 <h2>例子1：</h2>
 <pre><code class="language-html">&lt;!DOCTYPE html&gt;
@@ -876,18 +886,19 @@ window.customElements.define('user-card', UserCard);
 customElements.define(&quot;my-com&quot;, MyCom);
 
 </code></pre>
-]]></content:encoded>
-  <category>JavaScript</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="JavaScript"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>Gin中间件上下文中的Set、Get函数的用法</title>
-  <link>https://ganto.me/post/20240415</link>
-  <guid isPermaLink="true">https://ganto.me/post/20240415</guid>
-  <pubDate>Mon, 15 Apr 2024 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[Code 如下代码所示，中间件middlewareA内部通过c.Set(&quot;middlewareA_key&quot;, str)将参数设置到上下文中 所以中间件middlewareB可以通过c.Get(&quot;middlewareA_key&quot;)获取到上下文中传递的值，并将值进行了修改，然后继续通过上下文进行了传递 然后在控制器函数中可以通过上下文c.Keys[&quot;middlewareB_key&quot;]的方式获取 package main import ( &quot;fmt&quot; &quot;github.com/gin-gonic/gin&quot; ) func main() { router := gin.Default() router.Use(middlewareA(&quot;中间件A传递的值&quot;), middlewareB()) router.GET(&quot;/&quot;, func(c *gin.Context) { valueA := c.Keys[&quot;middlewareA_key&quot;] va]]></description>
-  <content:encoded><![CDATA[<h2>Code</h2>
+  <link href="https://ganto.me/post/20240415"/>
+  <id>https://ganto.me/post/20240415</id>
+  <updated>2024-04-15T00:00:00+08:00</updated>
+  <published>2024-04-15T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[Code 如下代码所示，中间件middlewareA内部通过c.Set(&quot;middlewareA_key&quot;, str)将参数设置到上下文中 所以中间件middlewareB可以通过c.Get(&quot;middlewareA_key&quot;)获取到上下文中传递的值，并将值进行了修改，然后继续通过上下文进行了传递 然后在控制器函数中可以通过上下文c.Keys[&quot;middlewareB_key&quot;]的方式获取 package main import ( &quot;fmt&quot; &quot;github.com/gin-gonic/gin&quot; ) func main() { router := gin.Default() router.Use(middlewareA(&quot;中间件A传递的值&quot;), middlewareB()) router.GET(&quot;/&quot;, func(c *gin.Context) { valueA := c.Keys[&quot;middlewareA_key&quot;] va]]></summary>
+  <content type="html"><![CDATA[<h2>Code</h2>
 <p>如下代码所示，中间件<code>middlewareA</code>内部通过<code>c.Set(&quot;middlewareA_key&quot;, str)</code>将参数设置到上下文中<br />
 所以中间件<code>middlewareB</code>可以通过<code>c.Get(&quot;middlewareA_key&quot;)</code>获取到上下文中传递的值，并将值进行了修改，然后继续通过上下文进行了传递<br />
 然后在控制器函数中可以通过上下文<code>c.Keys[&quot;middlewareB_key&quot;]</code>的方式获取</p>
@@ -946,19 +957,20 @@ func middlewareB() gin.HandlerFunc {
 }
 
 </code></pre>
-]]></content:encoded>
-  <category>Golang</category>
-  <category>后端</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="Golang"/>
+  <category term="后端"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>React中forwardRef的用法</title>
-  <link>https://ganto.me/post/20240412</link>
-  <guid isPermaLink="true">https://ganto.me/post/20240412</guid>
-  <pubDate>Fri, 12 Apr 2024 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[官网文档：https://zh-hans.react.dev/reference/react/forwardRef 今天我们就一起学习一下React中的ref怎么获取组件实例，只讨论函数式组件中的ref 如下代码，我们直接在App根组件中，意图只使用ref就获取Footer组件实例 细心的同学可能已经发现控制台报错了，提示我们应该使用forwardRef，并且编辑器也提示ref={footRef}类型不对 这是因为React不会默认暴露组件中的东西，如果开发者想要从组件中暴露出来东西，需要手动挡进行操作，这也是为了组件数据安全的考量 App.tsx import { useRef } from 'react' import { Footer } from '@/components/footer' const App = () =&gt; { const footRef = useRef(null) const getFootRef = () =&gt; { console.log(footRef.current) } return ( &lt;div className='app'&]]></description>
-  <content:encoded><![CDATA[<blockquote>
+  <link href="https://ganto.me/post/20240412"/>
+  <id>https://ganto.me/post/20240412</id>
+  <updated>2024-04-12T00:00:00+08:00</updated>
+  <published>2024-04-12T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[官网文档：https://zh-hans.react.dev/reference/react/forwardRef 今天我们就一起学习一下React中的ref怎么获取组件实例，只讨论函数式组件中的ref 如下代码，我们直接在App根组件中，意图只使用ref就获取Footer组件实例 细心的同学可能已经发现控制台报错了，提示我们应该使用forwardRef，并且编辑器也提示ref={footRef}类型不对 这是因为React不会默认暴露组件中的东西，如果开发者想要从组件中暴露出来东西，需要手动挡进行操作，这也是为了组件数据安全的考量 App.tsx import { useRef } from 'react' import { Footer } from '@/components/footer' const App = () =&gt; { const footRef = useRef(null) const getFootRef = () =&gt; { console.log(footRef.current) } return ( &lt;div className='app'&]]></summary>
+  <content type="html"><![CDATA[<blockquote>
 <p>官网文档：<a href="https://zh-hans.react.dev/reference/react/forwardRef">https://zh-hans.react.dev/reference/react/forwardRef</a></p>
 </blockquote>
 <p>今天我们就一起学习一下React中的ref怎么获取组件实例，只讨论函数式组件中的ref</p>
@@ -1073,21 +1085,22 @@ export const Footer = ({props, ref}) =&gt; {
 
 </code></pre>
 <p>React19 发布之后，我们不应该继续使用forwardRef，应该使用最新的写法</p>
-]]></content:encoded>
-  <category>JavaScript</category>
-  <category>React</category>
-  <category>TypeScript</category>
-  <category>前端</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="JavaScript"/>
+  <category term="React"/>
+  <category term="TypeScript"/>
+  <category term="前端"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>5分钟快速入门Taro</title>
-  <link>https://ganto.me/post/20240402</link>
-  <guid isPermaLink="true">https://ganto.me/post/20240402</guid>
-  <pubDate>Tue, 02 Apr 2024 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[Taro介绍 Taro是由凹凸实验室开发的一个开放式跨端跨框架，支持使用 React/Vue/Nerv 等框架来开发 微信 / 京东 / 百度 / 支付宝 / 字节跳动 / QQ / 飞书 小程序 / H5 / RN 等应用 Taro类似于uniapp，都是跨端框架，一次开发多端部署 这是Taro官方文档，可以结合官方文档食用更佳 准备 你需要了解最基本的 HTML + CSS + JS ，俗称前端三件套 最好会使用Vue React node环境（&gt;=16.20.0） 安装Taro CLI工具 安装 npm install -g @tarojs/cli 查看是否安装成功 npm info @tarojs/cli 初始化项目 taro init myApp 进入到项目根目录，安装依赖 cd myApp pnpm i 启动项目 开发 pnpm dev:weapp 打包 pnpm build:weapp 项目启动之后，在微信开发者工具中打开该项目根目录，即可预览项目 这样Taro项目就启动起来了]]></description>
-  <content:encoded><![CDATA[<h2>Taro介绍</h2>
+  <link href="https://ganto.me/post/20240402"/>
+  <id>https://ganto.me/post/20240402</id>
+  <updated>2024-04-02T00:00:00+08:00</updated>
+  <published>2024-04-02T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[Taro介绍 Taro是由凹凸实验室开发的一个开放式跨端跨框架，支持使用 React/Vue/Nerv 等框架来开发 微信 / 京东 / 百度 / 支付宝 / 字节跳动 / QQ / 飞书 小程序 / H5 / RN 等应用 Taro类似于uniapp，都是跨端框架，一次开发多端部署 这是Taro官方文档，可以结合官方文档食用更佳 准备 你需要了解最基本的 HTML + CSS + JS ，俗称前端三件套 最好会使用Vue React node环境（&gt;=16.20.0） 安装Taro CLI工具 安装 npm install -g @tarojs/cli 查看是否安装成功 npm info @tarojs/cli 初始化项目 taro init myApp 进入到项目根目录，安装依赖 cd myApp pnpm i 启动项目 开发 pnpm dev:weapp 打包 pnpm build:weapp 项目启动之后，在微信开发者工具中打开该项目根目录，即可预览项目 这样Taro项目就启动起来了]]></summary>
+  <content type="html"><![CDATA[<h2>Taro介绍</h2>
 <p>Taro是由凹凸实验室开发的一个开放式跨端跨框架，支持使用 React/Vue/Nerv 等框架来开发 <a href="https://mp.weixin.qq.com/">微信</a> / <a href="https://mp.jd.com/?entrance=taro">京东</a> / <a href="https://smartprogram.baidu.com/">百度</a> / <a href="https://mini.open.alipay.com/">支付宝</a> / <a href="https://developer.open-douyin.com/">字节跳动</a> / <a href="https://q.qq.com/">QQ</a> / <a href="https://open.feishu.cn/document/uYjL24iN/ucDOzYjL3gzM24yN4MjN">飞书</a> 小程序 / H5 / RN 等应用</p>
 <p>Taro类似于uniapp，都是跨端框架，一次开发多端部署</p>
 <p>这是<a href="https://taro-docs.jd.com/">Taro官方文档</a>，可以结合官方文档食用更佳</p>
@@ -1126,22 +1139,23 @@ pnpm i
 </code></pre>
 <p>项目启动之后，在微信开发者工具中打开该项目根目录，即可预览项目</p>
 <p>这样Taro项目就启动起来了</p>
-]]></content:encoded>
-  <category>JavaScript</category>
-  <category>React</category>
-  <category>TypeScript</category>
-  <category>Vue</category>
-  <category>前端</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="JavaScript"/>
+  <category term="React"/>
+  <category term="TypeScript"/>
+  <category term="Vue"/>
+  <category term="前端"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>React中使用Immer编写简洁的更新逻辑</title>
-  <link>https://ganto.me/post/20240328</link>
-  <guid isPermaLink="true">https://ganto.me/post/20240328</guid>
-  <pubDate>Thu, 28 Mar 2024 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[在 浅谈React中的mutation 一文中，突出表达了对象和数组类型的state，不宜直接修改原对象和数组，直接修改会制造一个mutation，并且无法触发React的重新渲染 在官方文档中提到一个库 Immer ，Immer 可以让我们直接修改对象和数组。 useImmer 需要先安装use-immer库 pnpm add use-immer -D import { useImmer } from 'use-immer'; export default function App() { const [state, setState] = useImmer({ count: 0, name: 'Joe' }) const handleClick = () =&gt; { setState(draft =&gt; { draft.count += 1 }) console.log(state) } return ( &lt;div className=&quot;app&quot;&gt; &lt;h1&gt;{state.count}&lt;/h1&gt; &lt;h2&gt;{s]]></description>
-  <content:encoded><![CDATA[<p>在 <a href="https://www.cnblogs.com/ganto/articles/18098638">浅谈React中的mutation</a> 一文中，突出表达了对象和数组类型的state，不宜直接修改原对象和数组，直接修改会制造一个mutation，并且无法触发React的重新渲染</p>
+  <link href="https://ganto.me/post/20240328"/>
+  <id>https://ganto.me/post/20240328</id>
+  <updated>2024-03-28T00:00:00+08:00</updated>
+  <published>2024-03-28T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[在 浅谈React中的mutation 一文中，突出表达了对象和数组类型的state，不宜直接修改原对象和数组，直接修改会制造一个mutation，并且无法触发React的重新渲染 在官方文档中提到一个库 Immer ，Immer 可以让我们直接修改对象和数组。 useImmer 需要先安装use-immer库 pnpm add use-immer -D import { useImmer } from 'use-immer'; export default function App() { const [state, setState] = useImmer({ count: 0, name: 'Joe' }) const handleClick = () =&gt; { setState(draft =&gt; { draft.count += 1 }) console.log(state) } return ( &lt;div className=&quot;app&quot;&gt; &lt;h1&gt;{state.count}&lt;/h1&gt; &lt;h2&gt;{s]]></summary>
+  <content type="html"><![CDATA[<p>在 <a href="https://www.cnblogs.com/ganto/articles/18098638">浅谈React中的mutation</a> 一文中，突出表达了对象和数组类型的state，不宜直接修改原对象和数组，直接修改会制造一个mutation，并且无法触发React的重新渲染</p>
 <p>在官方文档中提到一个库 <a href="https://github.com/immerjs/use-immer">Immer</a> ，Immer 可以让我们直接修改对象和数组。</p>
 <h2>useImmer</h2>
 <p>需要先安装use-immer库</p>
@@ -1200,20 +1214,21 @@ export default function App() {
 }
 
 </code></pre>
-]]></content:encoded>
-  <category>JavaScript</category>
-  <category>React</category>
-  <category>前端</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="JavaScript"/>
+  <category term="React"/>
+  <category term="前端"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>浅谈React中的mutation</title>
-  <link>https://ganto.me/post/20240327</link>
-  <guid isPermaLink="true">https://ganto.me/post/20240327</guid>
-  <pubDate>Wed, 27 Mar 2024 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[官方文档：保持组件纯粹、更新 state 中的对象、更新 state 中的数组 保持组件纯粹 这里说的纯粹也就是JS中的纯函数 那么，什么是纯函数？ 纯函数 通常具有如下特征（摘自React官网）： **只负责自己的任务。**它不会更改在该函数调用前就已存在的对象或变量。 **输入相同，则输出相同。**给定相同的输入，纯函数应总是返回相同的结果。 只负责自己的任务 简单点说就是不应该有任何副作用； 输入相同，则输出相同 就是字面意思，函数输入的参数相同的情况下，输出的内容一定是相同的； 函数满足以上两点，那么该函数就可以被成为纯函数。 就如以下代码（官网示例进行简化）： function Recipe({ drinkers }) { return ( &lt;ol&gt; &lt;li&gt;drinkers: {drinkers}&lt;/li&gt; &lt;li&gt;drinkers: {drinkers}; 0.5 * drinkers: {0.5 * drinkers}&lt;/li&gt; &lt;li&gt;0.5 * drinkers: {0.5 * drinkers]]></description>
-  <content:encoded><![CDATA[<blockquote>
+  <link href="https://ganto.me/post/20240327"/>
+  <id>https://ganto.me/post/20240327</id>
+  <updated>2024-03-27T00:00:00+08:00</updated>
+  <published>2024-03-27T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[官方文档：保持组件纯粹、更新 state 中的对象、更新 state 中的数组 保持组件纯粹 这里说的纯粹也就是JS中的纯函数 那么，什么是纯函数？ 纯函数 通常具有如下特征（摘自React官网）： **只负责自己的任务。**它不会更改在该函数调用前就已存在的对象或变量。 **输入相同，则输出相同。**给定相同的输入，纯函数应总是返回相同的结果。 只负责自己的任务 简单点说就是不应该有任何副作用； 输入相同，则输出相同 就是字面意思，函数输入的参数相同的情况下，输出的内容一定是相同的； 函数满足以上两点，那么该函数就可以被成为纯函数。 就如以下代码（官网示例进行简化）： function Recipe({ drinkers }) { return ( &lt;ol&gt; &lt;li&gt;drinkers: {drinkers}&lt;/li&gt; &lt;li&gt;drinkers: {drinkers}; 0.5 * drinkers: {0.5 * drinkers}&lt;/li&gt; &lt;li&gt;0.5 * drinkers: {0.5 * drinkers]]></summary>
+  <content type="html"><![CDATA[<blockquote>
 <p>官方文档：<a href="https://zh-hans.react.dev/learn/keeping-components-pure">保持组件纯粹</a>、<a href="https://zh-hans.react.dev/learn/updating-objects-in-state">更新 state 中的对象</a>、<a href="https://zh-hans.react.dev/learn/updating-arrays-in-state">更新 state 中的数组</a></p>
 </blockquote>
 <h1>保持组件纯粹</h1>
@@ -1333,19 +1348,20 @@ const changeObj = () =&gt; {
 </tr>
 </tbody>
 </table>
-]]></content:encoded>
-  <category>JavaScript</category>
-  <category>React</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="JavaScript"/>
+  <category term="React"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>Go语言高并发编程初探</title>
-  <link>https://ganto.me/post/20240326</link>
-  <guid isPermaLink="true">https://ganto.me/post/20240326</guid>
-  <pubDate>Tue, 26 Mar 2024 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[在当今这个数据爆炸的时代，高并发编程已成为开发者们必须掌握的技能之一。Go语言，由于其出色的并发支持和简洁的语法，正逐渐成为高并发编程领域的热门选择。本文将带您走进Go语言高并发编程的世界，探索其中的奥秘。 一、Go语言的并发模型 Go语言采用了CSP（Communicating Sequential Processes）并发模型，即通过通道（channel）在协程（goroutine）之间进行通信。协程是Go语言实现并发的基本单位，它们比线程更轻量级，可以创建成千上万个而不会给系统带来太大负担。通道则用于协程之间的数据传递，使得并发编程更加安全、高效。 二、创建与管理协程 在Go语言中，使用go关键字可以轻松地创建协程。例如： package main import &quot;fmt&quot; func main() { go sayHello() // 创建协程执行sayHello函数 fmt.Println(&quot;Main function continues...&quot;) } func sayHello() { fmt.Println(&quot;Hello f]]></description>
-  <content:encoded><![CDATA[<p>在当今这个数据爆炸的时代，高并发编程已成为开发者们必须掌握的技能之一。Go语言，由于其出色的并发支持和简洁的语法，正逐渐成为高并发编程领域的热门选择。本文将带您走进Go语言高并发编程的世界，探索其中的奥秘。</p>
+  <link href="https://ganto.me/post/20240326"/>
+  <id>https://ganto.me/post/20240326</id>
+  <updated>2024-03-26T00:00:00+08:00</updated>
+  <published>2024-03-26T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[在当今这个数据爆炸的时代，高并发编程已成为开发者们必须掌握的技能之一。Go语言，由于其出色的并发支持和简洁的语法，正逐渐成为高并发编程领域的热门选择。本文将带您走进Go语言高并发编程的世界，探索其中的奥秘。 一、Go语言的并发模型 Go语言采用了CSP（Communicating Sequential Processes）并发模型，即通过通道（channel）在协程（goroutine）之间进行通信。协程是Go语言实现并发的基本单位，它们比线程更轻量级，可以创建成千上万个而不会给系统带来太大负担。通道则用于协程之间的数据传递，使得并发编程更加安全、高效。 二、创建与管理协程 在Go语言中，使用go关键字可以轻松地创建协程。例如： package main import &quot;fmt&quot; func main() { go sayHello() // 创建协程执行sayHello函数 fmt.Println(&quot;Main function continues...&quot;) } func sayHello() { fmt.Println(&quot;Hello f]]></summary>
+  <content type="html"><![CDATA[<p>在当今这个数据爆炸的时代，高并发编程已成为开发者们必须掌握的技能之一。Go语言，由于其出色的并发支持和简洁的语法，正逐渐成为高并发编程领域的热门选择。本文将带您走进Go语言高并发编程的世界，探索其中的奥秘。</p>
 <p><strong>一、Go语言的并发模型</strong></p>
 <p>Go语言采用了CSP（Communicating Sequential Processes）并发模型，即通过通道（channel）在协程（goroutine）之间进行通信。协程是Go语言实现并发的基本单位，它们比线程更轻量级，可以创建成千上万个而不会给系统带来太大负担。通道则用于协程之间的数据传递，使得并发编程更加安全、高效。</p>
 <p><strong>二、创建与管理协程</strong></p>
@@ -1416,21 +1432,22 @@ func main() {
 <p>在上面的代码中，我们使用<code>sync.Mutex</code>来保护<code>counter</code>变量，确保在增加计数时不会出现并发冲突。</p>
 <p><strong>五、总结</strong></p>
 <p>Go语言以其简洁的语法和强大的并发支持，成为高并发编程领域的佼佼者。通过掌握Go语言的并发模型和通道机制，我们可以轻松地编写出高效、安全的并发程序。当然，高并发编程是一个复杂的领域，还需要结合具体的业务场景和需求进行深入的探索和实践。希望本文能为您在Go语言高并发编程的道路上提供一些启示和帮助。</p>
-]]></content:encoded>
-  <category>AI</category>
-  <category>Golang</category>
-  <category>后端</category>
-  <category>高并发</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="AI"/>
+  <category term="Golang"/>
+  <category term="后端"/>
+  <category term="高并发"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>windows终端命令受限</title>
-  <link>https://ganto.me/post/20240315</link>
-  <guid isPermaLink="true">https://ganto.me/post/20240315</guid>
-  <pubDate>Fri, 15 Mar 2024 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[在windows系统上，通过以下命令安装pnpm包管理工具，然后在终端执行pnpm -v会报错 npm install -g pnpm pnpm -v # 报错 运行get-ExecutionPolicy，显示Restricted（受限的） get-ExecutionPolicy Restricted 运行set-ExecutionPolicy RemoteSigned，设置RemoteSigned set-ExecutionPolicy RemoteSigned 再次查看 get-ExecutionPolicy RemoteSigned]]></description>
-  <content:encoded><![CDATA[<p>在windows系统上，通过以下命令安装pnpm包管理工具，然后在终端执行<code>pnpm -v</code>会报错</p>
+  <link href="https://ganto.me/post/20240315"/>
+  <id>https://ganto.me/post/20240315</id>
+  <updated>2024-03-15T00:00:00+08:00</updated>
+  <published>2024-03-15T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[在windows系统上，通过以下命令安装pnpm包管理工具，然后在终端执行pnpm -v会报错 npm install -g pnpm pnpm -v # 报错 运行get-ExecutionPolicy，显示Restricted（受限的） get-ExecutionPolicy Restricted 运行set-ExecutionPolicy RemoteSigned，设置RemoteSigned set-ExecutionPolicy RemoteSigned 再次查看 get-ExecutionPolicy RemoteSigned]]></summary>
+  <content type="html"><![CDATA[<p>在windows系统上，通过以下命令安装pnpm包管理工具，然后在终端执行<code>pnpm -v</code>会报错</p>
 <pre><code class="language-sh">npm install -g pnpm
 
 pnpm -v # 报错
@@ -1450,18 +1467,19 @@ Restricted
 RemoteSigned
 
 </code></pre>
-]]></content:encoded>
-  <category>Windows</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="Windows"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>TypeScript类型取反</title>
-  <link>https://ganto.me/post/20240313</link>
-  <guid isPermaLink="true">https://ganto.me/post/20240313</guid>
-  <pubDate>Wed, 13 Mar 2024 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[读码见意 function func(arg: number) {} func(1) func(&quot;zs&quot;) // ERROR Argument of type 'string' is not assignable to parameter of type 'number'. 如想要将函数参数定义为非number的其他类型，则可以这样 function func&lt;T&gt;(arg: T extends number ? never : T) {} func(1) // ERROR Argument of type 'number' is not assignable to parameter of type 'never'. func(&quot;zs&quot;) func(true) func([]) func({}) func(() =&gt; {}) 写成一个通用的type类型 type negationType&lt;T, U&gt; = T extends U ? never : T function func&lt;T&gt;(arg: nega]]></description>
-  <content:encoded><![CDATA[<p>读码见意</p>
+  <link href="https://ganto.me/post/20240313"/>
+  <id>https://ganto.me/post/20240313</id>
+  <updated>2024-03-13T00:00:00+08:00</updated>
+  <published>2024-03-13T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[读码见意 function func(arg: number) {} func(1) func(&quot;zs&quot;) // ERROR Argument of type 'string' is not assignable to parameter of type 'number'. 如想要将函数参数定义为非number的其他类型，则可以这样 function func&lt;T&gt;(arg: T extends number ? never : T) {} func(1) // ERROR Argument of type 'number' is not assignable to parameter of type 'never'. func(&quot;zs&quot;) func(true) func([]) func({}) func(() =&gt; {}) 写成一个通用的type类型 type negationType&lt;T, U&gt; = T extends U ? never : T function func&lt;T&gt;(arg: nega]]></summary>
+  <content type="html"><![CDATA[<p>读码见意</p>
 <pre><code class="language-ts">function func(arg: number) {}
 func(1)
 func(&quot;zs&quot;) // ERROR Argument of type 'string' is not assignable to parameter of type 'number'.
@@ -1488,18 +1506,19 @@ func({})
 func(() =&gt; {})
 
 </code></pre>
-]]></content:encoded>
-  <category>TypeScript</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="TypeScript"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>实现一个丝滑的暗黑模式切换动画</title>
-  <link>https://ganto.me/post/20240102</link>
-  <guid isPermaLink="true">https://ganto.me/post/20240102</guid>
-  <pubDate>Tue, 02 Jan 2024 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[体验：https://ganto.me 参考内容： 参考文章：https://juejin.cn/post/7269388083342082107 MDN：https://developer.mozilla.org/zh-CN/docs/Web/API/View_Transitions_API https://developer.mozilla.org/zh-CN/docs/Web/CSS/::view-transition-new 实现方式就是利用vueuse将html元素动态添加class类名dark 利用伪元素::view-transition-old以及::view-transition-new，如需了解这两个伪元素，请移步文章开头参考内容 可以这样理解，调用document.startViewTransition(() =&gt; { /* 修改html元素类名 */ })方法时，在该方法的回调函数中，添加修改页面变化的代码； 这样伪元素::view-transition-old记录的就是修改之前的页面'截图'，而伪元素::view-transition-new是修改页面变化]]></description>
-  <content:encoded><![CDATA[<blockquote>
+  <link href="https://ganto.me/post/20240102"/>
+  <id>https://ganto.me/post/20240102</id>
+  <updated>2024-01-02T00:00:00+08:00</updated>
+  <published>2024-01-02T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[体验：https://ganto.me 参考内容： 参考文章：https://juejin.cn/post/7269388083342082107 MDN：https://developer.mozilla.org/zh-CN/docs/Web/API/View_Transitions_API https://developer.mozilla.org/zh-CN/docs/Web/CSS/::view-transition-new 实现方式就是利用vueuse将html元素动态添加class类名dark 利用伪元素::view-transition-old以及::view-transition-new，如需了解这两个伪元素，请移步文章开头参考内容 可以这样理解，调用document.startViewTransition(() =&gt; { /* 修改html元素类名 */ })方法时，在该方法的回调函数中，添加修改页面变化的代码； 这样伪元素::view-transition-old记录的就是修改之前的页面'截图'，而伪元素::view-transition-new是修改页面变化]]></summary>
+  <content type="html"><![CDATA[<blockquote>
 <p>体验：<a href="https://ganto.me">https://ganto.me</a></p>
 </blockquote>
 <blockquote>
@@ -1711,19 +1730,20 @@ document.startViewTransition(() =&gt; {
 &lt;/html&gt;
 
 </code></pre>
-]]></content:encoded>
-  <category>Vue</category>
-  <category>前端</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="Vue"/>
+  <category term="前端"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>Vue3.3+ 新特性 defineOptions</title>
-  <link>https://ganto.me/post/20231221-2</link>
-  <guid isPermaLink="true">https://ganto.me/post/20231221-2</guid>
-  <pubDate>Thu, 21 Dec 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[defineOptions是一个宏，是在Vue3.3+中新增的新特性 defineOptions配置项 name 在Vue3.3之前，组件的默认组件名为.vue单文件组件[SFC]文件的名字，如果需要修改组件名则需要结合Options API进行配置 &lt;!-- src/components/Com.vue --&gt; &lt;script setup&gt; &lt;/script&gt; &lt;script&gt; export default { name: 'ComponentName' } &lt;/script&gt; &lt;template&gt; &lt;div&gt;Com Component&lt;/div&gt; &lt;/template&gt; 在以上的代码中，写了两个script标签，一个标签写Composition API代码，一个标签以Options API的方式配置组件名 虽然可以配置组件名，但是这种处理方式很不好 在Vue3.3+新增的defineOptions宏，可以很好的解决这个问题 &lt;!-- src/components/Com]]></description>
-  <content:encoded><![CDATA[<p><code>defineOptions</code>是一个宏，是在Vue3.3+中新增的新特性</p>
+  <link href="https://ganto.me/post/20231221-2"/>
+  <id>https://ganto.me/post/20231221-2</id>
+  <updated>2023-12-21T00:00:00+08:00</updated>
+  <published>2023-12-21T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[defineOptions是一个宏，是在Vue3.3+中新增的新特性 defineOptions配置项 name 在Vue3.3之前，组件的默认组件名为.vue单文件组件[SFC]文件的名字，如果需要修改组件名则需要结合Options API进行配置 &lt;!-- src/components/Com.vue --&gt; &lt;script setup&gt; &lt;/script&gt; &lt;script&gt; export default { name: 'ComponentName' } &lt;/script&gt; &lt;template&gt; &lt;div&gt;Com Component&lt;/div&gt; &lt;/template&gt; 在以上的代码中，写了两个script标签，一个标签写Composition API代码，一个标签以Options API的方式配置组件名 虽然可以配置组件名，但是这种处理方式很不好 在Vue3.3+新增的defineOptions宏，可以很好的解决这个问题 &lt;!-- src/components/Com]]></summary>
+  <content type="html"><![CDATA[<p><code>defineOptions</code>是一个宏，是在Vue3.3+中新增的新特性</p>
 <h1>defineOptions配置项</h1>
 <h2>name</h2>
 <p>在Vue3.3之前，组件的默认组件名为.vue单文件组件[SFC]文件的名字，如果需要修改组件名则需要结合Options API进行配置</p>
@@ -1824,20 +1844,21 @@ defineOptions({
 
 </code></pre>
 <p><code>defineOptions</code>宏还可以配置其他内容，具体内容请查看官方文档 <a href="https://cn.vuejs.org/api/sfc-script-setup.html#defineoptions">https://cn.vuejs.org/api/sfc-script-setup.html#defineoptions</a></p>
-]]></content:encoded>
-  <category>JavaScript</category>
-  <category>Vue</category>
-  <category>前端</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="JavaScript"/>
+  <category term="Vue"/>
+  <category term="前端"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>Vue3 实验性特性 defineModel</title>
-  <link>https://ganto.me/post/20231221</link>
-  <guid isPermaLink="true">https://ganto.me/post/20231221</guid>
-  <pubDate>Thu, 21 Dec 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[在Vue3.4中，defineModel宏已经被正式启用，无需配置，直接可用 启用defineModel 目前[Vue3.3.13]defineModel宏是实验性特性，如果需要使用该宏，需要在vite.config.js配置以下内容 export default defineConfig({ plugins: [ vue({ script: { defineModel: true } }), ], }) 因为是实验性功能，在运行项目时，会有提示 [@vue/compiler-sfc] defineModel() is an experimental feature and disabled by default. To enable it, follow the RFC at https://github.com/vuejs/rfcs/discussions/503. defineModel出现的必要 在Vue中，父传子的数据是单向数据流，即无法直接通过子组件修改父组件传递过来的数据 如果需要修改可以通过自定义事件的方式，通过子组件的自定义事件来修改父组件的状态 &lt;!-- sr]]></description>
-  <content:encoded><![CDATA[<blockquote>
+  <link href="https://ganto.me/post/20231221"/>
+  <id>https://ganto.me/post/20231221</id>
+  <updated>2023-12-21T00:00:00+08:00</updated>
+  <published>2023-12-21T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[在Vue3.4中，defineModel宏已经被正式启用，无需配置，直接可用 启用defineModel 目前[Vue3.3.13]defineModel宏是实验性特性，如果需要使用该宏，需要在vite.config.js配置以下内容 export default defineConfig({ plugins: [ vue({ script: { defineModel: true } }), ], }) 因为是实验性功能，在运行项目时，会有提示 [@vue/compiler-sfc] defineModel() is an experimental feature and disabled by default. To enable it, follow the RFC at https://github.com/vuejs/rfcs/discussions/503. defineModel出现的必要 在Vue中，父传子的数据是单向数据流，即无法直接通过子组件修改父组件传递过来的数据 如果需要修改可以通过自定义事件的方式，通过子组件的自定义事件来修改父组件的状态 &lt;!-- sr]]></summary>
+  <content type="html"><![CDATA[<blockquote>
 <p>在Vue3.4中，defineModel宏已经被正式启用，无需配置，直接可用</p>
 </blockquote>
 <h1>启用defineModel</h1>
@@ -1971,20 +1992,21 @@ const handleClick = () =&gt; {
 
 </code></pre>
 <p>defineModel宏目前还是实验性功能，不应该在生产环境中进行使用</p>
-]]></content:encoded>
-  <category>JavaScript</category>
-  <category>Vue</category>
-  <category>前端</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="JavaScript"/>
+  <category term="Vue"/>
+  <category term="前端"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>JavaScript闭包直接修改内部属性</title>
-  <link>https://ganto.me/post/20231117-3</link>
-  <guid isPermaLink="true">https://ganto.me/post/20231117-3</guid>
-  <pubDate>Fri, 17 Nov 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[事例代码 var o = (function() { var obj = { a: 1, b: 2, } return { get: function(k) { return obj[k] } } })() 说明 如上一段代码，在不改变原代码的情况下，修改obj对象中的a、b属性。 分析 代码使用了闭包，返回一个对象，对象中有一个get函数，这个get函数只能通过o.get('a')的方式查看obj中的属性 如果想要直接修改是无法修改的 所有对象都有一个原型链，该原型链继承自Object，Object上有一个valueOf属性，该属性为一个函数，执行可以返回对象自身 var o = (function() { var obj = { a: 1, b: 2, } return { get: function(k) { return obj[k] } } })() console.log(o.get('valueOf')) 如上代码，可以打印出来obj的valueOf结构了，直接执行console.log(o.get('valueOf')())，发现已经报错了，这里报错的原因是因为在执行v]]></description>
-  <content:encoded><![CDATA[<h2>事例代码</h2>
+  <link href="https://ganto.me/post/20231117-3"/>
+  <id>https://ganto.me/post/20231117-3</id>
+  <updated>2023-11-17T00:00:00+08:00</updated>
+  <published>2023-11-17T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[事例代码 var o = (function() { var obj = { a: 1, b: 2, } return { get: function(k) { return obj[k] } } })() 说明 如上一段代码，在不改变原代码的情况下，修改obj对象中的a、b属性。 分析 代码使用了闭包，返回一个对象，对象中有一个get函数，这个get函数只能通过o.get('a')的方式查看obj中的属性 如果想要直接修改是无法修改的 所有对象都有一个原型链，该原型链继承自Object，Object上有一个valueOf属性，该属性为一个函数，执行可以返回对象自身 var o = (function() { var obj = { a: 1, b: 2, } return { get: function(k) { return obj[k] } } })() console.log(o.get('valueOf')) 如上代码，可以打印出来obj的valueOf结构了，直接执行console.log(o.get('valueOf')())，发现已经报错了，这里报错的原因是因为在执行v]]></summary>
+  <content type="html"><![CDATA[<h2>事例代码</h2>
 <pre><code class="language-js">var o = (function() {
     var obj = {
         a: 1,
@@ -2130,18 +2152,19 @@ console.log(o.get('a'), o.get('b'));
 
 </code></pre>
 <p>这样obj就不存在原型了，无法去Object身上读取xxx属性</p>
-]]></content:encoded>
-  <category>JavaScript</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="JavaScript"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>使用class实现评分</title>
-  <link>https://ganto.me/post/20231117-2</link>
-  <guid isPermaLink="true">https://ganto.me/post/20231117-2</guid>
-  <pubDate>Fri, 17 Nov 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[创建Star类 class Star { constructor(will, score, dom) { this.will = will; this.score = score; this.dom = dom; } init() { const that = this; this.dom.forEach(element =&gt; { element.onmouseover = e =&gt; { that.point(Number(e.target.innerText)); } element.onmouseout = () =&gt; { that.point(); } element.onclick = function() { if (that.score === this.innerText) { that.score = 0; } else { that.score = Number(this.innerText); } } }) } point(parm) { this.will = parm || this.score; this.dom.forEach((eleme]]></description>
-  <content:encoded><![CDATA[<h1>创建Star类</h1>
+  <link href="https://ganto.me/post/20231117-2"/>
+  <id>https://ganto.me/post/20231117-2</id>
+  <updated>2023-11-17T00:00:00+08:00</updated>
+  <published>2023-11-17T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[创建Star类 class Star { constructor(will, score, dom) { this.will = will; this.score = score; this.dom = dom; } init() { const that = this; this.dom.forEach(element =&gt; { element.onmouseover = e =&gt; { that.point(Number(e.target.innerText)); } element.onmouseout = () =&gt; { that.point(); } element.onclick = function() { if (that.score === this.innerText) { that.score = 0; } else { that.score = Number(this.innerText); } } }) } point(parm) { this.will = parm || this.score; this.dom.forEach((eleme]]></summary>
+  <content type="html"><![CDATA[<h1>创建Star类</h1>
 <pre><code class="language-js">class Star {
   constructor(will, score, dom) {
     this.will = will;
@@ -2323,16 +2346,17 @@ star_1.init();
 &lt;/html&gt;
 
 </code></pre>
-]]></content:encoded>
-</item>
-<item>
+]]></content>
+</entry>
+<entry>
   <title>函数柯里化</title>
-  <link>https://ganto.me/post/20231117</link>
-  <guid isPermaLink="true">https://ganto.me/post/20231117</guid>
-  <pubDate>Fri, 17 Nov 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[柯里化就是将多参函数变成单参函数 // 实现函数柯里化 function currying() { } // 测试柯里化函数 const sum = (a, b, c, d) =&gt; a + b + c + d; console.log(currying(sum)(1)(2)(3)(4)); // 10 console.log(currying(sum, 1)(2, 3)(4)); // 10 console.log(currying(sum, 1, 2)(3)(4)); // 10 console.log(currying(sum, 1, 2)(3, 4)); // 10 如上代码，实现柯里化函数 实现方式如下，自行理解代码 // 实现函数柯里化 function currying(fn, ...bindArgs) { return (...args) =&gt; { const allArgs = [...bindArgs, ...args]; if (allArgs.length &lt; fn.length) { return currying(fn, ...allArgs]]></description>
-  <content:encoded><![CDATA[<p>柯里化就是将多参函数变成单参函数</p>
+  <link href="https://ganto.me/post/20231117"/>
+  <id>https://ganto.me/post/20231117</id>
+  <updated>2023-11-17T00:00:00+08:00</updated>
+  <published>2023-11-17T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[柯里化就是将多参函数变成单参函数 // 实现函数柯里化 function currying() { } // 测试柯里化函数 const sum = (a, b, c, d) =&gt; a + b + c + d; console.log(currying(sum)(1)(2)(3)(4)); // 10 console.log(currying(sum, 1)(2, 3)(4)); // 10 console.log(currying(sum, 1, 2)(3)(4)); // 10 console.log(currying(sum, 1, 2)(3, 4)); // 10 如上代码，实现柯里化函数 实现方式如下，自行理解代码 // 实现函数柯里化 function currying(fn, ...bindArgs) { return (...args) =&gt; { const allArgs = [...bindArgs, ...args]; if (allArgs.length &lt; fn.length) { return currying(fn, ...allArgs]]></summary>
+  <content type="html"><![CDATA[<p>柯里化就是将多参函数变成单参函数</p>
 <pre><code class="language-js">// 实现函数柯里化
 function currying() {
   
@@ -2370,16 +2394,17 @@ console.log(currying(sum, 1, 2)(3)(4)); // 10
 console.log(currying(sum, 1, 2)(3, 4)); // 10
 
 </code></pre>
-]]></content:encoded>
-</item>
-<item>
+]]></content>
+</entry>
+<entry>
   <title>自定义Typora主题分享</title>
-  <link>https://ganto.me/post/20230831</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230831</guid>
-  <pubDate>Thu, 31 Aug 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[Typora主题的开发主要就是编写css样式，将Typora的默认样式进行覆盖 介绍 Toxic主题没有特别之处，使用了MiSans字体，看着比较工整 预览 体验 下载主题包 github仓库地址 欢迎下载使用、修改、分享 安装步骤 先将主题代码down下来，目录文件结构如下，只需要toxic.css文件、toxic文件夹 安装主题步骤，使用mac进行演示，windows安装方式请自行寻找 直接将主题文件拷贝到主题目录中，如图 重启Typora 然后选择Toxic主题]]></description>
-  <content:encoded><![CDATA[<p>Typora主题的开发主要就是编写css样式，将Typora的默认样式进行覆盖</p>
+  <link href="https://ganto.me/post/20230831"/>
+  <id>https://ganto.me/post/20230831</id>
+  <updated>2023-08-31T00:00:00+08:00</updated>
+  <published>2023-08-31T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[Typora主题的开发主要就是编写css样式，将Typora的默认样式进行覆盖 介绍 Toxic主题没有特别之处，使用了MiSans字体，看着比较工整 预览 体验 下载主题包 github仓库地址 欢迎下载使用、修改、分享 安装步骤 先将主题代码down下来，目录文件结构如下，只需要toxic.css文件、toxic文件夹 安装主题步骤，使用mac进行演示，windows安装方式请自行寻找 直接将主题文件拷贝到主题目录中，如图 重启Typora 然后选择Toxic主题]]></summary>
+  <content type="html"><![CDATA[<p>Typora主题的开发主要就是编写css样式，将Typora的默认样式进行覆盖</p>
 <h1>介绍</h1>
 <p>Toxic主题没有特别之处，使用了<code>MiSans</code>字体，看着比较工整</p>
 <h1>预览</h1>
@@ -2400,16 +2425,17 @@ console.log(currying(sum, 1, 2)(3, 4)); // 10
 <p>重启Typora<br />
 然后选择Toxic主题<br />
 <img src="https://img2023.cnblogs.com/blog/2229842/202308/2229842-20230831214717082-1753119573.png" alt="" /></p>
-]]></content:encoded>
-</item>
-<item>
+]]></content>
+</entry>
+<entry>
   <title>git学习教程</title>
-  <link>https://ganto.me/post/20230829</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230829</guid>
-  <pubDate>Tue, 29 Aug 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[网址一：Learn Git Branching! https://learngitbranching.js.org/?locale=zh_CN 另外粘贴一篇详细介绍的链接： https://zhuanlan.zhihu.com/p/383960650 《为你自己学git》一书的练习场 https://gitbook.tw/playground 网址三： git原理入门 https://ithelp.ithome.com.tw/articles/10190453 网址四: 连猴子都能懂得git入门指南 https://backlog.com/git-tutorial/tw/ 博文：Git命令和操作的学习及在线练习 https://www.cnblogs.com/Sky-seeker/p/13332222.html git教程 https://www.yiibai.com/git 原文地址： https://www.cnblogs.com/leoych/p/15330559.html 其他链接： https://www.cnblogs.com/zhangsanfeng/p/10163968]]></description>
-  <content:encoded><![CDATA[<h1>网址一：Learn Git Branching!</h1>
+  <link href="https://ganto.me/post/20230829"/>
+  <id>https://ganto.me/post/20230829</id>
+  <updated>2023-08-29T00:00:00+08:00</updated>
+  <published>2023-08-29T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[网址一：Learn Git Branching! https://learngitbranching.js.org/?locale=zh_CN 另外粘贴一篇详细介绍的链接： https://zhuanlan.zhihu.com/p/383960650 《为你自己学git》一书的练习场 https://gitbook.tw/playground 网址三： git原理入门 https://ithelp.ithome.com.tw/articles/10190453 网址四: 连猴子都能懂得git入门指南 https://backlog.com/git-tutorial/tw/ 博文：Git命令和操作的学习及在线练习 https://www.cnblogs.com/Sky-seeker/p/13332222.html git教程 https://www.yiibai.com/git 原文地址： https://www.cnblogs.com/leoych/p/15330559.html 其他链接： https://www.cnblogs.com/zhangsanfeng/p/10163968]]></summary>
+  <content type="html"><![CDATA[<h1>网址一：Learn Git Branching!</h1>
 <p><a href="https://learngitbranching.js.org/?locale=zh_CN">https://learngitbranching.js.org/?locale=zh_CN</a></p>
 <p>另外粘贴一篇详细介绍的链接：<br />
 <a href="https://zhuanlan.zhihu.com/p/383960650">https://zhuanlan.zhihu.com/p/383960650</a></p>
@@ -2426,16 +2452,17 @@ console.log(currying(sum, 1, 2)(3, 4)); // 10
 <p><strong>原文地址：</strong> <a href="https://www.cnblogs.com/leoych/p/15330559.html">https://www.cnblogs.com/leoych/p/15330559.html</a></p>
 <p><strong>其他链接：</strong> <a href="https://www.cnblogs.com/zhangsanfeng/p/10163968.html">https://www.cnblogs.com/zhangsanfeng/p/10163968.html</a><br />
 <img src="https://img2023.cnblogs.com/blog/2229842/202309/2229842-20230906110959868-973072007.png" alt="" /></p>
-]]></content:encoded>
-</item>
-<item>
+]]></content>
+</entry>
+<entry>
   <title>博客园自定义主题</title>
-  <link>https://ganto.me/post/20230827</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230827</guid>
-  <pubDate>Sun, 27 Aug 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[最新主题仓库：Gitee@ganto/cnblogs-theme 博客园默认皮肤选择 将博客园主题切换为：Custom 博客侧边栏公告 这里是定义公告栏目的地方 页面定制 CSS 代码 先将禁用模版默认CSS勾选上 源代码提供的css为scss格式，要将scss代码编译为css代码，再拷贝到 页面定制css代码 中 编译scss文件，可以利用vscode插件 Live Sass Compiler 进行编译 首先安装 Live Sass Compiler，安装好后，在vscode最底部（最新版是在最底部）有一个 Watch Sass 选项，点击即可编译sass。 页首 HTML 代码 这里是定义全局提示信息的地方 页脚 HTML 代码 页脚主要是Js相关代码 代码使用到了jQuery，jQuery无需额外引用，因为全局存在jQuery环境]]></description>
-  <content:encoded><![CDATA[<blockquote>
+  <link href="https://ganto.me/post/20230827"/>
+  <id>https://ganto.me/post/20230827</id>
+  <updated>2023-08-27T00:00:00+08:00</updated>
+  <published>2023-08-27T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[最新主题仓库：Gitee@ganto/cnblogs-theme 博客园默认皮肤选择 将博客园主题切换为：Custom 博客侧边栏公告 这里是定义公告栏目的地方 页面定制 CSS 代码 先将禁用模版默认CSS勾选上 源代码提供的css为scss格式，要将scss代码编译为css代码，再拷贝到 页面定制css代码 中 编译scss文件，可以利用vscode插件 Live Sass Compiler 进行编译 首先安装 Live Sass Compiler，安装好后，在vscode最底部（最新版是在最底部）有一个 Watch Sass 选项，点击即可编译sass。 页首 HTML 代码 这里是定义全局提示信息的地方 页脚 HTML 代码 页脚主要是Js相关代码 代码使用到了jQuery，jQuery无需额外引用，因为全局存在jQuery环境]]></summary>
+  <content type="html"><![CDATA[<blockquote>
 <p>最新主题仓库：<a href="https://gitee.com/ganto/cnblogs-theme.git">Gitee@ganto/cnblogs-theme</a></p>
 </blockquote>
 <h1>博客园默认皮肤选择</h1>
@@ -2454,19 +2481,20 @@ console.log(currying(sum, 1, 2)(3, 4)); // 10
 <h1>页脚 HTML 代码</h1>
 <p>页脚主要是Js相关代码<br />
 代码使用到了jQuery，jQuery无需额外引用，因为全局存在jQuery环境</p>
-]]></content:encoded>
-  <category>JavaScript</category>
-  <category>前端</category>
-  <category>技术</category>
-</item>
-<item>
+]]></content>
+  <category term="JavaScript"/>
+  <category term="前端"/>
+  <category term="技术"/>
+</entry>
+<entry>
   <title>Golang学习笔记</title>
-  <link>https://ganto.me/post/20230816</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230816</guid>
-  <pubDate>Wed, 16 Aug 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[Hello Golang // Hello Golang package main import &quot;fmt&quot; func main() { fmt.Println(&quot;Hello Golang&quot;) } Gogs是unknwon无闻主导开发的git管理平台，类似于gitlab，可以本地部署，采用Go语言开发，要比gitlab更加轻量。 Gogs官网 Gitea是Gogs的克隆项目，是属于Gogs的一个分支项目。 gitea.com gitea.io Golang 天生支持高并发 package main import ( &quot;fmt&quot; &quot;time&quot; ) func goFunc(i int) { fmt.Println(&quot;goroutine &quot;, i, &quot; ...&quot;) } func main() { for i := 0; i &lt; 10000; i++ { go goFunc(i) // 开启一个并发协程 } time.Sleep(time.Second) } Windo]]></description>
-  <content:encoded><![CDATA[<h1>Hello Golang</h1>
+  <link href="https://ganto.me/post/20230816"/>
+  <id>https://ganto.me/post/20230816</id>
+  <updated>2023-08-16T00:00:00+08:00</updated>
+  <published>2023-08-16T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[Hello Golang // Hello Golang package main import &quot;fmt&quot; func main() { fmt.Println(&quot;Hello Golang&quot;) } Gogs是unknwon无闻主导开发的git管理平台，类似于gitlab，可以本地部署，采用Go语言开发，要比gitlab更加轻量。 Gogs官网 Gitea是Gogs的克隆项目，是属于Gogs的一个分支项目。 gitea.com gitea.io Golang 天生支持高并发 package main import ( &quot;fmt&quot; &quot;time&quot; ) func goFunc(i int) { fmt.Println(&quot;goroutine &quot;, i, &quot; ...&quot;) } func main() { for i := 0; i &lt; 10000; i++ { go goFunc(i) // 开启一个并发协程 } time.Sleep(time.Second) } Windo]]></summary>
+  <content type="html"><![CDATA[<h1>Hello Golang</h1>
 <pre><code class="language-go">// Hello Golang
 package main
 
@@ -6151,16 +6179,17 @@ func main() {
 ./server
 
 </code></pre>
-]]></content:encoded>
-</item>
-<item>
+]]></content>
+</entry>
+<entry>
   <title>Web Component</title>
-  <link>https://ganto.me/post/20230412</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230412</guid>
-  <pubDate>Wed, 12 Apr 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[原生Web Component的使用]]></description>
-  <content:encoded><![CDATA[<p><a href="https://developer.mozilla.org/zh-CN/docs/Web/API/Web_components">Web Component MDN</a></p>
+  <link href="https://ganto.me/post/20230412"/>
+  <id>https://ganto.me/post/20230412</id>
+  <updated>2023-04-12T00:00:00+08:00</updated>
+  <published>2023-04-12T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[原生Web Component的使用]]></summary>
+  <content type="html"><![CDATA[<p><a href="https://developer.mozilla.org/zh-CN/docs/Web/API/Web_components">Web Component MDN</a></p>
 <h2>例子1：</h2>
 <pre><code class="language-html">&lt;!DOCTYPE html&gt;
 &lt;html lang=&quot;en&quot;&gt;
@@ -6457,18 +6486,19 @@ window.customElements.define('user-card', UserCard);
 
 customElements.define(&quot;my-com&quot;, MyCom);
 </code></pre>
-]]></content:encoded>
-  <category>JavaScript</category>
-  <category>Web Component</category>
-</item>
-<item>
+]]></content>
+  <category term="JavaScript"/>
+  <category term="Web Component"/>
+</entry>
+<entry>
   <title>Java学习笔记</title>
-  <link>https://ganto.me/post/20230301</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230301</guid>
-  <pubDate>Wed, 01 Mar 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[基础👇 简单Java类 第一种开发要求 类名称必须存在有意义，例如：Book、Emp； 类之中所有的属性必须private封装，封装后的属性必须提供有setter、getter方法； 类之中可以提供有任意多个构造方法，但是必须保留有一个无参构造方法； 类之中不允许出现任何的输出语句，所有的信息输出必须交给被调用处输出； 类之中需要提供有一个取得对象完整信息的方法，暂定为：getInfo()，而且返回String型数据； 范例 class Emp{ // 定义一个有意义的类 // 用private封装 private int empno; private String ename; private String job; private double sal; private double comm; public Emp(){} // 无参构造方法 public Emp(int empno,String ename,String job,double sal,double comm){ // 有参构造方法 empno = empno; ename = ename; job = job;]]></description>
-  <content:encoded><![CDATA[<h1>基础👇</h1>
+  <link href="https://ganto.me/post/20230301"/>
+  <id>https://ganto.me/post/20230301</id>
+  <updated>2023-03-01T00:00:00+08:00</updated>
+  <published>2023-03-01T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[基础👇 简单Java类 第一种开发要求 类名称必须存在有意义，例如：Book、Emp； 类之中所有的属性必须private封装，封装后的属性必须提供有setter、getter方法； 类之中可以提供有任意多个构造方法，但是必须保留有一个无参构造方法； 类之中不允许出现任何的输出语句，所有的信息输出必须交给被调用处输出； 类之中需要提供有一个取得对象完整信息的方法，暂定为：getInfo()，而且返回String型数据； 范例 class Emp{ // 定义一个有意义的类 // 用private封装 private int empno; private String ename; private String job; private double sal; private double comm; public Emp(){} // 无参构造方法 public Emp(int empno,String ename,String job,double sal,double comm){ // 有参构造方法 empno = empno; ename = ename; job = job;]]></summary>
+  <content type="html"><![CDATA[<h1>基础👇</h1>
 <h1>简单Java类</h1>
 <h3>第一种开发要求</h3>
 <ul>
@@ -12439,16 +12469,17 @@ public class Main {
 <li>java中的有一条这样的规则：方法体中的代码必须遵循自上而下顺序依次逐行执行（亘古不变的语法）</li>
 <li>java中还有一条语法规则：return语法一旦执行，整个方法必须结束（亘古不变的语法）</li>
 </ul>
-]]></content:encoded>
-</item>
-<item>
+]]></content>
+</entry>
+<entry>
   <title>规范和快捷键</title>
-  <link>https://ganto.me/post/20230220-3</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230220-3</guid>
-  <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[规范和快捷键 前端代码缩进2格 Java代码缩进4格 Golang代码缩进4格 通用快捷方式 快捷键 说明 Alt+/ 代码提示 Shift+Alt+↑ 或 Shift+Alt+↓ 复制整行 Alt+↑ 或 Alt+↓ 移动代码 Ctrl+/ 单行注释 Ctrl+Shift+/ 多行注释 Ctrl+c 复制（不选中任何字符，则复制整行） Ctrl+v 粘贴 Ctrl+x 剪切（不选中任何字符，则剪切整行） Ctrl+Shift+X 删除行 Ctrl+Alt+↑ 或 Ctrl+Alt+↓ 复制多个光标 Shift+Alt+F 格式化代码 Ctrl+F 搜索 Ctrl+D 选中下一个相同的内容 IntellJ IDEA快捷键 快捷键 说明 Ctrl Ctrl 运行 Shift+Backspace 删除最近的命令 Shift Shift 查找类、文件等 Ctrl+Shift+F10 执行Java程序 Alt+Shift+Ins 开启/关闭块编辑 Alt+Shift+鼠标左 块编辑 Alt+Shift+Z 错误描述 Alt+Shift+Enter 使用 try/catch 环绕 Alt+ins]]></description>
-  <content:encoded><![CDATA[<h1>规范和快捷键</h1>
+  <link href="https://ganto.me/post/20230220-3"/>
+  <id>https://ganto.me/post/20230220-3</id>
+  <updated>2023-02-20T00:00:00+08:00</updated>
+  <published>2023-02-20T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[规范和快捷键 前端代码缩进2格 Java代码缩进4格 Golang代码缩进4格 通用快捷方式 快捷键 说明 Alt+/ 代码提示 Shift+Alt+↑ 或 Shift+Alt+↓ 复制整行 Alt+↑ 或 Alt+↓ 移动代码 Ctrl+/ 单行注释 Ctrl+Shift+/ 多行注释 Ctrl+c 复制（不选中任何字符，则复制整行） Ctrl+v 粘贴 Ctrl+x 剪切（不选中任何字符，则剪切整行） Ctrl+Shift+X 删除行 Ctrl+Alt+↑ 或 Ctrl+Alt+↓ 复制多个光标 Shift+Alt+F 格式化代码 Ctrl+F 搜索 Ctrl+D 选中下一个相同的内容 IntellJ IDEA快捷键 快捷键 说明 Ctrl Ctrl 运行 Shift+Backspace 删除最近的命令 Shift Shift 查找类、文件等 Ctrl+Shift+F10 执行Java程序 Alt+Shift+Ins 开启/关闭块编辑 Alt+Shift+鼠标左 块编辑 Alt+Shift+Z 错误描述 Alt+Shift+Enter 使用 try/catch 环绕 Alt+ins]]></summary>
+  <content type="html"><![CDATA[<h1>规范和快捷键</h1>
 <blockquote>
 <p>前端代码缩进2格</p>
 <p>Java代码缩进4格</p>
@@ -12568,16 +12599,17 @@ public class Main {
 </tr>
 </tbody>
 </table>
-]]></content:encoded>
-</item>
-<item>
+]]></content>
+</entry>
+<entry>
   <title>黑苹果</title>
-  <link>https://ganto.me/post/20230220</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230220</guid>
-  <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[VMWare 【VMware安装原版macOS虚拟机，从此告别第三方封装镜像】 https://www.bilibili.com/video/BV1TP4y1i7kh/?share_source=copy_web&amp;vd_source=e5014f57b96061a4d1009d47c32b74e8 虚拟机利用苹果官方恢复工具自动下载安装官方最新MacOS13系统 安装VMWare17 https://www.vmware.com/products/workstation-pro.html 选择试用 下载安装包 并安装 VMware Workstation Pro 17激活码： 4A4RR-813DK-M81A9-4U35H-06KND NZ4RR-FTK5H-H81C1-Q30QH-1V2LA 4C21U-2KK9Q-M8130-4V2QH-CF810 MC60H-DWHD5-H80U9-6V85M-8280D JU090-6039P-08409-8J0QH-2YR7F 4Y09U-AJK97-089Z0-A3054-83KLA 输入激活码激活 unlocker 利用unloc]]></description>
-  <content:encoded><![CDATA[<h1>VMWare</h1>
+  <link href="https://ganto.me/post/20230220"/>
+  <id>https://ganto.me/post/20230220</id>
+  <updated>2023-02-20T00:00:00+08:00</updated>
+  <published>2023-02-20T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[VMWare 【VMware安装原版macOS虚拟机，从此告别第三方封装镜像】 https://www.bilibili.com/video/BV1TP4y1i7kh/?share_source=copy_web&amp;vd_source=e5014f57b96061a4d1009d47c32b74e8 虚拟机利用苹果官方恢复工具自动下载安装官方最新MacOS13系统 安装VMWare17 https://www.vmware.com/products/workstation-pro.html 选择试用 下载安装包 并安装 VMware Workstation Pro 17激活码： 4A4RR-813DK-M81A9-4U35H-06KND NZ4RR-FTK5H-H81C1-Q30QH-1V2LA 4C21U-2KK9Q-M8130-4V2QH-CF810 MC60H-DWHD5-H80U9-6V85M-8280D JU090-6039P-08409-8J0QH-2YR7F 4Y09U-AJK97-089Z0-A3054-83KLA 输入激活码激活 unlocker 利用unloc]]></summary>
+  <content type="html"><![CDATA[<h1>VMWare</h1>
 <p>【VMware安装原版macOS虚拟机，从此告别第三方封装镜像】 <a href="https://www.bilibili.com/video/BV1TP4y1i7kh/?share_source=copy_web&amp;vd_source=e5014f57b96061a4d1009d47c32b74e8">https://www.bilibili.com/video/BV1TP4y1i7kh/?share_source=copy_web&amp;vd_source=e5014f57b96061a4d1009d47c32b74e8</a></p>
 <p>虚拟机利用苹果官方恢复工具自动下载安装官方最新MacOS13系统</p>
 <h2>安装VMWare17</h2>
@@ -12683,16 +12715,17 @@ python3 macrecovery.py -b Mac-4B682C642B45593E -m 00000000000000000 download
 <p>如果硬盘没有EFI分区，请使用DG软件进行设置即可</p>
 <h2>安装</h2>
 <p>U盘插入电脑，使用U盘进行启动即可</p>
-]]></content:encoded>
-</item>
-<item>
+]]></content>
+</entry>
+<entry>
   <title>防抖函数debounce</title>
-  <link>https://ganto.me/post/20230220-4</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230220-4</guid>
-  <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[防抖函数 防抖函数 封装 // 防抖函数的封装 export default function debounce(func, delay){ let timer = null return function () { if (timer) clearTimeout(timer) timer = setTimeout(() =&gt; { func.apply() }, delay) } } 使用 getHomeDataList = debounce(() =&gt; { getHomeData() .then(res =&gt; { console.log(res) }) .catch(err =&gt; { console.error(err) }) }, 500)]]></description>
-  <content:encoded><![CDATA[<h1>防抖函数</h1>
+  <link href="https://ganto.me/post/20230220-4"/>
+  <id>https://ganto.me/post/20230220-4</id>
+  <updated>2023-02-20T00:00:00+08:00</updated>
+  <published>2023-02-20T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[防抖函数 防抖函数 封装 // 防抖函数的封装 export default function debounce(func, delay){ let timer = null return function () { if (timer) clearTimeout(timer) timer = setTimeout(() =&gt; { func.apply() }, delay) } } 使用 getHomeDataList = debounce(() =&gt; { getHomeData() .then(res =&gt; { console.log(res) }) .catch(err =&gt; { console.error(err) }) }, 500)]]></summary>
+  <content type="html"><![CDATA[<h1>防抖函数</h1>
 <p>防抖函数</p>
 <h2>封装</h2>
 <pre><code class="language-js">// 防抖函数的封装
@@ -12719,16 +12752,17 @@ export default function debounce(func, delay){
 }, 500)
 
 </code></pre>
-]]></content:encoded>
-</item>
-<item>
+]]></content>
+</entry>
+<entry>
   <title>TypeScript学习笔记</title>
-  <link>https://ganto.me/post/20230220-6</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230220-6</guid>
-  <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[TypeScript 准备 安装node.js 安装 npm install -g typescript 查看版本 tsc -v 在编写ts代码时，有时虽然没有写错，但是依然有报错信息 如：无法重新声明块范围变量，只需要执行tsc --init生成tsconfig.json文件即可解决 第一个TS程序 app.ts var message:string = &quot;Hello TypeScript!&quot; console.log(message) TypeScript指令 使用tsc命令，将app.ts文件编译成为app.js文件 tsc app.ts tsc指令可以同时编译多个ts文件 tsc app.ts app1.ts app2.ts --declaration会再生成一个.d.ts文件 tsc app.ts --declaration 利用node命令，执行app.js文件 node app.js Hello TypeScript! 自动热部署命令 首先生成tsconfig.json文件 tsc --init tsconfig.json { &quot;compile]]></description>
-  <content:encoded><![CDATA[<h1>TypeScript</h1>
+  <link href="https://ganto.me/post/20230220-6"/>
+  <id>https://ganto.me/post/20230220-6</id>
+  <updated>2023-02-20T00:00:00+08:00</updated>
+  <published>2023-02-20T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[TypeScript 准备 安装node.js 安装 npm install -g typescript 查看版本 tsc -v 在编写ts代码时，有时虽然没有写错，但是依然有报错信息 如：无法重新声明块范围变量，只需要执行tsc --init生成tsconfig.json文件即可解决 第一个TS程序 app.ts var message:string = &quot;Hello TypeScript!&quot; console.log(message) TypeScript指令 使用tsc命令，将app.ts文件编译成为app.js文件 tsc app.ts tsc指令可以同时编译多个ts文件 tsc app.ts app1.ts app2.ts --declaration会再生成一个.d.ts文件 tsc app.ts --declaration 利用node命令，执行app.js文件 node app.js Hello TypeScript! 自动热部署命令 首先生成tsconfig.json文件 tsc --init tsconfig.json { &quot;compile]]></summary>
+  <content type="html"><![CDATA[<h1>TypeScript</h1>
 <h2>准备</h2>
 <p>安装node.js</p>
 <h2>安装</h2>
@@ -14650,16 +14684,17 @@ const mc1 = new MyClass&lt;Number&gt;(123);
 console.log(mc,mc1);
 
 </code></pre>
-]]></content:encoded>
-</item>
-<item>
+]]></content>
+</entry>
+<entry>
   <title>ES6 标准入门 - 阮一峰</title>
-  <link>https://ganto.me/post/20230220-2</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230220-2</guid>
-  <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[Object.assign() const a = {name: '小华', age: 19, sex: '女'} const b = {name: '小华', age: 20} const c = Object.assign(a, b) console.log(a) console.log(b) console.log(c) // {name: '小华', age: 20, sex: '女'} // {name: '小华', age: 20} // {name: '小华', age: 20, sex: '女'} 通过上方代码可以看出，通过Object.assign()方法，会修改原对象a，并且返回的c对象和a对象一样，b对象不会修改被对象，Object.assign()第一个对象为目标对象，后边的无论多少都是源对象，目标对象是合并后，要返回的对象，在时机使用过程中一般第一个对象写成一个空对象，这样才不会对其他对象造成影响。 const a = {name: '小华', age: 19, sex: '女'} const b = {name: '小华', age: 20} Object.]]></description>
-  <content:encoded><![CDATA[<h1>Object.assign()</h1>
+  <link href="https://ganto.me/post/20230220-2"/>
+  <id>https://ganto.me/post/20230220-2</id>
+  <updated>2023-02-20T00:00:00+08:00</updated>
+  <published>2023-02-20T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[Object.assign() const a = {name: '小华', age: 19, sex: '女'} const b = {name: '小华', age: 20} const c = Object.assign(a, b) console.log(a) console.log(b) console.log(c) // {name: '小华', age: 20, sex: '女'} // {name: '小华', age: 20} // {name: '小华', age: 20, sex: '女'} 通过上方代码可以看出，通过Object.assign()方法，会修改原对象a，并且返回的c对象和a对象一样，b对象不会修改被对象，Object.assign()第一个对象为目标对象，后边的无论多少都是源对象，目标对象是合并后，要返回的对象，在时机使用过程中一般第一个对象写成一个空对象，这样才不会对其他对象造成影响。 const a = {name: '小华', age: 19, sex: '女'} const b = {name: '小华', age: 20} Object.]]></summary>
+  <content type="html"><![CDATA[<h1>Object.assign()</h1>
 <pre><code class="language-js">const a = {name: '小华', age: 19, sex: '女'}
 const b = {name: '小华', age: 20}
 const c = Object.assign(a, b)
@@ -14783,16 +14818,17 @@ foo()
 console.log('4',x); // 1
 
 </code></pre>
-]]></content:encoded>
-</item>
-<item>
+]]></content>
+</entry>
+<entry>
   <title>css常用场景</title>
-  <link>https://ganto.me/post/20230220-5</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230220-5</guid>
-  <pubDate>Mon, 20 Feb 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[初始化样式 body, html, div, p, span, i, b, ul, ol li, input, img, video { padding: 0; margin: 0; box-sizing: border-box; } img { vertical-align: bottom; object-fit: cover; } ul, ol { list-style: none; } i { font-style: normal; } .container { width: 1200px; margin: auto; position: relative; } ._row { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; } Github仓库 清除浮动 0、给父元素内部最后一个没有浮动的子标签设置clear:both &lt;style&gt; .box{ width: 500px; background-color: red; } .child1{ width: 100px; height: 1]]></description>
-  <content:encoded><![CDATA[<h1>初始化样式</h1>
+  <link href="https://ganto.me/post/20230220-5"/>
+  <id>https://ganto.me/post/20230220-5</id>
+  <updated>2023-02-20T00:00:00+08:00</updated>
+  <published>2023-02-20T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[初始化样式 body, html, div, p, span, i, b, ul, ol li, input, img, video { padding: 0; margin: 0; box-sizing: border-box; } img { vertical-align: bottom; object-fit: cover; } ul, ol { list-style: none; } i { font-style: normal; } .container { width: 1200px; margin: auto; position: relative; } ._row { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; } Github仓库 清除浮动 0、给父元素内部最后一个没有浮动的子标签设置clear:both &lt;style&gt; .box{ width: 500px; background-color: red; } .child1{ width: 100px; height: 1]]></summary>
+  <content type="html"><![CDATA[<h1>初始化样式</h1>
 <pre><code class="language-css">body,
 html,
 div,
@@ -15755,17 +15791,18 @@ div.xxx_box { container-name: xxx; }
 
 </code></pre>
 <p><code>mix-blend-mode</code>属性的值有很多</p>
-]]></content:encoded>
-  <category>前端</category>
-</item>
-<item>
+]]></content>
+  <category term="前端"/>
+</entry>
+<entry>
   <title>JavaScript中的事件冒泡与事件捕获</title>
-  <link>https://ganto.me/post/20230119</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230119</guid>
-  <pubDate>Thu, 19 Jan 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[前言 Capture：事件捕获 Bubble：事件冒泡 如图所示，大致展示了事件冒泡和事件捕获的流程 可能还有点迷惑，无妨，继续往下看 事件冒泡展示 我们先创建一个嵌套的HTML结构 &lt;div class=&quot;div1&quot;&gt; &lt;p&gt;div1&lt;/p&gt; &lt;div class=&quot;div2&quot;&gt; &lt;p&gt;div2&lt;/p&gt; &lt;button&gt;CLICK ME!&lt;/button&gt; &lt;/div&gt; &lt;/div&gt; 并且为他们各自添加点击事件，并给window和document也添加上点击事件 window.addEventListener(&quot;click&quot;, () =&gt; { console.log('Window'); }); document.addEventListener(&quot;click&quot;, () =&gt; { console.log('Document'); }); document.querySelec]]></description>
-  <content:encoded><![CDATA[<h2>前言</h2>
+  <link href="https://ganto.me/post/20230119"/>
+  <id>https://ganto.me/post/20230119</id>
+  <updated>2023-01-19T00:00:00+08:00</updated>
+  <published>2023-01-19T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[前言 Capture：事件捕获 Bubble：事件冒泡 如图所示，大致展示了事件冒泡和事件捕获的流程 可能还有点迷惑，无妨，继续往下看 事件冒泡展示 我们先创建一个嵌套的HTML结构 &lt;div class=&quot;div1&quot;&gt; &lt;p&gt;div1&lt;/p&gt; &lt;div class=&quot;div2&quot;&gt; &lt;p&gt;div2&lt;/p&gt; &lt;button&gt;CLICK ME!&lt;/button&gt; &lt;/div&gt; &lt;/div&gt; 并且为他们各自添加点击事件，并给window和document也添加上点击事件 window.addEventListener(&quot;click&quot;, () =&gt; { console.log('Window'); }); document.addEventListener(&quot;click&quot;, () =&gt; { console.log('Document'); }); document.querySelec]]></summary>
+  <content type="html"><![CDATA[<h2>前言</h2>
 <p>Capture：事件捕获
 Bubble：事件冒泡</p>
 <p><img src="/static/blog-images/JavaScript%E4%B8%AD%E7%9A%84%E4%BA%8B%E4%BB%B6%E5%86%92%E6%B3%A1%E4%B8%8E%E4%BA%8B%E4%BB%B6%E6%8D%95%E8%8E%B7_images/2229842-20241220165118171-411205481.png" alt="" />
@@ -15974,17 +16011,18 @@ DIV 2
 DIV 1
 </code></pre>
 <p>优先依次执行事件捕获，再从最内部开始依次事件冒泡</p>
-]]></content:encoded>
-  <category>JavaScript</category>
-</item>
-<item>
+]]></content>
+  <category term="JavaScript"/>
+</entry>
+<entry>
   <title>React组件ref</title>
-  <link>https://ganto.me/post/20230117</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230117</guid>
-  <pubDate>Tue, 17 Jan 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[React中forwardRef的用法 官网文档：https://zh-hans.react.dev/reference/react/forwardRef 今天我们就一起学习一下React中的ref怎么获取组件实例，只讨论函数式组件中的ref 如下代码，我们直接在App根组件中，意图只使用ref就获取Footer组件实例 细心的同学可能已经发现控制台报错了，提示我们应该使用forwardRef，并且编辑器也提示ref={footRef}类型不对 这是因为React不会默认暴露组件中的东西，如果开发者想要从组件中暴露出来东西，需要手动挡进行操作，这也是为了组件数据安全的考量 App.tsx import { useRef } from 'react' import { Footer } from '@/components/footer' const App = () =&gt; { const footRef = useRef(null) const getFootRef = () =&gt; { console.log(footRef.current) } return ( &lt;]]></description>
-  <content:encoded><![CDATA[<h1>React中forwardRef的用法</h1>
+  <link href="https://ganto.me/post/20230117"/>
+  <id>https://ganto.me/post/20230117</id>
+  <updated>2023-01-17T00:00:00+08:00</updated>
+  <published>2023-01-17T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[React中forwardRef的用法 官网文档：https://zh-hans.react.dev/reference/react/forwardRef 今天我们就一起学习一下React中的ref怎么获取组件实例，只讨论函数式组件中的ref 如下代码，我们直接在App根组件中，意图只使用ref就获取Footer组件实例 细心的同学可能已经发现控制台报错了，提示我们应该使用forwardRef，并且编辑器也提示ref={footRef}类型不对 这是因为React不会默认暴露组件中的东西，如果开发者想要从组件中暴露出来东西，需要手动挡进行操作，这也是为了组件数据安全的考量 App.tsx import { useRef } from 'react' import { Footer } from '@/components/footer' const App = () =&gt; { const footRef = useRef(null) const getFootRef = () =&gt; { console.log(footRef.current) } return ( &lt;]]></summary>
+  <content type="html"><![CDATA[<h1>React中forwardRef的用法</h1>
 <blockquote>
 <p>官网文档：<a href="https://zh-hans.react.dev/reference/react/forwardRef">https://zh-hans.react.dev/reference/react/forwardRef</a></p>
 </blockquote>
@@ -16077,18 +16115,19 @@ export const Footer = forwardRef&lt;object&gt;((props, ref) =&gt; {
 })
 </code></pre>
 <p>很明显的问题，p标签如要一同暴露，不能直接使用<code>ref={ref}</code>进行暴露，需要将p标签设置一个useRef，然后将其他同其他状态数据一起暴露</p>
-]]></content:encoded>
-  <category>JavaScript</category>
-  <category>React</category>
-</item>
-<item>
+]]></content>
+  <category term="JavaScript"/>
+  <category term="React"/>
+</entry>
+<entry>
   <title>JavaScript 高阶函数之 reduce</title>
-  <link>https://ganto.me/post/20230116</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230116</guid>
-  <pubDate>Mon, 16 Jan 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[MDN：https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce 关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为累加器 reduce常见用例如下： let goods = [ { name: &quot;T恤&quot;, price: 99, count: 2 }, { name: &quot;polo衫&quot;, price: 120, count: 1 }, { name: &quot;牛仔裤&quot;, price: 197, count: 11 } ] const goodsSum = goods.reduce((sum, item) =&gt; { return sum + item.price * item.count; }, initSum = 0) console.log(goodsSum) // 2485 以上代码，我相信对于你那真实信手捏来... 但是还是需要解释一下，reduce就是对goods数组]]></description>
-  <content:encoded><![CDATA[<blockquote>
+  <link href="https://ganto.me/post/20230116"/>
+  <id>https://ganto.me/post/20230116</id>
+  <updated>2023-01-16T00:00:00+08:00</updated>
+  <published>2023-01-16T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[MDN：https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce 关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为累加器 reduce常见用例如下： let goods = [ { name: &quot;T恤&quot;, price: 99, count: 2 }, { name: &quot;polo衫&quot;, price: 120, count: 1 }, { name: &quot;牛仔裤&quot;, price: 197, count: 11 } ] const goodsSum = goods.reduce((sum, item) =&gt; { return sum + item.price * item.count; }, initSum = 0) console.log(goodsSum) // 2485 以上代码，我相信对于你那真实信手捏来... 但是还是需要解释一下，reduce就是对goods数组]]></summary>
+  <content type="html"><![CDATA[<blockquote>
 <p>MDN：<a href="https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce">https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce</a></p>
 </blockquote>
 <p>关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为<strong>累加器</strong></p>
@@ -16151,17 +16190,18 @@ console.log(ret)
 <p>结束reduce</p>
 <p>返回 <code>&quot;你好&quot;</code></p>
 <p>啊？reduce函数还能这么用！</p>
-]]></content:encoded>
-  <category>JavaScript</category>
-</item>
-<item>
+]]></content>
+  <category term="JavaScript"/>
+</entry>
+<entry>
   <title>Taro快速体验</title>
-  <link>https://ganto.me/post/20230112</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230112</guid>
-  <pubDate>Thu, 12 Jan 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[5分钟快速入门Taro Taro介绍 Taro是由凹凸实验室开发的一个开放式跨端跨框架，支持使用 React/Vue/Nerv 等框架来开发 微信 / 京东 / 百度 / 支付宝 / 字节跳动 / QQ / 飞书 小程序 / H5 / RN 等应用 Taro类似于uniapp，都是跨端框架，一次开发多端部署 这是Taro官方文档，可以结合官方文档食用更佳 准备 你需要了解最基本的 HTML + CSS + JS ，俗称前端三件套 最好会使用Vue React node环境（&gt;=16.20.0） 安装Taro CLI工具 安装 npm install -g @tarojs/cli 查看是否安装成功 npm info @tarojs/cli 初始化项目 taro init myApp 进入到项目根目录，安装依赖 cd myApp pnpm i 启动项目 开发 pnpm dev:weapp 打包 pnpm build:weapp 项目启动之后，在微信开发者工具中打开该项目根目录，即可预览项目 这样Taro项目就启动起来了]]></description>
-  <content:encoded><![CDATA[<h1>5分钟快速入门Taro</h1>
+  <link href="https://ganto.me/post/20230112"/>
+  <id>https://ganto.me/post/20230112</id>
+  <updated>2023-01-12T00:00:00+08:00</updated>
+  <published>2023-01-12T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[5分钟快速入门Taro Taro介绍 Taro是由凹凸实验室开发的一个开放式跨端跨框架，支持使用 React/Vue/Nerv 等框架来开发 微信 / 京东 / 百度 / 支付宝 / 字节跳动 / QQ / 飞书 小程序 / H5 / RN 等应用 Taro类似于uniapp，都是跨端框架，一次开发多端部署 这是Taro官方文档，可以结合官方文档食用更佳 准备 你需要了解最基本的 HTML + CSS + JS ，俗称前端三件套 最好会使用Vue React node环境（&gt;=16.20.0） 安装Taro CLI工具 安装 npm install -g @tarojs/cli 查看是否安装成功 npm info @tarojs/cli 初始化项目 taro init myApp 进入到项目根目录，安装依赖 cd myApp pnpm i 启动项目 开发 pnpm dev:weapp 打包 pnpm build:weapp 项目启动之后，在微信开发者工具中打开该项目根目录，即可预览项目 这样Taro项目就启动起来了]]></summary>
+  <content type="html"><![CDATA[<h1>5分钟快速入门Taro</h1>
 <h2>Taro介绍</h2>
 <p>Taro是由凹凸实验室开发的一个开放式跨端跨框架，支持使用 React/Vue/Nerv 等框架来开发 <a href="https://mp.weixin.qq.com/">微信</a> / <a href="https://mp.jd.com/?entrance=taro">京东</a> / <a href="https://smartprogram.baidu.com/">百度</a> / <a href="https://mini.open.alipay.com/">支付宝</a> / <a href="https://developer.open-douyin.com/">字节跳动</a> / <a href="https://q.qq.com/">QQ</a> / <a href="https://open.feishu.cn/document/uYjL24iN/ucDOzYjL3gzM24yN4MjN">飞书</a> 小程序 / H5 / RN 等应用</p>
 <p>Taro类似于uniapp，都是跨端框架，一次开发多端部署</p>
@@ -16195,17 +16235,18 @@ pnpm i
 </code></pre>
 <p>项目启动之后，在微信开发者工具中打开该项目根目录，即可预览项目</p>
 <p>这样Taro项目就启动起来了</p>
-]]></content:encoded>
-  <category>Taro</category>
-</item>
-<item>
+]]></content>
+  <category term="Taro"/>
+</entry>
+<entry>
   <title>Rust中的所有权初体验</title>
-  <link>https://ganto.me/post/20230111</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230111</guid>
-  <pubDate>Wed, 11 Jan 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[所有权系统是Rust中的一大特点 今日靓仔我啊，就来体验一番 我们先来看一段代码 fn main() { let s1 = String::from(&quot;hello&quot;); let s2 = s1; // s1 的所有权转移给了 s2 println!(&quot;s1: {}, s2: {}&quot;, s1, s2); // 报错，s1 已经被移动了 } 你可能不了解rust代码，那么按照你熟悉的语言去理解他，大同小异 代码中先定义了一个String字符串类型的变量 s1 然后紧接着定义了一个变量 s2，此时需要注意，s2 的值是由 s1 赋值所得（可以先简单理解为赋值） 然后打印出 s1，s2 发现报错了 问题就出现在 let s2 = s1; 这段代码，这里其实发生了所有权转移，也就是 s1 的所有权发生了向 s2 转移 那么 s1 变量在所有权发生转移后，再进行访问，那么在rust中将是不合法的访问 如果不需要所有权转移，而只是简单的拷贝，则可以使用clone函数 fn main() { let mut s1 = String::from(&quot;hel]]></description>
-  <content:encoded><![CDATA[<p>所有权系统是Rust中的一大特点
+  <link href="https://ganto.me/post/20230111"/>
+  <id>https://ganto.me/post/20230111</id>
+  <updated>2023-01-11T00:00:00+08:00</updated>
+  <published>2023-01-11T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[所有权系统是Rust中的一大特点 今日靓仔我啊，就来体验一番 我们先来看一段代码 fn main() { let s1 = String::from(&quot;hello&quot;); let s2 = s1; // s1 的所有权转移给了 s2 println!(&quot;s1: {}, s2: {}&quot;, s1, s2); // 报错，s1 已经被移动了 } 你可能不了解rust代码，那么按照你熟悉的语言去理解他，大同小异 代码中先定义了一个String字符串类型的变量 s1 然后紧接着定义了一个变量 s2，此时需要注意，s2 的值是由 s1 赋值所得（可以先简单理解为赋值） 然后打印出 s1，s2 发现报错了 问题就出现在 let s2 = s1; 这段代码，这里其实发生了所有权转移，也就是 s1 的所有权发生了向 s2 转移 那么 s1 变量在所有权发生转移后，再进行访问，那么在rust中将是不合法的访问 如果不需要所有权转移，而只是简单的拷贝，则可以使用clone函数 fn main() { let mut s1 = String::from(&quot;hel]]></summary>
+  <content type="html"><![CDATA[<p>所有权系统是Rust中的一大特点
 今日靓仔我啊，就来体验一番</p>
 <p>我们先来看一段代码</p>
 <pre><code class="language-rust">fn main() {
@@ -16231,17 +16272,18 @@ pnpm i
 </code></pre>
 <p>以上代码，通过对 <code>s1</code> 进行修改，会发现 <code>s2</code> 没有被一同修改，说明 <code>clone()</code> 函数是深拷贝</p>
 <p>体验了rust中的所有权，很奇妙，像进了米奇妙妙屋...</p>
-]]></content:encoded>
-  <category>Rust</category>
-</item>
-<item>
+]]></content>
+  <category term="Rust"/>
+</entry>
+<entry>
   <title>Gin中间件上下文的Set、Get用法</title>
-  <link>https://ganto.me/post/20230110</link>
-  <guid isPermaLink="true">https://ganto.me/post/20230110</guid>
-  <pubDate>Tue, 10 Jan 2023 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[Code 如上代码所示，中间件middlewareA内部通过c.Set(&quot;middlewareA_key&quot;, str)将参数设置到上下文中 所以中间件middlewareB可以通过c.Get(&quot;middlewareA_key&quot;)获取到上下文中传递的值，并将值进行了修改，然后继续通过上下文进行了传递 然后在控制器函数中可以通过上下文c.Keys[&quot;middlewareB_key&quot;]的方式获取 package main import ( &quot;fmt&quot; &quot;github.com/gin-gonic/gin&quot; ) func main() { router := gin.Default() router.Use(middlewareA(&quot;中间件A传递的值&quot;), middlewareB()) router.GET(&quot;/&quot;, func(c *gin.Context) { valueA := c.Keys[&quot;middlewareA_key&quot;] va]]></description>
-  <content:encoded><![CDATA[<h2>Code</h2>
+  <link href="https://ganto.me/post/20230110"/>
+  <id>https://ganto.me/post/20230110</id>
+  <updated>2023-01-10T00:00:00+08:00</updated>
+  <published>2023-01-10T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[Code 如上代码所示，中间件middlewareA内部通过c.Set(&quot;middlewareA_key&quot;, str)将参数设置到上下文中 所以中间件middlewareB可以通过c.Get(&quot;middlewareA_key&quot;)获取到上下文中传递的值，并将值进行了修改，然后继续通过上下文进行了传递 然后在控制器函数中可以通过上下文c.Keys[&quot;middlewareB_key&quot;]的方式获取 package main import ( &quot;fmt&quot; &quot;github.com/gin-gonic/gin&quot; ) func main() { router := gin.Default() router.Use(middlewareA(&quot;中间件A传递的值&quot;), middlewareB()) router.GET(&quot;/&quot;, func(c *gin.Context) { valueA := c.Keys[&quot;middlewareA_key&quot;] va]]></summary>
+  <content type="html"><![CDATA[<h2>Code</h2>
 <p>如上代码所示，中间件<code>middlewareA</code>内部通过<code>c.Set(&quot;middlewareA_key&quot;, str)</code>将参数设置到上下文中
 所以中间件<code>middlewareB</code>可以通过<code>c.Get(&quot;middlewareA_key&quot;)</code>获取到上下文中传递的值，并将值进行了修改，然后继续通过上下文进行了传递
 然后在控制器函数中可以通过上下文<code>c.Keys[&quot;middlewareB_key&quot;]</code>的方式获取</p>
@@ -16298,18 +16340,19 @@ func middlewareB() gin.HandlerFunc {
     }
 }
 </code></pre>
-]]></content:encoded>
-  <category>Golang</category>
-  <category>Gin</category>
-</item>
-<item>
+]]></content>
+  <category term="Golang"/>
+  <category term="Gin"/>
+</entry>
+<entry>
   <title>hexo-theme-heri主题开发简记</title>
-  <link>https://ganto.me/post/20210105</link>
-  <guid isPermaLink="true">https://ganto.me/post/20210105</guid>
-  <pubDate>Tue, 05 Jan 2021 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[Heri介绍： 究极简洁的Hexo主题 展示站点 展示站点 下载Heri hexo-theme-heri 下载完整的Heri主题，拷贝到Hexo的主题文件夹下 引用Heri 在Hexo根配置文件中这样引用即可 theme: heri 根配置文件的其他必要配置 # Site title: Ganto # 网站名称 subtitle: '但愿可以成为有趣的人' # 网站小标题，可为座右铭 # URL url: https://www.baidu.cn # 网站链接 root: / # 如无特殊，设置&quot;/&quot;即可 主题配置文件的必要配置 # 网站icon favicon: /images/g.png # 网站的icon # 日期/时间格式 time_format: date_format: YYYY-MM-DD time_format: HH:mm:ss division: &quot;&quot; # 日期与时间中间的间隔，如：division: &quot;/&quot; ===&gt;&gt;&gt; 2020-20-20/20:20:20 # 网站声明 websit]]></description>
-  <content:encoded><![CDATA[<h1>Heri介绍：</h1>
+  <link href="https://ganto.me/post/20210105"/>
+  <id>https://ganto.me/post/20210105</id>
+  <updated>2021-01-05T00:00:00+08:00</updated>
+  <published>2021-01-05T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[Heri介绍： 究极简洁的Hexo主题 展示站点 展示站点 下载Heri hexo-theme-heri 下载完整的Heri主题，拷贝到Hexo的主题文件夹下 引用Heri 在Hexo根配置文件中这样引用即可 theme: heri 根配置文件的其他必要配置 # Site title: Ganto # 网站名称 subtitle: '但愿可以成为有趣的人' # 网站小标题，可为座右铭 # URL url: https://www.baidu.cn # 网站链接 root: / # 如无特殊，设置&quot;/&quot;即可 主题配置文件的必要配置 # 网站icon favicon: /images/g.png # 网站的icon # 日期/时间格式 time_format: date_format: YYYY-MM-DD time_format: HH:mm:ss division: &quot;&quot; # 日期与时间中间的间隔，如：division: &quot;/&quot; ===&gt;&gt;&gt; 2020-20-20/20:20:20 # 网站声明 websit]]></summary>
+  <content type="html"><![CDATA[<h1>Heri介绍：</h1>
 <p>究极简洁的Hexo主题<br />
 <img src="https://heri.ganto.cn/ArticleResources/Hexo-Theme-Heri/heri.png" alt="预览图" /></p>
 <h2>展示站点</h2>
@@ -16361,19 +16404,19 @@ website_notice:
 <img src="https://heri.ganto.cn/ArticleResources/Hexo-Theme-Heri/1.png" alt="预览图" /></p>
 <p>目及所见，皆是全部；化繁为简，只为高效。</p>
 <p>没错，这就是Heri的全部。</p>
-]]></content:encoded>
-</item>
-<item>
+]]></content>
+</entry>
+<entry>
   <title>测试文章</title>
-  <link>https://ganto.me/post/20201222</link>
-  <guid isPermaLink="true">https://ganto.me/post/20201222</guid>
-  <pubDate>Tue, 22 Dec 2020 00:00:00 +0800</pubDate>
-  <author>i@ganto.me (干徒)</author>
-  <description><![CDATA[测试文章 测试文章 ```js nihao ```]]></description>
-  <content:encoded><![CDATA[<h1>测试文章</h1>
+  <link href="https://ganto.me/post/20201222"/>
+  <id>https://ganto.me/post/20201222</id>
+  <updated>2020-12-22T00:00:00+08:00</updated>
+  <published>2020-12-22T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[测试文章 测试文章 ```js nihao ```]]></summary>
+  <content type="html"><![CDATA[<h1>测试文章</h1>
 <p>测试文章</p>
 <p>```js nihao ```</p>
-]]></content:encoded>
-</item>
-</channel>
-</rss>
+]]></content>
+</entry>
+</feed>
