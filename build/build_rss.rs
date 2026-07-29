@@ -46,11 +46,6 @@ fn md_to_html(md: &str) -> String {
     comrak::markdown_to_html(md, &options)
 }
 
-fn escape_cdata(content: &str) -> String {
-    // 如果内容包含 ]]>，拆分为 ]]]]><![CDATA[> 避免提前关闭 CDATA
-    content.replace("]]>", "]]]]><![CDATA[>")
-}
-
 pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
     let last_build_date = if let Some(latest) = posts.first() {
         format_rfc2822(&latest.date)
@@ -122,11 +117,11 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
             escape_xml(&description_text)
         ));
 
-        // content:encoded: 全文 HTML，CDATA 包裹
+        // content:encoded: 全文 HTML，XML 实体编码（不用 CDATA，避免校验器误判代码片段为 HTML 标签）
         let html = md_to_html(&post.content);
         xml.push_str(&format!(
-            "  <content:encoded><![CDATA[{}]]></content:encoded>\n",
-            escape_cdata(&html)
+            "  <content:encoded>{}</content:encoded>\n",
+            escape_xml(&html)
         ));
 
         for tag in &post.tags {
