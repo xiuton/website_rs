@@ -36,7 +36,7 @@ pub fn generate_atom_feed(posts: &[PostData], out_dir: &str) {
         "<generator uri=\"https://ganto.me\">website-rs</generator>\n",
     ));
 
-    let total = posts.len().min(50);
+    let total = posts.len().min(20);
     for post in posts.iter().take(total) {
         xml.push_str("<entry>\n");
 
