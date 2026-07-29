@@ -36,6 +36,81 @@ fn format_rfc2822(date_str: &str) -> String {
     format!("{}, {:02} {} {:04} 00:00:00 +0800", weekdays[h as usize], day, month_abbr, year)
 }
 
+fn escape_html_code(html: &str) -> String {
+    // 转义 <code>...</code> 内的 < > &，防止代码片段被 RSS 校验器误判为 HTML 标签
+    let mut result = String::with_capacity(html.len());
+    let mut in_code = false;
+    let bytes = html.as_bytes();
+    let mut i = 0;
+
+    while i < bytes.len() {
+        if !in_code {
+            if i + 5 < bytes.len() && &bytes[i..i+5] == b"<code" {
+                // 把开标签 <code ...> 完整复制出来，跳过其内部 > 再开始转义
+                in_code = true;
+                result.push(bytes[i] as char);
+                i += 1;
+                while i < bytes.len() && bytes[i] != b'>' {
+                    result.push(bytes[i] as char);
+                    i += 1;
+                }
+                if i < bytes.len() {
+                    result.push('>');
+                    i += 1;
+                }
+                continue;
+            }
+        } else {
+            if i + 7 < bytes.len() && &bytes[i..i+7] == b"</code>" {
+                result.push_str("</code>");
+                i += 7;
+                in_code = false;
+                continue;
+            } else {
+                match bytes[i] {
+                    b'<' => { result.push_str("&lt;"); i += 1; continue; }
+                    b'>' => { result.push_str("&gt;"); i += 1; continue; }
+                    b'&' => {
+                        let rest = &bytes[i..];
+                        let min_len = rest.len().min(6);
+                        let slice = std::str::from_utf8(&rest[..min_len]).unwrap_or("");
+                        if slice.starts_with("&lt;") || slice.starts_with("&gt;")
+                            || slice.starts_with("&amp;") || slice.starts_with("&quot;")
+                            || slice.starts_with("&apos;") || slice.starts_with("&#")
+                        {
+                            // 已有实体，原样保留
+                        } else {
+                            result.push_str("&amp;");
+                            i += 1;
+                            continue;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        result.push(bytes[i] as char);
+        i += 1;
+    }
+    result
+}
+
+fn strip_html_tags(html: &str) -> String {
+    // 去掉 HTML 标签，保留实体编码（如 &lt;），不解码
+    let mut result = String::new();
+    let mut in_tag = false;
+    for c in html.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => result.push(c),
+            _ => {}
+        }
+    }
+    // 压缩连续空白
+    result.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 fn md_to_html(md: &str) -> String {
     let mut options = ComrakOptions::default();
     options.extension.table = true;
@@ -43,7 +118,8 @@ fn md_to_html(md: &str) -> String {
     options.extension.tasklist = true;
     options.extension.autolink = true;
     options.extension.footnotes = true;
-    comrak::markdown_to_html(md, &options)
+    let raw = comrak::markdown_to_html(md, &options);
+    escape_html_code(&raw)
 }
 
 pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
@@ -61,21 +137,20 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
         r#"<link>https://ganto.me</link>"#,
         r#"<description>干徒 (Ganto) 的个人技术博客，分享 Rust、前端、WebAssembly 等编程技术文章。</description>"#,
         r#"<language>zh-CN</language>"#,
+        r#"<copyright>Copyright 2024-2026 干徒 (Ganto)</copyright>"#,
         r#"<docs>https://www.rssboard.org/rss-specification</docs>"#,
         r#"<generator>website-rs</generator>"#,
-    ));
-
-    xml.push_str(&format!(
-        "  <lastBuildDate>{}</lastBuildDate>\n",
-        escape_xml(&last_build_date)
-    ));
-    xml.push_str(&format!(
-        "  <pubDate>{}</pubDate>\n",
-        escape_xml(&last_build_date)
-    ));
-
-    xml.push_str(concat!(
+        r#"<ttl>60</ttl>"#,
         r#"<atom:link href="https://ganto.me/static/feed.xml" rel="self" type="application/rss+xml"/>"#,
+    ));
+
+    xml.push_str(&format!(
+        "<lastBuildDate>{}</lastBuildDate>\n",
+        escape_xml(&last_build_date)
+    ));
+    xml.push_str(&format!(
+        "<pubDate>{}</pubDate>\n",
+        escape_xml(&last_build_date)
     ));
 
     let total = posts.len().min(50);
@@ -106,22 +181,24 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
             escape_xml(&post.author)
         ));
 
-        // description: 优先使用 summary，否则取正文前 500 字符
+        // description: 优先使用 summary，否则转 HTML 后提取纯文本前 500 字符
         let description_text = if !post.summary.is_empty() {
             post.summary.clone()
         } else {
-            post.content.chars().take(500).collect()
+            let html = md_to_html(&post.content);
+            let text = strip_html_tags(&html);
+            text.chars().take(500).collect()
         };
         xml.push_str(&format!(
-            "  <description>{}</description>\n",
-            escape_xml(&description_text)
+            "  <description><![CDATA[{}]]></description>\n",
+            description_text
         ));
 
-        // content:encoded: 全文 HTML，XML 实体编码（不用 CDATA，避免校验器误判代码片段为 HTML 标签）
+        // content:encoded: 全文 HTML，CDATA 包裹
         let html = md_to_html(&post.content);
         xml.push_str(&format!(
-            "  <content:encoded>{}</content:encoded>\n",
-            escape_xml(&html)
+            "  <content:encoded><![CDATA[{}]]></content:encoded>\n",
+            html
         ));
 
         for tag in &post.tags {
