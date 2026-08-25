@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 use crate::utils::title;
-use crate::components::icons::{GitHubIcon, EmailIcon, BlogIcon};
+use crate::components::icons::{GitHubIcon, EmailIcon};
 
 #[component]
 pub fn About() -> Element {
@@ -134,7 +134,7 @@ pub fn About() -> Element {
                         EmailIcon {}
                         span { "i@ganto.me" }
                     }
-                    a { 
+                    a {
                         href: "https://github.com/gantoho",
                         target: "_blank",
                         rel: "noopener noreferrer",
@@ -142,15 +142,6 @@ pub fn About() -> Element {
                         aria_label: "GitHub 主页",
                         GitHubIcon {}
                         span { "GitHub" }
-                    }
-                    a { 
-                        href: "https://cnblogs.com/ganto",
-                        target: "_blank",
-                        rel: "noopener noreferrer",
-                        class: "contact-link blog-link",
-                        aria_label: "博客园主页",
-                        BlogIcon {}
-                        span { "博客园" }
                     }
                 }
             }

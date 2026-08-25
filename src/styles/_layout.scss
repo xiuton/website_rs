@@ -227,6 +227,10 @@
         .about-section {
           margin-bottom: 2.5rem;
 
+          &:last-child {
+            margin-bottom: 0;
+          }
+
           h2 {
             font-size: 1.3rem;
             font-weight: 700;
@@ -2756,7 +2760,7 @@ html.dark::view-transition-new(root) {
 #main .app .main-content .rss-page {
     max-width: 600px;
     margin: 0 auto;
-    padding: 2rem 0rem;
+    padding: 1rem 0rem 0rem;
 
     .rss-title {
         display: flex;
@@ -2784,7 +2788,6 @@ html.dark::view-transition-new(root) {
         display: flex;
         flex-direction: column;
         gap: 1.25rem;
-        margin-bottom: 2rem;
     }
 
     .rss-card {

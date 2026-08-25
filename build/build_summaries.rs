@@ -227,8 +227,42 @@ fn extractive_summary(text: &str, top_n: usize) -> Option<String> {
     }
 }
 
-/// 转义 JSON 字符串中的特殊字符（手动实现，免额外依赖）
+/// 根据 tags 推断一个适合在 UI 展示的分类名。
+/// 优先匹配 tags 中的关键词；若 tags 为空或 fallback 是无意义的目录名，则返回 "其他"。
+pub fn display_category(tags: &[String], fallback: &str) -> String {
+    // 按优先级匹配（与前端的 category_color 保持一致）
+    const RULES: &[(&[&str], &str)] = &[
+        (&["Rust"], "Rust"),
+        (&["Dioxus"], "Dioxus"),
+        (&["Windows"], "Windows"),
+        (&["Golang", "Gin"], "Golang"),
+        (&["TypeScript"], "TypeScript"),
+        (&["Vue"], "Vue"),
+        (&["React"], "React"),
+        (&["Web Component"], "Web Component"),
+        (&["Artificial Intelligence", "AI"], "AI"),
+        (&["Taro"], "前端"),
+        (&["JavaScript", "前端", "后端", "技术"], "前端"),
+    ];
 
+    for (needles, label) in RULES {
+        if tags.iter().any(|t| needles.iter().any(|n| t.contains(n))) {
+            return (*label).to_string();
+        }
+    }
+
+    // 忽略无意义的目录名 fallback（如空字符串、'ganto' 等）
+    let fallback_trim = fallback.trim();
+    let fallback_is_meaningless = fallback_trim.is_empty()
+        || fallback_trim.eq_ignore_ascii_case("ganto")
+        || fallback_trim.eq_ignore_ascii_case("posts")
+        || fallback_trim.eq_ignore_ascii_case("default");
+
+    if !fallback_is_meaningless {
+        return fallback_trim.to_string();
+    }
+    "其他".to_string()
+}
 
 pub fn generate_ai_summaries(posts: &[PostData]) {
     if posts.is_empty() {
@@ -250,6 +284,8 @@ pub fn generate_ai_summaries(posts: &[PostData]) {
 
         let escaped_summary = escape_json_string(&summary);
         let escaped_title = escape_json_string(&post.title);
+        let display_cat = display_category(&post.tags, &post.category);
+        let escaped_category = escape_json_string(&display_cat);
 
         json.push_str(&format!(
             r#"  {{"slug":"{}","title":"{}","summary":"{}","date":"{}","tags":["{}"],"category":"{}"}}"#,
@@ -258,7 +294,7 @@ pub fn generate_ai_summaries(posts: &[PostData]) {
             escaped_summary,
             post.date,
             post.tags.join(r#"",""#),
-            post.category,
+            escaped_category,
         ));
 
         if idx < posts.len() - 1 {

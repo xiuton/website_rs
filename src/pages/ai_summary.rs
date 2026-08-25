@@ -21,6 +21,7 @@ fn category_color(cat: &str) -> &'static str {
         s if s.contains("AI") || s.contains("Artificial") => "#10b981",
         s if s.contains("技术") => "#6366f1",
         s if s.contains("React") => "#61dafb",
+        s if s.contains("其他") || s.contains("未分类") => "#94a3b8",
         _ => "#9ca3af",
     }
 }

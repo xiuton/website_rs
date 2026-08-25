@@ -7,7 +7,7 @@
 .ai-summary-container {
   max-width: 800px;
   margin: 0 auto;
-  padding: 1rem 0rem 2rem;
+  padding: 1rem 0rem 0rem;
 
   .ai-summary-header {
     text-align: center;
@@ -134,7 +134,7 @@
 
 @include mobile {
   .ai-summary-container {
-    padding: 0.5rem 0 1.5rem;
+    padding: 0.5rem 0 0rem;
 
     .ai-summary-header {
       padding: 1rem 0 1.2rem;
