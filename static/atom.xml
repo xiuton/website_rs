@@ -222,8 +222,8 @@ registry = &quot;sparse+https://mirrors.aliyun.com/crates.io-index/&quot;
 </entry>
 <entry>
   <title>Rust所有权</title>
-  <link href="https://ganto.me/post/20250220"/>
-  <id>https://ganto.me/post/20250220</id>
+  <link href="https://ganto.me/post/20250220-2"/>
+  <id>https://ganto.me/post/20250220-2</id>
   <updated>2025-02-20T00:00:00+08:00</updated>
   <published>2025-02-20T00:00:00+08:00</published>
   <author><name>干徒</name></author>
@@ -263,8 +263,8 @@ registry = &quot;sparse+https://mirrors.aliyun.com/crates.io-index/&quot;
 </entry>
 <entry>
   <title>JavaScript 高阶函数之 reduce</title>
-  <link href="https://ganto.me/post/20250220-2"/>
-  <id>https://ganto.me/post/20250220-2</id>
+  <link href="https://ganto.me/post/20250220"/>
+  <id>https://ganto.me/post/20250220</id>
   <updated>2025-02-20T00:00:00+08:00</updated>
   <published>2025-02-20T00:00:00+08:00</published>
   <author><name>干徒</name></author>
@@ -1737,8 +1737,8 @@ document.startViewTransition(() =&gt; {
 </entry>
 <entry>
   <title>Vue3.3+ 新特性 defineOptions</title>
-  <link href="https://ganto.me/post/20231221-2"/>
-  <id>https://ganto.me/post/20231221-2</id>
+  <link href="https://ganto.me/post/20231221"/>
+  <id>https://ganto.me/post/20231221</id>
   <updated>2023-12-21T00:00:00+08:00</updated>
   <published>2023-12-21T00:00:00+08:00</published>
   <author><name>干徒</name></author>
@@ -1852,8 +1852,8 @@ defineOptions({
 </entry>
 <entry>
   <title>Vue3 实验性特性 defineModel</title>
-  <link href="https://ganto.me/post/20231221"/>
-  <id>https://ganto.me/post/20231221</id>
+  <link href="https://ganto.me/post/20231221-2"/>
+  <id>https://ganto.me/post/20231221-2</id>
   <updated>2023-12-21T00:00:00+08:00</updated>
   <published>2023-12-21T00:00:00+08:00</published>
   <author><name>干徒</name></author>
@@ -2000,8 +2000,8 @@ const handleClick = () =&gt; {
 </entry>
 <entry>
   <title>JavaScript闭包直接修改内部属性</title>
-  <link href="https://ganto.me/post/20231117-3"/>
-  <id>https://ganto.me/post/20231117-3</id>
+  <link href="https://ganto.me/post/20231117-2"/>
+  <id>https://ganto.me/post/20231117-2</id>
   <updated>2023-11-17T00:00:00+08:00</updated>
   <published>2023-11-17T00:00:00+08:00</published>
   <author><name>干徒</name></author>

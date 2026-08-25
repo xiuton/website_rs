@@ -833,6 +833,9 @@ pre code.hljs {
 #main .app .main-content .about-container .about-section {
   margin-bottom: 2.5rem;
 }
+#main .app .main-content .about-container .about-section:last-child {
+  margin-bottom: 0;
+}
 #main .app .main-content .about-container .about-section h2 {
   font-size: 1.3rem;
   font-weight: 700;
@@ -3046,7 +3049,7 @@ html.dark::view-transition-new(root) {
 #main .app .main-content .rss-page {
   max-width: 600px;
   margin: 0 auto;
-  padding: 2rem 0rem;
+  padding: 1rem 0rem 0rem;
 }
 #main .app .main-content .rss-page .rss-title {
   display: flex;
@@ -3071,7 +3074,6 @@ html.dark::view-transition-new(root) {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  margin-bottom: 2rem;
 }
 #main .app .main-content .rss-page .rss-card {
   padding: 1.5rem;
@@ -4544,7 +4546,7 @@ html.dark::view-transition-new(root) {
 .ai-summary-container {
   max-width: 800px;
   margin: 0 auto;
-  padding: 1rem 0rem 2rem;
+  padding: 1rem 0rem 0rem;
 }
 .ai-summary-container .ai-summary-header {
   text-align: center;
@@ -4656,7 +4658,7 @@ html.dark::view-transition-new(root) {
 
 @media (max-width: 768px) {
   .ai-summary-container {
-    padding: 0.5rem 0 1.5rem;
+    padding: 0.5rem 0 0rem;
   }
   .ai-summary-container .ai-summary-header {
     padding: 1rem 0 1.2rem;
