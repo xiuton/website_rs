@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ES6 标准入门 - 阮一峰 - 干徒</title>
+    <meta name="description" content="Object.assign() const a = {name: &#39;小华&#39;, age: 19, sex: &#39;女&#39;} const b = {name: &#39;小华&#39;, age: 20} const c = Object.assign(a, b) console.log(a) console.log(b) console.lo">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="">
+    <link rel="canonical" href="https://ganto.me/post/20230220-4">
+    <meta property="og:title" content="ES6 标准入门 - 阮一峰 - 干徒">
+    <meta property="og:description" content="Object.assign() const a = {name: &#39;小华&#39;, age: 19, sex: &#39;女&#39;} const b = {name: &#39;小华&#39;, age: 20} const c = Object.assign(a, b) console.log(a) console.log(b) console.lo">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/20230220-4">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="ES6 标准入门 - 阮一峰 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="ES6 标准入门 - 阮一峰 - 干徒">
+    <meta name="twitter:description" content="Object.assign() const a = {name: &#39;小华&#39;, age: 19, sex: &#39;女&#39;} const b = {name: &#39;小华&#39;, age: 20} const c = Object.assign(a, b) console.log(a) console.log(b) console.lo">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"ES6 标准入门 - 阮一峰","description":"Object.assign() const a = {name: '小华', age: 19, sex: '女'} const b = {name: '小华', age: 20} const c = Object.assign(a, b) console.log(a) console.log(b) console.lo","url":"https://ganto.me/post/20230220-4","datePublished":"2023-02-20","dateModified":"2023-02-20","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-2a23876f5cfbaf78.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>ES6 标准入门 - 阮一峰</h1>
+                <div class="prerender-meta">
+                    <span>2023-02-20</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"></div>
+                <div class="blog-content">
+<h1><a href="#objectassign" aria-hidden="true" class="anchor" id="user-content-objectassign"></a>Object.assign()</h1>
+<pre><code class="language-js">const a = {name: '小华', age: 19, sex: '女'}
+const b = {name: '小华', age: 20}
+const c = Object.assign(a, b)
+console.log(a)
+console.log(b)
+console.log(c)
+// {name: '小华', age: 20, sex: '女'}
+// {name: '小华', age: 20}
+// {name: '小华', age: 20, sex: '女'}
+
+</code></pre>
+<p>通过上方代码可以看出，通过<code>Object.assign()</code>方法，会修改原对象a，并且返回的c对象和a对象一样，b对象不会修改被对象，<code>Object.assign()</code>第一个对象为目标对象，后边的无论多少都是源对象，目标对象是合并后，要返回的对象，在时机使用过程中一般第一个对象写成一个空对象，这样才不会对其他对象造成影响。</p>
+<pre><code class="language-js">const a = {name: '小华', age: 19, sex: '女'}
+const b = {name: '小华', age: 20}
+Object.assign({}, a, b);
+
+</code></pre>
+<h1><a href="#new-set" aria-hidden="true" class="anchor" id="user-content-new-set"></a>new set()</h1>
+<h2><a href="#去重" aria-hidden="true" class="anchor" id="user-content-去重"></a>去重</h2>
+<p>这里用到了Rest参数</p>
+<pre><code class="language-js">let arr = [1,1,2,2,2,2,2,3,3,3,4,4,4]
+let item = [...new Set(arr)] // 这里放在数组里面使用Rest参数将去重后的数值一个一个存放到item数组中
+console.log(item)
+// [1,2,3,4]
+
+</code></pre>
+<h1><a href="#新增方法" aria-hidden="true" class="anchor" id="user-content-新增方法"></a>新增方法</h1>
+<h2><a href="#arrayfrom" aria-hidden="true" class="anchor" id="user-content-arrayfrom"></a>Array.from()</h2>
+<p>将伪数组转化为真正的数组</p>
+<ul>
+<li>转化后数组会根据伪数组中的<code>length: 2</code>属性进行，也就是如果length的值为2，只会转化伪数组的前两个值</li>
+</ul>
+<pre><code class="language-js">let likeArr  = {
+  0:'React',
+  1:'Vue',
+  2:'Angular',
+  3:'Node',
+  4:'Vant',
+  'length':2
+}
+let arr = Array.from(likeArr);
+console.log(arr); // (2) ['React', 'Vue']
+
+</code></pre>
+<h2><a href="#objectfreeze" aria-hidden="true" class="anchor" id="user-content-objectfreeze"></a>Object.freeze()</h2>
+<pre><code class="language-js">const foo = {name: '小明'}
+foo.name = '小华'
+console.log(foo); // {name: '小华'}
+
+</code></pre>
+<p>如上代码，虽然const声明的为常量，其foo指向的内存地址不可改变，但其内部的属性可以改变，也就是上述代码可以正确执行。</p>
+<p>如果使用<code>Object.freeze()</code>方法，则会把对象冻结，则表示不仅foo指向的内存地址不可改变，其内部的属性也不会被改变。如下代码，在使用了<code>Object.freeze()</code>方法之后，更改foo的属性将不起作用。</p>
+<pre><code class="language-js">const foo = {name: '小明'}
+Object.freeze(foo)
+foo.name = '小华'
+console.log(foo); // {name: '小明'}
+
+</code></pre>
+<p>如果在使用了<code>Object.freeze()</code>方法后，再开启严格模式<code>'use strict'</code>，代码更会报错。</p>
+<pre><code class="language-js">'use strict'
+const foo = {name: '小明'}
+Object.freeze(foo)
+foo.name = '小华'
+console.log(foo); // （报错）
+
+</code></pre>
+<h2><a href="#objectkeys" aria-hidden="true" class="anchor" id="user-content-objectkeys"></a>Object.keys()</h2>
+<h3><a href="#冷知识" aria-hidden="true" class="anchor" id="user-content-冷知识"></a>冷知识</h3>
+<p>对象可以通过以下两种方式获取值。</p>
+<pre><code class="language-js">let obj = {name1: '小强', name2: '小虎', name3: '小华', name4: '小明'}
+console.log(obj['name1'], obj.name1); // 小强 小强
+
+</code></pre>
+<pre><code class="language-js">let obj = {name1: '小强', name2: '小虎', name3: '小华', name4: '小明'}
+const objKeys = Object.keys(obj)
+console.log(objKeys) // (4)['name1', 'name2', 'name3', 'name4']
+
+</code></pre>
+<p>如上代码所示，<code>Object.keys</code>的主要作用就是将对象中的所有<code>key</code>打包成数组进行返回。然后可以通过<code>forEach()</code>对对象的值进行遍历，如下代码所示。</p>
+<pre><code class="language-js">let obj = {name1: '小强', name2: '小虎', name3: '小华', name4: '小明'}
+Object.keys(obj).forEach((key, index) =&gt; {
+  console.log(obj[key]) // 小强 小虎 小华 小明
+})
+
+</code></pre>
+<p><strong>注意</strong>：这里的取值采用<code>obj[key]</code>的方式，因为<code>Object.keys(obj)</code>返回的对象<code>key</code>为字符串，如果取值用<code>obj.'name1'</code>显然不对。</p>
+<h1><a href="#es6-声明变量的六种方法" aria-hidden="true" class="anchor" id="user-content-es6-声明变量的六种方法"></a>ES6 声明变量的六种方法</h1>
+<ol>
+<li>var <strong>[ES5]</strong></li>
+<li>function <strong>[ES5]</strong></li>
+<li>let <strong>[ES6]</strong></li>
+<li>const <strong>[ES6]</strong></li>
+<li>import <strong>[ES6]</strong></li>
+<li>class <strong>[ES6]</strong></li>
+</ol>
+<h1><a href="#generator" aria-hidden="true" class="anchor" id="user-content-generator"></a>Generator</h1>
+<p><code>yield</code>表达式只能用在Generator函数内，用在其他地方将报错。</p>
+<pre><code class="language-js">function* f() {
+  let a = 0;
+  while(true){
+  	yield a
+    a++
+  }
+}
+
+const [a, b, c, d, e, ff, g] = f()
+console.log(a, b, c, d, e, ff, g)
+
+</code></pre>
+<h1><a href="#作用域" aria-hidden="true" class="anchor" id="user-content-作用域"></a>作用域</h1>
+<p>因为在foo函数作用域中，新声明了一个x变量，而y()函数中的x其实是foo函数参数那里新声明的x，x=2也是改变的foo函数参数那里新声明的x，foo函数内到的打印x，遵循就近原则，先找自己作用域下的x，也就是x=3。在下面代码中声明了三个x变量，根据不同的作用域，改变不同的x变量</p>
+<pre><code class="language-js">var x = 1;
+function foo(x, y = function() { x = 2; }) {
+  let x = 3;
+  console.log('1',x); // 3
+  y();
+  console.log('2',x); // 3
+}
+console.log('3',x); // 1
+foo()
+console.log('4',x); // 1
+
+</code></pre>
+
+                </div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

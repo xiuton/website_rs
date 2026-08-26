@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+# Do not crawl the static resources directory
+Disallow: /static/blog-images/
+
+Sitemap: https://ganto.me/static/sitemap.xml

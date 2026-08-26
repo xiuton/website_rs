@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React中forwardRef的用法 - 干徒</title>
+    <meta name="description" content="官网文档： https://zh-hans.react.dev/reference/react/forwardRef 今天我们就一起学习一下React中的ref怎么获取组件实例，只讨论函数式组件中的ref 如下代码，我们直接在App根组件中，意图只使用ref就获取Footer组件实例 细心的同学可能已经发现控制台报错了">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="JavaScript, React, TypeScript, 前端, 技术">
+    <link rel="canonical" href="https://ganto.me/post/20240412">
+    <meta property="og:title" content="React中forwardRef的用法 - 干徒">
+    <meta property="og:description" content="官网文档： https://zh-hans.react.dev/reference/react/forwardRef 今天我们就一起学习一下React中的ref怎么获取组件实例，只讨论函数式组件中的ref 如下代码，我们直接在App根组件中，意图只使用ref就获取Footer组件实例 细心的同学可能已经发现控制台报错了">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/20240412">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="React中forwardRef的用法 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="React中forwardRef的用法 - 干徒">
+    <meta name="twitter:description" content="官网文档： https://zh-hans.react.dev/reference/react/forwardRef 今天我们就一起学习一下React中的ref怎么获取组件实例，只讨论函数式组件中的ref 如下代码，我们直接在App根组件中，意图只使用ref就获取Footer组件实例 细心的同学可能已经发现控制台报错了">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"React中forwardRef的用法","description":"官网文档： https://zh-hans.react.dev/reference/react/forwardRef 今天我们就一起学习一下React中的ref怎么获取组件实例，只讨论函数式组件中的ref 如下代码，我们直接在App根组件中，意图只使用ref就获取Footer组件实例 细心的同学可能已经发现控制台报错了","url":"https://ganto.me/post/20240412","datePublished":"2024-04-12","dateModified":"2024-04-12","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"JavaScript, React, TypeScript, 前端, 技术","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-2a23876f5cfbaf78.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>React中forwardRef的用法</h1>
+                <div class="prerender-meta">
+                    <span>2024-04-12</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">JavaScript</span><span class="blog-tag">React</span><span class="blog-tag">TypeScript</span><span class="blog-tag">前端</span><span class="blog-tag">技术</span></div>
+                <div class="blog-content">
+<blockquote>
+<p>官网文档：<a href="https://zh-hans.react.dev/reference/react/forwardRef">https://zh-hans.react.dev/reference/react/forwardRef</a></p>
+</blockquote>
+<p>今天我们就一起学习一下React中的ref怎么获取组件实例，只讨论函数式组件中的ref</p>
+<p>如下代码，我们直接在App根组件中，意图只使用ref就获取Footer组件实例</p>
+<p>细心的同学可能已经发现控制台报错了，提示我们应该使用forwardRef，并且编辑器也提示<code>ref={footRef}</code>类型不对</p>
+<p>这是因为React不会默认暴露组件中的东西，如果开发者想要从组件中暴露出来东西，需要手动挡进行操作，这也是为了组件数据安全的考量</p>
+<p>App.tsx</p>
+<pre><code class="language-tsx">import { useRef } from 'react'
+import { Footer } from '@/components/footer'
+
+const App = () =&gt; {
+  const footRef = useRef(null)
+  const getFootRef = () =&gt; {
+    console.log(footRef.current)
+  }
+  return (
+    &lt;div className='app'&gt;
+      &lt;h1&gt;App&lt;/h1&gt;
+      &lt;button onClick={getFootRef}&gt;Show footRef&lt;/button&gt;
+      &lt;Footer ref={footRef}&gt;&lt;/Footer&gt;
+    &lt;/div&gt;
+  )
+}
+
+export default App
+
+</code></pre>
+<p>components/Footer/index.tsx</p>
+<pre><code class="language-tsx">import { useState } from 'react'
+
+export const Footer = () =&gt; {
+  const [count, setCount] = useState(0)
+  return (
+    &lt;div className=&quot;footer&quot;&gt;
+      &lt;h1&gt;Footer&lt;/h1&gt;
+      &lt;p&gt;{ count }&lt;/p&gt;
+      &lt;button onClick={() =&gt; setCount(count + 1)}&gt;Click Me&lt;/button&gt;
+    &lt;/div&gt;
+  )
+}
+
+</code></pre>
+<p>那么我们如何获取组件实例呢</p>
+<p>直接请出forwardRef来对Footer组件进行改造</p>
+<p>App.tsx 不变</p>
+<p>Footer组件改造如下</p>
+<p>components/Footer/index.tsx</p>
+<pre><code class="language-tsx">import { useState, forwardRef } from 'react'
+
+export const Footer = forwardRef&lt;HTMLDivElement&gt;((props, ref) =&gt; {
+  console.log(props)
+  const [count, setCount] = useState(0)
+  return (
+    &lt;div className=&quot;footer&quot;&gt;
+      &lt;h1&gt;Footer&lt;/h1&gt;
+      &lt;p ref={ref}&gt;{ count }&lt;/p&gt;
+      &lt;button onClick={() =&gt; setCount(count + 1)}&gt;Click Me&lt;/button&gt;
+    &lt;/div&gt;
+  )
+})
+
+</code></pre>
+<p>可以看出已经能打印出来p标签了，等等...为什么ref绑定在了p标签上，是的没错，想将哪个标签暴露给父组件，就绑定给谁身上</p>
+<p>forwardRef的用法就是直接套在组件函数外部，此时组件函数入参的第一个参数依然是props，第二个参数就是ref</p>
+<p>此时更应该注意的是，forwardRef需要编写泛型，该泛型就是需要暴露出去的东东的类型，如上代码，我们将p标签暴露出去了</p>
+<p>如想将组件状态数据暴露出去，需要使用一个Hook，那就是<code>useImperativeHandle</code></p>
+<p>使用方法见以下代码</p>
+<p>App.tsx不变</p>
+<p>Footer组件改造为以下</p>
+<p>components/Footer/index.tsx</p>
+<pre><code class="language-tsx">import { useState, useRef, forwardRef, useImperativeHandle } from 'react'
+
+export const Footer = forwardRef&lt;object&gt;((props, ref) =&gt; {
+  console.log(props)
+  const [count, setCount] = useState(0)
+  const pRef = useRef&lt;HTMLParagraphElement&gt;(null)
+
+  useImperativeHandle(ref, () =&gt; {
+    return {
+      count,
+      pRef
+    }
+  })
+
+  return (
+    &lt;div className=&quot;footer&quot;&gt;
+      &lt;h1&gt;Footer&lt;/h1&gt;
+      &lt;p ref={pRef}&gt;{ count }&lt;/p&gt;
+      &lt;button onClick={() =&gt; setCount(count + 1)}&gt;Click Me&lt;/button&gt;
+    &lt;/div&gt;
+  )
+})
+
+</code></pre>
+<p>很明显的问题，p标签如要一同暴露，不能直接使用<code>ref={ref}</code>进行暴露，需要将p标签设置一个useRef，然后将同其他状态数据一起暴露</p>
+<h2><a href="#react19" aria-hidden="true" class="anchor" id="user-content-react19"></a>React19</h2>
+<p>在React19中，forwardRef将不再必须使用，未来版本会删除forwardRef</p>
+<p>components/Footer/index.tsx</p>
+<pre><code class="language-tsx">import { useState } from 'react'
+
+export const Footer = ({props, ref}) =&gt; {
+  console.log(props)
+  const [count, setCount] = useState(0)
+  return (
+    &lt;div className=&quot;footer&quot;&gt;
+      &lt;h1&gt;Footer&lt;/h1&gt;
+      &lt;p ref={ref}&gt;{ count }&lt;/p&gt;
+      &lt;button onClick={() =&gt; setCount(count + 1)}&gt;Click Me&lt;/button&gt;
+    &lt;/div&gt;
+  )
+}
+
+</code></pre>
+<p>React19 发布之后，我们不应该继续使用forwardRef，应该使用最新的写法</p>
+
+                </div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

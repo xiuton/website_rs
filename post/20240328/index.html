@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React中使用Immer编写简洁的更新逻辑 - 干徒</title>
+    <meta name="description" content="在 浅谈React中的mutation 一文中，突出表达了对象和数组类型的state，不宜直接修改原对象和数组，直接修改会制造一个mutation，并且无法触发React的重新渲染 在官方文档中提到一个库 Immer ，Immer 可以让我们直接修改对象和数组。 useImmer 需要先安装use-immer库 pnp">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="JavaScript, React, 前端, 技术">
+    <link rel="canonical" href="https://ganto.me/post/20240328">
+    <meta property="og:title" content="React中使用Immer编写简洁的更新逻辑 - 干徒">
+    <meta property="og:description" content="在 浅谈React中的mutation 一文中，突出表达了对象和数组类型的state，不宜直接修改原对象和数组，直接修改会制造一个mutation，并且无法触发React的重新渲染 在官方文档中提到一个库 Immer ，Immer 可以让我们直接修改对象和数组。 useImmer 需要先安装use-immer库 pnp">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/20240328">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="React中使用Immer编写简洁的更新逻辑 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="React中使用Immer编写简洁的更新逻辑 - 干徒">
+    <meta name="twitter:description" content="在 浅谈React中的mutation 一文中，突出表达了对象和数组类型的state，不宜直接修改原对象和数组，直接修改会制造一个mutation，并且无法触发React的重新渲染 在官方文档中提到一个库 Immer ，Immer 可以让我们直接修改对象和数组。 useImmer 需要先安装use-immer库 pnp">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"React中使用Immer编写简洁的更新逻辑","description":"在 浅谈React中的mutation 一文中，突出表达了对象和数组类型的state，不宜直接修改原对象和数组，直接修改会制造一个mutation，并且无法触发React的重新渲染 在官方文档中提到一个库 Immer ，Immer 可以让我们直接修改对象和数组。 useImmer 需要先安装use-immer库 pnp","url":"https://ganto.me/post/20240328","datePublished":"2024-03-28","dateModified":"2024-03-28","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"JavaScript, React, 前端, 技术","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-2a23876f5cfbaf78.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>React中使用Immer编写简洁的更新逻辑</h1>
+                <div class="prerender-meta">
+                    <span>2024-03-28</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">JavaScript</span><span class="blog-tag">React</span><span class="blog-tag">前端</span><span class="blog-tag">技术</span></div>
+                <div class="blog-content">
+<p>在 <a href="https://www.cnblogs.com/ganto/articles/18098638">浅谈React中的mutation</a> 一文中，突出表达了对象和数组类型的state，不宜直接修改原对象和数组，直接修改会制造一个mutation，并且无法触发React的重新渲染</p>
+<p>在官方文档中提到一个库 <a href="https://github.com/immerjs/use-immer">Immer</a> ，Immer 可以让我们直接修改对象和数组。</p>
+<h2><a href="#useimmer" aria-hidden="true" class="anchor" id="user-content-useimmer"></a>useImmer</h2>
+<p>需要先安装use-immer库</p>
+<pre><code class="language-sh">pnpm add use-immer -D
+
+</code></pre>
+<pre><code class="language-jsx">import { useImmer } from 'use-immer';
+
+export default function App() {
+  const [state, setState] = useImmer({
+    count: 0,
+    name: 'Joe'
+  })
+
+  const handleClick = () =&gt; {
+    setState(draft =&gt; {
+      draft.count += 1
+    })
+    console.log(state)
+  }
+
+  return (
+    &lt;div className=&quot;app&quot;&gt;
+      &lt;h1&gt;{state.count}&lt;/h1&gt;
+      &lt;h2&gt;{state.name}&lt;/h2&gt;
+      &lt;button onClick={handleClick}&gt;CLICK ME&lt;/button&gt;
+    &lt;/div&gt;
+  )
+}
+
+</code></pre>
+<h2><a href="#usestate" aria-hidden="true" class="anchor" id="user-content-usestate"></a>useState</h2>
+<pre><code class="language-jsx">import { useState } from 'react';
+
+export default function App() {
+  const [state, setState] = useState({
+    count: 0,
+    name: 'Joe'
+  })
+
+  const handleClick = () =&gt; {
+    setState(obj =&gt; {
+      obj.count += 1
+      return obj // setState的参数-匿名函数需要有返回值
+    })
+    console.log(state) // 此处的打印结果并非最新的state，但是依然能反应出state已被修改
+  }
+
+  return (
+    &lt;div className=&quot;app&quot;&gt;
+      &lt;h1&gt;{state.count}&lt;/h1&gt;
+      &lt;h2&gt;{state.name}&lt;/h2&gt;
+      &lt;button onClick={handleClick}&gt;CLICK ME&lt;/button&gt;
+    &lt;/div&gt;
+  )
+}
+
+</code></pre>
+
+                </div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

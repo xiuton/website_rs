@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>hexo-theme-heri主题开发简记 - 干徒</title>
+    <meta name="description" content="Heri介绍： 究极简洁的Hexo主题 展示站点 展示站点 下载Heri hexo-theme-heri 下载完整的Heri主题，拷贝到Hexo的主题文件夹下 引用Heri 在Hexo根配置文件中这样引用即可 theme: heri 根配置文件的其他必要配置 # Site title: Ganto # 网站名称 sub">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="">
+    <link rel="canonical" href="https://ganto.me/post/20210105">
+    <meta property="og:title" content="hexo-theme-heri主题开发简记 - 干徒">
+    <meta property="og:description" content="Heri介绍： 究极简洁的Hexo主题 展示站点 展示站点 下载Heri hexo-theme-heri 下载完整的Heri主题，拷贝到Hexo的主题文件夹下 引用Heri 在Hexo根配置文件中这样引用即可 theme: heri 根配置文件的其他必要配置 # Site title: Ganto # 网站名称 sub">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/20210105">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="hexo-theme-heri主题开发简记 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="hexo-theme-heri主题开发简记 - 干徒">
+    <meta name="twitter:description" content="Heri介绍： 究极简洁的Hexo主题 展示站点 展示站点 下载Heri hexo-theme-heri 下载完整的Heri主题，拷贝到Hexo的主题文件夹下 引用Heri 在Hexo根配置文件中这样引用即可 theme: heri 根配置文件的其他必要配置 # Site title: Ganto # 网站名称 sub">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"hexo-theme-heri主题开发简记","description":"Heri介绍： 究极简洁的Hexo主题 展示站点 展示站点 下载Heri hexo-theme-heri 下载完整的Heri主题，拷贝到Hexo的主题文件夹下 引用Heri 在Hexo根配置文件中这样引用即可 theme: heri 根配置文件的其他必要配置 # Site title: Ganto # 网站名称 sub","url":"https://ganto.me/post/20210105","datePublished":"2021-01-05","dateModified":"2021-01-05","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-2a23876f5cfbaf78.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>hexo-theme-heri主题开发简记</h1>
+                <div class="prerender-meta">
+                    <span>2021-01-05</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"></div>
+                <div class="blog-content">
+<h1><a href="#heri介绍" aria-hidden="true" class="anchor" id="user-content-heri介绍"></a>Heri介绍：</h1>
+<p>究极简洁的Hexo主题<br />
+<img src="https://heri.ganto.cn/ArticleResources/Hexo-Theme-Heri/heri.png" alt="预览图" /></p>
+<h2><a href="#展示站点" aria-hidden="true" class="anchor" id="user-content-展示站点"></a>展示站点</h2>
+<p><a href="https://heri.ganto.cn">展示站点</a></p>
+<h1><a href="#下载heri" aria-hidden="true" class="anchor" id="user-content-下载heri"></a>下载Heri</h1>
+<p><a href="https://github.com/ganto-cn/hexo-theme-heri/releases">hexo-theme-heri</a></p>
+<p>下载完整的Heri主题，拷贝到Hexo的主题文件夹下</p>
+<h1><a href="#引用heri" aria-hidden="true" class="anchor" id="user-content-引用heri"></a>引用Heri</h1>
+<p>在Hexo根配置文件中这样引用即可</p>
+<pre><code class="language-makefile">theme: heri
+
+</code></pre>
+<h1><a href="#根配置文件的其他必要配置" aria-hidden="true" class="anchor" id="user-content-根配置文件的其他必要配置"></a>根配置文件的其他必要配置</h1>
+<pre><code class="language-yaml"># Site
+title: Ganto # 网站名称
+subtitle: '但愿可以成为有趣的人' # 网站小标题，可为座右铭
+# URL
+url: https://www.baidu.cn # 网站链接
+root: / # 如无特殊，设置&quot;/&quot;即可
+
+</code></pre>
+<h1><a href="#主题配置文件的必要配置" aria-hidden="true" class="anchor" id="user-content-主题配置文件的必要配置"></a>主题配置文件的必要配置</h1>
+<pre><code class="language-yaml"># 网站icon
+favicon: /images/g.png # 网站的icon
+
+# 日期/时间格式
+time_format:
+  date_format: YYYY-MM-DD
+  time_format: HH:mm:ss
+  division: &quot;&quot; # 日期与时间中间的间隔，如：division: &quot;/&quot; ===&gt;&gt;&gt; 2020-20-20/20:20:20
+
+# 网站声明
+website_notice:
+  txt: 如果你需要“转载”、“引用”小站的文章，可以不需要作者同意，请务必标明出处和文章链接。 # 文章末尾处的声明文字
+
+</code></pre>
+<h1><a href="#代码高亮" aria-hidden="true" class="anchor" id="user-content-代码高亮"></a>代码高亮</h1>
+<p>如需代码高亮，请这样设置根配置文件</p>
+<pre><code class="language-vbnet">hljs: true
+
+</code></pre>
+<h1><a href="#图片预览插件" aria-hidden="true" class="anchor" id="user-content-图片预览插件"></a>图片预览插件</h1>
+<p><a href="https://fancyapps.com/">fancybox</a><br />
+<img src="https://heri.ganto.cn/ArticleResources/Hexo-Theme-Heri/0.jpg" alt="预览图" /></p>
+<h1><a href="#动效插件" aria-hidden="true" class="anchor" id="user-content-动效插件"></a>动效插件</h1>
+<p><a href="https://animate.style/">Animate.css</a></p>
+<h1><a href="#代码高亮-1" aria-hidden="true" class="anchor" id="user-content-代码高亮-1"></a>代码高亮</h1>
+<p><a href="https://highlightjs.org/">highlight</a><br />
+<img src="https://heri.ganto.cn/ArticleResources/Hexo-Theme-Heri/1.png" alt="预览图" /></p>
+<p>目及所见，皆是全部；化繁为简，只为高效。</p>
+<p>没错，这就是Heri的全部。</p>
+
+                </div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

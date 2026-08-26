@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实现一个丝滑的暗黑模式切换动画 - 干徒</title>
+    <meta name="description" content="体验： https://ganto.me 参考内容： 参考文章： https://juejin.cn/post/7269388083342082107 MDN： https://developer.mozilla.org/zh-CN/docs/Web/API/View_Transitions_API https://d">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Vue, 前端, 技术">
+    <link rel="canonical" href="https://ganto.me/post/20240102">
+    <meta property="og:title" content="实现一个丝滑的暗黑模式切换动画 - 干徒">
+    <meta property="og:description" content="体验： https://ganto.me 参考内容： 参考文章： https://juejin.cn/post/7269388083342082107 MDN： https://developer.mozilla.org/zh-CN/docs/Web/API/View_Transitions_API https://d">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/20240102">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="实现一个丝滑的暗黑模式切换动画 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="实现一个丝滑的暗黑模式切换动画 - 干徒">
+    <meta name="twitter:description" content="体验： https://ganto.me 参考内容： 参考文章： https://juejin.cn/post/7269388083342082107 MDN： https://developer.mozilla.org/zh-CN/docs/Web/API/View_Transitions_API https://d">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"实现一个丝滑的暗黑模式切换动画","description":"体验： https://ganto.me 参考内容： 参考文章： https://juejin.cn/post/7269388083342082107 MDN： https://developer.mozilla.org/zh-CN/docs/Web/API/View_Transitions_API https://d","url":"https://ganto.me/post/20240102","datePublished":"2024-01-02","dateModified":"2024-01-02","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Vue, 前端, 技术","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-2a23876f5cfbaf78.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>实现一个丝滑的暗黑模式切换动画</h1>
+                <div class="prerender-meta">
+                    <span>2024-01-02</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Vue</span><span class="blog-tag">前端</span><span class="blog-tag">技术</span></div>
+                <div class="blog-content">
+<blockquote>
+<p>体验：<a href="https://ganto.me">https://ganto.me</a></p>
+</blockquote>
+<blockquote>
+<p>参考内容：<br />
+参考文章：<a href="https://juejin.cn/post/7269388083342082107">https://juejin.cn/post/7269388083342082107</a><br />
+MDN：<a href="https://developer.mozilla.org/zh-CN/docs/Web/API/View_Transitions_API">https://developer.mozilla.org/zh-CN/docs/Web/API/View_Transitions_API</a> <a href="https://developer.mozilla.org/zh-CN/docs/Web/CSS/::view-transition-new">https://developer.mozilla.org/zh-CN/docs/Web/CSS/::view-transition-new</a></p>
+</blockquote>
+<p>实现方式就是利用vueuse将html元素动态添加class类名dark</p>
+<p>利用伪元素<code>::view-transition-old</code>以及<code>::view-transition-new</code>，如需了解这两个伪元素，请移步文章开头参考内容</p>
+<p>可以这样理解，调用<code>document.startViewTransition(() =&gt; { /* 修改html元素类名 */ })</code>方法时，在该方法的回调函数中，添加修改页面变化的代码；<br />
+这样伪元素<code>::view-transition-old</code>记录的就是修改之前的页面'截图'，而伪元素<code>::view-transition-new</code>是修改页面变化后的页面，然后是这两个伪元素进行的动画过渡</p>
+<p>如果你想快速在项目中添加该动画，请添加以下代码<br />
+*css</p>
+<pre><code class="language-css">html {
+  --g-tabbar-border: #c9c9c9;
+  --g-tabbar-item-after: #595959;
+  --g-about-link-border: #c9c9c9;
+  --g-about-link-hover: #374151;
+  --g-blog-bg-color: #d4d4d4;
+}
+html.dark {
+  --g-tabbar-border: #595959;
+  --g-tabbar-item-after: #fff;
+  --g-about-link-border: #374151;
+  --g-about-link-hover: #fff;
+  --g-blog-bg-color: #8a8a8a;
+}
+
+::view-transition-old(*) {
+  animation: none;
+}
+
+::view-transition-new(*) {
+  animation: clip .5s ease-in;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
+}
+
+html.dark::view-transition-old(*) {
+  animation: clip .5s ease-in reverse;
+}
+
+html.dark::view-transition-new(*) {
+  animation: none;
+}
+
+html.dark::view-transition-old(root) {
+  z-index: 9999;
+}
+
+html.dark::view-transition-new(root) {
+  z-index: 1;
+}
+
+@keyframes clip {
+  from {
+    clip-path: circle(0% at var(--x) var(--y));
+  }
+  to{
+    clip-path: circle(var(--r) at var(--x) var(--y));
+  }
+}
+
+</code></pre>
+<p><code>clip-path</code> css样式中的 <code>circle</code> 函数，第一个参数就是圆的半径，第二、三个参数是圆心坐标</p>
+<p>*js</p>
+<pre><code class="language-js">const changeBtn = (func, $eve) =&gt; {
+  const x = $eve.clientX
+  const y = $eve.clientY
+  // 计算鼠标点击位置距离视窗的最大圆半径
+  const endRadius = Math.hypot(
+    Math.max(x, innerWidth - x),
+    Math.max(y, innerHeight - y),
+  )
+  document.documentElement.style.setProperty('--x', x + 'px')
+  document.documentElement.style.setProperty('--y', y + 'px')
+  document.documentElement.style.setProperty('--r', endRadius + 'px')
+  // 判断浏览器是否支持document.startViewTransition
+  if (document.startViewTransition) {
+    // 如果支持就使用document.startViewTransition方法
+    document.startViewTransition(() =&gt; {
+      func.call() // 这里的函数是切换主题的函数，调用changeBtn函数时进行传入
+    })
+  } else {
+    // 如果不支持，就使用最原始的方式，切换主题
+    func.call()
+  }
+}
+
+</code></pre>
+<p>动画会用到鼠标点击按钮时的点击坐标</p>
+<p>如果你想快速测试，在添加css代码后，直接在浏览器控制台Console中运行以下代码测试</p>
+<p>*测试</p>
+<pre><code class="language-js">document.querySelector('html').setAttribute('style', '--r: 100px; --x: 100px; --y: 100px;')
+document.startViewTransition(() =&gt; {
+    document.querySelector('html').classList.toggle('dark')
+})
+
+</code></pre>
+<h1><a href="#完整案例" aria-hidden="true" class="anchor" id="user-content-完整案例"></a>完整案例</h1>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+  &lt;head&gt;
+    &lt;meta charset=&quot;UTF-8&quot; /&gt;
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot; /&gt;
+    &lt;title&gt;Document&lt;/title&gt;
+    &lt;style&gt;
+      html {
+        --bg-color: #000;
+        --text-color: #fff;
+      }
+      html.dark {
+        --bg-color: #fff;
+        --text-color: #000;
+      }
+
+      ::view-transition-old(*) {
+        animation: none;
+      }
+
+      ::view-transition-new(*) {
+        animation: clip 0.5s ease-in;
+      }
+
+      ::view-transition-old(root) {
+        z-index: 1;
+      }
+
+      ::view-transition-new(root) {
+        z-index: 9999;
+      }
+
+      html.dark::view-transition-old(*) {
+        animation: clip 0.5s ease-in reverse;
+      }
+
+      html.dark::view-transition-new(*) {
+        animation: none;
+      }
+
+      html.dark::view-transition-old(root) {
+        z-index: 9999;
+      }
+
+      html.dark::view-transition-new(root) {
+        z-index: 1;
+      }
+
+      @keyframes clip {
+        from {
+          clip-path: circle(0% at var(--x) var(--y));
+        }
+        to {
+          clip-path: circle(var(--r) at var(--x) var(--y));
+        }
+      }
+
+      /* 样式写法例子，使用css变量，可以实现动态切换主题 */
+      body {
+        background-color: var(--bg-color);
+        color: var(--text-color);
+      }
+    &lt;/style&gt;
+  &lt;/head&gt;
+  &lt;body&gt;
+    &lt;h1&gt;
+      test text
+    &lt;/h1&gt;
+    &lt;button id=&quot;btn&quot;&gt;changeTheme&lt;/button&gt;
+
+    &lt;script&gt;
+      // 主题切换函数
+      const changeTheme = () =&gt; {
+        document.querySelector('html').classList.toggle('dark')
+      }
+      const changeBtn = (func, $eve) =&gt; {
+        const x = $eve.clientX
+        const y = $eve.clientY
+        // 计算鼠标点击位置距离视窗的最大圆半径
+        const endRadius = Math.hypot(
+          Math.max(x, innerWidth - x),
+          Math.max(y, innerHeight - y),
+        )
+        document.documentElement.style.setProperty('--x', x + 'px')
+        document.documentElement.style.setProperty('--y', y + 'px')
+        document.documentElement.style.setProperty('--r', endRadius + 'px')
+        // 判断浏览器是否支持document.startViewTransition
+        if (document.startViewTransition) {
+          // 如果支持就使用document.startViewTransition方法
+          document.startViewTransition(() =&gt; {
+            func.call() // 这里的函数是切换主题的函数，调用changeBtn函数时进行传入
+          })
+        } else {
+          // 如果不支持，就使用最原始的方式，切换主题
+          func.call()
+        }
+      }
+      document.getElementById('btn').addEventListener('click', (e) =&gt; {
+        changeBtn(changeTheme, e)
+      })
+    &lt;/script&gt;
+  &lt;/body&gt;
+&lt;/html&gt;
+
+</code></pre>
+
+                </div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

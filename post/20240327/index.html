@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>浅谈React中的mutation - 干徒</title>
+    <meta name="description" content="官方文档： 保持组件纯粹 、 更新 state 中的对象 、 更新 state 中的数组 保持组件纯粹 这里说的纯粹也就是JS中的纯函数 那么，什么是纯函数？ 纯函数 通常具有如下特征（摘自React官网）： **只负责自己的任务。**它不会更改在该函数调用前就已存在的对象或变量。 **输入相同，则输出相同。**给定相">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="JavaScript, React, 技术">
+    <link rel="canonical" href="https://ganto.me/post/20240327">
+    <meta property="og:title" content="浅谈React中的mutation - 干徒">
+    <meta property="og:description" content="官方文档： 保持组件纯粹 、 更新 state 中的对象 、 更新 state 中的数组 保持组件纯粹 这里说的纯粹也就是JS中的纯函数 那么，什么是纯函数？ 纯函数 通常具有如下特征（摘自React官网）： **只负责自己的任务。**它不会更改在该函数调用前就已存在的对象或变量。 **输入相同，则输出相同。**给定相">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/20240327">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="浅谈React中的mutation - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="浅谈React中的mutation - 干徒">
+    <meta name="twitter:description" content="官方文档： 保持组件纯粹 、 更新 state 中的对象 、 更新 state 中的数组 保持组件纯粹 这里说的纯粹也就是JS中的纯函数 那么，什么是纯函数？ 纯函数 通常具有如下特征（摘自React官网）： **只负责自己的任务。**它不会更改在该函数调用前就已存在的对象或变量。 **输入相同，则输出相同。**给定相">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"浅谈React中的mutation","description":"官方文档： 保持组件纯粹 、 更新 state 中的对象 、 更新 state 中的数组 保持组件纯粹 这里说的纯粹也就是JS中的纯函数 那么，什么是纯函数？ 纯函数 通常具有如下特征（摘自React官网）： **只负责自己的任务。**它不会更改在该函数调用前就已存在的对象或变量。 **输入相同，则输出相同。**给定相","url":"https://ganto.me/post/20240327","datePublished":"2024-03-27","dateModified":"2024-03-27","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"JavaScript, React, 技术","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-2a23876f5cfbaf78.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>浅谈React中的mutation</h1>
+                <div class="prerender-meta">
+                    <span>2024-03-27</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">JavaScript</span><span class="blog-tag">React</span><span class="blog-tag">技术</span></div>
+                <div class="blog-content">
+<blockquote>
+<p>官方文档：<a href="https://zh-hans.react.dev/learn/keeping-components-pure">保持组件纯粹</a>、<a href="https://zh-hans.react.dev/learn/updating-objects-in-state">更新 state 中的对象</a>、<a href="https://zh-hans.react.dev/learn/updating-arrays-in-state">更新 state 中的数组</a></p>
+</blockquote>
+<h1><a href="#保持组件纯粹" aria-hidden="true" class="anchor" id="user-content-保持组件纯粹"></a>保持组件纯粹</h1>
+<p>这里说的纯粹也就是JS中的纯函数</p>
+<p>那么，什么是纯函数？</p>
+<p>纯函数 通常具有如下特征（摘自React官网）：</p>
+<ul>
+<li>**只负责自己的任务。**它不会更改在该函数调用前就已存在的对象或变量。</li>
+<li>**输入相同，则输出相同。**给定相同的输入，纯函数应总是返回相同的结果。</li>
+</ul>
+<p><em><strong>只负责自己的任务</strong></em> 简单点说就是不应该有任何副作用；<br />
+<em><strong>输入相同，则输出相同</strong></em> 就是字面意思，函数输入的参数相同的情况下，输出的内容一定是相同的；<br />
+函数满足以上两点，那么该函数就可以被成为<em><strong>纯函数</strong></em>。</p>
+<p>就如以下代码（官网示例进行简化）：</p>
+<pre><code class="language-jsx">function Recipe({ drinkers }) {
+  return (
+    &lt;ol&gt;    
+      &lt;li&gt;drinkers: {drinkers}&lt;/li&gt;
+      &lt;li&gt;drinkers: {drinkers}; 0.5 * drinkers: {0.5 * drinkers}&lt;/li&gt;
+      &lt;li&gt;0.5 * drinkers: {0.5 * drinkers}&lt;/li&gt;
+    &lt;/ol&gt;
+  );
+}
+
+export default function App() {
+  return (
+    &lt;section&gt;
+      &lt;Recipe drinkers={2} /&gt;
+      &lt;Recipe drinkers={4} /&gt;
+    &lt;/section&gt;
+  );
+}
+
+</code></pre>
+<p>以上代码中的<code>Recipe</code>组件就是一个纯粹的组件，因为<code>Recipe</code>函数是一个纯函数，在参数<code>drinkers</code>的值固定的情况下，那么<code>{drinkers}</code> <code>{0.5 * drinkers}</code>将永恒不变</p>
+<p>官网有这么一段话，强调组件应当保持纯粹：React 的渲染过程必须自始至终是纯粹的。组件应该只 返回 它们的 JSX，而不 改变 在渲染前，就已存在的任何对象或变量 — 这将会使它们变得不纯粹！<br />
+并且给出了反例：</p>
+<pre><code class="language-jsx">let guest = 0;
+
+function Cup() {
+  // Bad：正在更改预先存在的变量！
+  guest = guest + 1;
+  return &lt;h2&gt;Tea cup for guest #{guest}&lt;/h2&gt;;
+}
+
+export default function TeaSet() {
+  return (
+    &lt;&gt;
+      &lt;Cup /&gt;
+      &lt;Cup /&gt;
+      &lt;Cup /&gt;
+    &lt;/&gt;
+  );
+}
+
+</code></pre>
+<p><code>Cup</code>组件正在读写其外部声明的 guest 变量，多次调用该组件会产生不同的结果，而<code>Cup</code>组件的结果将变的无法预测</p>
+<p>React官网将这种 <code>组件改变了 预先存在的 变量的值</code> 的现象称为 突变（mutation）</p>
+<h1><a href="#更新-state-中的对象" aria-hidden="true" class="anchor" id="user-content-更新-state-中的对象"></a>更新 state 中的对象</h1>
+<p>在state中可以存放JavaScript中的任何值，这些值应该是不可变的（immutable），它们不能被改变或是只读的。</p>
+<p>如以下代码:</p>
+<pre><code class="language-jsx">const [count, setCount] = useState(0)
+setCount(1)
+
+</code></pre>
+<p>count从0到1，其本质是新创建了一个数字1覆盖掉了数字0，0本身并没有改变<br />
+如果你了解JS中的辟栈内，那么你应该了解，0和1并非是同一个变量，而是存在栈内存中的两个不相关的内存空间</p>
+<p>如果你了解了上面的内容，你大致也能猜到JS中的对象应该如何更新状态</p>
+<pre><code class="language-jsx">const [obj, setObj] = useState({name: &quot;张三&quot;, age: 19})
+const changeObj = () =&gt; {
+  obj.name = &quot;李四&quot;
+  setObj(obj)
+}
+
+</code></pre>
+<p>以上的代码对吗？很显然不对，在一开始就已经说过 在state中可以存放JavaScript中的任何值，这些值应该是不可变的（immutable），它们不能被改变或是只读的。</p>
+<p><code>obj.name = &quot;李四&quot;</code>这段代码就会制造一个<strong>mutation</strong></p>
+<p>如果运行以上代码，显然不会触发重新渲染，可以将其修改为以下代码</p>
+<pre><code class="language-jsx">const [obj, setObj] = useState({name: &quot;张三&quot;, age: 19})
+const changeObj = () =&gt; {
+  setObj({...obj, name: &quot;李四&quot;})
+}
+
+</code></pre>
+<p>现在一切完美</p>
+<h1><a href="#更新-state-中的数组" aria-hidden="true" class="anchor" id="user-content-更新-state-中的数组"></a>更新 state 中的数组</h1>
+<p>数组是特殊的对象，我们依然要在没有 mutation 的前提下更新数组<br />
+我们应该遵循一个原则，不改变原数组，要利用原数组产生一个新数组，进而利用新数组去修改状态</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>避免使用 (会改变原始数组)</th>
+<th>推荐使用 (会返回一个新数组）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>添加元素</td>
+<td>push，unshift</td>
+<td>concat，[...arr] 展开语法（<a href="https://zh-hans.react.dev/learn/updating-arrays-in-state#adding-to-an-array">例子</a>）</td>
+</tr>
+<tr>
+<td>删除元素</td>
+<td>pop，shift，splice</td>
+<td>filter，slice（<a href="https://zh-hans.react.dev/learn/updating-arrays-in-state#removing-from-an-array">例子</a>）</td>
+</tr>
+<tr>
+<td>替换元素</td>
+<td>splice，arr[i] = ... 赋值</td>
+<td>map（<a href="https://zh-hans.react.dev/learn/updating-arrays-in-state#replacing-items-in-an-array">例子</a>）</td>
+</tr>
+<tr>
+<td>排序</td>
+<td>reverse，sort</td>
+<td>先将数组复制一份（<a href="https://zh-hans.react.dev/learn/updating-arrays-in-state#making-other-changes-to-an-array">例子</a>）</td>
+</tr>
+</tbody>
+</table>
+
+                </div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

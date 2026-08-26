@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JavaScript闭包直接修改内部属性 - 干徒</title>
+    <meta name="description" content="事例代码 var o = (function() { var obj = { a: 1, b: 2, } return { get: function(k) { return obj[k] } } })() 说明 如上一段代码，在不改变原代码的情况下，修改obj对象中的a、b属性。 分析 代码使用了闭包，返回一个对象，">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="JavaScript, 技术">
+    <link rel="canonical" href="https://ganto.me/post/20231117-2">
+    <meta property="og:title" content="JavaScript闭包直接修改内部属性 - 干徒">
+    <meta property="og:description" content="事例代码 var o = (function() { var obj = { a: 1, b: 2, } return { get: function(k) { return obj[k] } } })() 说明 如上一段代码，在不改变原代码的情况下，修改obj对象中的a、b属性。 分析 代码使用了闭包，返回一个对象，">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/20231117-2">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="JavaScript闭包直接修改内部属性 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="JavaScript闭包直接修改内部属性 - 干徒">
+    <meta name="twitter:description" content="事例代码 var o = (function() { var obj = { a: 1, b: 2, } return { get: function(k) { return obj[k] } } })() 说明 如上一段代码，在不改变原代码的情况下，修改obj对象中的a、b属性。 分析 代码使用了闭包，返回一个对象，">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"JavaScript闭包直接修改内部属性","description":"事例代码 var o = (function() { var obj = { a: 1, b: 2, } return { get: function(k) { return obj[k] } } })() 说明 如上一段代码，在不改变原代码的情况下，修改obj对象中的a、b属性。 分析 代码使用了闭包，返回一个对象，","url":"https://ganto.me/post/20231117-2","datePublished":"2023-11-17","dateModified":"2023-11-17","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"JavaScript, 技术","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-2a23876f5cfbaf78.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>JavaScript闭包直接修改内部属性</h1>
+                <div class="prerender-meta">
+                    <span>2023-11-17</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">JavaScript</span><span class="blog-tag">技术</span></div>
+                <div class="blog-content">
+<h2><a href="#事例代码" aria-hidden="true" class="anchor" id="user-content-事例代码"></a>事例代码</h2>
+<pre><code class="language-js">var o = (function() {
+    var obj = {
+        a: 1,
+        b: 2,
+    }
+    return {
+        get: function(k) {
+            return obj[k]
+        }
+    }
+})()
+
+</code></pre>
+<h2><a href="#说明" aria-hidden="true" class="anchor" id="user-content-说明"></a>说明</h2>
+<p>如上一段代码，在不改变原代码的情况下，修改obj对象中的a、b属性。</p>
+<h2><a href="#分析" aria-hidden="true" class="anchor" id="user-content-分析"></a>分析</h2>
+<p>代码使用了闭包，返回一个对象，对象中有一个get函数，这个get函数只能通过<code>o.get('a')</code>的方式查看obj中的属性<br />
+如果想要直接修改是无法修改的</p>
+<p>所有对象都有一个原型链，该原型链继承自Object，Object上有一个<code>valueOf</code>属性，该属性为一个函数，执行可以返回对象自身</p>
+<pre><code class="language-js">var o = (function() {
+    var obj = {
+        a: 1,
+        b: 2,
+    }
+    return {
+        get: function(k) {
+            return obj[k]
+        }
+    }
+})()
+console.log(o.get('valueOf'))
+
+</code></pre>
+<p>如上代码，可以打印出来obj的valueOf结构了，直接执行<code>console.log(o.get('valueOf')())</code>，发现已经报错了，这里报错的原因是因为在执行valueOf的this指向错误。</p>
+<p>如下代码，演示this指向：</p>
+<pre><code class="language-js">const obj = Object.prototype.valueOf
+console.log(obj()) // 报错
+
+const obj = Object.prototype.valueOf()
+console.log(obj) // 可以获取Object对象
+
+</code></pre>
+<p>那么标志着这种方式行不通</p>
+<h2><a href="#突破" aria-hidden="true" class="anchor" id="user-content-突破"></a>突破</h2>
+<pre><code class="language-js">var o = (function() {
+    var obj = {
+        a: 1,
+        b: 2,
+    }
+    return {
+        get: function(k) {
+            return obj[k]
+        }
+    }
+})()
+
+Object.defineProperty(Object.prototype, 'xxx', {
+    get() {
+        return this
+    }
+})
+
+console.log(o.get('xxx'));
+
+</code></pre>
+<p>以上代码是在Object的原型上添加了一个xxx属性的访问器，因为是在Object的原型上，所以其他属性也可以读取xxx属性<br />
+Object原型上的xxx属性的访问器，返回了this，这里的this是只要哪个对象访问这个属性，this就指向哪个对象，这样就解决了this指向的问题</p>
+<p>当o.get('xxx')执行的时候，会触发o对象返回的get方法中返回的obj['xxx']，这里就相当于o中的obj访问了xxx属性，所以这里读取o.get('xxx')，但是obj身上没有xxx属性，就会读Object身上的xxx属性，就会触发xxx属性访问器中的get方法，那么this指向obj，也就是obj对象</p>
+<p>在此时我们就可以修改obj属性值了</p>
+<pre><code class="language-js">var o = (function() {
+    var obj = {
+        a: 1,
+        b: 2,
+    }
+    return {
+        get: function(k) {
+            return obj[k]
+        }
+    }
+})()
+
+Object.defineProperty(Object.prototype, 'xxx', {
+    get() {
+        return this
+    }
+})
+o.get('xxx').a = 100
+o.get('xxx').b = 200
+console.log(o.get('a'), o.get('b')); // 100 200
+
+</code></pre>
+<h2><a href="#如何避免这种情况" aria-hidden="true" class="anchor" id="user-content-如何避免这种情况"></a>如何避免这种情况</h2>
+<h3><a href="#判断对象属性是否存在" aria-hidden="true" class="anchor" id="user-content-判断对象属性是否存在"></a>判断对象属性是否存在</h3>
+<p>可以在读取obj的属性的时候加一个判断</p>
+<pre><code class="language-js">var o = (function() {
+    var obj = {
+        a: 1,
+        b: 2,
+    }
+    return {
+        get: function(k) {
+            if (obj.hasOwnProperty(k)) {
+                return obj[k]
+            }
+            return undefined
+        }
+    }
+})()
+
+Object.defineProperty(Object.prototype, 'xxx', {
+    get() {
+        return this
+    }
+})
+o.get('xxx').a = 100
+o.get('xxx').b = 200
+console.log(o.get('a'), o.get('b'));
+
+</code></pre>
+<p>这样处理后就无法读取xxx属性了，以为xxx属性不是obj身上存在的属性</p>
+<h3><a href="#将对象原型设置为null" aria-hidden="true" class="anchor" id="user-content-将对象原型设置为null"></a>将对象原型设置为null</h3>
+<pre><code class="language-js">var o = (function() {
+    var obj = {
+        a: 1,
+        b: 2,
+    }
+    Object.setPrototypeOf(obj, null)
+    return {
+        get: function(k) {
+            return obj[k]
+        }
+    }
+})()
+
+Object.defineProperty(Object.prototype, 'xxx', {
+    get() {
+        return this
+    }
+})
+o.get('xxx').a = 100
+o.get('xxx').b = 200
+console.log(o.get('a'), o.get('b'));
+
+</code></pre>
+<p>这样obj就不存在原型了，无法去Object身上读取xxx属性</p>
+
+                </div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

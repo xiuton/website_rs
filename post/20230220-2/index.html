@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>css常用场景 - 干徒</title>
+    <meta name="description" content="初始化样式 body, html, div, p, span, i, b, ul, ol li, input, img, video { padding: 0; margin: 0; box-sizing: border-box; } img { vertical-align: bottom; object-fit: ">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="前端">
+    <link rel="canonical" href="https://ganto.me/post/20230220-2">
+    <meta property="og:title" content="css常用场景 - 干徒">
+    <meta property="og:description" content="初始化样式 body, html, div, p, span, i, b, ul, ol li, input, img, video { padding: 0; margin: 0; box-sizing: border-box; } img { vertical-align: bottom; object-fit: ">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/20230220-2">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="css常用场景 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="css常用场景 - 干徒">
+    <meta name="twitter:description" content="初始化样式 body, html, div, p, span, i, b, ul, ol li, input, img, video { padding: 0; margin: 0; box-sizing: border-box; } img { vertical-align: bottom; object-fit: ">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"css常用场景","description":"初始化样式 body, html, div, p, span, i, b, ul, ol li, input, img, video { padding: 0; margin: 0; box-sizing: border-box; } img { vertical-align: bottom; object-fit: ","url":"https://ganto.me/post/20230220-2","datePublished":"2023-02-20","dateModified":"2023-02-20","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"前端","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-2a23876f5cfbaf78.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>css常用场景</h1>
+                <div class="prerender-meta">
+                    <span>2023-02-20</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">前端</span></div>
+                <div class="blog-content">
+<h1><a href="#初始化样式" aria-hidden="true" class="anchor" id="user-content-初始化样式"></a>初始化样式</h1>
+<pre><code class="language-css">body,
+html,
+div,
+p,
+span,
+i,
+b,
+ul,
+ol
+li,
+input,
+img,
+video {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+img {
+ vertical-align: bottom;
+ object-fit: cover;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+i {
+  font-style: normal;
+}
+
+.container {
+  width: 1200px;
+  margin: auto;
+  position: relative;
+}
+
+._row {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+</code></pre>
+<p><a href="https://gitee.com/ganto/css">Github仓库</a></p>
+<h1><a href="#清除浮动" aria-hidden="true" class="anchor" id="user-content-清除浮动"></a>清除浮动</h1>
+<p><strong>0、给父元素内部最后一个没有浮动的子标签设置clear:both</strong></p>
+<pre><code class="language-html">&lt;style&gt;
+  .box{
+    width: 500px;
+    background-color: red;
+  }
+  .child1{
+    width: 100px;
+    height: 100px;
+    background-color: green;
+    float: right;
+  }
+  .child2{
+    width: 100px;
+    height: 100px;
+    background-color: pink;
+    float: right;
+  }
+  .child3{
+    clear: both;
+  }
+&lt;/style&gt;
+
+&lt;div class=&quot;box&quot;&gt;
+  &lt;div class=&quot;child1&quot;&gt;盒子1&lt;/div&gt;
+  &lt;div class=&quot;child2&quot;&gt;盒子2&lt;/div&gt;
+  &lt;div class=&quot;child3&quot;&gt;你好呀&lt;/div&gt;
+&lt;/div&gt;
+
+</code></pre>
+<p><strong>1、给父元素内部添加一个空的子标签</strong></p>
+<pre><code class="language-html">&lt;style&gt;
+  .box{
+    width: 500px;
+    background-color: red;
+  }
+  .child1{
+    width: 100px;
+    height: 100px;
+    background-color: green;
+    float: right;
+  }
+  .child2{
+    width: 100px;
+    height: 100px;
+    background-color: pink;
+    float: right;
+  }
+
+  .clear{
+    clear: both;
+  }
+&lt;/style&gt;
+
+&lt;div class=&quot;box&quot;&gt;
+  &lt;div class=&quot;child1&quot;&gt;盒子1&lt;/div&gt;
+  &lt;div class=&quot;child2&quot;&gt;盒子2&lt;/div&gt;
+  &lt;div class=&quot;clear&quot;&gt;&lt;/div&gt;
+&lt;/div&gt;
+
+</code></pre>
+<p><strong>2、给父元素设置一个after伪类来代替空标签</strong></p>
+<pre><code class="language-html">&lt;style&gt;
+  .box{
+    width: 500px;
+    background-color: red;
+  }
+  .child1{
+    width: 100px;
+    height: 100px;
+    background-color: green;
+    float: right;
+  }
+  .child2{
+    width: 100px;
+    height: 100px;
+    background-color: pink;
+    float: right;
+  }
+
+  .clearfix::after{
+    content: &quot;&quot;;
+    display: block;
+    clear: both;
+  }
+&lt;/style&gt;
+
+&lt;div class=&quot;box&quot; class=&quot;clearfix&quot;&gt;
+  &lt;div class=&quot;child1&quot;&gt;盒子1&lt;/div&gt;
+  &lt;div class=&quot;child2&quot;&gt;盒子2&lt;/div&gt;
+&lt;/div&gt;
+
+</code></pre>
+<p><strong>3、给父元素设置overflow:hidden</strong></p>
+<pre><code class="language-html">&lt;style&gt;
+  .box{
+    width: 500px;
+    background-color: red;
+    overflow: hidden;
+  }
+  .child1{
+    width: 100px;
+    height: 100px;
+    background-color: green;
+    float: right;
+  }
+  .child2{
+    width: 100px;
+    height: 100px;
+    background-color: pink;
+    float: right;
+  }
+&lt;/style&gt;
+
+&lt;div class=&quot;box&quot;&gt;
+  &lt;div class=&quot;child1&quot;&gt;盒子1&lt;/div&gt;
+  &lt;div class=&quot;child2&quot;&gt;盒子2&lt;/div&gt;
+&lt;/div&gt;
+
+</code></pre>
+<p>BFC块级格式话上下文</p>
+<p>overflow:hidden;属性就可以触发BFC规则去渲染页面</p>
+<p>BFC规则有：浮动的元素也参与运算高度</p>
+<h1><a href="#图片不变形" aria-hidden="true" class="anchor" id="user-content-图片不变形"></a>图片不变形</h1>
+<pre><code class="language-css">object-fit: contain;
+
+</code></pre>
+<h1><a href="#固定背景图片" aria-hidden="true" class="anchor" id="user-content-固定背景图片"></a>固定背景图片</h1>
+<p>将背景图片在视口内固定。</p>
+<pre><code class="language-css">background-attachment: fixed;
+
+</code></pre>
+<h1><a href="#提高权限" aria-hidden="true" class="anchor" id="user-content-提高权限"></a>提高权限</h1>
+<p>通过添加<code>!important</code>的方式提高权限</p>
+<pre><code class="language-css">box{
+  background-color: '#ff0000 !important';
+}
+
+</code></pre>
+<h1><a href="#flex布局对调" aria-hidden="true" class="anchor" id="user-content-flex布局对调"></a>flex布局对调</h1>
+<p>见名知意，就是flex布局左右对调。</p>
+<pre><code class="language-css">display: flex;
+flex-flow: row-reverse;
+
+</code></pre>
+<h1><a href="#last-childafter" aria-hidden="true" class="anchor" id="user-content-last-childafter"></a>:last-child::after</h1>
+<pre><code class="language-css">.item::after {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 24px;
+  background-color: #fff;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  margin-top: -12px;
+}
+.item:last-child::after{
+  background-color: transparent;
+}
+
+</code></pre>
+<h1><a href="#文字省略" aria-hidden="true" class="anchor" id="user-content-文字省略"></a>文字省略</h1>
+<pre><code class="language-css">.omit {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+</code></pre>
+<h1><a href="#white-space-pre" aria-hidden="true" class="anchor" id="user-content-white-space-pre"></a>white-space: pre;</h1>
+<p>保留原始格式</p>
+<pre><code class="language-css">div	{
+  white-space: pre;
+}
+
+</code></pre>
+<h1><a href="#bfc" aria-hidden="true" class="anchor" id="user-content-bfc"></a>BFC</h1>
+<h2><a href="#bfc简介" aria-hidden="true" class="anchor" id="user-content-bfc简介"></a>BFC简介</h2>
+<ul>
+<li>BFC是Block Formatting Context(块级格式上下文)，可以理解成元素的一个“特异功能”。</li>
+<li>该“特异功能”，在默认的情况下处于关闭状态；当元素满足了某些条件后，该“特异功能”被激活。</li>
+<li>所谓“特异功能”，专业点说就是：该元素创建了BFC（又称：开启了BFC）</li>
+</ul>
+<h2><a href="#开启bfc能解决什么问题" aria-hidden="true" class="anchor" id="user-content-开启bfc能解决什么问题"></a>开启BFC能解决什么问题</h2>
+<ul>
+<li>元素开启BFC后，其子元素不会再产生margin塌陷问题</li>
+<li>元素开启BFC后，自己不会被其他浮动元素所覆盖</li>
+<li>元素开启BFC后，就算其子元素浮动，元素自身高度也不会塌陷</li>
+</ul>
+<h2><a href="#如何开启bfc" aria-hidden="true" class="anchor" id="user-content-如何开启bfc"></a>如何开启BFC</h2>
+<ul>
+<li>根元素（html元素天生就开启了BFC）</li>
+<li>浮动的元素（设置float属性）</li>
+<li>绝对定位、固定定位的元素（position属性，属性值需要是absolute、fixed）</li>
+<li>行内块元素（display: inline-block）</li>
+<li>表格单元格：<code>table</code>、<code>thead</code>、<code>tbody</code>、<code>tfoot</code>、<code>th</code>、<code>td</code>、<code>tr</code>、<code>caption</code>（display: table）</li>
+<li><code>overflow</code>的值不为<code>visible</code>的块元素（overflow: auto）</li>
+<li>伸缩项目 （给其需要开启BFC的父元素设置，display: flex）</li>
+<li>多列容器（设置column-count: 1）</li>
+<li><code>column-span</code>为<code>all</code>的元素（即使该元素没有包裹在多列容器中）</li>
+<li><code>display</code>的值，设置为<code>flow-root</code>(设置display: flow-root)</li>
+</ul>
+<p>**注意：**强调为常用</p>
+<p>子元素浮动问题，导致父元素高度坍塌，依然可以使用BFC来解决，另一种方式就是<a href="#%E6%B8%85%E9%99%A4%E6%B5%AE%E5%8A%A8">清除浮动</a></p>
+<h1><a href="#css权重" aria-hidden="true" class="anchor" id="user-content-css权重"></a>CSS权重</h1>
+<blockquote>
+<p>权重计算规则<br />
+第一等：代表内联样式，如: <code>style=&quot;&quot;</code>，权值为<strong>1000</strong>。<br />
+第二等：代表ID选择器，如：<code>#content</code>，权值为<strong>0100</strong>。<br />
+第三等：代表类，伪类和属性选择器，如<code>.content</code>，权值为<strong>0010</strong>。<br />
+第四等：代表类型选择器和伪元素选择器，如<code>div p</code>，权值为<strong>0001</strong>。<br />
+通配符、子选择器、相邻选择器等的。如<code>*、&gt;、+</code>,权值为<strong>0000</strong>。<br />
+继承的样式没有权值。</p>
+</blockquote>
+<h1><a href="#选择父元素" aria-hidden="true" class="anchor" id="user-content-选择父元素"></a>选择父元素</h1>
+<p>语法：<code>body:has(.a) .item { color: #FF0000; }</code></p>
+<pre><code class="language-html">&lt;body&gt;
+  &lt;div class=&quot;items&quot;&gt;
+  	&lt;div class=&quot;item&quot;&gt;
+	  &lt;span class=&quot;is_has&quot;&gt;isHas&lt;/span&gt;
+	  &lt;p&gt;文字&lt;/p&gt;
+	&lt;/div&gt;
+	&lt;div class=&quot;item&quot;&gt;
+	  &lt;span class=&quot;not_has&quot;&gt;notHas&lt;/span&gt;
+	  &lt;p&gt;文字&lt;/p&gt;
+	&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/body&gt;
+
+</code></pre>
+<pre><code class="language-css">.items&gt;.item:has(.is_has)&gt;p{
+  color: #FF0000;
+}
+
+</code></pre>
+<h1><a href="#相邻兄弟选择器" aria-hidden="true" class="anchor" id="user-content-相邻兄弟选择器"></a>相邻兄弟选择器</h1>
+<pre><code class="language-html">&lt;body&gt;
+  &lt;span&gt;Java&lt;/span&gt;
+  &lt;span&gt;JavaScript&lt;/span&gt;
+  &lt;span&gt;Golang&lt;/span&gt;
+  &lt;span&gt;C&lt;/span&gt;
+&lt;/body&gt;
+
+</code></pre>
+<pre><code class="language-css">span+span::before{
+	content: &quot;、&quot;;
+}
+
+</code></pre>
+<p>以上写法的意思是选择每个 <code>span</code> 后边相邻的第一个<code>span</code> ，给其添加伪类 <code>before</code></p>
+<h1><a href="#黑白" aria-hidden="true" class="anchor" id="user-content-黑白"></a>黑白</h1>
+<pre><code class="language-css">filter: grayscale(1);
+
+</code></pre>
+<h1><a href="#文字内背景" aria-hidden="true" class="anchor" id="user-content-文字内背景"></a>文字内背景</h1>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+    &lt;meta charset=&quot;UTF-8&quot;&gt;
+    &lt;meta http-equiv=&quot;X-UA-Compatible&quot; content=&quot;IE=edge&quot;&gt;
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+    &lt;title&gt;Document&lt;/title&gt;
+    &lt;style&gt;
+        div{
+            font-weight: 900;
+            font-size: 100px;
+            background-image: url(./1.png);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div&gt;20%&lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+
+</code></pre>
+<h1><a href="#字体显示两行省略" aria-hidden="true" class="anchor" id="user-content-字体显示两行省略"></a>字体显示两行省略</h1>
+<pre><code class="language-css">p{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+</code></pre>
+<h1><a href="#字体背景图内嵌" aria-hidden="true" class="anchor" id="user-content-字体背景图内嵌"></a>字体背景图内嵌</h1>
+<pre><code class="language-css">h1{
+  	background-image: url(https://baidu.com/favicon.ico);
+    background-clip: text;
+    -webkit-background-clip: text;
+  	color: transparent;
+    -webkit-text-fill-color: transparent;
+}
+
+</code></pre>
+<h1><a href="#边框渐变" aria-hidden="true" class="anchor" id="user-content-边框渐变"></a>边框渐变</h1>
+<pre><code class="language-css">div {
+    width: 100px;
+    height: 50px;
+    border: 5px solid;
+    border-image: linear-gradient(to right, red, #fff000) 2;
+}
+
+</code></pre>
+<h1><a href="#等高" aria-hidden="true" class="anchor" id="user-content-等高"></a>等高</h1>
+<p>给父类添加这个属性</p>
+<pre><code class="language-css">display: grid;
+grid-auto-flow: column;
+
+</code></pre>
+<h2><a href="#swiper-row-等高" aria-hidden="true" class="anchor" id="user-content-swiper-row-等高"></a>swiper row 等高</h2>
+<p>只需要给子tiem添加<code>height: auto;</code>即可</p>
+<p><code>display: flex;</code>布局，如果需要子元素等高，给子元素设置<code>height: auto;</code></p>
+<p>确保<code>height</code>高度一致，请不要给父元素添加<code>align-items: flex-start;</code></p>
+<h1><a href="#meta标签重定向" aria-hidden="true" class="anchor" id="user-content-meta标签重定向"></a>meta标签重定向</h1>
+<pre><code class="language-html">&lt;meta http-equiv=&quot;refresh&quot; content=&quot;0; url=https://figmachina.com&quot;&gt;
+
+</code></pre>
+<h1><a href="#动态融合" aria-hidden="true" class="anchor" id="user-content-动态融合"></a>动态融合</h1>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;style&gt;
+        .contantBox {
+            filter: contrast(50);
+            background: black;
+            padding: 100px 0 0;
+            display: flex;
+        }
+        .item {
+            width: 50px;
+            height: 50px;
+            filter: blur(10px);
+            background: white;
+            animation: item 5s linear infinite;
+            margin-bottom: -25px;
+        }
+        @keyframes item {
+            0%{
+                transform: rotate(0deg);
+            }
+            100%{
+                transform: rotate(360deg);
+            }
+        }
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;div class=&quot;contantBox&quot;&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;item&quot;&gt;&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+
+</code></pre>
+<p>这里的背景颜色不能为白色，盒子不能为黑色，否则将失效</p>
+<h1><a href="#将a标签设置为不可点击" aria-hidden="true" class="anchor" id="user-content-将a标签设置为不可点击"></a>将a标签设置为不可点击</h1>
+<pre><code class="language-css">pointer-events: none;
+
+</code></pre>
+<h1><a href="#单词连接符" aria-hidden="true" class="anchor" id="user-content-单词连接符"></a>单词连接符</h1>
+<pre><code class="language-css">.text{
+    word-break: break-word;
+    -webkit-hyphens: auto;
+    -moz-hyphens: auto;
+    hyphens:auto;
+}
+
+</code></pre>
+<p>连接符要配合html属性lang一起使用，英文单词就必须设置lang为英文属性，德语单词就必须设置lang为德语的属性，否则单词连接符会有问题。</p>
+<h1><a href="#锚点滚动" aria-hidden="true" class="anchor" id="user-content-锚点滚动"></a>锚点滚动</h1>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;meta http-equiv=&quot;X-UA-Compatible&quot; content=&quot;IE=edge&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+  &lt;title&gt;Document&lt;/title&gt;
+  &lt;style&gt;
+    .box{
+      border: 1px solid red;
+      height: 100vh;
+      overflow:scroll;
+      scroll-behavior: smooth;
+    }
+    header{
+      width: 100%;
+      height: 500px;
+    }
+    main{
+      width: 100%;
+      height: 900px; 
+    }
+    footer{
+      width: 100%;
+      height: 500px;
+    }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;div class=&quot;box&quot;&gt;
+    &lt;header&gt;&lt;/header&gt;
+    &lt;main&gt;
+      &lt;h1 id=&quot;h1&quot;&gt;fjeiafjieoafjoeaf &lt;a href=&quot;#h1&quot;&gt;#h1&lt;/a&gt;&lt;/h1&gt;
+    &lt;/main&gt;
+    &lt;footer&gt;&lt;/footer&gt;
+  &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+
+</code></pre>
+<h1><a href="#滚动吸附" aria-hidden="true" class="anchor" id="user-content-滚动吸附"></a>滚动吸附</h1>
+<p>容器</p>
+<pre><code class="language-css">.container{
+    scroll-snap-type: x mandatory; /* 滚动方向，吸附方式 mandatory 强制吸附 */
+}
+.container .item{
+    scroll-snap-align: start; /* 吸附方式 */
+    scroll-snap-stop: always; /* 一项一项的滚动，不能跳过中间的项 */
+}
+
+</code></pre>
+<h1><a href="#遮罩层" aria-hidden="true" class="anchor" id="user-content-遮罩层"></a>遮罩层</h1>
+<p>将图片透明部分挖空</p>
+<pre><code class="language-html">&lt;div class=&quot;container&quot;&gt;
+    &lt;p&gt;
+        福建人道具佛饿啊哇建瓯放假哦饿啊我发金额就哦给人家而搜集哦感觉肉色机构金融二十感觉热分解二篇金佛破傲剑法静安分局
+    &lt;/p&gt;
+&lt;/div&gt;
+
+</code></pre>
+<pre><code class="language-css">.container{
+    -webkit-mask: url(https://jp.puprime.com/wp-content/themes/puprime_new/images/home_awards_item3.webp?v=4) repeat;
+    -webkit-mask-image: linear-gradient(top, right, #000, #000 13%, transparent 13%, transparent 82%, #000 82%), url(./mask.svg);
+    -webkit-mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+}
+
+</code></pre>
+<h1><a href="#css变量" aria-hidden="true" class="anchor" id="user-content-css变量"></a>css变量</h1>
+<pre><code class="language-css">:root{
+    --background-color: red;
+}
+body{
+    background-color: var(--background-color, #fff)
+}
+
+</code></pre>
+<p>以上定义了一个css变量<code>--background-color: red;</code>，在<code>body</code>上通过<code>var(--background-color, #fff)</code>，var的第二个参数是默认值，如果<code>--background-color: red;</code>变量没有值，则会启动默认值。</p>
+<h1><a href="#反色" aria-hidden="true" class="anchor" id="user-content-反色"></a>反色</h1>
+<pre><code class="language-css">mix-blend-mode: difference;
+
+</code></pre>
+<h1><a href="#暗黑模式" aria-hidden="true" class="anchor" id="user-content-暗黑模式"></a>暗黑模式</h1>
+<p>根据系统颜色自动设置网页颜色</p>
+<pre><code class="language-css">html {
+    color-scheme: light dark;
+}
+
+</code></pre>
+<p>系统颜色媒体查询</p>
+<pre><code class="language-css">@media (prefers-color-scheme: dark) {
+    body {
+        background: #000000;
+        color: #ffffff;
+    }
+}
+@media (prefers-color-scheme: light) {
+    body {
+        background: #ffffff;
+        color: #000000;
+    }
+}
+
+</code></pre>
+<pre><code class="language-css">@media (prefers-color-scheme: dark) {
+    :root {
+        --background: #000000;
+        --color: #ffffff;
+    }
+}
+@media (prefers-color-scheme: light) {
+    :root {
+        --background: #ffffff;
+        --color: #000000;
+    }
+}
+body {
+    background-color: var(--background);
+    color: var(--color);
+}
+
+</code></pre>
+<p>css可以有媒体查询检测系统颜色，那么js当然也有检测系统颜色的方式</p>
+<pre><code class="language-js">const themeMedia = window.matchMedia(&quot;(prefers-color-scheme: light)&quot;);
+if (themeMedia.matches) {
+    console.log(&quot;light&quot;)
+} else {
+    console.log(&quot;dark&quot;)
+}
+
+</code></pre>
+<p>js不仅可以检测系统颜色，还可以检测系统颜色的变化</p>
+<pre><code class="language-js">const themeMedia = window.matchMedia(&quot;(prefers-color-scheme: light)&quot;);
+themeMedia.addListener(e =&gt; {
+    if (e.matches) {
+        console.log(&quot;light&quot;);
+    } else {
+        console.log(&quot;dark&quot;);
+    }
+});
+
+</code></pre>
+<p>应用</p>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot; data-theme=&quot;auto&quot;&gt;
+&lt;head&gt;
+    &lt;meta charset=&quot;UTF-8&quot;&gt;
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+    &lt;title&gt;Document&lt;/title&gt;
+    &lt;style&gt;
+        [data-theme=light] {
+            --background: #ffffff;
+            --color: #000000;
+        }
+        [data-theme=dark] {
+            --background: #000000;
+            --color: #ffffff;
+        }
+        body {
+            background-color: var(--background);
+            color: var(--color);
+        }
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;p&gt;ABCabc123你好&lt;/p&gt;
+    &lt;script&gt;
+        const initThemeMedia = window.matchMedia(&quot;(prefers-color-scheme: light)&quot;);
+        if (initThemeMedia.matches) {
+            console.log(&quot;light&quot;)
+            document.querySelector(&quot;html&quot;).setAttribute(&quot;data-theme&quot;, &quot;light&quot;)
+        } else {
+            console.log(&quot;dark&quot;)
+            document.querySelector(&quot;html&quot;).setAttribute(&quot;data-theme&quot;, &quot;dark&quot;)
+        }
+        const themeMedia = window.matchMedia(&quot;(prefers-color-scheme: light)&quot;);
+        themeMedia.addListener(e =&gt; {
+            if (e.matches) {
+                console.log(&quot;light&quot;);
+                document.querySelector(&quot;html&quot;).setAttribute(&quot;data-theme&quot;, &quot;light&quot;)
+            } else {
+                console.log(&quot;dark&quot;);
+                document.querySelector(&quot;html&quot;).setAttribute(&quot;data-theme&quot;, &quot;dark&quot;)
+            }
+        });
+    &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+
+</code></pre>
+<h1><a href="#字体渐变" aria-hidden="true" class="anchor" id="user-content-字体渐变"></a>字体渐变</h1>
+<pre><code class="language-css">p {
+	background: -webkit-linear-gradient(left,#D008FF 2.56%,#05F3F3 100%);
+    background: -moz-linear-gradient(left,#D008FF 2.56%,#05F3F3 100%);
+    background: linear-gradient(90deg,#D008FF 2.56%,#05F3F3 100%);
+    -webkit-background-clip: text;
+    background-clip: text;    
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+}
+
+</code></pre>
+<h1><a href="#字体背景图" aria-hidden="true" class="anchor" id="user-content-字体背景图"></a>字体背景图</h1>
+<pre><code class="language-css">p {
+    background-image: url(https://baidu.com/favicon.ico);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+}
+
+</code></pre>
+<h1><a href="#css透明图片阴影效果" aria-hidden="true" class="anchor" id="user-content-css透明图片阴影效果"></a>css透明图片阴影效果</h1>
+<pre><code class="language-css">filter: drop-shadow(0 0 10px #000);
+
+</code></pre>
+<p><code>filter: drop-shadow(0 0 10px #000);</code>属性是只给图片的可视区域（像素点）添加阴影效果，透明部分不添加</p>
+<p>而<code>box-shadow</code>，会给整个盒子做阴影</p>
+<h1><a href="#去除移动端点击蓝色背景" aria-hidden="true" class="anchor" id="user-content-去除移动端点击蓝色背景"></a>去除移动端点击蓝色背景</h1>
+<pre><code class="language-css">body{ -webkit-tap-highlight-color: transparent; }
+
+</code></pre>
+<h1><a href="#去除safari浏览器-输入框右侧的icon" aria-hidden="true" class="anchor" id="user-content-去除safari浏览器-输入框右侧的icon"></a>去除safari浏览器 输入框右侧的icon</h1>
+<pre><code class="language-css">input::-webkit-credentials-auto-fill-button{ display: none !important; visibility: hidden; pointer-events: none; position: absolute; right: 0; } /* 去除密码icon */
+input::-webkit-contacts-auto-fill-button{ display: none !important; visibility: hidden; pointer-events: none; position: absolute; right: 0; } /* 去除用户名icon */
+
+</code></pre>
+<h1><a href="#css边界碰撞检测" aria-hidden="true" class="anchor" id="user-content-css边界碰撞检测"></a>CSS边界，碰撞检测</h1>
+<p>利用css动画的反转进行实现</p>
+<p>唯一的缺点就是，在不同大小的窗口，无法控制速度保持一致</p>
+<pre><code class="language-css">.box {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: red;
+  position: absolute;
+  left: 0;
+  top: 0;
+  animation: hor 1.6s infinite linear alternate, ver 0.5s infinite linear alternate;
+}
+@keyframes hor {
+  to {
+    left: calc(100vw - 50px);
+  }
+}
+@keyframes ver {
+  to {
+    top: calc(100vh - 50px);
+  }
+  
+}
+
+</code></pre>
+<h1><a href="#行盒换行边框背景被截断问题" aria-hidden="true" class="anchor" id="user-content-行盒换行边框背景被截断问题"></a>行盒换行边框/背景被截断问题</h1>
+<p><img src="images/css%E5%B8%B8%E7%94%A8%E5%9C%BA%E6%99%AF_images/image-20231202151605893.png" alt="image-20231202151605893" /></p>
+<pre><code class="language-css">span {
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
+</code></pre>
+<p><img src="images/css%E5%B8%B8%E7%94%A8%E5%9C%BA%E6%99%AF_images/image-20231202151548317.png" alt="image-20231202151548317" /></p>
+<h1><a href="#容器查询" aria-hidden="true" class="anchor" id="user-content-容器查询"></a>容器查询</h1>
+<p>区别于媒体查询，媒体查询是相对于浏览器视口进行工作的</p>
+<p>而容器查询是相对于元素进行工作，区别于媒体查询，可以直接设置，而容器查询需要设置父元素的container属性，以配合@container进行使用，只有设置了container属性的子元素才能有效果。</p>
+<p>container是整合写法，可以分开写container-type、container-name等</p>
+<p><code>container: layout / inline-size;</code>等同于<code>container-name: layout; container-type: inline-size;</code></p>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+  &lt;title&gt;Document&lt;/title&gt;
+  &lt;style&gt;
+    .box {
+      display: flex;
+      &amp; .item {
+        flex: 1;
+        container: layout / inline-size;
+        &amp;:nth-child(odd) {
+          background-color: #c9c9c9;
+        }
+      }
+    }
+    @media (max-width: 768px) {
+      .box {
+        &amp; .item {
+          &amp;:nth-child(odd) {
+            background-color: transparent;
+          }
+          &amp;:nth-child(even) {
+            background-color: #c9c9c9;
+          }
+        }
+      }
+    }
+    @container (max-width: 100px) {
+      .box {
+        border: 1px solid rgb(0, 255, 94);
+        &amp; .item {
+          border: 1px solid rgb(0, 55, 255);
+          &amp; span {
+            border: 1px solid red;
+            color: red;
+            box-decoration-break: clone;
+            -webkit-box-decoration-break: clone;
+          }
+        }
+      }
+    }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;div class=&quot;box&quot;&gt;
+    &lt;div class=&quot;item&quot;&gt;&lt;span&gt;This is an example text. No.1&lt;/span&gt;&lt;/div&gt;
+    &lt;div class=&quot;item&quot;&gt;&lt;span&gt;This is an example text. No.2&lt;/span&gt;&lt;/div&gt;
+    &lt;div class=&quot;item&quot;&gt;&lt;span&gt;This is an example text. No.3&lt;/span&gt;&lt;/div&gt;
+    &lt;div class=&quot;item&quot;&gt;&lt;span&gt;This is an example text. No.4&lt;/span&gt;&lt;/div&gt;
+    &lt;div class=&quot;item&quot;&gt;&lt;span&gt;This is an example text. No.5&lt;/span&gt;&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+
+</code></pre>
+<p><code>container-type</code>是定义查询模式</p>
+<p><code>container-name</code>定义容器名，有多个容器查询时，可以用于区分</p>
+<pre><code class="language-css">div.layout_box { container-name: layout; }
+div.xxx_box { container-name: xxx; }
+@container layout (max-width: 100px) {...}
+@container xxx (max-width: 200px) {...}
+
+</code></pre>
+<h2><a href="#字体大小根据容器变化" aria-hidden="true" class="anchor" id="user-content-字体大小根据容器变化"></a>字体大小根据容器变化</h2>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;title&gt;Hello React&lt;/title&gt;
+  &lt;style&gt;
+    div {
+      width: 500px;
+      height: 300px;
+      resize: both;
+      overflow: hidden;
+      background-color: rebeccapurple;
+      container: xxx / inline-size;
+    }
+    div p {
+      font-size: 5cqw;
+    }
+  &lt;/style&gt;
+&lt;/head&gt;
+
+&lt;body&gt;
+  &lt;div&gt;
+    &lt;p&gt;
+      道可道，非常道。名可名，非常名。无名天地之始，有名万物之母。故常无欲以观其妙，以观其徼。此两者，同出而异名，同谓之玄。玄之又玄，众妙之门。
+    &lt;/p&gt;
+  &lt;/div&gt;
+&lt;/body&gt;
+
+&lt;/html&gt;
+
+</code></pre>
+<h1><a href="#容器适应内容" aria-hidden="true" class="anchor" id="user-content-容器适应内容"></a>容器适应内容</h1>
+<pre><code class="language-css">p {
+    width: fit-content;
+}
+
+</code></pre>
+<h1><a href="#css实现进度条" aria-hidden="true" class="anchor" id="user-content-css实现进度条"></a>css实现进度条</h1>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;title&gt;Hello&lt;/title&gt;
+  &lt;style&gt;
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      position: relative;
+      background-image: linear-gradient(
+        to right top,
+        #409eff 50%,
+        #0003 50%
+      );
+      background-size: 100% calc(100% - 100vh + 5px);
+      background-repeat: no-repeat;
+      z-index: 1;
+    }
+    body::after {
+      content: &quot;&quot;;
+      position: fixed;
+      top: 5px;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ff0000;
+      z-index: -1;
+    }
+    .ball {
+      width: 100%;
+      height: 2000px;
+
+    }
+  &lt;/style&gt;
+&lt;/head&gt;
+
+&lt;body&gt;
+  &lt;div class=&quot;ball&quot;&gt;
+    123123
+  &lt;/div&gt;
+&lt;/body&gt;
+
+&lt;/html&gt;
+
+</code></pre>
+<h1><a href="#背景颜色混合模式" aria-hidden="true" class="anchor" id="user-content-背景颜色混合模式"></a>背景颜色混合模式</h1>
+<p>默认css中，多背景颜色或者多背景图，只能显示一个，有个属性可以进行多个背景颜色或者背景图片混合显示</p>
+<pre><code class="language-css">div {
+  background-color: #ff0000;
+  background-image: url(&quot;https://files.cevno.cn/files/Sunlight_Cloud_Beach_Coast_Seashore_Hills_Iceland_5K_1920x1080.jpg&quot;);
+  background-size: cover;
+  background-position: center;
+  background-blend-mode: darken;
+}
+
+</code></pre>
+<h1><a href="#页面滚动阻尼效果" aria-hidden="true" class="anchor" id="user-content-页面滚动阻尼效果"></a>页面滚动阻尼效果</h1>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;title&gt;Hello React&lt;/title&gt;
+  &lt;style&gt;
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-color: #171717;
+    }
+    img {
+      width: 40rem;
+      margin-bottom: 5rem;
+      pointer-events: none;
+      user-select: none;
+    }
+    .scrollbox {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      flex-shrink: 0;
+      transition: 1.15s ease;
+    }
+    .viewbox {
+      position: fixed;
+      top: 0;
+      display: flex;
+      align-items: flex-start;
+      width: 100vw;
+      height: 100vh;
+    }
+  &lt;/style&gt;
+&lt;/head&gt;
+
+&lt;body&gt;
+  &lt;div class=&quot;viewbox&quot;&gt;
+    &lt;div class=&quot;scrollbox&quot;&gt;
+      &lt;img src=&quot;http://files.cevno.cn/files/骰子游戏黑黄点-微距摄影壁纸壁纸_1920x1080[10wallpaper.com].jpg&quot; alt=&quot;&quot;&gt;
+      &lt;img src=&quot;http://files.cevno.cn/files/窗口，可爱，宠物，猫，特写，照片壁纸_1920x1080[10wallpaper.com].jpg&quot; alt=&quot;&quot;&gt;
+      &lt;img src=&quot;http://files.cevno.cn/files/小米，Mix_3，抽象，多彩，黑暗，桌面壁纸_1920x1080[10wallpaper.com].jpg&quot; alt=&quot;&quot;&gt;
+      &lt;img src=&quot;http://files.cevno.cn/files/Cheetah_Maasai_Mara_National_Reserve_Kenya_Bing_4K_1920x1080.jpg&quot; alt=&quot;&quot;&gt;
+      &lt;img src=&quot;http://files.cevno.cn/files/54.jpg&quot; alt=&quot;&quot;&gt;
+      &lt;img src=&quot;http://files.cevno.cn/files/43.jpg&quot; alt=&quot;&quot;&gt;
+      &lt;img src=&quot;http://files.cevno.cn/files/5.jpg&quot; alt=&quot;&quot;&gt;
+      &lt;img src=&quot;http://files.cevno.cn/files/12.jpg&quot; alt=&quot;&quot;&gt;
+      &lt;img src=&quot;http://files.cevno.cn/files/34.jpg&quot; alt=&quot;&quot;&gt;
+      &lt;img src=&quot;http://files.cevno.cn/files/41.jpg&quot; alt=&quot;&quot;&gt;
+      &lt;img src=&quot;http://files.cevno.cn/files/54.jpg&quot; alt=&quot;&quot;&gt;
+      &lt;img src=&quot;http://files.cevno.cn/files/64.jpg&quot; alt=&quot;&quot;&gt;
+      &lt;img src=&quot;http://files.cevno.cn/files/48.jpg&quot; alt=&quot;&quot;&gt;
+      &lt;img src=&quot;http://files.cevno.cn/files/49.jpg&quot; alt=&quot;&quot;&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;script&gt;
+    let scrollbox = document.querySelector('.scrollbox');
+    function resize_body() {
+      let height = scrollbox.offsetHeight;
+      console.log(height)
+      document.body.style.height = height + 'px';
+    }
+    function scroll() {
+      console.log(scrollY)
+      scrollbox.style.transform = 'translateY(' + -scrollY + 'px)';
+    }
+    window.addEventListener(&quot;scroll&quot;, scroll);
+    window.addEventListener(&quot;resize&quot;, resize_body);
+    window.addEventListener(&quot;load&quot;, resize_body);
+  &lt;/script&gt;
+&lt;/body&gt;
+
+&lt;/html&gt;
+
+</code></pre>
+<h1><a href="#字体根据背景颜色融合" aria-hidden="true" class="anchor" id="user-content-字体根据背景颜色融合"></a>字体根据背景颜色融合</h1>
+<pre><code class="language-js">p {
+    mix-blend-mode: difference;
+}
+
+</code></pre>
+<p><code>mix-blend-mode</code>属性的值有很多</p>
+
+                </div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

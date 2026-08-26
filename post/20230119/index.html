@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JavaScript中的事件冒泡与事件捕获 - 干徒</title>
+    <meta name="description" content="前言 Capture：事件捕获 Bubble：事件冒泡 如图所示，大致展示了事件冒泡和事件捕获的流程 可能还有点迷惑，无妨，继续往下看 事件冒泡展示 我们先创建一个嵌套的HTML结构 &amp;lt;div class=&amp;quot;div1&amp;quot;&amp;gt; &amp;lt;p&amp;gt;div1&amp;lt;/p&amp;gt; &amp;lt;div c">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="JavaScript">
+    <link rel="canonical" href="https://ganto.me/post/20230119">
+    <meta property="og:title" content="JavaScript中的事件冒泡与事件捕获 - 干徒">
+    <meta property="og:description" content="前言 Capture：事件捕获 Bubble：事件冒泡 如图所示，大致展示了事件冒泡和事件捕获的流程 可能还有点迷惑，无妨，继续往下看 事件冒泡展示 我们先创建一个嵌套的HTML结构 &amp;lt;div class=&amp;quot;div1&amp;quot;&amp;gt; &amp;lt;p&amp;gt;div1&amp;lt;/p&amp;gt; &amp;lt;div c">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/20230119">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="JavaScript中的事件冒泡与事件捕获 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="JavaScript中的事件冒泡与事件捕获 - 干徒">
+    <meta name="twitter:description" content="前言 Capture：事件捕获 Bubble：事件冒泡 如图所示，大致展示了事件冒泡和事件捕获的流程 可能还有点迷惑，无妨，继续往下看 事件冒泡展示 我们先创建一个嵌套的HTML结构 &amp;lt;div class=&amp;quot;div1&amp;quot;&amp;gt; &amp;lt;p&amp;gt;div1&amp;lt;/p&amp;gt; &amp;lt;div c">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"JavaScript中的事件冒泡与事件捕获","description":"前言 Capture：事件捕获 Bubble：事件冒泡 如图所示，大致展示了事件冒泡和事件捕获的流程 可能还有点迷惑，无妨，继续往下看 事件冒泡展示 我们先创建一个嵌套的HTML结构 &lt;div class=&quot;div1&quot;&gt; &lt;p&gt;div1&lt;/p&gt; &lt;div c","url":"https://ganto.me/post/20230119","datePublished":"2023-01-19","dateModified":"2023-01-19","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"JavaScript","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-2a23876f5cfbaf78.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>JavaScript中的事件冒泡与事件捕获</h1>
+                <div class="prerender-meta">
+                    <span>2023-01-19</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">JavaScript</span></div>
+                <div class="blog-content">
+<h2><a href="#前言" aria-hidden="true" class="anchor" id="user-content-前言"></a>前言</h2>
+<p>Capture：事件捕获
+Bubble：事件冒泡</p>
+<p><img src="/static/blog-images/JavaScript%E4%B8%AD%E7%9A%84%E4%BA%8B%E4%BB%B6%E5%86%92%E6%B3%A1%E4%B8%8E%E4%BA%8B%E4%BB%B6%E6%8D%95%E8%8E%B7_images/2229842-20241220165118171-411205481.png" alt="" />
+如图所示，大致展示了事件冒泡和事件捕获的流程</p>
+<p>可能还有点迷惑，无妨，继续往下看</p>
+<h2><a href="#事件冒泡展示" aria-hidden="true" class="anchor" id="user-content-事件冒泡展示"></a>事件冒泡展示</h2>
+<p>我们先创建一个嵌套的HTML结构</p>
+<pre><code class="language-html">&lt;div class=&quot;div1&quot;&gt;
+    &lt;p&gt;div1&lt;/p&gt;
+    &lt;div class=&quot;div2&quot;&gt;
+        &lt;p&gt;div2&lt;/p&gt;
+        &lt;button&gt;CLICK ME!&lt;/button&gt;
+    &lt;/div&gt;
+&lt;/div&gt;
+</code></pre>
+<p>并且为他们各自添加点击事件，并给window和document也添加上点击事件</p>
+<pre><code class="language-js">window.addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('Window');
+});
+document.addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('Document');
+});
+document.querySelector(&quot;.div1&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('DIV 1');
+});
+document.querySelector(&quot;.div2&quot;).addEventListener(&quot;click&quot;, () =&gt; { 
+  console.log('DIV 2');
+});
+document.querySelector(&quot;button&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('CLICK ME!');
+});
+</code></pre>
+<p>完整代码</p>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+  &lt;title&gt;Document&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;div class=&quot;div1&quot;&gt;
+    &lt;p&gt;div1&lt;/p&gt;
+    &lt;div class=&quot;div2&quot;&gt;
+        &lt;p&gt;div2&lt;/p&gt;
+        &lt;button&gt;CLICK ME!&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+  &lt;script&gt;
+    window.addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('Window');
+    });
+    document.addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('Document');
+    });
+    document.querySelector(&quot;.div1&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('DIV 1');
+    });
+    document.querySelector(&quot;.div2&quot;).addEventListener(&quot;click&quot;, () =&gt; { 
+      console.log('DIV 2');
+    });
+    document.querySelector(&quot;button&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('CLICK ME!');
+    });
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+<p>在点击<code>CLICK ME!</code>按钮的时候，可以在控制台看到打印结果</p>
+<pre><code>CLICK ME!
+DIV 2
+DIV 1
+Document
+Window
+</code></pre>
+<p>以上代码所绑定的所有点击事件，默认都是事件冒泡，所以事件触发会由内往外扩展</p>
+<h2><a href="#事件捕获展示" aria-hidden="true" class="anchor" id="user-content-事件捕获展示"></a>事件捕获展示</h2>
+<p>如上代码可知，默认绑定的事件会默认开始事件冒泡，如果想要开始事件捕获，可以通过事件绑定的第三个参数进行设置</p>
+<pre><code class="language-js">document.querySelector(&quot;button&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('CLICK ME!');
+}, true);
+</code></pre>
+<p>因为第三个参数如果不进行传入，则默认为false，也就是事件冒泡模式</p>
+<p>现在我们重新修改代码</p>
+<pre><code class="language-js">window.addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('Window');
+}, true);
+document.addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('Document');
+}, true);
+document.querySelector(&quot;.div1&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('DIV 1');
+}, true);
+document.querySelector(&quot;.div2&quot;).addEventListener(&quot;click&quot;, () =&gt; { 
+  console.log('DIV 2');
+}, true);
+document.querySelector(&quot;button&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('CLICK ME!');
+}, true);
+</code></pre>
+<p>完整代码</p>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+  &lt;title&gt;Document&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;div class=&quot;div1&quot;&gt;
+    &lt;p&gt;div1&lt;/p&gt;
+    &lt;div class=&quot;div2&quot;&gt;
+        &lt;p&gt;div2&lt;/p&gt;
+        &lt;button&gt;CLICK ME!&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+  &lt;script&gt;
+    window.addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('Window');
+    }, true);
+    document.addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('Document');
+    }, true);
+    document.querySelector(&quot;.div1&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('DIV 1');
+    }, true);
+    document.querySelector(&quot;.div2&quot;).addEventListener(&quot;click&quot;, () =&gt; { 
+      console.log('DIV 2');
+    }, true);
+    document.querySelector(&quot;button&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('CLICK ME!');
+    }, true);
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+<p>打印结果</p>
+<pre><code>Window
+Document
+DIV 1
+DIV 2
+CLICK ME!
+</code></pre>
+<p>这时再次触发<code>CLICK ME!</code>按钮的点击事件，发现打印结果反过来了</p>
+<p>因为这时已经是通过事件捕获进行了依次触发</p>
+<h2><a href="#事件冒泡和事件捕获混用" aria-hidden="true" class="anchor" id="user-content-事件冒泡和事件捕获混用"></a>事件冒泡和事件捕获混用</h2>
+<p>如果将两者混用会发生什么？
+依然会遵循两者的执行顺序</p>
+<pre><code class="language-js">window.addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('Window');
+}, true);
+document.addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('Document');
+}, true);
+document.querySelector(&quot;.div1&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('DIV 1');
+}, false);
+document.querySelector(&quot;.div2&quot;).addEventListener(&quot;click&quot;, () =&gt; { 
+  console.log('DIV 2');
+}, false);
+document.querySelector(&quot;button&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('CLICK ME!');
+}, true);
+</code></pre>
+<p>完整代码</p>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+  &lt;title&gt;Document&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;div class=&quot;div1&quot;&gt;
+    &lt;p&gt;div1&lt;/p&gt;
+    &lt;div class=&quot;div2&quot;&gt;
+        &lt;p&gt;div2&lt;/p&gt;
+        &lt;button&gt;CLICK ME!&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+  &lt;script&gt;
+    window.addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('Window');
+    }, true);
+    document.addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('Document');
+    }, true);
+    document.querySelector(&quot;.div1&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('DIV 1');
+    }, false);
+    document.querySelector(&quot;.div2&quot;).addEventListener(&quot;click&quot;, () =&gt; { 
+      console.log('DIV 2');
+    }, false);
+    document.querySelector(&quot;button&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('CLICK ME!');
+    }, true);
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+<p>打印结果</p>
+<pre><code>Window
+Document
+CLICK ME!
+DIV 2
+DIV 1
+</code></pre>
+<p>优先依次执行事件捕获，再从最内部开始依次事件冒泡</p>
+
+                </div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

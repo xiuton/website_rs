@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JavaScript 高阶函数之 reduce - 干徒</title>
+    <meta name="description" content="MDN： https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce 关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为 累加器 reduce常见用例如下： let ">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="JavaScript, Vue, 前端, 技术">
+    <link rel="canonical" href="https://ganto.me/post/20250220">
+    <meta property="og:title" content="JavaScript 高阶函数之 reduce - 干徒">
+    <meta property="og:description" content="MDN： https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce 关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为 累加器 reduce常见用例如下： let ">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/20250220">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="JavaScript 高阶函数之 reduce - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="JavaScript 高阶函数之 reduce - 干徒">
+    <meta name="twitter:description" content="MDN： https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce 关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为 累加器 reduce常见用例如下： let ">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"JavaScript 高阶函数之 reduce","description":"MDN： https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce 关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为 累加器 reduce常见用例如下： let ","url":"https://ganto.me/post/20250220","datePublished":"2025-02-20","dateModified":"2025-02-20","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"JavaScript, Vue, 前端, 技术","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-2a23876f5cfbaf78.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>JavaScript 高阶函数之 reduce</h1>
+                <div class="prerender-meta">
+                    <span>2025-02-20</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">JavaScript</span><span class="blog-tag">Vue</span><span class="blog-tag">前端</span><span class="blog-tag">技术</span></div>
+                <div class="blog-content">
+<blockquote>
+<p>MDN：<a href="https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce">https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce</a></p>
+</blockquote>
+<p>关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为<strong>累加器</strong></p>
+<p>reduce常见用例如下：</p>
+<pre><code class="language-js">let goods = [
+  { name: &quot;T恤&quot;, price: 99, count: 2 },
+  { name: &quot;polo衫&quot;, price: 120, count: 1 },
+  { name: &quot;牛仔裤&quot;, price: 197, count: 11 }
+]
+
+const goodsSum = goods.reduce((sum, item) =&gt; {
+  return sum + item.price * item.count;
+}, initSum = 0)
+
+console.log(goodsSum) // 2485
+
+</code></pre>
+<p>以上代码，我相信对于你那真是信手捏来...</p>
+<blockquote>
+<p>但是还是需要解释一下，reduce就是对goods数组中的每项的价格进行相加<br />
+reduce传递两个参数，第一个参数是一个回调函数，第二个参数是一个用于统计累加结果的初始值<br />
+reduce函数的第一个回调函数又有两个参数，第一个参数<code>sum</code>的初始状态等于reduce第二个参数<code>initSum</code>，在reduce执行完一次，第一个参数<code>sum</code>会变成reduce执行完返回的内容<br />
+reduce函数的第一个回调函数的第二个参数也就是goods数组中的每项<br />
+reduce执行次数与数组的长度有关</p>
+</blockquote>
+<p>在阅读vue官方文档的时候，发现了一段有趣的代码</p>
+<pre><code class="language-js">// plugins/i18n.js
+export default {
+  install: (app, options) =&gt; {
+    // 注入一个全局可用的 $translate() 方法
+    app.config.globalProperties.$translate = (key) =&gt; {
+      // 获取 `options` 对象的深层属性
+      // 使用 `key` 作为索引
+      return key.split('.').reduce((o, i) =&gt; {
+        if (o) return o[i]
+      }, options)
+    }
+  }
+}
+
+</code></pre>
+<p>以上代码是vue中定义一个插件的代码，有趣的是其中的reduce函数</p>
+<p>我们将代码进行精简</p>
+<pre><code class="language-js">let obj = {
+  greetings: {
+    hello: &quot;你好&quot;
+  }
+}
+
+const ret = &quot;greetings.hello&quot;.split('.').reduce((o, i) =&gt; {
+  if (o) {
+    return o[i]
+  }
+}, obj)
+
+console.log(ret)
+
+</code></pre>
+<p>以上代码是通过&quot;greetings.hello&quot;这段字符串，进而获取obj对象中的值</p>
+<p>以上代码<code>&quot;greetings.hello&quot;.split('.')</code> 就是数组 <code>[&quot;greetings&quot;, &quot;hello&quot;]</code></p>
+<p>reduce函数中的第一个回调函数中的第一个参数也就是<code>o</code>等于<code>obj</code>对象，第二个参数<code>i</code>变成了 <code>[&quot;greetings&quot;, &quot;hello&quot;]</code> 数组中的每项</p>
+<p>第一次执行 <code>o 是 {greetings: {hello: &quot;你好&quot;}}</code> <code>i 是 &quot;greetings&quot;</code> ，返回 <code>o[i] 也就是 {hello: &quot;你好&quot;}</code> 此时 <code>o 变成 {hello: &quot;你好&quot;}</code></p>
+<p>进入下一次reduce回调</p>
+<p>第二次执行 <code>o 是 {hello: &quot;你好&quot;}</code> <code>i 是 &quot;hello&quot;</code> ，返回 <code>o[i] 也就是 &quot;你好&quot;</code></p>
+<p>结束reduce</p>
+<p>返回 <code>&quot;你好&quot;</code></p>
+<p>啊？reduce函数还能这么用！</p>
+
+                </div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

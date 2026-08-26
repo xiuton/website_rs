@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Component - 干徒</title>
+    <meta name="description" content="原生Web Component的使用">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="JavaScript, Web Component">
+    <link rel="canonical" href="https://ganto.me/post/20230412">
+    <meta property="og:title" content="Web Component - 干徒">
+    <meta property="og:description" content="原生Web Component的使用">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/20230412">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Web Component - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Web Component - 干徒">
+    <meta name="twitter:description" content="原生Web Component的使用">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"Web Component","description":"原生Web Component的使用","url":"https://ganto.me/post/20230412","datePublished":"2023-04-12","dateModified":"2023-04-12","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"JavaScript, Web Component","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-2a23876f5cfbaf78.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>Web Component</h1>
+                <div class="prerender-meta">
+                    <span>2023-04-12</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">JavaScript</span><span class="blog-tag">Web Component</span></div>
+                <div class="blog-content">
+<p><a href="https://developer.mozilla.org/zh-CN/docs/Web/API/Web_components">Web Component MDN</a></p>
+<h2><a href="#例子1" aria-hidden="true" class="anchor" id="user-content-例子1"></a>例子1：</h2>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+  &lt;title&gt;Document&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;popup-info text=&quot;web components&quot; style=&quot;background-color: 50px;&quot;/&gt;
+
+  &lt;script&gt;
+    // Create a class for the element
+    class PopUpInfo extends HTMLElement {
+      constructor() {
+        // Always call super first in constructor
+        super();
+
+        // Create a shadow root
+        var shadow = this.attachShadow({ mode: &quot;open&quot; });
+
+        // Create spans
+        var wrapper = document.createElement(&quot;span&quot;);
+        wrapper.setAttribute(&quot;class&quot;, &quot;wrapper&quot;);
+        var icon = document.createElement(&quot;span&quot;);
+        icon.setAttribute(&quot;class&quot;, &quot;icon&quot;);
+        icon.setAttribute(&quot;tabindex&quot;, &quot;0&quot;);
+        var info = document.createElement(&quot;span&quot;);
+        info.setAttribute(&quot;class&quot;, &quot;info&quot;);
+
+        // Take attribute content and put it inside the info span
+        var text = this.getAttribute(&quot;text&quot;);
+        info.textContent = text;
+
+        // Insert icon
+        var imgUrl;
+        if (this.hasAttribute(&quot;img&quot;)) {
+          imgUrl = this.getAttribute(&quot;img&quot;);
+        } else {
+          imgUrl = &quot;https://baidu.com/favicon.ico&quot;;
+        }
+        var img = document.createElement(&quot;img&quot;);
+        img.style = `
+          width: 50px;
+          height: 50px;
+          border: 2px solid #f0f;
+          border-radius: 10px;
+        `
+        img.src = imgUrl;
+        icon.appendChild(img);
+
+        // Create some CSS to apply to the shadow dom
+        var style = document.createElement(&quot;style&quot;);
+
+        style.textContent = `
+          .wrapper {
+            position: relative;
+          }
+          
+          .info {
+            font-size: 0.8rem;
+            width: 200px;
+            display: inline-block;
+            border: 1px solid black;
+            padding: 10px;
+            background: white;
+            border-radius: 10px;
+            opacity: 0;
+            transition: 0.6s all;
+            position: absolute;
+            top: 20px;
+            left: 10px;
+            z-index: 3;
+          }
+          
+          img {
+            width: 20.2rem;
+          }
+          
+          .icon:hover + .info, .icon:focus + .info {
+            opacity: 1;
+          }
+        `;
+
+        // attach the created elements to the shadow dom
+
+        shadow.appendChild(style);
+        shadow.appendChild(wrapper);
+        wrapper.appendChild(icon);
+        wrapper.appendChild(info);
+      }
+    }
+
+    customElements.define(&quot;popup-info&quot;, PopUpInfo);
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+<h2><a href="#例子2" aria-hidden="true" class="anchor" id="user-content-例子2"></a>例子2：</h2>
+<p>这个例子使用了template标签的形式描述html结构，而不是如例子1那样，用纯js来描述html结构
+index.html</p>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+  &lt;meta charset=&quot;utf-8&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width&quot;&gt;
+  &lt;title&gt;JS Bin&lt;/title&gt;
+&lt;/head&gt;
+
+&lt;body&gt;
+  &lt;user-card image=&quot;https://semantic-ui.com/images/avatar2/large/kristy.png&quot; name=&quot;User Name&quot;
+    email=&quot;yourmail@some-email.com&quot;&gt;&lt;/user-card&gt;
+
+  &lt;template id=&quot;userCardTemplate&quot;&gt;
+    &lt;style&gt;
+      :host {
+        display: flex;
+        align-items: center;
+        width: 450px;
+        height: 180px;
+        background-color: #d4d4d4;
+        border: 1px solid #d5d5d5;
+        box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.1);
+        border-radius: 3px;
+        overflow: hidden;
+        padding: 10px;
+        box-sizing: border-box;
+        font-family: 'Poppins', sans-serif;
+      }
+
+      .image {
+        flex: 0 0 auto;
+        width: 160px;
+        height: 160px;
+        vertical-align: middle;
+        border-radius: 5px;
+      }
+
+      .container {
+        box-sizing: border-box;
+        padding: 20px;
+        height: 160px;
+      }
+
+      .container&gt;.name {
+        font-size: 20px;
+        font-weight: 600;
+        line-height: 1;
+        margin: 0;
+        margin-bottom: 5px;
+      }
+
+      .container&gt;.email {
+        font-size: 12px;
+        opacity: 0.75;
+        line-height: 1;
+        margin: 0;
+        margin-bottom: 15px;
+      }
+
+      .container&gt;.button {
+        padding: 10px 25px;
+        font-size: 12px;
+        border-radius: 5px;
+        text-transform: uppercase;
+      }
+    &lt;/style&gt;
+
+    &lt;img class=&quot;image&quot;&gt;
+    &lt;div class=&quot;container&quot;&gt;
+      &lt;p class=&quot;name&quot;&gt;&lt;/p&gt;
+      &lt;p class=&quot;email&quot;&gt;&lt;/p&gt;
+      &lt;button class=&quot;button&quot;&gt;Follow John&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/template&gt;
+
+  &lt;script src=&quot;./index.js&quot;&gt;&lt;/script&gt;
+&lt;/body&gt;
+
+&lt;/html&gt;
+</code></pre>
+<p>index.js</p>
+<pre><code class="language-js">class UserCard extends HTMLElement {
+  constructor() {
+    super();
+    var shadow = this.attachShadow( { mode: 'closed' } );
+    
+    var templateElem = document.getElementById('userCardTemplate');
+    var content = templateElem.content.cloneNode(true); // 这里克隆一个新的结构，而不是在原template节点上操作，因为确保原template不会变化，从而可以复用
+    content.querySelector('img').setAttribute('src', this.getAttribute('image'));
+    content.querySelector('.container&gt;.name').innerText = this.getAttribute('name');
+    content.querySelector('.container&gt;.email').innerText = this.getAttribute('email');
+
+    shadow.appendChild(content);
+  }
+}
+window.customElements.define('user-card', UserCard);
+</code></pre>
+<h2><a href="#说明" aria-hidden="true" class="anchor" id="user-content-说明"></a>说明</h2>
+<p><code>this.attachShadow( { mode: 'closed' } );</code> 这段代码是创建一个自定义元素
+<code>mode: 'closed'</code>表示自定义组件对外部不可见，即不能通过JavaScript访问，也不能通过外部CSS样式表来直接修改其内部元素的样式
+可选项为 <code>open</code>、<code>closed</code>，mode属性必须写</p>
+<h2><a href="#生命周期" aria-hidden="true" class="anchor" id="user-content-生命周期"></a>生命周期</h2>
+<table>
+<thead>
+<tr>
+<th>函数</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>connectedCallback</td>
+<td>自定义元素添加至页面。</td>
+</tr>
+<tr>
+<td>disconnectedCallback</td>
+<td>自定义元素从页面中移除。</td>
+</tr>
+<tr>
+<td>adoptedCallback</td>
+<td>自定义元素移动至新页面。</td>
+</tr>
+<tr>
+<td>attributeChangedCallback</td>
+<td>属性改变</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+  &lt;meta charset=&quot;utf-8&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width&quot;&gt;
+  &lt;title&gt;Web Component&lt;/title&gt;
+&lt;/head&gt;
+
+&lt;body&gt;
+  &lt;iframe id=&quot;iframe&quot; style=&quot;display: none;&quot; frameborder=&quot;0&quot;&gt;&lt;/iframe&gt;
+
+  &lt;my-com class=&quot;my-com&quot; data=&quot;123&quot;&gt;&lt;/my-com&gt;
+  &lt;button onclick=&quot;document.querySelector('.my-com').remove()&quot;&gt;移除组件&lt;/button&gt;
+  &lt;button onclick=&quot;move()&quot;&gt;移动到新页面&lt;/button&gt;
+  &lt;button onclick=&quot;document.querySelector('.my-com').setAttribute('data', '456')&quot;&gt;变更属性&lt;/button&gt;
+
+  &lt;script&gt;
+    function move() {
+      const iframeNode = document.querySelector('#iframe').contentDocument
+      console.dir(iframeNode, '===');
+      const myComNode = document.querySelector('.my-com')
+      iframeNode.body.appendChild(myComNode.cloneNode(true))
+
+      // document.querySelector('.my-com').remove()
+    }
+  &lt;/script&gt;
+  &lt;script src=&quot;./MyCom.js&quot;&gt;&lt;/script&gt;
+&lt;/body&gt;
+
+&lt;/html&gt;
+</code></pre>
+<pre><code class="language-js">class MyCom extends HTMLElement {
+  constructor() {
+    super();
+    var shadow = this.attachShadow({ mode: &quot;open&quot; });
+
+    const div = document.createElement(&quot;div&quot;)
+    div.innerHTML = &quot;123&quot;
+
+    shadow.appendChild(div)
+  }
+
+  static get observedAttributes() {
+    return ['data'];
+  }
+
+  connectedCallback() {
+    console.log(&quot;自定义元素添加至页面。&quot;);
+  }
+
+  disconnectedCallback() {
+    console.log(&quot;自定义元素从页面中移除。&quot;);
+  }
+
+  adoptedCallback() {
+    console.log(&quot;自定义元素移动至新页面。&quot;);
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    console.log(`属性 ${name} 已变更。 变更前 ${oldValue}, 变更后 ${newValue} 。`);
+  }
+}
+
+customElements.define(&quot;my-com&quot;, MyCom);
+</code></pre>
+
+                </div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

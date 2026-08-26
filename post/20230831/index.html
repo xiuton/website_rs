@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自定义Typora主题分享 - 干徒</title>
+    <meta name="description" content="Typora主题的开发主要就是编写css样式，将Typora的默认样式进行覆盖 介绍 Toxic主题没有特别之处，使用了 MiSans 字体，看着比较工整 预览 体验 下载主题包 github仓库地址 欢迎下载使用、修改、分享 安装步骤 先将主题代码down下来，目录文件结构如下，只需要 toxic.css 文件、 t">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="">
+    <link rel="canonical" href="https://ganto.me/post/20230831">
+    <meta property="og:title" content="自定义Typora主题分享 - 干徒">
+    <meta property="og:description" content="Typora主题的开发主要就是编写css样式，将Typora的默认样式进行覆盖 介绍 Toxic主题没有特别之处，使用了 MiSans 字体，看着比较工整 预览 体验 下载主题包 github仓库地址 欢迎下载使用、修改、分享 安装步骤 先将主题代码down下来，目录文件结构如下，只需要 toxic.css 文件、 t">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/20230831">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="自定义Typora主题分享 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="自定义Typora主题分享 - 干徒">
+    <meta name="twitter:description" content="Typora主题的开发主要就是编写css样式，将Typora的默认样式进行覆盖 介绍 Toxic主题没有特别之处，使用了 MiSans 字体，看着比较工整 预览 体验 下载主题包 github仓库地址 欢迎下载使用、修改、分享 安装步骤 先将主题代码down下来，目录文件结构如下，只需要 toxic.css 文件、 t">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"自定义Typora主题分享","description":"Typora主题的开发主要就是编写css样式，将Typora的默认样式进行覆盖 介绍 Toxic主题没有特别之处，使用了 MiSans 字体，看着比较工整 预览 体验 下载主题包 github仓库地址 欢迎下载使用、修改、分享 安装步骤 先将主题代码down下来，目录文件结构如下，只需要 toxic.css 文件、 t","url":"https://ganto.me/post/20230831","datePublished":"2023-08-31","dateModified":"2023-08-31","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-2a23876f5cfbaf78.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>自定义Typora主题分享</h1>
+                <div class="prerender-meta">
+                    <span>2023-08-31</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"></div>
+                <div class="blog-content">
+<p>Typora主题的开发主要就是编写css样式，将Typora的默认样式进行覆盖</p>
+<h1><a href="#介绍" aria-hidden="true" class="anchor" id="user-content-介绍"></a>介绍</h1>
+<p>Toxic主题没有特别之处，使用了<code>MiSans</code>字体，看着比较工整</p>
+<h1><a href="#预览" aria-hidden="true" class="anchor" id="user-content-预览"></a>预览</h1>
+<p><img src="https://img2023.cnblogs.com/blog/2229842/202308/2229842-20230831214029753-586461364.png" alt="" /><br />
+<img src="https://img2023.cnblogs.com/blog/2229842/202308/2229842-20230831213436571-419322600.png" alt="" /><br />
+<img src="https://img2023.cnblogs.com/blog/2229842/202308/2229842-20230831213442956-654898172.png" alt="" /><br />
+<img src="https://img2023.cnblogs.com/blog/2229842/202308/2229842-20230831213622516-593509612.png" alt="" /></p>
+<h1><a href="#体验" aria-hidden="true" class="anchor" id="user-content-体验"></a>体验</h1>
+<h2><a href="#下载主题包" aria-hidden="true" class="anchor" id="user-content-下载主题包"></a>下载主题包</h2>
+<p><a href="https://github.com/gantoho/typora-toxic-themes.git">github仓库地址</a> 欢迎下载使用、修改、分享</p>
+<h2><a href="#安装步骤" aria-hidden="true" class="anchor" id="user-content-安装步骤"></a>安装步骤</h2>
+<p>先将主题代码down下来，目录文件结构如下，只需要<code>toxic.css</code>文件、<code>toxic</code>文件夹<br />
+<img src="https://img2023.cnblogs.com/blog/2229842/202308/2229842-20230831215447771-450309216.png" alt="" /></p>
+<p>安装主题步骤，使用mac进行演示，windows安装方式请自行寻找<br />
+<img src="https://img2023.cnblogs.com/blog/2229842/202308/2229842-20230831214459652-1983871182.png" alt="" /></p>
+<p>直接将主题文件拷贝到主题目录中，如图<br />
+<img src="https://img2023.cnblogs.com/blog/2229842/202308/2229842-20230831215244328-661387215.png" alt="" /></p>
+<p>重启Typora<br />
+然后选择Toxic主题<br />
+<img src="https://img2023.cnblogs.com/blog/2229842/202308/2229842-20230831214717082-1753119573.png" alt="" /></p>
+
+                </div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

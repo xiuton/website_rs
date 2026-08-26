@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vue3.3+ 新特性 defineOptions - 干徒</title>
+    <meta name="description" content="defineOptions 是一个宏，是在Vue3.3+中新增的新特性 defineOptions配置项 name 在Vue3.3之前，组件的默认组件名为.vue单文件组件[SFC]文件的名字，如果需要修改组件名则需要结合Options API进行配置 &amp;lt;!-- src/components/Com.vue --">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="JavaScript, Vue, 前端, 技术">
+    <link rel="canonical" href="https://ganto.me/post/20231221">
+    <meta property="og:title" content="Vue3.3+ 新特性 defineOptions - 干徒">
+    <meta property="og:description" content="defineOptions 是一个宏，是在Vue3.3+中新增的新特性 defineOptions配置项 name 在Vue3.3之前，组件的默认组件名为.vue单文件组件[SFC]文件的名字，如果需要修改组件名则需要结合Options API进行配置 &amp;lt;!-- src/components/Com.vue --">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/20231221">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Vue3.3+ 新特性 defineOptions - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Vue3.3+ 新特性 defineOptions - 干徒">
+    <meta name="twitter:description" content="defineOptions 是一个宏，是在Vue3.3+中新增的新特性 defineOptions配置项 name 在Vue3.3之前，组件的默认组件名为.vue单文件组件[SFC]文件的名字，如果需要修改组件名则需要结合Options API进行配置 &amp;lt;!-- src/components/Com.vue --">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"Vue3.3+ 新特性 defineOptions","description":"defineOptions 是一个宏，是在Vue3.3+中新增的新特性 defineOptions配置项 name 在Vue3.3之前，组件的默认组件名为.vue单文件组件[SFC]文件的名字，如果需要修改组件名则需要结合Options API进行配置 &lt;!-- src/components/Com.vue --","url":"https://ganto.me/post/20231221","datePublished":"2023-12-21","dateModified":"2023-12-21","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"JavaScript, Vue, 前端, 技术","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-2a23876f5cfbaf78.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>Vue3.3+ 新特性 defineOptions</h1>
+                <div class="prerender-meta">
+                    <span>2023-12-21</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">JavaScript</span><span class="blog-tag">Vue</span><span class="blog-tag">前端</span><span class="blog-tag">技术</span></div>
+                <div class="blog-content">
+<p><code>defineOptions</code>是一个宏，是在Vue3.3+中新增的新特性</p>
+<h1><a href="#defineoptions配置项" aria-hidden="true" class="anchor" id="user-content-defineoptions配置项"></a>defineOptions配置项</h1>
+<h2><a href="#name" aria-hidden="true" class="anchor" id="user-content-name"></a>name</h2>
+<p>在Vue3.3之前，组件的默认组件名为.vue单文件组件[SFC]文件的名字，如果需要修改组件名则需要结合Options API进行配置</p>
+<pre><code class="language-vue">&lt;!-- src/components/Com.vue --&gt;
+&lt;script setup&gt;
+
+&lt;/script&gt;
+
+&lt;script&gt;
+export default {
+  name: 'ComponentName'
+}
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;div&gt;Com Component&lt;/div&gt;
+&lt;/template&gt;
+
+</code></pre>
+<p>在以上的代码中，写了两个script标签，一个标签写Composition API代码，一个标签以Options API的方式配置组件名<br />
+虽然可以配置组件名，但是这种处理方式很不好</p>
+<p>在Vue3.3+新增的defineOptions宏，可以很好的解决这个问题</p>
+<pre><code class="language-vue">&lt;!-- src/components/Com.vue --&gt;
+&lt;script setup&gt;
+defineOptions({
+  name: 'ComponentName'
+})
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;div&gt;Com Component&lt;/div&gt;
+&lt;/template&gt;
+
+</code></pre>
+<p>在以上代码中可以看到，defineOptions是全局的宏，无需导入</p>
+<h2><a href="#inheritattrs" aria-hidden="true" class="anchor" id="user-content-inheritattrs"></a>inheritAttrs</h2>
+<p>在Vue中如果在组件标签上添加属性，则会被透传到组件的根标签上，<em>在Vue3中，组件的根标签可以存在多个，如果根标签存在多个，那么透传将失效</em></p>
+<pre><code class="language-vue">&lt;!-- src/App.vue --&gt;
+&lt;script setup&gt;
+import Com from './components/Com.vue'
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;Com class=&quot;comComponentClassName&quot; /&gt;
+&lt;/template&gt;
+
+</code></pre>
+<pre><code class="language-vue">&lt;!-- src/components/Com.vue --&gt;
+&lt;script setup&gt;
+defineOptions({
+  name: 'ComponentName',
+})
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;div&gt;Com Component&lt;/div&gt;
+&lt;/template&gt;
+
+</code></pre>
+<p>解析后的代码</p>
+<pre><code class="language-html">&lt;div id=&quot;app&quot; data-v-app=&quot;&quot;&gt;
+  &lt;div class=&quot;comComponentClassName&quot;&gt;Com Component&lt;/div&gt;
+&lt;/div&gt;
+
+</code></pre>
+<p>有时在开发中，并不希望组件存在透传行为，我们可以通过配置进行关闭</p>
+<pre><code class="language-vue">&lt;!-- src/components/Com.vue --&gt;
+&lt;script setup&gt;
+defineOptions({
+  name: 'ComponentName',
+})
+&lt;/script&gt;
+
+&lt;script&gt;
+export default {
+  inheritAttrs: false
+}
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;div&gt;Com Component&lt;/div&gt;
+&lt;/template&gt;
+
+</code></pre>
+<p>以上代码，在Vue3.3之前，如需配置组件禁用透传，那么配置方式和配置组件名一样，需要在单独的script写Options API配置项</p>
+<p>在Vue3.3+可以通过defineOptions宏进行配置</p>
+<pre><code class="language-vue">&lt;!-- src/components/Com.vue --&gt;
+&lt;script setup&gt;
+defineOptions({
+  name: 'ComponentName',
+  inheritAttrs: false,
+})
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;div&gt;Com Component&lt;/div&gt;
+&lt;/template&gt;
+
+</code></pre>
+<p><code>defineOptions</code>宏还可以配置其他内容，具体内容请查看官方文档 <a href="https://cn.vuejs.org/api/sfc-script-setup.html#defineoptions">https://cn.vuejs.org/api/sfc-script-setup.html#defineoptions</a></p>
+
+                </div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>
