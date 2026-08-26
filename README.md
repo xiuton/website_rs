@@ -16,6 +16,7 @@
 - 🔄 **宽屏模式** — 博客文章支持一键切换宽屏布局
 - 📦 **GitHub Actions CI/CD** — 自动构建部署到 GitHub Pages
 - ☁️ **Netlify 部署** — SPA 路由重定向配置
+- 🔍 **SEO 优化** — sitemap.xml / robots.txt、JSON-LD 结构化数据（WebSite / BlogPosting）、OG 分享图、文章静态预渲染（爬虫可直接读取全文）
 
 ## 技术栈
 
@@ -31,6 +32,8 @@
 | Markdown 解析 | pulldown-cmark (首页预览) |
 | 路由 | dioxus-router 0.6.3 |
 | 构建脚本 | `build.rs` 编译期解析博客文章 |
+| 数据生成 | `build/` 目录下多个 `build_*.rs` 模块（posts.json、rss、atom、搜索索引、摘要、SEO 文件等） |
+| 预渲染工具 | `src/bin/prerender.rs`（trunk 构建后生成文章静态页与 404.html） |
 | 字体 | Inter, JetBrains Mono, MiSans, 得意黑 |
 
 ## 环境要求
@@ -97,6 +100,14 @@ trunk build --release
 
 构建产物输出到 `dist/` 目录。
 
+生成文章静态页（SEO 预渲染，爬虫无需执行 JS 即可读取全文）：
+
+```bash
+cargo run --release --bin prerender
+```
+
+该命令读取 `dist/static/posts.json`，为每篇文章生成 `dist/post/<slug>/index.html`，并将 `dist/index.html` 复制为 `dist/404.html`（GitHub Pages SPA 兜底）。CI 部署流程会自动执行此步骤。
+
 ### 清理并重新构建
 
 ```bash
@@ -141,7 +152,16 @@ tags: [rust, dioxus]
 .
 ├── .github/
 │   └── workflows/
-│       └── build.yml        # GitHub Actions CI/CD
+│       └── build.yml        # GitHub Actions CI/CD（含 SEO 预渲染步骤）
+├── build/                   # 构建期数据生成模块（build.rs 调用）
+│   ├── build_common.rs      # 共享工具
+│   ├── build_posts_json.rs  # 生成 posts.json
+│   ├── build_rss.rs         # RSS 订阅
+│   ├── build_atom.rs        # Atom 订阅
+│   ├── build_search.rs      # 搜索索引
+│   ├── build_summaries.rs   # AI 摘要分类
+│   ├── build_seo.rs         # sitemap.xml 生成
+│   └── ...                  # 其余 build_*.rs 模块
 ├── data/                    # 应用数据
 │   └── bookmarks.toml       # 书签配置
 ├── posts/                   # 博客 Markdown 文章
@@ -150,7 +170,8 @@ tags: [rust, dioxus]
 │   └── ...
 ├── src/
 │   ├── bin/
-│   │   └── new.rs           # CLI 工具：新建博客文章
+│   │   ├── new.rs           # CLI 工具：新建博客文章
+│   │   └── prerender.rs     # CLI 工具：文章静态预渲染（SEO）
 │   ├── assets/
 │   │   └── playground.css   # 操场页面专用样式
 │   ├── components/          # 可复用 UI 组件
@@ -190,6 +211,8 @@ tags: [rust, dioxus]
 │   │   ├── NeueMachina-Bold.woff2
 │   │   └── SmileySans-Oblique.otf
 │   ├── images/              # 通用图片
+│   │   └── og-image.png     # 社交分享图（1200×630）
+│   ├── robots.txt           # 爬虫协议（指向 sitemap.xml）
 │   └── favicon.svg          # 网站图标
 ├── .gitignore
 ├── Cargo.toml               # Rust 依赖配置
@@ -253,7 +276,8 @@ trunk build --release
 
 1. 安装 Rust wasm 工具链
 2. 运行 `trunk build --release`
-3. 将 `dist/` 部署到 `gh-pages` 分支
+3. 编译并运行 `prerender` 工具生成文章静态页与 `404.html`
+4. 将 `dist/` 部署到 `gh-pages` 分支
 
 配置文件：[.github/workflows/build.yml](.github/workflows/build.yml)
 

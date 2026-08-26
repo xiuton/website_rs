@@ -70,6 +70,15 @@ jobs:
         echo "=== Dist static directory ==="
         ls -la dist/static/
 
+    - name: Prerender article pages for SEO
+      run: |
+        echo "=== Building prerender tool ==="
+        cargo build --release --bin prerender 2>&1 | tail -10
+        echo "=== Prerendering static post pages ==="
+        ./target/release/prerender
+        echo "=== Post prerender pages ==="
+        ls dist/post/ | head -20
+
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
       with:

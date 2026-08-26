@@ -20,6 +20,8 @@ mod build_markov;
 mod build_rake;
 #[path = "build/build_lda.rs"]
 mod build_lda;
+#[path = "build/build_seo.rs"]
+mod build_seo;
 #[path = "build/build_posts_json.rs"]
 mod build_posts_json;
 
@@ -34,6 +36,7 @@ use build_summaries::generate_ai_summaries;
 use build_markov::generate_markov_chain;
 use build_rake::generate_rake_keywords;
 use build_lda::generate_lda_topics;
+use build_seo::generate_sitemap;
 use build_posts_json::generate_posts_json;
 
 use std::env;
@@ -94,6 +97,7 @@ fn main() {
     generate_markov_chain(&posts);
     generate_rake_keywords(&posts);
     generate_lda_topics(&posts);
+    generate_sitemap(&posts);
     generate_posts_json(&posts);
 
     println!("cargo:rerun-if-changed=build.rs");

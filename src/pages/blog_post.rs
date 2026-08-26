@@ -155,10 +155,16 @@ pub fn BlogPostView(slug: String) -> Element {
             } else {
                 crate::utils::markdown::clean_markdown_excerpt(post.content, 150)
             };
-            title::set_seo(
+            let post_url = format!("https://ganto.me/post/{}", post.slug);
+            title::set_seo(&post.title, &description, &post_url);
+            // 文章级 BlogPosting 结构化数据
+            title::set_article_jsonld(
                 &post.title,
                 &description,
-                &format!("https://ganto.me/post/{}", post.slug),
+                &post_url,
+                &post.date,
+                &post.author,
+                post.tags,
             );
         }
         if post().is_some() {
