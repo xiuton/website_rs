@@ -68,7 +68,7 @@ fn main() {
 
     for post in &posts {
         output.push_str(&format!(
-            "    BlogPost {{\n        title: r#####\"{}\"#####,\n        date: r#####\"{}\"#####,\n        author: r#####\"{}\"#####,\n        tags: &[{}],\n        content: r#####\"{}\"#####,\n        slug: r#####\"{}\"#####,\n        category: r#####\"{}\"#####,\n        summary: r#####\"{}\"#####,\n    }},\n",
+            "    BlogPost {{\n        title: r#####\"{}\"#####,\n        date: r#####\"{}\"#####,\n        author: r#####\"{}\"#####,\n        tags: &[{}],\n        content: r#####\"{}\"#####,\n        slug: r#####\"{}\"#####,\n        category: r#####\"{}\"#####,\n        summary: r#####\"{}\"#####,\n        series: r#####\"{}\"#####,\n        order: {},\n    }},\n",
             post.title,
             post.date,
             post.author,
@@ -80,6 +80,8 @@ fn main() {
             post.slug,
             post.category,
             post.summary,
+            post.series,
+            post.order,
         ));
     }
 

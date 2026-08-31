@@ -31,6 +31,10 @@ mod prerender_impl {
         summary: String,
         #[serde(default)]
         content_html: String,
+        #[serde(default)]
+        series: String,
+        #[serde(default)]
+        order: i32,
     }
 
     /// HTML 属性/文本转义
@@ -141,8 +145,70 @@ mod prerender_impl {
         text.chars().take(160).collect()
     }
 
+    /// 生成系列章节导航 HTML（与 SPA 中的 .series-nav 结构一致）
+    fn series_nav_html(post: &PostJson, all_posts: &[PostJson]) -> String {
+        if post.series.is_empty() {
+            return String::new();
+        }
+        let mut chapters: Vec<&PostJson> = all_posts
+            .iter()
+            .filter(|q| q.series == post.series)
+            .collect();
+        chapters.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| b.date.cmp(&a.date)));
+        let idx = chapters.iter().position(|q| q.slug == post.slug).unwrap_or(0);
+        let total = chapters.len();
+
+        let mut list = String::new();
+        for (i, ch) in chapters.iter().enumerate() {
+            let active = i == idx;
+            let current_badge = if active {
+                "<span class=\"series-nav-item-now\">本篇</span>".to_string()
+            } else {
+                String::new()
+            };
+            list.push_str(&format!(
+                "<a class=\"series-nav-item{}\" href=\"/post/{}/\"><span class=\"series-nav-item-index\">{}</span><span class=\"series-nav-item-title\">{}</span>{}</a>",
+                if active { " active" } else { "" },
+                ch.slug,
+                i + 1,
+                esc(&ch.title),
+                current_badge,
+            ));
+        }
+
+        let prev_html = if idx > 0 {
+            let prev = chapters[idx - 1];
+            format!(
+                "<a class=\"series-nav-page prev\" href=\"/post/{}/\"><span class=\"series-nav-page-label\">上一篇</span><span class=\"series-nav-page-title\">{}</span></a>",
+                prev.slug,
+                esc(&prev.title),
+            )
+        } else {
+            "<span class=\"series-nav-page disabled\">已经是第一章</span>".to_string()
+        };
+
+        let next_html = if let Some(next) = chapters.get(idx + 1) {
+            format!(
+                "<a class=\"series-nav-page next\" href=\"/post/{}/\"><span class=\"series-nav-page-label\">下一篇</span><span class=\"series-nav-page-title\">{}</span></a>",
+                next.slug,
+                esc(&next.title),
+            )
+        } else {
+            "<span class=\"series-nav-page disabled\">已经是最后一章</span>".to_string()
+        };
+
+        format!(
+            "<div class=\"series-nav\"><div class=\"series-nav-header\"><svg xmlns=\"http://www.w3.org/2000/svg\" view_box=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke_width=\"2\" stroke_linecap=\"round\" stroke_linejoin=\"round\" class=\"section-icon\"><path d=\"M4 19.5A2.5 2.5 0 0 1 6.5 17H20\"/><path d=\"M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z\"/></svg><div class=\"series-nav-heading\"><span class=\"series-nav-title\">{}</span><span class=\"series-nav-count\">共 {} 章</span></div></div><div class=\"series-nav-list\">{}</div><div class=\"series-nav-pager\">{}{}</div></div>",
+            esc(&post.series),
+            total,
+            list,
+            prev_html,
+            next_html,
+        )
+    }
+
     /// 生成单篇文章的预渲染 HTML
-    fn render_page(post: &PostJson, css: &str, vars_style: &str) -> String {
+    fn render_page(post: &PostJson, all_posts: &[PostJson], css: &str, vars_style: &str) -> String {
         let title = &post.title;
         let date: String = post.date.chars().take(10).collect();
         let author = if post.author.trim().is_empty() { "干徒" } else { &post.author };
@@ -155,6 +221,8 @@ mod prerender_impl {
             .iter()
             .map(|t| format!("<span class=\"blog-tag\">{}</span>", esc(t)))
             .collect();
+
+        let series_html = series_nav_html(post, all_posts);
 
         let jsonld = format!(
             r#"{{"@context":"https://schema.org","@type":"BlogPosting","headline":{},"description":{},"url":{},"datePublished":{},"dateModified":{},"inLanguage":"zh-CN","image":{},"author":{{"@type":"Person","name":{}}},"keywords":{},"publisher":{{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}}}"#,
@@ -249,6 +317,7 @@ mod prerender_impl {
                 <div class="blog-content">
 {content_html}
                 </div>
+                {series_html}
             </article>
         </main>
         <footer class="prerender-footer">
@@ -270,6 +339,7 @@ mod prerender_impl {
             date = esc(&date),
             tag_html = tag_html,
             content_html = content_html,
+            series_html = series_html,
         )
     }
 
@@ -295,7 +365,7 @@ mod prerender_impl {
             }
             let out_dir = dist.join("post").join(&post.slug);
             fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
-            let page = render_page(post, &css, &vars_style);
+            let page = render_page(post, &posts, &css, &vars_style);
             fs::write(out_dir.join("index.html"), page).map_err(|e| e.to_string())?;
             count += 1;
         }

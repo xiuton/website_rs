@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 use crate::routes::Route;
 use crate::BLOG_POSTS;
+use crate::models::BlogPost;
 use crate::utils::{title, code_highlight, storage};
 use crate::components::icons::{BackArrowIcon, HomeIcon, ScrollTopIcon, TagIcon, WideModeIcon};
 use crate::utils::search::SearchEngine;
@@ -186,6 +187,22 @@ pub fn BlogPostView(slug: String) -> Element {
     // 保存 slug 备用（避免在 if-let 内部被 post 绑定屏蔽）
     let post_slug = current_slug();
 
+    // 系列聚合信息：(系列名, 章节列表, 当前章节索引)
+    // 同一 series 字段的文章属于同一个多章节文档，按 order（其次日期）排序
+    let series_info: Option<(String, Vec<&'static BlogPost>, usize)> = post().and_then(|p| {
+        if p.series.is_empty() {
+            return None;
+        }
+        let series = p.series.to_string();
+        let mut chapters: Vec<&'static BlogPost> = BLOG_POSTS
+            .iter()
+            .filter(|q| q.series == p.series)
+            .collect();
+        chapters.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| b.date.cmp(&a.date)));
+        let idx = chapters.iter().position(|q| q.slug == p.slug)?;
+        Some((series, chapters, idx))
+    });
+
     rsx! {
         div { class: "blog-container",
             if let Some(post) = post() {
@@ -251,6 +268,71 @@ pub fn BlogPostView(slug: String) -> Element {
                         class: "blog-content",
                         dangerous_inner_html: prepare_blog_html(post.content)
                     }
+                    // 系列章节导航（多章节文档）
+                    {series_info.as_ref().map(|(series, chapters, idx)| {
+                        let total = chapters.len();
+                        let prev = if *idx > 0 { Some(chapters[*idx - 1]) } else { None };
+                        let next = chapters.get(*idx + 1);
+                        rsx! {
+                            div { class: "series-nav",
+                                div { class: "series-nav-header",
+                                    svg {
+                                        xmlns: "http://www.w3.org/2000/svg",
+                                        view_box: "0 0 24 24",
+                                        width: "16", height: "16",
+                                        fill: "none", stroke: "currentColor",
+                                        stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round",
+                                        class: "section-icon",
+                                        path { d: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20" }
+                                        path { d: "M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" }
+                                    }
+                                    div { class: "series-nav-heading",
+                                        span { class: "series-nav-title", "{series}" }
+                                        span { class: "series-nav-count", "共 {total} 章" }
+                                    }
+                                }
+                                div { class: "series-nav-list",
+                                    {chapters.iter().enumerate().map(|(i, ch)| {
+                                        let to = Route::BlogPostView { slug: ch.slug.to_string() };
+                                        let is_current = i == *idx;
+                                        rsx! {
+                                            Link {
+                                                to,
+                                                class: if is_current { "series-nav-item active" } else { "series-nav-item" },
+                                                span { class: "series-nav-item-index", "{i + 1}" }
+                                                span { class: "series-nav-item-title", "{ch.title}" }
+                                                if is_current {
+                                                    span { class: "series-nav-item-now", "本篇" }
+                                                }
+                                            }
+                                        }
+                                    })}
+                                }
+                                div { class: "series-nav-pager",
+                                    if let Some(prev) = prev {
+                                        Link {
+                                            to: Route::BlogPostView { slug: prev.slug.to_string() },
+                                            class: "series-nav-page prev",
+                                            span { class: "series-nav-page-label", "上一篇" }
+                                            span { class: "series-nav-page-title", "{prev.title}" }
+                                        }
+                                    } else {
+                                        span { class: "series-nav-page disabled", "已经是第一章" }
+                                    }
+                                    if let Some(next) = next {
+                                        Link {
+                                            to: Route::BlogPostView { slug: next.slug.to_string() },
+                                            class: "series-nav-page next",
+                                            span { class: "series-nav-page-label", "下一篇" }
+                                            span { class: "series-nav-page-title", "{next.title}" }
+                                        }
+                                    } else {
+                                        span { class: "series-nav-page disabled", "已经是最后一章" }
+                                    }
+                                }
+                            }
+                        }
+                    })}
                     div { class: "blog-tags",
                         {post.tags.iter().map(|tag| rsx! {
                             span { class: "blog-tag",

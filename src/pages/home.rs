@@ -80,13 +80,41 @@ pub fn Home() -> Element {
         cats
     };
 
+    // 合并系列文章：同一 series 的章节在列表中只显示文档入口（order 最小的一章），
+    // 并记录章节数，避免首页被同一文档的所有章节刷屏
+    let display_posts = use_memo(move || {
+        let all = posts.read();
+        let mut seen: BTreeSet<&str> = BTreeSet::new();
+        let mut result: Vec<(&BlogPost, usize)> = Vec::new();
+        for post in all.iter() {
+            if post.series.is_empty() {
+                result.push((post, 0));
+            } else if !seen.contains(post.series) {
+                seen.insert(post.series);
+                let chapters: Vec<&BlogPost> = all
+                    .iter()
+                    .copied()
+                    .filter(|p| p.series == post.series)
+                    .collect();
+                let entry = *chapters
+                    .iter()
+                    .min_by(|a, b| a.order.cmp(&b.order).then_with(|| a.date.cmp(&b.date)))
+                    .unwrap();
+                result.push((entry, chapters.len()));
+            }
+        }
+        // 按日期倒序排序（文档入口使用其发布时间）
+        result.sort_by(|a, b| b.0.date.cmp(&a.0.date));
+        result
+    });
+
     let filtered_posts = use_memo(move || {
         let cat = selected_category();
         if cat == ALL_CATEGORY {
-            posts.read().clone()
+            display_posts.read().clone()
         } else {
-            posts.read().iter()
-                .filter(|p| p.category == cat)
+            display_posts.read().iter()
+                .filter(|(p, _)| p.category == cat)
                 .copied()
                 .collect::<Vec<_>>()
         }
@@ -138,12 +166,15 @@ pub fn Home() -> Element {
                     div { class: "loading", "加载中..." }
                 } else {
                     div { class: "blog-posts",
-                        {current_page_posts().iter().map(|post| {
+                        {current_page_posts().iter().map(|(post, chapter_count)| {
                             rsx! {
                                 div { class: "blog-preview",
                                     Link { to: Route::BlogPostView { slug: post.slug.to_string() },
                                         div { class: "preview-header",
                                             h2 { class: "preview-title", {post.title} }
+                                            if *chapter_count > 0 {
+                                                span { class: "preview-series-badge", "系列 · 共 {chapter_count} 章" }
+                                            }
                                             if !post.category.is_empty() {
                                                 span { class: "preview-category", {post.category} }
                                             }

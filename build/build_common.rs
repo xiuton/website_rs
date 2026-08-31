@@ -12,6 +12,10 @@ pub struct PostData {
     pub slug: String,
     pub category: String,
     pub summary: String,
+    /// 所属系列名（多章节文档），空串表示独立文章
+    pub series: String,
+    /// 章节在系列中的顺序，缺省为 0
+    pub order: i32,
 }
 
 pub fn escape_rust_string(s: &str) -> String {
@@ -344,10 +348,26 @@ pub fn process_post(
             .unwrap_or_default(),
     );
 
+    // 系列字段：同一 series 名的文章属于同一个多章节文档
+    let series = strip_yaml_quotes(
+        &front_matter
+            .lines()
+            .find(|l| l.starts_with("series:"))
+            .map(|l| l.replace("series:", "").trim().to_string())
+            .unwrap_or_default(),
+    );
+
+    // 章节顺序：缺失时默认 0（按日期排序兜底）
+    let order = front_matter
+        .lines()
+        .find(|l| l.starts_with("order:"))
+        .and_then(|l| l.replace("order:", "").trim().parse::<i32>().ok())
+        .unwrap_or(0);
+
     let custom_slug = front_matter
         .lines()
         .find(|l| l.starts_with("slug:"))
-        .map(|l| l.replace("slug:", "").trim().to_string())
+        .map(|l| strip_yaml_quotes(&l.replace("slug:", "").trim().to_string()))
         .filter(|s| !s.is_empty());
 
     let slug = if let Some(slug) = custom_slug {
@@ -377,6 +397,8 @@ pub fn process_post(
         slug,
         category: category.to_string(),
         summary,
+        series,
+        order,
     });
 }
 
