@@ -138,6 +138,17 @@
             align-items: center;
             position: relative;
 
+            // 透明桥接层：填补父项与子菜单之间的 8px 空隙，
+            // 避免鼠标移入子菜单时 hover 丢失导致菜单消失
+            &::after {
+              content: "";
+              position: absolute;
+              top: 100%;
+              left: 0;
+              right: 0;
+              height: 8px;
+            }
+
             &:hover .nav-submenu {
               display: block;
             }
