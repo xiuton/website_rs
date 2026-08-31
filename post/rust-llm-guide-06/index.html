@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改 - 干徒</title>
+    <meta name="description" content="实现 MSE/CrossEntropy 损失函数与 SGD/AdamW 优化器。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 优化器">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-06">
+    <meta property="og:title" content="第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改 - 干徒">
+    <meta property="og:description" content="实现 MSE/CrossEntropy 损失函数与 SGD/AdamW 优化器。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-06">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改 - 干徒">
+    <meta name="twitter:description" content="实现 MSE/CrossEntropy 损失函数与 SGD/AdamW 优化器。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改","description":"实现 MSE/CrossEntropy 损失函数与 SGD/AdamW 优化器。","url":"https://ganto.me/post/rust-llm-guide-06","datePublished":"2026-09-07","dateModified":"2026-09-07","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 优化器","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-c64c465a01d82915.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-07</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">优化器</span></div>
+                <div class="blog-content">
+<h1><a href="#第-6-课损失函数与优化器--让模型知道错在哪怎么改" aria-hidden="true" class="anchor" id="user-content-第-6-课损失函数与优化器--让模型知道错在哪怎么改"></a>第 6 课：损失函数与优化器 —— 让模型知道&quot;错在哪、怎么改&quot;</h1>
+<blockquote>
+<p>代码位置：</p>
+<ul>
+<li><a href="file:///d:/Code/Rust/llm_from_scratch/src/loss.rs">src/loss.rs</a>（MSE / CrossEntropy）</li>
+<li><a href="file:///d:/Code/Rust/llm_from_scratch/src/optim.rs">src/optim.rs</a>（SGD / AdamW）</li>
+</ul>
+<p>演示入口：<a href="file:///d:/Code/Rust/llm_from_scratch/src/main.rs">src/main.rs</a>（demo_xor 使用 <code>cross_entropy_loss</code> + <code>SGD</code>）</p>
+</blockquote>
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li>损失函数是干什么的？MSE 和 CrossEntropy 分别用在什么任务？</li>
+<li>CrossEntropy 为什么是&quot;one-hot + log_softmax + 取均值&quot;？</li>
+<li>SGD 的一行更新公式 <code>θ = θ - lr·g</code> 为什么能让损失下降？</li>
+<li>训练循环的&quot;四步&quot;（前向、反向、更新、清零）分别对应哪几行代码？</li>
+</ol>
+<h2><a href="#2-损失函数一杆错得有多离谱的秤" aria-hidden="true" class="anchor" id="user-content-2-损失函数一杆错得有多离谱的秤"></a>2. 损失函数：一杆&quot;错得有多离谱&quot;的秤</h2>
+<p>训练 = 让模型输出不断接近目标。怎么量化&quot;接近&quot;？用<strong>损失函数</strong> <code>L(pred, target)</code>：</p>
+<ul>
+<li>L 越大 → 错得越离谱</li>
+<li>训练就是不断减小 L</li>
+</ul>
+<p>两类任务对应两个损失：</p>
+<table>
+<thead>
+<tr>
+<th>任务</th>
+<th>预测什么</th>
+<th>损失函数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>回归</td>
+<td>连续数值（房价、温度）</td>
+<td>MSE（均方误差）</td>
+</tr>
+<tr>
+<td>分类</td>
+<td>属于哪个类别（猫/狗、下一个 token）</td>
+<td>CrossEntropy（交叉熵）</td>
+</tr>
+</tbody>
+</table>
+<p>语言模型本质是&quot;预测下一个 token 是哪一类&quot;，所以 LLM 用的是 CrossEntropy。</p>
+<h2><a href="#3-mse均方误差回归" aria-hidden="true" class="anchor" id="user-content-3-mse均方误差回归"></a>3. MSE：均方误差（回归）</h2>
+<p><strong>公式</strong>：</p>
+<pre><code>MSE = (1/N) · Σᵢ (predᵢ - targetᵢ)²
+</code></pre>
+<p><strong>对应代码</strong>（<code>loss.rs</code>，全是一行链式调用）：</p>
+<pre><code class="language-rust">/// 均方误差：loss = mean((pred - target)²)
+pub fn mse_loss(pred: &amp;Tensor, target: &amp;Tensor) -&gt; Tensor {
+    pred.sub(target)
+        .pow(2.0)
+        .sum()
+        .mul_scalar(1.0 / pred.numel() as f32)
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>代码</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>相减</td>
+<td><code>pred.sub(target)</code></td>
+<td>误差 eᵢ = predᵢ − targetᵢ</td>
+</tr>
+<tr>
+<td>平方</td>
+<td><code>.pow(2.0)</code></td>
+<td>eᵢ²：消除正负抵消、放大大误差</td>
+</tr>
+<tr>
+<td>求和</td>
+<td><code>.sum()</code></td>
+<td>Σ eᵢ²</td>
+</tr>
+<tr>
+<td>取平均</td>
+<td><code>.mul_scalar(1/N)</code></td>
+<td>除以元素总数 N（<code>pred.numel()</code>）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>为什么平方？</strong> 正负误差不会互相抵消；大误差被放大（对离群点更敏感）。</p>
+<p><strong>梯度</strong>（不需要手写，自动微分自动算出来）：</p>
+<pre><code>∂L/∂predᵢ = 2·(predᵢ - targetᵢ) / N
+</code></pre>
+<h2><a href="#4-crossentropy交叉熵分类" aria-hidden="true" class="anchor" id="user-content-4-crossentropy交叉熵分类"></a>4. CrossEntropy：交叉熵（分类）</h2>
+<p>分类任务里模型输出的是 <strong>logits</strong>（每个类别的&quot;原始分数&quot;），要把它变成&quot;概率&quot;再用交叉熵衡量。</p>
+<p><strong>输入</strong>：</p>
+<ul>
+<li><code>logits</code>: [B, D] —— B 个样本，每个 D 个类别的分数</li>
+<li><code>targets</code>: [B] —— 每个样本真实类别的下标</li>
+</ul>
+<p><strong>数学公式</strong>：</p>
+<pre><code>loss = -(1/B) · Σᵢ log( softmax(logitsᵢ)[targetsᵢ] )
+</code></pre>
+<p>对应代码分三步（<code>loss.rs</code>）：</p>
+<pre><code class="language-rust">pub fn cross_entropy_loss(logits: &amp;Tensor, targets: &amp;[usize]) -&gt; Tensor {
+    assert_eq!(logits.rank(), 2, &quot;交叉熵的 logits 应为 [B, D]&quot;);
+    let (b, d) = (logits.shape()[0], logits.shape()[1]);
+
+    // —— 第 1 步：one-hot 编码 ——
+    let mut onehot = vec![0.0f32; b * d];
+    for (i, &amp;t) in targets.iter().enumerate() {
+        assert!(t &lt; d, &quot;目标类别越界：{} &gt;= {}&quot;, t, d);
+        onehot[i * d + t] = 1.0;
+    }
+    let oh = Tensor::from_vec(onehot, vec![b, d]);
+
+    // —— 第 2 步：log_softmax ——
+    let log_probs = logits.softmax_last_dim().log();
+
+    // —— 第 3 步：取出正确类别的 log 概率，取负，再取均值 ——
+    log_probs
+        .mul(&amp;oh)        // 只保留正确类别位置的 log 概率
+        .sum_last_dim()  // [B,1]：每行求和 = 正确类别的 log 概率
+        .neg()           // 取负：正确概率越高 loss 越小
+        .sum()           // 所有样本相加
+        .mul_scalar(1.0 / b as f32)  // 除以 B 取平均
+}
+</code></pre>
+<h3><a href="#逐步拆解" aria-hidden="true" class="anchor" id="user-content-逐步拆解"></a>逐步拆解</h3>
+<p><strong>第 1 步 one-hot</strong>：把&quot;下标 2&quot;变成 <code>[0, 0, 1, 0, ...]</code>，只有正确位置是 1。</p>
+<p><strong>第 2 步 log_softmax</strong>：<code>softmax</code> 把分数变成概率（和为 1、都为正），<code>log</code> 取对数。</p>
+<blockquote>
+<p>注：这里用的是朴素写法 <code>softmax 之后 log</code>（即 log_softmax）。因为 <code>softmax_last_dim</code> 内部已经做了&quot;先减最大值再 exp&quot;的数值稳定处理，所以直接 log 是安全的。</p>
+</blockquote>
+<p><strong>第 3 步 取负 + 取均值</strong>：</p>
+<ul>
+<li><code>mul(&amp;oh)</code> 后每行只有正确类别位置非 0 → <code>sum_last_dim()</code> 恰好得到每个样本正确类别的 log 概率</li>
+<li>正确概率越高 → <code>-log p</code> 越小 → loss 越小 ✓</li>
+<li>除以 B（样本数）取平均</li>
+</ul>
+<h3><a href="#数值例子2-类2-个样本示意" aria-hidden="true" class="anchor" id="user-content-数值例子2-类2-个样本示意"></a>数值例子（2 类、2 个样本，示意）</h3>
+<table>
+<thead>
+<tr>
+<th>样本</th>
+<th>logits</th>
+<th>softmax</th>
+<th>正确类别</th>
+<th>−log p</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>第 1 个</td>
+<td>[2.0, 0.5]</td>
+<td>[0.82, 0.18]</td>
+<td>0</td>
+<td>−ln 0.82 ≈ 0.20</td>
+</tr>
+<tr>
+<td>第 2 个</td>
+<td>[0.1, 1.8]</td>
+<td>[0.15, 0.85]</td>
+<td>1</td>
+<td>−ln 0.85 ≈ 0.17</td>
+</tr>
+</tbody>
+</table>
+<p>平均 loss ≈ (0.20 + 0.17) / 2 ≈ 0.18。如果模型对正确类别给出概率接近 1，loss 就接近 0。</p>
+<blockquote>
+<p>关于梯度：softmax + 交叉熵的组合，数学上梯度恰好等于 <code>p − y_onehot</code>（预测概率减去 one-hot）。我们的代码没有手写这个式子——反向传播会自动把它算出来。这正好展示了&quot;公式 → 自动微分&quot;的分工。</p>
+</blockquote>
+<h2><a href="#5-梯度下降原理沿着最陡的下坡走" aria-hidden="true" class="anchor" id="user-content-5-梯度下降原理沿着最陡的下坡走"></a>5. 梯度下降原理：沿着&quot;最陡的下坡&quot;走</h2>
+<p>回顾第 2 课的核心公式，对每个参数 θ：</p>
+<pre><code>θ = θ - 学习率 × ∂L/∂θ
+</code></pre>
+<ul>
+<li><code>∂L/∂θ &gt; 0</code>：θ 增大 loss 也增大 → 减去它，θ 变小</li>
+<li><code>∂L/∂θ &lt; 0</code>：θ 增大 loss 减小 → 减去它，θ 变大</li>
+<li>学习率（lr）控制每步迈多大：<strong>太小</strong>收敛慢，<strong>太大</strong>来回震荡甚至发散</li>
+</ul>
+<p>几何直觉：loss 是参数的山坡，梯度指向&quot;上升最快的方向&quot;，我们每次都朝<strong>反方向</strong>走一小步，就像小球从山坡滚下。</p>
+<pre><code>loss
+  │        .
+  │      .   .
+  │    .       .
+  │  .           .
+  └──────────────────→ θ
+</code></pre>
+<h2><a href="#6-sgd把更新规则写成代码" aria-hidden="true" class="anchor" id="user-content-6-sgd把更新规则写成代码"></a>6. SGD：把更新规则写成代码</h2>
+<p>**随机梯度下降（SGD）**是最朴素的优化器（<code>optim.rs</code>）：</p>
+<pre><code class="language-rust">/// 随机梯度下降（SGD）
+pub struct SGD {
+    lr: f32,
+    params: Vec&lt;Tensor&gt;,
+}
+
+impl SGD {
+    pub fn new(lr: f32, params: Vec&lt;Tensor&gt;) -&gt; Self {
+        SGD { lr, params }
+    }
+
+    /// 更新一步：θ = θ - lr * g
+    pub fn step(&amp;self) {
+        for p in &amp;self.params {
+            let g = p.grad();
+            let d = p.data();
+            let updated: Vec&lt;f32&gt; = d.iter().zip(&amp;g).map(|(v, g)| v - self.lr * g).collect();
+            p.set_data(updated);
+        }
+    }
+
+    pub fn zero_grad(&amp;self) {
+        for p in &amp;self.params {
+            p.zero_grad();
+        }
+    }
+}
+</code></pre>
+<p><strong>公式与代码的对应</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>公式</th>
+<th>代码</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>θ（当前参数值）</td>
+<td><code>p.data()</code></td>
+</tr>
+<tr>
+<td>g（梯度）</td>
+<td><code>p.grad()</code></td>
+</tr>
+<tr>
+<td>θ − lr·g</td>
+<td><code>d.iter().zip(&amp;g).map(|(v, g)| v - self.lr * g)</code></td>
+</tr>
+<tr>
+<td>写回</td>
+<td><code>p.set_data(updated)</code></td>
+</tr>
+</tbody>
+</table>
+<p>两个方法的<strong>分工</strong>：</p>
+<ul>
+<li><code>step()</code>：必须在 <code>loss.backward()</code> 之后调用，否则梯度全是 0，参数纹丝不动</li>
+<li><code>zero_grad()</code>：每轮更新后必须清零梯度。因为反向传播是 <code>+=</code> 累加（第 2 课讲过），不清零的话下一轮的梯度会叠加上一轮的旧梯度</li>
+</ul>
+<blockquote>
+<p>顺带一提：<code>optim.rs</code> 里还有 AdamW（第 17 课讲）。它把&quot;固定步长&quot;换成&quot;动量 + 自适应步长&quot;，但接口完全一样（<code>step()</code> / <code>zero_grad()</code>），这正是统一接口的好处。</p>
+</blockquote>
+<h2><a href="#7-训练循环四步舞" aria-hidden="true" class="anchor" id="user-content-7-训练循环四步舞"></a>7. 训练循环：四步舞</h2>
+<p>一次完整的学习 = 四步（所有深度学习框架训练循环的骨架）：</p>
+<pre><code class="language-rust">// 1. 前向：算预测和损失
+let logits = model.forward(&amp;x);
+let loss = cross_entropy_loss(&amp;logits, &amp;y_targets);
+// 2. 反向：自动算出每个参数的梯度
+loss.backward();
+// 3. 更新：θ = θ - lr·g
+opt.step();
+// 4. 清零梯度：否则下一轮会累加
+opt.zero_grad();
+</code></pre>
+<p><strong>顺序很重要</strong>：<code>backward → step → zero_grad</code>，反了或漏了都会出错。</p>
+<h2><a href="#8-运行与测试" aria-hidden="true" class="anchor" id="user-content-8-运行与测试"></a>8. 运行与测试</h2>
+<pre><code class="language-bash">cargo test     # 测试全部通过
+cargo run      # 演示 1 中 loss 从初始值一路下降、正确率 4/4
+</code></pre>
+<p>（demo_xor 的每一行会在第 7 课完整讲解。）</p>
+<h2><a href="#9-动手练习" aria-hidden="true" class="anchor" id="user-content-9-动手练习"></a>9. 动手练习</h2>
+<ol>
+<li>把 <code>cross_entropy_loss</code> 的取均值从&quot;除以 b&quot;改成&quot;除以 b·d&quot;，观察 loss 数值变化，思考哪个更合理。</li>
+<li>给 SGD 加<strong>动量</strong>：<code>v = 0.9·v + g; θ = θ - lr·v</code>，对比收敛速度。</li>
+<li>思考：one-hot 为什么只在正确位置是 1？如果给两个类别各标 0.5（soft label）会怎样？</li>
+<li>手算一个 3 分类、2 个样本的 <code>cross_entropy_loss</code>，和程序输出对一下。</li>
+<li>尝试用 <code>mse_loss</code> 替代 <code>cross_entropy_loss</code> 训练分类任务（直接把 logits 往 one-hot 上回归），观察效果差异。</li>
+</ol>
+<h2><a href="#10-本课总结" aria-hidden="true" class="anchor" id="user-content-10-本课总结"></a>10. 本课总结</h2>
+<ul>
+<li><strong>MSE</strong>：回归任务的 <code>mean((pred - target)²)</code></li>
+<li><strong>CrossEntropy</strong>：one-hot + log_softmax → 取负 → 取均值，分类任务标配（LLM 用它）</li>
+<li><strong>SGD</strong>：<code>θ = θ - lr·g</code>，一行代码一个循环</li>
+<li><strong>训练循环</strong> = 前向 → 反向 → 更新 → 清零，四步缺一不可</li>
+<li>下一课：把 Linear、ReLU、CrossEntropy、SGD 拼起来，训练第一个 MLP！</li>
+</ul>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-05/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-07/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a></div></div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

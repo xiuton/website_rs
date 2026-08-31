@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34 - 干徒</title>
+    <meta name="description" content="完整训练一个小型 GPT 模型，观察 loss 从 4.06 一路下降到 0.34。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, GPT">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-16">
+    <meta property="og:title" content="第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34 - 干徒">
+    <meta property="og:description" content="完整训练一个小型 GPT 模型，观察 loss 从 4.06 一路下降到 0.34。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-16">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34 - 干徒">
+    <meta name="twitter:description" content="完整训练一个小型 GPT 模型，观察 loss 从 4.06 一路下降到 0.34。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34","description":"完整训练一个小型 GPT 模型，观察 loss 从 4.06 一路下降到 0.34。","url":"https://ganto.me/post/rust-llm-guide-16","datePublished":"2026-09-17","dateModified":"2026-09-17","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, GPT","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-c64c465a01d82915.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-17</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">GPT</span></div>
+                <div class="blog-content">
+<h1><a href="#第-16-课训练小-gpt--看-loss-从-406-一路降到-034" aria-hidden="true" class="anchor" id="user-content-第-16-课训练小-gpt--看-loss-从-406-一路降到-034"></a>第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</h1>
+<blockquote>
+<p>代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/main.rs">src/main.rs</a>（<code>demo_gpt</code>）
+代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/train.rs">src/train.rs</a>（<code>train_gpt</code> / <code>LRScheduler</code> / <code>clip_grad_norm</code>）
+代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/data.rs">src/data.rs</a>（<code>CORPUS</code> / <code>DataLoader</code>）
+代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/sample.rs">src/sample.rs</a>（<code>generate</code> / <code>sample_token</code>）</p>
+</blockquote>
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li><code>demo_gpt</code> 从数据到生成文本，完整流程分哪几步？</li>
+<li>只有 669 个字符的小语料，训练日志里的 <code>step / lr / loss</code> 三列怎么读？</li>
+<li>warmup 阶段学习率为什么是 <code>0.00012</code> 起步？cosine 衰减在日志里怎么体现？</li>
+<li>temperature、top-k、top-p 三个参数是怎么配合采样的？</li>
+<li>为什么 loss 已经降到 0.34，模型输出的文本依然只是&quot;像样&quot;而不是&quot;正确&quot;？</li>
+</ol>
+<h2><a href="#2-训练全景demo_gpt-做了什么" aria-hidden="true" class="anchor" id="user-content-2-训练全景demo_gpt-做了什么"></a>2. 训练全景：demo_gpt 做了什么</h2>
+<p><code>src/main.rs</code> 的演示 3（第 12-16、17-20 课）是本节的主角：</p>
+<pre><code class="language-rust">fn demo_gpt() {
+    println!(&quot;=== 演示 3：训练小 GPT 并生成文本 ===&quot;);
+
+    let mut rng = Rng::new(1234);
+    let tokenizer = CharTokenizer::new(CORPUS);
+    let vocab_size = tokenizer.vocab_size();
+    println!(&quot;  语料 {} 字符，字符词表 {} 个&quot;, CORPUS.len(), vocab_size);
+
+    let model = GPT::new(GPTConfig::tiny(vocab_size), &amp;mut rng);
+
+    // 训练（第 13、17、20 课：训练循环 + AdamW + warmup/cosine 调度）
+    let loader = DataLoader::new(CORPUS, &amp;tokenizer, model.cfg.block_size, 8);
+    train::train_gpt(&amp;model, &amp;tokenizer, &amp;loader, 600, 8, 3e-3, 50, 100, &amp;mut rng);
+
+    // 生成（无 cache）
+    println!(&quot;\n  —— 生成 1（temperature=0.8, top-k=10, top-p=0.9, 无 KV cache）——&quot;);
+    let out1 = generate(&amp;model, &amp;tokenizer, &quot;Once upon a&quot;, 80, 0.8, 10, 0.9, false, &amp;mut rng);
+    println!(&quot;  {}&quot;, out1);
+
+    // 生成（带 KV cache，第 18 课）
+    println!(&quot;\n  —— 生成 2（temperature=0.8, top-k=10, top-p=0.9, 带 KV cache）——&quot;);
+    let out2 = generate(&amp;model, &amp;tokenizer, &quot;The fox&quot;, 80, 0.8, 10, 0.9, true, &amp;mut rng);
+    println!(&quot;  {}&quot;, out2);
+    println!(&quot;\n  （KV cache 只改计算方式、不改生成分布，两者应高度一致）&quot;);
+}
+</code></pre>
+<p>整个流程可以拆成 5 步：</p>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>代码</th>
+<th>做了什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. 分词</td>
+<td><code>CharTokenizer::new(CORPUS)</code></td>
+<td>扫描语料，得到 35 个字符的词表</td>
+</tr>
+<tr>
+<td>2. 建模型</td>
+<td><code>GPT::new(GPTConfig::tiny(vocab_size), &amp;mut rng)</code></td>
+<td>用 tiny 配置（n_embd=64、n_head=4、n_layer=2、block_size=32）初始化模型</td>
+</tr>
+<tr>
+<td>3. 造数据</td>
+<td><code>DataLoader::new(CORPUS, &amp;tokenizer, 32, 8)</code></td>
+<td>把 669 字符的语料切成 token 序列，按 block_size=32 切块、batch_size=8</td>
+</tr>
+<tr>
+<td>4. 训练</td>
+<td><code>train_gpt(..., 600, 8, 3e-3, 50, 100, ...)</code></td>
+<td>600 步，峰值学习率 3e-3，前 50 步 warmup，每 100 步打印一次</td>
+</tr>
+<tr>
+<td>5. 生成</td>
+<td><code>generate(..., &quot;Once upon a&quot;, 80, 0.8, 10, 0.9, false, ...)</code></td>
+<td>给定开头，最多续写 80 个字符</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>注意：训练用的是字符级分词器，所以&quot;1 个字符 = 1 个 token&quot;，语料 669 个字符就是 669 个 token。这让后面的数字（32、80）可以直接按&quot;字符数&quot;理解。</p>
+</blockquote>
+<h2><a href="#3-数据669-字符的小语料" aria-hidden="true" class="anchor" id="user-content-3-数据669-字符的小语料"></a>3. 数据：669 字符的小语料</h2>
+<p><code>src/data.rs</code> 里内置了一篇英文小故事（狐狸 Red 找金钥匙）：</p>
+<pre><code class="language-rust">pub const CORPUS: &amp;str = &quot;\
+Once upon a time in a small village, there lived a curious little fox named Red. \
+Every morning, Red would wake up early and explore the forest. ...&quot;;
+</code></pre>
+<p>训练数据是<strong>自监督</strong>的：输入 x 是一段 32 个 token 的序列，标签 y 是 x 右移一位——每个位置都预测&quot;下一个字符是谁&quot;，文本自己就是标签，不需要人工标注。</p>
+<p><code>DataLoader::sample_batch</code> 每次随机选 8 个起点，各截 33 个 token（前 32 个作 x，后 32 个作 y）：</p>
+<pre><code class="language-rust">pub fn sample_batch(&amp;self, rng: &amp;mut Rng) -&gt; (Vec&lt;usize&gt;, Vec&lt;usize&gt;) {
+    let max_start = self.tokens.len() - self.block_size - 1;
+    let mut x = Vec::with_capacity(self.batch_size * self.block_size);
+    let mut y = Vec::with_capacity(self.batch_size * self.block_size);
+    for _ in 0..self.batch_size {
+        let start = rng.choice(max_start);
+        for j in 0..self.block_size {
+            x.push(self.tokens[start + j]);
+            y.push(self.tokens[start + j + 1]);
+        }
+    }
+    (x, y)
+}
+</code></pre>
+<p>关键点：</p>
+<ul>
+<li><strong>随机采样而非顺序扫描</strong>：每次 <code>sample_batch</code> 都在语料里随机挑起点。语料只有 669 token，但 600 步 × 8 个 batch 会反复&quot;看到&quot;语料的不同片段（有些片段会被重复看，有的可能一次都没被抽到）——小语料训练天然就是&quot;背课文&quot;。</li>
+<li>返回的 x、y 都是 <code>[B*T] = [8×32] = [256]</code> 的展平数组，正好满足 <code>GPT::forward(idx, b=8, t=32, None)</code> 的输入要求（训练时 <code>kv_cache</code> 传 <code>None</code>）。</li>
+</ul>
+<h2><a href="#4-超参数一览" aria-hidden="true" class="anchor" id="user-content-4-超参数一览"></a>4. 超参数一览</h2>
+<p><code>train_gpt</code> 的调用参数与 <code>GPTConfig::tiny</code> 汇总：</p>
+<table>
+<thead>
+<tr>
+<th>超参数</th>
+<th>值</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>steps</code></td>
+<td>600</td>
+<td>总训练步数</td>
+</tr>
+<tr>
+<td><code>batch_size</code></td>
+<td>8</td>
+<td>每步采样 8 条序列（每条 32 token）</td>
+</tr>
+<tr>
+<td><code>block_size</code></td>
+<td>32</td>
+<td>最大上下文长度，来自 <code>GPTConfig::tiny</code></td>
+</tr>
+<tr>
+<td><code>max_lr</code></td>
+<td>3e-3</td>
+<td>学习率峰值</td>
+</tr>
+<tr>
+<td><code>warmup_steps</code></td>
+<td>50</td>
+<td>前 50 步学习率从 0 线性爬升到峰值</td>
+</tr>
+<tr>
+<td><code>min_lr</code></td>
+<td>max_lr × 0.1 = 3e-4</td>
+<td>cosine 衰减的终点（<code>LRScheduler::new</code> 里算的）</td>
+</tr>
+<tr>
+<td><code>weight_decay</code></td>
+<td>0.01</td>
+<td>AdamW 的权重衰减（第 17 课）</td>
+</tr>
+<tr>
+<td><code>max_norm</code>（梯度裁剪）</td>
+<td>1.0</td>
+<td>梯度范数上限（<code>clip_grad_norm</code>）</td>
+</tr>
+<tr>
+<td><code>eval_every</code></td>
+<td>100</td>
+<td>每 100 步打印一次日志</td>
+</tr>
+</tbody>
+</table>
+<p>模型参数量：<code>train_gpt</code> 开头会打印真实数字：</p>
+<pre><code>训练参数数量：104611
+</code></pre>
+<p>按第 12 课的方法验证一下：词表 V=35（不是 100）时，<code>tok_emb = 35×64 = 2240</code>，每层 Block ≈ 49984，两层 ≈ 99968，<code>ln_f = 128</code>，<code>lm_head = 64×35+35 = 2275</code>，总计 <strong>2240 + 99968 + 128 + 2275 = 104611</strong> ✓。约 10 万参数，CPU 上几秒就能跑完整个 demo。</p>
+<h2><a href="#5-真实训练日志解读" aria-hidden="true" class="anchor" id="user-content-5-真实训练日志解读"></a>5. 真实训练日志解读</h2>
+<p>运行 <code>cargo run --release</code>，演示 3 会打印（这是<strong>真实运行输出</strong>，不是编的）：</p>
+<pre><code>=== 演示 3：训练小 GPT 并生成文本 ===
+  语料 669 字符，字符词表 35 个
+训练参数数量：104611
+step     0 | lr 0.00012 | loss 4.0569
+step   100 | lr 0.00294 | loss 2.2772
+step   200 | lr 0.00253 | loss 1.8047
+step   300 | lr 0.00183 | loss 0.9119
+step   400 | lr 0.00108 | loss 0.5509
+step   500 | lr 0.00051 | loss 0.3939
+step   599 | lr 0.00030 | loss 0.3351
+</code></pre>
+<h3><a href="#51-三列日志分别是什么" aria-hidden="true" class="anchor" id="user-content-51-三列日志分别是什么"></a>5.1 三列日志分别是什么</h3>
+<table>
+<thead>
+<tr>
+<th>列</th>
+<th>含义</th>
+<th>从哪来</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>step</code></td>
+<td>训练步数（从 0 到 599）</td>
+<td><code>train_gpt</code> 的循环变量</td>
+</tr>
+<tr>
+<td><code>lr</code></td>
+<td>当前学习率（打印前一刻的值）</td>
+<td><code>scheduler.lr()</code></td>
+</tr>
+<tr>
+<td><code>loss</code></td>
+<td>本步 batch 的平均交叉熵</td>
+<td><code>cross_entropy_loss(&amp;logits, &amp;y)</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>train_gpt</code> 里每步做 6 件事，日志打印在最后：</p>
+<pre><code class="language-rust">for step in 0..steps {
+    let (x, y) = loader.sample_batch(rng);          // 1. 采样 batch
+    let logits = model.forward(&amp;x, b, t, None);     // 2. 前向
+    let loss = cross_entropy_loss(&amp;logits, &amp;y);     //    算损失
+    loss.backward();                                // 3. 反向
+    clip_grad_norm(&amp;params, 1.0);                   // 4. 梯度裁剪
+    opt.lr = scheduler.lr();                        // 5. 更新参数（设置当前 lr）
+    opt.step();
+    opt.zero_grad();                                // 6. 清零梯度
+    scheduler.step();
+    // 每 eval_every 步（或最后一步）打印
+    println!(&quot;step {:&gt;5} | lr {:.5} | loss {:.4}&quot;, step, scheduler.lr(), loss.data()[0]);
+}
+</code></pre>
+<h3><a href="#52-loss406--034-说明了什么" aria-hidden="true" class="anchor" id="user-content-52-loss406--034-说明了什么"></a>5.2 loss：4.06 → 0.34 说明了什么</h3>
+<ul>
+<li><strong>起步 4.06</strong>：随机初始化时，模型对 35 个字符基本&quot;一视同仁&quot;，理论下界是均匀分布的交叉熵 <code>ln(35) ≈ 3.56</code>。4.06 略高于它，是因为初始权重并不完全均匀、且首批样本有随机性。loss 在 4 附近徘徊，说明模型&quot;啥也没学会&quot;。</li>
+<li><strong>先快后慢</strong>：前 300 步 loss 从 4.06 掉到 0.91（降了 78%），后 300 步只从 0.91 掉到 0.34。这是训练曲线的典型形态——早期梯度大、方向明确，后期接近收敛、只能精雕细琢。</li>
+<li><strong>终点 0.34</strong>：交叉熵 0.34 意味着模型给&quot;正确下一个字符&quot;的平均概率约为 <code>exp(-0.34) ≈ 0.71</code>。对一篇 669 字符的&quot;课文&quot;来说，模型已经相当好地&quot;背&quot;下了其中的统计规律。</li>
+</ul>
+<h3><a href="#53-warmup-阶段lr-从-000012-爬升" aria-hidden="true" class="anchor" id="user-content-53-warmup-阶段lr-从-000012-爬升"></a>5.3 warmup 阶段：lr 从 0.00012 爬升</h3>
+<p><code>LRScheduler</code> 的规则（<code>src/train.rs</code>）：</p>
+<pre><code class="language-rust">pub fn lr(&amp;self) -&gt; f32 {
+    if self.step &lt; self.warmup_steps {
+        // 线性 warmup
+        self.max_lr * (self.step as f32 + 1.0) / self.warmup_steps.max(1) as f32
+    } else {
+        // cosine 衰减
+        let progress = (self.step - self.warmup_steps) as f32
+            / (self.total_steps - self.warmup_steps).max(1) as f32;
+        let progress = progress.min(1.0);
+        let cosine = 0.5 * (1.0 + (std::f32::consts::PI * progress).cos());
+        self.min_lr + (self.max_lr - self.min_lr) * cosine
+    }
+}
+</code></pre>
+<p>warmup 就是前 50 步让学习率<strong>线性爬升</strong>：</p>
+<pre><code>lr(step) = max_lr × (step + 1) / warmup_steps     （step &lt; 50 时）
+</code></pre>
+<p>代入 <code>max_lr = 0.003</code>、<code>warmup_steps = 50</code>：</p>
+<table>
+<thead>
+<tr>
+<th>scheduler.step</th>
+<th>计算</th>
+<th>lr</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0（真正用于第 1 步更新）</td>
+<td>0.003 × 1 / 50</td>
+<td>0.00006</td>
+</tr>
+<tr>
+<td>1</td>
+<td>0.003 × 2 / 50</td>
+<td>0.00012</td>
+</tr>
+<tr>
+<td>25</td>
+<td>0.003 × 26 / 50</td>
+<td>0.00156</td>
+</tr>
+<tr>
+<td>50（warmup 结束）</td>
+<td>0.003 × 51 / 50</td>
+<td>≈ 0.00306（峰值）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>日志里 <code>step 0 | lr 0.00012</code>：因为打印发生在 <code>scheduler.step()</code> 之后，所以显示的是&quot;下一步&quot;的学习率；第 1 步更新实际用的是 6e-5。这只是打印时机的 1 步错位，不影响理解——<strong>前 50 步 lr 从接近 0 线性爬到峰值 0.003</strong>。</p>
+<p>为什么要 warmup？训练刚开始时参数是随机值，梯度方向噪声大、量级不可控。如果一上来就用 0.003 的大步长，很容易把参数&quot;推飞&quot;（loss 直接变成 NaN）。先用小步长稳住方向，再逐渐加力，是现代 LLM 训练的标准做法。</p>
+</blockquote>
+<h3><a href="#54-cosine-衰减从峰值平滑降回-min_lr" aria-hidden="true" class="anchor" id="user-content-54-cosine-衰减从峰值平滑降回-min_lr"></a>5.4 cosine 衰减：从峰值平滑降回 min_lr</h3>
+<p>第 50 步之后走 cosine 曲线，从 <code>max_lr = 0.003</code> 平滑降到 <code>min_lr = 0.003 × 0.1 = 0.0003</code>：</p>
+<pre><code>lr = min_lr + (max_lr - min_lr) × 0.5 × (1 + cos(π × progress))
+progress = (step - 50) / (600 - 50)，超过 1 就截断到 1
+</code></pre>
+<p>验证日志里的两个数字：</p>
+<ul>
+<li><code>step 100</code>：<code>progress = (101-50)/550 ≈ 0.0927</code>，<code>cosine ≈ 0.9789</code>，<code>lr = 0.0003 + 0.0027×0.9789 ≈ 0.00294</code> ✓</li>
+<li><code>step 599</code>：<code>progress = (600-50)/550 = 1.0</code>，<code>cosine = 0.5×(1+cos π) = 0</code>，<code>lr = min_lr = 0.00030</code> ✓</li>
+</ul>
+<p>学习率全程曲线：</p>
+<pre><code>lr
+│
+0.003 ┤        ╭╮
+      │       ╭╯ ╰╮
+0.002 ┤      ╭╯    ╰╮
+      │     ╭╯      ╰╮
+0.001 ┤    ╭╯        ╰╮
+      │   ╭╯          ╰╮
+0.0003┤──╯             ╰────── (min_lr)
+      └──┬────┬────┬────┬────→ step
+         0   100  200  300  400  500  600
+         └warmup(50步)┘└─── cosine 衰减 ───┘
+</code></pre>
+<p>后期的&quot;小步慢走&quot;是为了在 loss 接近收敛时不震荡、精细地落到更优的参数点。</p>
+<h2><a href="#6-生成文本与采样参数" aria-hidden="true" class="anchor" id="user-content-6-生成文本与采样参数"></a>6. 生成文本与采样参数</h2>
+<p>训练 600 步后调用 <code>generate</code>（<code>src/sample.rs</code>），参数 <code>(prompt, max_new=80, temperature=0.8, top_k=10, top_p=0.9)</code>。</p>
+<p><code>sample_token</code> 内部的 6 步采样管线：</p>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>代码</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. 温度缩放</td>
+<td><code>l / temperature.max(1e-5)</code></td>
+<td>除以 0.8：logits 变大 → softmax 更&quot;锐利&quot;，更敢选高概率 token</td>
+</tr>
+<tr>
+<td>2. 排序</td>
+<td><code>items.sort_by(...)</code></td>
+<td>按分数从高到低排</td>
+</tr>
+<tr>
+<td>3. top-k</td>
+<td><code>items.truncate(top_k)</code></td>
+<td>只留前 10 个</td>
+</tr>
+<tr>
+<td>4. softmax</td>
+<td><code>(*v - max).exp()</code> 再归一化</td>
+<td>把截断后的分数变成概率</td>
+</tr>
+<tr>
+<td>5. top-p</td>
+<td>累积概率到 0.9 截断</td>
+<td>进一步砍掉长尾低概率 token，再归一化</td>
+</tr>
+<tr>
+<td>6. 抽样</td>
+<td><code>rng.next_f32()</code> 按概率累积选取</td>
+<td>有随机性地选一个 token</td>
+</tr>
+</tbody>
+</table>
+<p>真实生成结果（<code>cargo run --release</code> 原样输出）：</p>
+<pre><code>  —— 生成 1（temperature=0.8, top-k=10, top-p=0.9, 无 KV cache）——
+  Once upon a to his friend, the wise old owl. One day, Red found a wold of colors and turned
+
+  —— 生成 2（temperature=0.8, top-k=10, top-p=0.9, 带 KV cache）——
+  The fox the hidden garden, whe li
+</code></pre>
+<p>（生成 2 用的是另一个 prompt &quot;The fox&quot;，且因缓存模式上下文达到 block_size=32 提前停止，第 18 课会专门讲；生成 1 在无缓存模式下把 80 个新字符完整生成完了。）</p>
+<p>读这段输出：模型学会了故事的结构——&quot;Once upon a...&quot; 开头、&quot;his friend, the wise old owl&quot;、主谓宾、句号逗号，甚至复现了语料里的 &quot;hidden garden&quot; 词组。<strong>字面上&quot;像样&quot;，但仔细读全是毛病</strong>：<code>a to</code> 语法不通、<code>wold of colors</code> 应该是 <code>world of colors</code>、句子戛然而止。这就是下一节要回答的问题。</p>
+<h2><a href="#7-为什么小模型输出只是像样而非正确" aria-hidden="true" class="anchor" id="user-content-7-为什么小模型输出只是像样而非正确"></a>7. 为什么小模型输出只是&quot;像样&quot;而非&quot;正确&quot;</h2>
+<p>四个层面叠加，缺一不可：</p>
+<table>
+<thead>
+<tr>
+<th>原因</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>语料太小</strong></td>
+<td>只有 669 字符、单一故事。模型只能&quot;背&quot;这篇课文里的统计规律，从未见过通用英语，谈不上泛化</td>
+</tr>
+<tr>
+<td><strong>模型太小</strong></td>
+<td>10 万参数 vs 真实 LLM 的数十亿～万亿参数。容量只够记住局部 n-gram 统计（&quot;Red&quot; 后常跟动词、名词前常有 the），装不下真正的语法规则</td>
+</tr>
+<tr>
+<td><strong>训练不足</strong></td>
+<td>600 步后 loss 仍为 0.34（正确概率仅 71%），远未收敛到 0。模型对很多位置仍&quot;没把握&quot;</td>
+</tr>
+<tr>
+<td><strong>采样带随机性</strong></td>
+<td>temperature=0.8 + top-k/top-p 是有意引入随机性。即使模型 100% 会预测 &quot;world&quot;，采样也可能选到 &quot;wold&quot;——这是&quot;创造性&quot;的代价</td>
+</tr>
+</tbody>
+</table>
+<p>用一句话总结：<strong>&quot;像样&quot;来自学到了语料的高频统计规律；&quot;不正确&quot;来自语料/模型/训练都不足以学到完整语法，再加上采样本身的随机性。</strong> 想要更&quot;正确&quot;，方向是加大语料、加大模型、多训几步（后面第 19、20 课还会继续优化），但永远不可能在 669 字符上学出真正的英语——这也侧面说明了为什么现代 LLM 需要 TB 级数据和千亿参数。</p>
+<h2><a href="#8-动手练习" aria-hidden="true" class="anchor" id="user-content-8-动手练习"></a>8. 动手练习</h2>
+<ol>
+<li><strong>改种子观察差异</strong>：把 <code>demo_gpt</code> 里 <code>Rng::new(1234)</code> 改成别的数字（如 42），重新 <code>cargo run --release</code>。loss 曲线和生成文本都会变——思考：为什么损失曲线也会变？（提示：采样 batch 的随机起点变了）</li>
+<li><strong>改 warmup</strong>：把 <code>train_gpt</code> 的 <code>warmup_steps</code> 从 50 改成 5 和 500，分别跑一次，对比前 100 步的 loss。体会&quot;warmup 太短容易起飞、太长浪费步数&quot;。</li>
+<li><strong>改生成参数</strong>：把 <code>generate</code> 的 <code>temperature</code> 改成 0.2 和 1.5 各跑一次。观察文本变得更&quot;死板/重复&quot;还是更&quot;发散/乱&quot;。</li>
+<li><strong>数 token</strong>：验证第 5.4 节——打印 <code>scheduler.lr()</code> 在 step 100、599 的计算过程，对照日志里的 <code>0.00294</code> 和 <code>0.00030</code>。</li>
+<li><strong>思考</strong>：loss 从 4.06 降到 0.34，但为什么不能说&quot;模型学会了英语&quot;？模型&quot;学会&quot;的到底是什么？</li>
+</ol>
+<h2><a href="#9-本课总结" aria-hidden="true" class="anchor" id="user-content-9-本课总结"></a>9. 本课总结</h2>
+<ul>
+<li>
+<p><code>demo_gpt</code> 五步走：分词 → 建模型 → 造数据 → <code>train_gpt</code> 训练 600 步 → <code>generate</code> 采样生成</p>
+</li>
+<li>
+<p>数据是自监督的：x 是 32 个 token，y 是 x 右移一位，预测&quot;下一个字符&quot;</p>
+</li>
+<li>
+<p>真实日志：loss <code>4.06 → 0.34</code>，前 300 步降得最快；lr 前 50 步从 <code>0.00012</code> 线性爬到峰值 <code>0.003</code>，之后 cosine 衰减到 <code>0.0003</code></p>
+</li>
+<li>
+<p>生成用 <code>temperature=0.8 + top-k=10 + top-p=0.9</code>：先缩放、再截断、再按概率随机抽样</p>
+</li>
+<li>
+<p>小模型输出&quot;像样而非正确&quot;：语料太小、模型太小、训练不足、采样随机，四者叠加</p>
+</li>
+<li>
+<p>下一课：换掉朴素的 SGD，给优化器装上&quot;动量 + 自适应步长 + 权重衰减&quot;——AdamW。</p>
+</li>
+</ul>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-15/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-17/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a></div></div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

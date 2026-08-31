@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 1 课：张量 Tensor —— 一切的基础 - 干徒</title>
+    <meta name="description" content="张量是深度学习里所有数据的统一容器，本课从零实现多维数组、内存布局与矩阵乘法。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 张量">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-01">
+    <meta property="og:title" content="第 1 课：张量 Tensor —— 一切的基础 - 干徒">
+    <meta property="og:description" content="张量是深度学习里所有数据的统一容器，本课从零实现多维数组、内存布局与矩阵乘法。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-01">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 1 课：张量 Tensor —— 一切的基础 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 1 课：张量 Tensor —— 一切的基础 - 干徒">
+    <meta name="twitter:description" content="张量是深度学习里所有数据的统一容器，本课从零实现多维数组、内存布局与矩阵乘法。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 1 课：张量 Tensor —— 一切的基础","description":"张量是深度学习里所有数据的统一容器，本课从零实现多维数组、内存布局与矩阵乘法。","url":"https://ganto.me/post/rust-llm-guide-01","datePublished":"2026-09-02","dateModified":"2026-09-02","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 张量","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-c64c465a01d82915.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 1 课：张量 Tensor —— 一切的基础</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-02</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">张量</span></div>
+                <div class="blog-content">
+<h1><a href="#第-1-课张量-tensor--一切的基础" aria-hidden="true" class="anchor" id="user-content-第-1-课张量-tensor--一切的基础"></a>第 1 课：张量 Tensor —— 一切的基础</h1>
+<blockquote>
+<p>代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/tensor.rs">src/tensor.rs</a>
+演示入口：<a href="file:///d:/Code/Rust/llm_from_scratch/src/main.rs">src/main.rs</a></p>
+</blockquote>
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li>什么是张量？为什么深度学习离不开它？</li>
+<li>计算机内存是&quot;一维&quot;的，多维数据怎么存？</li>
+<li>矩阵乘法到底在算什么？代码怎么写？</li>
+</ol>
+<h2><a href="#2-什么是张量" aria-hidden="true" class="anchor" id="user-content-2-什么是张量"></a>2. 什么是张量</h2>
+<p><strong>张量（Tensor）就是多维数组</strong>，是深度学习里所有数据的统一容器：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>名称</th>
+<th>例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>标量 (scalar)</td>
+<td>损失值 0.37</td>
+</tr>
+<tr>
+<td>1</td>
+<td>向量 (vector)</td>
+<td>一个词被表示成 [0.1, -0.3, 0.8, ...]</td>
+</tr>
+<tr>
+<td>2</td>
+<td>矩阵 (matrix)</td>
+<td>一批词向量堆在一起</td>
+</tr>
+<tr>
+<td>3</td>
+<td>3 维张量</td>
+<td>一批文本（每条文本是一串词向量）</td>
+</tr>
+<tr>
+<td>4</td>
+<td>4 维张量</td>
+<td>一批图像（高×宽×通道）</td>
+</tr>
+</tbody>
+</table>
+<p>在我们的实现里，张量由两部分构成：</p>
+<pre><code class="language-rust">pub struct Tensor {
+    pub data: Vec&lt;f32&gt;,      // 所有数值，展平成一维数组
+    pub shape: Vec&lt;usize&gt;,   // 每个维度的大小
+}
+</code></pre>
+<p><strong>关键思想</strong>：内存只有一维，但我们可以通过 <code>shape</code> 决定&quot;怎么解释&quot;这些数。</p>
+<h2><a href="#3-行优先存储row-major" aria-hidden="true" class="anchor" id="user-content-3-行优先存储row-major"></a>3. 行优先存储（Row-Major）</h2>
+<p>假设我们要存一个 2×3 的矩阵：</p>
+<pre><code>[ 1 2 3 ]
+[ 4 5 6 ]
+</code></pre>
+<p><strong>行优先</strong>就是&quot;一行一行地平铺&quot;：<code>[1, 2, 3, 4, 5, 6]</code>。</p>
+<p>那么&quot;第 i 行第 j 列&quot;的元素在数组里的下标是：</p>
+<pre><code>下标 = i * 列数 + j
+</code></pre>
+<p>例如矩阵里的元素 5，它在视觉上是&quot;第 2 行第 2 列&quot;，但编程里的行号、列号都<strong>从 0 开始数</strong>，
+所以行下标 i=1、列下标 j=1，列数=3：
+<code>下标 = 1*3 + 1 = 4</code>，<code>data[4] = 5</code> ✓</p>
+<blockquote>
+<p>容易混淆的点：<strong>&quot;第 1 行&quot; 和 &quot;行下标 1&quot; 不是一回事</strong>。
+行下标 1 其实是指视觉上的第 2 行。Rust 数组下标（<code>vec[i]</code>）也都是从 0 开始的。</p>
+</blockquote>
+<p>我们把这段逻辑写成了通用函数 <code>flat_index</code>，支持任意维度：</p>
+<pre><code class="language-rust">fn flat_index(&amp;self, index: &amp;[usize]) -&gt; usize {
+    let mut flat = 0;
+    for (i, &amp;idx) in index.iter().enumerate() {
+        flat = flat * self.shape[i] + idx;
+    }
+    flat
+}
+</code></pre>
+<h2><a href="#4-逐元素运算element-wise" aria-hidden="true" class="anchor" id="user-content-4-逐元素运算element-wise"></a>4. 逐元素运算（Element-wise）</h2>
+<p>两个形状相同的张量，对应位置各自做运算：</p>
+<ul>
+<li>加法：<code>c[i] = a[i] + b[i]</code></li>
+<li>减法：<code>c[i] = a[i] - b[i]</code></li>
+<li>乘法（Hadamard 积）：<code>c[i] = a[i] * b[i]</code></li>
+</ul>
+<p>Rust 里用 <code>zip</code> 可以优雅地实现：</p>
+<pre><code class="language-rust">pub fn add(&amp;self, other: &amp;Tensor) -&gt; Tensor {
+    assert_eq!(self.shape, other.shape, &quot;加法要求形状相同&quot;);
+    Tensor {
+        data: self.data.iter().zip(&amp;other.data).map(|(a, b)| a + b).collect(),
+        shape: self.shape.clone(),
+    }
+}
+</code></pre>
+<blockquote>
+<p>注意：逐元素乘法 <code>*</code> 和矩阵乘法 <code>@</code> 是完全不同的两件事！很多人刚开始会混淆。</p>
+</blockquote>
+<h2><a href="#5-矩阵乘法matrix-multiplication" aria-hidden="true" class="anchor" id="user-content-5-矩阵乘法matrix-multiplication"></a>5. 矩阵乘法（Matrix Multiplication）</h2>
+<p>这是神经网络里<strong>最重要的运算</strong>。一个线性层 <code>y = xW + b</code> 本质就是矩阵乘法。</p>
+<p><strong>数学定义</strong>：设 A 是 m×k，B 是 k×n，则 C = A×B 是 m×n，其中：</p>
+<pre><code>C[i][j] = Σ(k) A[i][k] * B[k][j]
+</code></pre>
+<p><strong>几何直觉</strong>：C 的第 i 行第 j 列 = A 的第 i 行 与 B 的第 j 列 的<strong>点积</strong>（对应位置相乘再求和）。</p>
+<p><strong>朴素实现</strong>（三重循环）：</p>
+<pre><code class="language-rust">pub fn matmul(&amp;self, other: &amp;Tensor) -&gt; Tensor {
+    let (m, k1) = (self.shape[0], self.shape[1]);
+    let (k2, n) = (other.shape[0], other.shape[1]);
+    assert_eq!(k1, k2, &quot;矩阵乘法维度不匹配&quot;);
+
+    let mut result = vec![0.0; m * n];
+    for i in 0..m {
+        for j in 0..n {
+            let mut sum = 0.0;
+            for k in 0..k1 {
+                sum += self.data[i * k1 + k] * other.data[k * n + j];
+            }
+            result[i * n + j] = sum;
+        }
+    }
+    Tensor { data: result, shape: vec![m, n] }
+}
+</code></pre>
+<p>验证一下：</p>
+<pre><code>[1 2]   [5 6]   [1*5+2*7  1*6+2*8]   [19 22]
+[3 4] × [7 8] = [3*5+4*7  3*6+4*8] = [43 50]
+</code></pre>
+<p>程序输出正是 <code>[19, 22, 43, 50]</code> ✓</p>
+<blockquote>
+<p>提示：三重循环复杂度是 O(m·n·k)。真实框架会用各种优化（分块、SIMD、GPU），
+我们后面课程会逐步改进，但<strong>先保证正确，再谈效率</strong>。</p>
+</blockquote>
+<h2><a href="#6-转置与-reshape" aria-hidden="true" class="anchor" id="user-content-6-转置与-reshape"></a>6. 转置与 reshape</h2>
+<ul>
+<li><strong>转置 (transpose)</strong>：m×n → n×m，<code>C[j][i] = A[i][j]</code>。后续反向传播中很常用。</li>
+<li><strong>reshape</strong>：只改变形状、不改变数据。<code>[1,2,3,4,5,6]</code> 可以是 2×3，也可以是 3×2，数据顺序不变。</li>
+</ul>
+<pre><code class="language-rust">let a = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![2, 3]);
+let b = a.reshape(vec![3, 2]);   // 形状变了，数据还是 [1..6]
+</code></pre>
+<h2><a href="#7-防御性编程习惯" aria-hidden="true" class="anchor" id="user-content-7-防御性编程习惯"></a>7. 防御性编程习惯</h2>
+<p>好代码应该&quot;出错早、出错明显&quot;。我们做了两个校验：</p>
+<pre><code class="language-rust">assert_eq!(data.len(), numel, &quot;数据长度与形状要求不一致&quot;);
+assert!(idx &lt; self.shape[i], &quot;索引越界&quot;);
+</code></pre>
+<p>这样一旦传错参数，程序立刻 panic 并告诉我们哪里错了，而不是静默产生错误结果。</p>
+<h2><a href="#8-运行与测试" aria-hidden="true" class="anchor" id="user-content-8-运行与测试"></a>8. 运行与测试</h2>
+<pre><code class="language-bash">cargo run      # 运行演示
+cargo test     # 运行单元测试（5 个全部通过）
+</code></pre>
+<h2><a href="#9-动手练习" aria-hidden="true" class="anchor" id="user-content-9-动手练习"></a>9. 动手练习</h2>
+<ol>
+<li>写一个函数 <code>scalar_dot(a: &amp;Tensor, b: &amp;Tensor) -&gt; f32</code>，计算两个 1 维张量的点积。</li>
+<li>给 <code>Tensor</code> 加一个 <code>apply(f: impl Fn(f32) -&gt; f32)</code> 方法，对每个元素应用函数
+（这个能力下一课做激活函数时会用到）。</li>
+<li>思考：<code>matmul</code> 为什么要求&quot;A 的列数 == B 的行数&quot;？如果 A 是 3×2、B 是 2×4，结果形状是什么？</li>
+</ol>
+<h2><a href="#10-本课总结" aria-hidden="true" class="anchor" id="user-content-10-本课总结"></a>10. 本课总结</h2>
+<ul>
+<li>张量 = 数据 + 形状，内存用行优先存储</li>
+<li>学会了：创建、reshape、转置、逐元素运算、矩阵乘法</li>
+<li>验证了矩阵乘法结果的正确性</li>
+<li>下一课：给张量加上&quot;梯度&quot;和自动微分，让它能学习！</li>
+</ul>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-00/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-02/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a></div></div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

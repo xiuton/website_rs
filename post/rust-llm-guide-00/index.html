@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>从零用 Rust 实现大语言模型 —— 学习计划 - 干徒</title>
+    <meta name="description" content="不使用任何深度学习框架，仅用 Rust 标准库从零手写张量、自动微分、Transformer，最终训练出一个能生成文本的小型 GPT 模型。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 学习计划">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-00">
+    <meta property="og:title" content="从零用 Rust 实现大语言模型 —— 学习计划 - 干徒">
+    <meta property="og:description" content="不使用任何深度学习框架，仅用 Rust 标准库从零手写张量、自动微分、Transformer，最终训练出一个能生成文本的小型 GPT 模型。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-00">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="从零用 Rust 实现大语言模型 —— 学习计划 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="从零用 Rust 实现大语言模型 —— 学习计划 - 干徒">
+    <meta name="twitter:description" content="不使用任何深度学习框架，仅用 Rust 标准库从零手写张量、自动微分、Transformer，最终训练出一个能生成文本的小型 GPT 模型。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"从零用 Rust 实现大语言模型 —— 学习计划","description":"不使用任何深度学习框架，仅用 Rust 标准库从零手写张量、自动微分、Transformer，最终训练出一个能生成文本的小型 GPT 模型。","url":"https://ganto.me/post/rust-llm-guide-00","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 学习计划","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-c64c465a01d82915.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>从零用 Rust 实现大语言模型 —— 学习计划</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-01</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">学习计划</span></div>
+                <div class="blog-content">
+<h1><a href="#从零用-rust-实现大语言模型--学习计划" aria-hidden="true" class="anchor" id="user-content-从零用-rust-实现大语言模型--学习计划"></a>从零用 Rust 实现大语言模型 —— 学习计划</h1>
+<blockquote>
+<p>目标：不使用任何深度学习框架（如 tch-rs / candle / burn），仅用 Rust 标准库，
+从零手写张量、自动微分、神经网络层、Transformer 架构，最终训练出一个能生成文本的小型 GPT 模型。</p>
+<p>核心理念：<strong>每一步都亲自动手实现，每一步都配套教程文档。</strong>
+每节课的文档都在 <code>docs/</code> 目录下，代码在 <code>src/</code> 目录下，一一对应。</p>
+</blockquote>
+<h2><a href="#为什么从零写" aria-hidden="true" class="anchor" id="user-content-为什么从零写"></a>为什么从零写？</h2>
+<ul>
+<li>学习张量/自动微分/反向传播，才能真正理解 PyTorch 等框架背后的原理。</li>
+<li>理解每一个数学公式如何变成一行行代码。</li>
+<li>训练过程透明可控，随时可以打印中间结果检查正确性。</li>
+</ul>
+<h2><a href="#依赖策略" aria-hidden="true" class="anchor" id="user-content-依赖策略"></a>依赖策略</h2>
+<ul>
+<li><strong>原则上零依赖</strong>：所有张量、数学运算、自动微分、网络层全部自己写。</li>
+<li>允许极少量工具库，使用时会明确说明并解释其作用（例如 <code>rand</code> 用于生成随机数）。</li>
+<li>每新增一个依赖都必须有理由，不能&quot;图省事&quot;。</li>
+</ul>
+<h2><a href="#总体路线图6-个阶段20-课" aria-hidden="true" class="anchor" id="user-content-总体路线图6-个阶段20-课"></a>总体路线图（6 个阶段，20 课）</h2>
+<h3><a href="#阶段一地基--张量与自动微分第-1-4-课" aria-hidden="true" class="anchor" id="user-content-阶段一地基--张量与自动微分第-1-4-课"></a>阶段一：地基 —— 张量与自动微分（第 1-4 课）</h3>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>01</td>
+<td>张量 Tensor</td>
+<td>数据布局、形状、reshape、逐元素运算、矩阵乘法</td>
+</tr>
+<tr>
+<td>02</td>
+<td>自动微分 Autograd</td>
+<td>计算图、反向传播、梯度链式法则</td>
+</tr>
+<tr>
+<td>03</td>
+<td>张量运算扩展</td>
+<td>广播、sum/mean、softmax、广播减法</td>
+</tr>
+<tr>
+<td>04</td>
+<td>模块化重构</td>
+<td>把张量库整理成独立模块，为上层打基础</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#阶段二神经网络基础第-5-7-课" aria-hidden="true" class="anchor" id="user-content-阶段二神经网络基础第-5-7-课"></a>阶段二：神经网络基础（第 5-7 课）</h3>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>05</td>
+<td>线性层与激活函数</td>
+<td>Linear、ReLU、Sigmoid、Tanh、参数管理</td>
+</tr>
+<tr>
+<td>06</td>
+<td>损失函数与优化器</td>
+<td>CrossEntropy、MSE、SGD、梯度下降原理</td>
+</tr>
+<tr>
+<td>07</td>
+<td>第一个 MLP</td>
+<td>用自己写的库训练 XOR / 分类任务，验证反向传播正确性</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#阶段三分词器第-8-课" aria-hidden="true" class="anchor" id="user-content-阶段三分词器第-8-课"></a>阶段三：分词器（第 8 课）</h3>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>08</td>
+<td>BPE 分词器</td>
+<td>文本→token、字节级编码、词表构建</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#阶段四transformer-架构第-9-12-课" aria-hidden="true" class="anchor" id="user-content-阶段四transformer-架构第-9-12-课"></a>阶段四：Transformer 架构（第 9-12 课）</h3>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>09</td>
+<td>注意力机制</td>
+<td>Scaled Dot-Product Attention、softmax、mask</td>
+</tr>
+<tr>
+<td>10</td>
+<td>多头注意力</td>
+<td>Multi-Head Attention、权重拼接</td>
+</tr>
+<tr>
+<td>11</td>
+<td>位置编码</td>
+<td>正弦位置编码、LayerNorm、残差连接</td>
+</tr>
+<tr>
+<td>12</td>
+<td>完整 GPT 模型</td>
+<td>Transformer Block、Embedding、输出头</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#阶段五训练与推理第-13-16-课" aria-hidden="true" class="anchor" id="user-content-阶段五训练与推理第-13-16-课"></a>阶段五：训练与推理（第 13-16 课）</h3>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>13</td>
+<td>训练循环</td>
+<td>前向/反向/更新、损失下降观察、梯度裁剪</td>
+</tr>
+<tr>
+<td>14</td>
+<td>数据加载</td>
+<td>数据集处理、batch、序列化样本构造</td>
+</tr>
+<tr>
+<td>15</td>
+<td>推理与采样</td>
+<td>temperature、top-k、top-p 采样</td>
+</tr>
+<tr>
+<td>16</td>
+<td>训练小 GPT</td>
+<td>在小型数据集上训练并生成有意义的文本</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#阶段六进阶优化第-17-20-课" aria-hidden="true" class="anchor" id="user-content-阶段六进阶优化第-17-20-课"></a>阶段六：进阶优化（第 17-20 课）</h3>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>17</td>
+<td>AdamW 优化器</td>
+<td>动量、自适应学习率、权重衰减</td>
+</tr>
+<tr>
+<td>18</td>
+<td>KV Cache</td>
+<td>推理加速，逐步生成时避免重复计算</td>
+</tr>
+<tr>
+<td>19</td>
+<td>RoPE 旋转位置编码</td>
+<td>现代 LLM 的位置编码方式</td>
+</tr>
+<tr>
+<td>20</td>
+<td>学习率调度与收尾</td>
+<td>warmup、cosine decay、总结与展望</td>
+</tr>
+</tbody>
+</table>
+<h2><a href="#每个阶段会学到的核心数学ml-概念" aria-hidden="true" class="anchor" id="user-content-每个阶段会学到的核心数学ml-概念"></a>每个阶段会学到的核心数学/ML 概念</h2>
+<ul>
+<li><strong>线性代数</strong>：矩阵乘法、转置、点积（第 1、5 课）</li>
+<li><strong>微积分</strong>：偏导数、链式法则、梯度（第 2 课）</li>
+<li><strong>概率</strong>：softmax、交叉熵、采样（第 6、15 课）</li>
+<li><strong>优化</strong>：梯度下降、学习率、动量（第 6、7、17 课）</li>
+<li><strong>深度学习</strong>：反向传播、正则化、归一化（第 2、5、11 课）</li>
+<li><strong>NLP</strong>：分词、词嵌入、注意力、Transformer（第 8-12 课）</li>
+</ul>
+<h2><a href="#推荐阅读顺序" aria-hidden="true" class="anchor" id="user-content-推荐阅读顺序"></a>推荐阅读顺序</h2>
+<ol>
+<li>先读每课的教程文档（<code>docs/XX-xxx.md</code>），理解原理。</li>
+<li>再看对应源码（<code>src/</code>），对照实现。</li>
+<li>自己动手改代码、跑实验，验证理解。</li>
+<li>完成课后&quot;动手练习&quot;。</li>
+</ol>
+<h2><a href="#验收标准" aria-hidden="true" class="anchor" id="user-content-验收标准"></a>验收标准</h2>
+<ul>
+<li>每一课结束，<code>cargo run</code> 能正常运行并输出预期结果。</li>
+<li>每一课都有配套文档，说明原理 + 代码讲解 + 练习。</li>
+<li>第 7 课结束时，我们的 MLP 能在 XOR 任务上收敛（验证自动微分正确）。</li>
+<li>第 16 课结束时，模型能生成通顺的短文本。</li>
+</ul>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item active" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div><div class="series-nav-pager"><span class="series-nav-page disabled">已经是第一章</span><a class="series-nav-page next" href="/post/rust-llm-guide-01/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 1 课：张量 Tensor —— 一切的基础</span></a></div></div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

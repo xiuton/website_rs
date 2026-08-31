@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型 - 干徒</title>
+    <meta name="description" content="组合 Embedding、TransformerBlock、LayerNorm 等积木，拼出完整的 GPT 模型结构。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, GPT">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-12">
+    <meta property="og:title" content="第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型 - 干徒">
+    <meta property="og:description" content="组合 Embedding、TransformerBlock、LayerNorm 等积木，拼出完整的 GPT 模型结构。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-12">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型 - 干徒">
+    <meta name="twitter:description" content="组合 Embedding、TransformerBlock、LayerNorm 等积木，拼出完整的 GPT 模型结构。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型","description":"组合 Embedding、TransformerBlock、LayerNorm 等积木，拼出完整的 GPT 模型结构。","url":"https://ganto.me/post/rust-llm-guide-12","datePublished":"2026-09-13","dateModified":"2026-09-13","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, GPT","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-c64c465a01d82915.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-13</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">GPT</span></div>
+                <div class="blog-content">
+<h1><a href="#第-12-课完整-gpt-模型--把积木拼成能预测下一个词的模型" aria-hidden="true" class="anchor" id="user-content-第-12-课完整-gpt-模型--把积木拼成能预测下一个词的模型"></a>第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</h1>
+<blockquote>
+<p>代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/model.rs">src/model.rs</a>（<code>GPTConfig</code> / <code>GPT</code> / <code>TransformerBlock</code> / <code>MultiHeadAttention</code>）
+代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/layers.rs">src/layers.rs</a>（<code>Embedding</code> / <code>Linear</code> / <code>LayerNorm</code> / <code>gelu</code>）
+演示入口：<a href="file:///d:/Code/Rust/llm_from_scratch/src/main.rs">src/main.rs</a>（演示 3：训练小 GPT 并生成文本）</p>
+</blockquote>
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li>一个完整的 GPT 由哪几大块组成？各自负责什么？</li>
+<li>Transformer Block 内部的数据是怎么流动的？pre-norm 到底&quot;pre&quot;在哪？</li>
+<li>输入一串 token id，经过 <code>GPT::forward</code> 后形状怎么一步步变成 logits？</li>
+<li><code>GPTConfig::tiny</code> 里每个数字（64 / 4 / 2 / 32）分别代表什么？</li>
+</ol>
+<h2><a href="#2-gpt-架构总览" aria-hidden="true" class="anchor" id="user-content-2-gpt-架构总览"></a>2. GPT 架构总览</h2>
+<p>把前几课的积木全部拼起来，就是完整的 GPT：</p>
+<pre><code>              ┌───────────────────────────────┐
+ token id     │  tok_emb: Embedding [V, D]    │  ← 每个 token 查表成向量
+              └───────────────────────────────┘
+              ┌───────────────────────────────┐
+              │  pos_emb: 正弦位置编码 [T, D]   │  ← 常数，告诉模型位置（第 11 课）
+              └───────────────────────────────┘
+              │        x = tok + pos_emb       │
+              ┌───────────────────────────────┐
+              │  blocks: N 层 Transformer      │  ← 注意力找相关性 + MLP 加工信息
+              │  Block（本课第 3 节）           │
+              └───────────────────────────────┘
+              ┌───────────────────────────────┐
+              │  ln_f: 最终 LayerNorm          │  ← 输出前再归一化一次
+              └───────────────────────────────┘
+              ┌───────────────────────────────┐
+              │  lm_head: Linear [D, V]        │  ← 映射成对每个词的打分
+              └───────────────────────────────┘
+                      logits [B*T, V]（预测下一个 token）
+</code></pre>
+<p>对应的 Rust 结构体（<code>src/model.rs</code>）：</p>
+<pre><code class="language-rust">/// 完整的 GPT 模型
+pub struct GPT {
+    pub cfg: GPTConfig,
+    tok_emb: Embedding,
+    pos_emb: Tensor, // 正弦位置编码 [block_size, D]（常数，不参与训练）
+    blocks: Vec&lt;TransformerBlock&gt;,
+    ln_f: LayerNorm,
+    lm_head: Linear, // [D, vocab]
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>作用</th>
+<th>对应积木（第几课）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cfg</code></td>
+<td><code>GPTConfig</code></td>
+<td>保存模型配置（维度、层数……）</td>
+<td>——</td>
+</tr>
+<tr>
+<td><code>tok_emb</code></td>
+<td><code>Embedding</code></td>
+<td>token id → 向量，查表 <code>[V, D]</code></td>
+<td>第 12 课（<code>layers.rs</code>）</td>
+</tr>
+<tr>
+<td><code>pos_emb</code></td>
+<td><code>Tensor</code></td>
+<td>正弦位置编码，<code>[block_size, D]</code>，<strong>不参与训练</strong></td>
+<td>第 11 课</td>
+</tr>
+<tr>
+<td><code>blocks</code></td>
+<td><code>Vec&lt;TransformerBlock&gt;</code></td>
+<td>N 层 Transformer Block，重复堆叠</td>
+<td>第 9-11 课</td>
+</tr>
+<tr>
+<td><code>ln_f</code></td>
+<td><code>LayerNorm</code></td>
+<td>输出前的最后归一化</td>
+<td>第 11 课</td>
+</tr>
+<tr>
+<td><code>lm_head</code></td>
+<td><code>Linear</code></td>
+<td><code>[D, V]</code>，把向量映射成对每个词的分数</td>
+<td>第 5 课</td>
+</tr>
+</tbody>
+</table>
+<p>在 <code>GPT::new</code> 里把它们创建出来：</p>
+<pre><code class="language-rust">pub fn new(cfg: GPTConfig, rng: &amp;mut Rng) -&gt; Self {
+    let n_embd = cfg.n_embd;
+    let vocab_size = cfg.vocab_size;
+    let pos_emb = Tensor::from_vec(
+        sinusoidal_positions(cfg.block_size, cfg.n_embd),
+        vec![cfg.block_size, cfg.n_embd],
+    );
+    let blocks = (0..cfg.n_layer).map(|_| TransformerBlock::new(&amp;cfg, rng)).collect();
+    GPT {
+        cfg,
+        tok_emb: Embedding::new(vocab_size, n_embd, rng),
+        pos_emb,
+        blocks,
+        ln_f: LayerNorm::new(n_embd, 1e-5),
+        lm_head: Linear::new(n_embd, vocab_size, rng),
+    }
+}
+</code></pre>
+<p>注意 <code>blocks</code> 是 <code>(0..cfg.n_layer).map(...).collect()</code>——<strong>同一份代码复制 N 份</strong>，层数完全由配置决定，想加深网络只要改一个数字。</p>
+<h2><a href="#3-transformerblock-内部结构" aria-hidden="true" class="anchor" id="user-content-3-transformerblock-内部结构"></a>3. TransformerBlock 内部结构</h2>
+<h3><a href="#31-pre-norm-结构" aria-hidden="true" class="anchor" id="user-content-31-pre-norm-结构"></a>3.1 pre-norm 结构</h3>
+<p>每个 Block 内部是&quot;两个子层 + 各自残差&quot;的 pre-norm 结构（第 11 课讲过 pre-norm 的好处）：</p>
+<pre><code>x ──► LN1 ──► MultiHeadAttention ──► (+残差) ──► LN2 ──► MLP(GELU) ──► (+残差) ──► 输出
+      │                                ▲          │                        ▲
+      └────────────────────────────────┘          └────────────────────────┘
+            加回输入 x（残差连接）                         加回输入 x（残差连接）
+</code></pre>
+<p>对应的结构体与 forward：</p>
+<pre><code class="language-rust">/// Transformer Block（第 11 课）
+///
+/// 结构（GPT-2 风格，pre-norm）：
+///   x -&gt; LayerNorm -&gt; Attention -&gt; 残差 +
+///   x -&gt; LayerNorm -&gt; MLP(GELU)  -&gt; 残差 +
+struct TransformerBlock {
+    ln1: LayerNorm,
+    attn: MultiHeadAttention,
+    ln2: LayerNorm,
+    mlp_linear1: Linear, // [D, 4D]
+    mlp_linear2: Linear, // [4D, D]
+}
+
+impl TransformerBlock {
+    fn forward(&amp;self, x: &amp;Tensor, mask: &amp;Tensor, kv_cache: Option&lt;&amp;mut KVCache&gt;) -&gt; Tensor {
+        // 注意力子层 + 残差连接
+        let h = self.attn.forward(&amp;self.ln1.forward(x), mask, kv_cache);
+        let x = x.add(&amp;h);
+        // 前馈子层 + 残差连接
+        let h = self.ln2.forward(&amp;x);
+        let h = gelu(&amp;self.mlp_linear1.forward(&amp;h));
+        let h = self.mlp_linear2.forward(&amp;h);
+        x.add(&amp;h)
+    }
+}
+</code></pre>
+<p>逐行拆解：</p>
+<table>
+<thead>
+<tr>
+<th>代码</th>
+<th>在做什么</th>
+<th>对应结构</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>self.ln1.forward(x)</code></td>
+<td>先归一化（pre-norm 的&quot;pre&quot;）</td>
+<td><code>x → LN1</code></td>
+</tr>
+<tr>
+<td><code>self.attn.forward(..., mask, kv_cache)</code></td>
+<td>多头注意力（第 10 课），<code>mask</code> 保证只能看过去</td>
+<td><code>→ Attention</code></td>
+</tr>
+<tr>
+<td><code>let x = x.add(&amp;h);</code></td>
+<td>注意力输出 + 输入（残差连接）</td>
+<td><code>+ 残差</code></td>
+</tr>
+<tr>
+<td><code>self.ln2.forward(&amp;x)</code></td>
+<td>再归一化</td>
+<td><code>→ LN2</code></td>
+</tr>
+<tr>
+<td><code>self.mlp_linear1.forward(&amp;h)</code></td>
+<td>升维到 4D：<code>[D] → [4D]</code>（每层 MLP 把维度先放大 4 倍）</td>
+<td><code>→ MLP 第一层</code></td>
+</tr>
+<tr>
+<td><code>gelu(...)</code></td>
+<td>GELU 激活（第 5 课，GPT 系列默认激活，比 ReLU 平滑）</td>
+<td><code>→ 激活</code></td>
+</tr>
+<tr>
+<td><code>self.mlp_linear2.forward(&amp;h)</code></td>
+<td>降维回 D：<code>[4D] → [D]</code></td>
+<td><code>→ MLP 第二层</code></td>
+</tr>
+<tr>
+<td><code>x.add(&amp;h)</code></td>
+<td>第二个残差连接</td>
+<td><code>+ 残差</code></td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#32-为什么-mlp-要先升维再降维" aria-hidden="true" class="anchor" id="user-content-32-为什么-mlp-要先升维再降维"></a>3.2 为什么 MLP 要&quot;先升维再降维&quot;</h3>
+<p>前馈子层 <code>MLP(D → 4D → D)</code> 是 Transformer 里唯一&quot;逐位置&quot;加工信息的部件（注意力负责&quot;跨位置&quot;交换信息，MLP 负责&quot;在每个位置上&quot;独立加工）：</p>
+<pre><code>MLP:  D → 4D → D
+       │      │
+   先放大   再压缩
+  （特征空间更丰富，    （恢复原维度，方便残差相加）
+   更容易学非线性）
+</code></pre>
+<p><code>4D</code> 是 GPT-2 论文里的惯例比例。MLP 和注意力形成互补：<strong>注意力负责&quot;找谁相关&quot;，MLP 负责&quot;想清楚该怎么表达&quot;。</strong></p>
+<h2><a href="#4-gptforward-数据流" aria-hidden="true" class="anchor" id="user-content-4-gptforward-数据流"></a>4. GPT::forward 数据流</h2>
+<h3><a href="#41-输入与输出" aria-hidden="true" class="anchor" id="user-content-41-输入与输出"></a>4.1 输入与输出</h3>
+<pre><code class="language-rust">pub fn forward(
+    &amp;self,
+    idx: &amp;[usize],          // [B*T] 展平的 token id
+    b: usize,               // batch 大小
+    t: usize,               // 序列长度
+    mut kv_cache: Option&lt;&amp;mut Vec&lt;KVCache&gt;&gt;,  // 推理缓存（第 18 课，训练时传 None）
+) -&gt; Tensor {
+</code></pre>
+<ul>
+<li><strong>输入</strong>：<code>idx</code> 是一维数组，长度 <code>b * t</code>，里面是 token id（比如 <code>[2, 5, 9, 3]</code> 表示一条样本 4 个词）。</li>
+<li><strong>输出</strong>：<code>logits</code>，形状 <code>[B*T, vocab_size]</code>——每个位置对&quot;下一个词是谁&quot;的打分。</li>
+</ul>
+<h3><a href="#42-五步数据流" aria-hidden="true" class="anchor" id="user-content-42-五步数据流"></a>4.2 五步数据流</h3>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>代码</th>
+<th>形状变化</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0. 输入</td>
+<td><code>idx: &amp;[usize]</code></td>
+<td><code>[B*T]</code></td>
+</tr>
+<tr>
+<td>1. token embedding</td>
+<td><code>self.tok_emb.forward(idx).reshape(vec![b, t, d])</code></td>
+<td><code>[B*T] → [B*T, D] → [B, T, D]</code></td>
+</tr>
+<tr>
+<td>2. 位置编码</td>
+<td><code>self.pos_emb.gather_rows(&amp;positions).reshape(vec![b, t, d])</code></td>
+<td><code>[B, T, D]</code>（与 tok 同形状）</td>
+</tr>
+<tr>
+<td>—— 相加</td>
+<td><code>let x = tok.add(&amp;pos_emb);</code></td>
+<td><code>[B, T, D]</code>（第 11 课：语义+位置）</td>
+</tr>
+<tr>
+<td>3. 构造因果掩码</td>
+<td><code>Tensor::from_vec(mask_data, vec![t, t_total])</code></td>
+<td><code>[T, T_total]</code>（未来位置为 -inf）</td>
+</tr>
+<tr>
+<td>4. 逐层 Transformer Block</td>
+<td><code>x = block.forward(&amp;x, &amp;mask, cache);</code></td>
+<td><code>[B, T, D]</code> → <code>[B, T, D]</code>（层内拆头又合并，形状不变）</td>
+</tr>
+<tr>
+<td>5. 最终归一化 + 输出头</td>
+<td><code>ln_f.forward(&amp;x)</code> 然后 <code>reshape(vec![b * t, d])</code>，<code>lm_head.forward(&amp;x)</code></td>
+<td><code>[B, T, D] → [B*T, D] → [B*T, V]</code></td>
+</tr>
+</tbody>
+</table>
+<p>完整代码：</p>
+<pre><code class="language-rust">let d = self.cfg.n_embd;
+assert_eq!(idx.len(), b * t, &quot;输入 id 数量必须等于 b*t&quot;);
+
+// 1. token embedding
+let tok = self.tok_emb.forward(idx).reshape(vec![b, t, d]);
+
+// 2. 位置编码：KV cache 推理时，当前位置从缓存长度开始
+let base = kv_cache
+    .as_ref()
+    .map(|c| c.first().map(|k| k.seq_len()).unwrap_or(0))
+    .unwrap_or(0);
+let mut positions = Vec::with_capacity(b * t);
+for _ in 0..b {
+    for j in 0..t {
+        positions.push(base + j);
+    }
+}
+let pos_emb = self.pos_emb.gather_rows(&amp;positions).reshape(vec![b, t, d]);
+let x = tok.add(&amp;pos_emb);
+
+// 3. 因果掩码：scores 形状 [B*H, T, T_total]，广播 mask [T, T_total]
+let t_total = t + base;
+let mut mask_data = vec![0.0f32; t * t_total];
+for i in 0..t {
+    for j in 0..t_total {
+        if j &gt; i + base {
+            mask_data[i * t_total + j] = f32::NEG_INFINITY;
+        }
+    }
+}
+let mask = Tensor::from_vec(mask_data, vec![t, t_total]);
+
+// 4. 逐层过 Transformer Block
+let mut x = x;
+for (i, block) in self.blocks.iter().enumerate() {
+    let cache = kv_cache.as_mut().map(|c| &amp;mut c[i]);
+    x = block.forward(&amp;x, &amp;mask, cache);
+}
+
+// 5. 最终归一化 + 输出头
+let x = self.ln_f.forward(&amp;x);
+let x = x.reshape(vec![b * t, d]);
+self.lm_head.forward(&amp;x)
+</code></pre>
+<p>几个容易忽略的细节：</p>
+<ol>
+<li><strong><code>gather_rows</code> 取位置行</strong>：<code>pos_emb</code> 是 <code>[block_size, D]</code>，<code>positions</code> 里存的是每个 token 的位置（<code>base + j</code>），<code>gather_rows</code> 按行取出对应的位置向量（第 1 课学的查表）。</li>
+<li><strong>因果掩码的构造</strong>：<code>j &gt; i + base</code> 的位置设为 <code>-inf</code>。也就是说第 i 个 token 只能看到&quot;它自己和它前面的&quot;（含 KV cache 里的历史位置），未来位置在 softmax 后概率为 0——保证模型只能预测下一个词、不能偷看答案。</li>
+<li><strong>最终形状</strong>：<code>lm_head</code> 是 <code>Linear [D, V]</code>，把每个位置的 <code>[D]</code> 向量打分成 <code>[V]</code> 个词的分数，所以输出是 <code>[B*T, V]</code>。</li>
+</ol>
+<h3><a href="#43-一张形状变化总表" aria-hidden="true" class="anchor" id="user-content-43-一张形状变化总表"></a>4.3 一张形状变化总表</h3>
+<p>以 <code>b=1, t=4, n_embd=64, vocab=100</code> 为例：</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>形状</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>idx</code></td>
+<td><code>[4]</code></td>
+<td>4 个 token id</td>
+</tr>
+<tr>
+<td><code>tok_emb.forward(idx)</code></td>
+<td><code>[4, 64]</code> → reshape <code>[1, 4, 64]</code></td>
+<td>每个 token 的语义向量</td>
+</tr>
+<tr>
+<td><code>pos_emb</code></td>
+<td><code>[1, 4, 64]</code></td>
+<td>每个 token 的位置向量</td>
+</tr>
+<tr>
+<td><code>x = tok + pos_emb</code></td>
+<td><code>[1, 4, 64]</code></td>
+<td>语义 + 位置</td>
+</tr>
+<tr>
+<td>注意力内部</td>
+<td>scores <code>[4, 4]</code>（1 个 batch、4 头时 <code>[4, 4, 4]</code>）</td>
+<td>相关性打分</td>
+</tr>
+<tr>
+<td>过完 2 个 Block</td>
+<td><code>[1, 4, 64]</code></td>
+<td>形状不变，信息被加工</td>
+</tr>
+<tr>
+<td><code>ln_f</code> 后</td>
+<td><code>[1, 4, 64]</code></td>
+<td>归一化</td>
+</tr>
+<tr>
+<td>reshape</td>
+<td><code>[4, 64]</code></td>
+<td>展平 B、T 两维</td>
+</tr>
+<tr>
+<td><code>lm_head</code></td>
+<td><code>[4, 100]</code></td>
+<td>每个位置对 100 个词的分数 = logits</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>全程只有两处形状变化：<code>tok_emb</code> 之后从 <code>[B*T, D]</code> 变成 <code>[B, T, D]</code>（为了层内处理），<code>lm_head</code> 之前从 <code>[B, T, D]</code> 变回 <code>[B*T, D]</code>（因为 <code>Linear</code> 把 3D 输入自动展平，输出再还原）。中间的注意力拆头/合头都在 Block 内部完成，外部看到的一直是 <code>[B, T, D]</code>。</p>
+</blockquote>
+<h2><a href="#5-gptconfigtiny-配置解读" aria-hidden="true" class="anchor" id="user-content-5-gptconfigtiny-配置解读"></a>5. GPTConfig::tiny 配置解读</h2>
+<pre><code class="language-rust">/// 一个小配置，适合学习演示
+pub fn tiny(vocab_size: usize) -&gt; Self {
+    GPTConfig {
+        vocab_size,
+        n_embd: 64,
+        n_head: 4,
+        n_layer: 2,
+        block_size: 32,
+    }
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>值</th>
+<th>含义</th>
+<th>影响</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vocab_size</code></td>
+<td>由调用者传入</td>
+<td>词表大小（有多少种 token）</td>
+<td>决定 <code>tok_emb</code> 表行数和 <code>lm_head</code> 输出维度</td>
+</tr>
+<tr>
+<td><code>n_embd</code></td>
+<td>64</td>
+<td>隐藏维度 D：每个 token 的向量长度</td>
+<td>所有层的宽度，模型&quot;容量&quot;的核心</td>
+</tr>
+<tr>
+<td><code>n_head</code></td>
+<td>4</td>
+<td>注意力头数</td>
+<td><code>head_dim = D / H = 64 / 4 = 16</code>，每个头在 16 维子空间找相关性</td>
+</tr>
+<tr>
+<td><code>n_layer</code></td>
+<td>2</td>
+<td>Transformer Block 层数</td>
+<td>网络深度（原版 GPT-2 是 12~48 层）</td>
+</tr>
+<tr>
+<td><code>block_size</code></td>
+<td>32</td>
+<td>最大上下文长度</td>
+<td>位置编码表 <code>[32, 64]</code> 的宽度；序列超过 32 个 token 就没位置编码可用</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#51-由配置推导出的关键数字" aria-hidden="true" class="anchor" id="user-content-51-由配置推导出的关键数字"></a>5.1 由配置推导出的关键数字</h3>
+<ul>
+<li><strong>每个头处理多少维</strong>：<code>head_dim = n_embd / n_head = 64 / 4 = 16</code>（<code>MultiHeadAttention::forward</code> 里有断言 <code>head_dim * n_head == d</code>，配置必须能整除）。</li>
+<li><strong>每层的形状</strong>：注意力 4 个 Linear 都是 <code>[64, 64]</code>；MLP 是 <code>[64, 256]</code> 和 <code>[256, 64]</code>（4 倍升维）。</li>
+<li><strong>位置编码表</strong>：<code>[block_size=32, n_embd=64]</code>，一共 32×64 个常数。</li>
+</ul>
+<h3><a href="#52-粗略参数量估算" aria-hidden="true" class="anchor" id="user-content-52-粗略参数量估算"></a>5.2 粗略参数量估算</h3>
+<p>设词表大小 = V，参数量约：</p>
+<table>
+<thead>
+<tr>
+<th>部件</th>
+<th>参数量</th>
+<th>tiny（V=100）时</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tok_emb</code></td>
+<td>V × 64</td>
+<td>6,400</td>
+</tr>
+<tr>
+<td>每个 Block 注意力（q/k/v/proj）</td>
+<td>4 × (64×64 + 64)</td>
+<td>16,640</td>
+</tr>
+<tr>
+<td>每个 Block MLP（两个 Linear）</td>
+<td>64×256+256 + 256×64+64</td>
+<td>33,088</td>
+</tr>
+<tr>
+<td>每个 Block 两个 LayerNorm</td>
+<td>2 × (64+64)</td>
+<td>256</td>
+</tr>
+<tr>
+<td>每层合计</td>
+<td>——</td>
+<td>≈ 49,984</td>
+</tr>
+<tr>
+<td>2 层 Block</td>
+<td>——</td>
+<td>≈ 99,968</td>
+</tr>
+<tr>
+<td><code>ln_f</code></td>
+<td>64 + 64</td>
+<td>128</td>
+</tr>
+<tr>
+<td><code>lm_head</code></td>
+<td>64×V + V</td>
+<td>6,500</td>
+</tr>
+<tr>
+<td><strong>总计</strong></td>
+<td>——</td>
+<td><strong>≈ 113,000（约 11 万参数）</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>真实 GPT-2 Small 有 1.17 亿参数（n_embd=768、n_layer=12、n_head=12）。我们的 tiny 把它缩小了约 1000 倍，纯粹是为了<strong>能在普通 CPU 上几秒钟跑一步训练</strong>，把原理讲清楚。</p>
+</blockquote>
+<h2><a href="#6-动手练习" aria-hidden="true" class="anchor" id="user-content-6-动手练习"></a>6. 动手练习</h2>
+<ol>
+<li><strong>手推数据流</strong>：设 <code>vocab=50, b=2, t=3</code>，用 tiny 配置，写出 <code>GPT::forward</code> 里每一步张量的形状（从 <code>idx</code> 到 <code>logits</code>），对照第 4.3 节的表检查。</li>
+<li><strong>改配置</strong>：自己加一个 <code>GPTConfig::small</code>，比如 <code>n_embd=128, n_head=8, n_layer=4, block_size=64</code>。注意 <code>head_dim = 128/8 = 16</code> 仍成立；再按 5.2 节的表估一下参数量。</li>
+<li><strong>验证 logits 形状</strong>：在 <code>main.rs</code> 演示 3 里，<code>model.forward(...)</code> 之后加一行打印 <code>logits.shape()</code>，确认是 <code>[B*T, V]</code>。</li>
+<li><strong>看 Block 内部分工</strong>：把 <code>mlp_linear1</code> 的维度改成 <code>2 * cfg.n_embd</code>（2 倍而不是 4 倍），训练看 loss 变化——体会 MLP 宽度对模型能力的影响。</li>
+<li><strong>思考</strong>：为什么 <code>lm_head</code> 和 <code>tok_emb</code> 可以&quot;共享权重&quot;（很多实现里是同一个矩阵的转置）？我们的代码里是两份独立参数，如果共享会省多少参数？（提示：<code>[V, D]</code> 和 <code>[D, V]</code> 恰好互为转置。）</li>
+</ol>
+<h2><a href="#7-本课总结" aria-hidden="true" class="anchor" id="user-content-7-本课总结"></a>7. 本课总结</h2>
+<ul>
+<li>
+<p>GPT 由 <strong>token embedding + 正弦位置编码 + N 层 Transformer Block + 最终 LayerNorm + lm_head</strong> 五大部分组成</p>
+</li>
+<li>
+<p>Transformer Block 是 <strong>pre-norm</strong> 结构：<code>LN → Attention → 残差</code>，再 <code>LN → MLP(GELU) → 残差</code>；MLP 做 <code>D → 4D → D</code> 的升维降维</p>
+</li>
+<li>
+<p><code>GPT::forward</code> 数据流：<code>idx [B*T] → [B, T, D] → ... → [B*T, V]</code>，只有进出输出头时形状变化，层内形状始终 <code>[B, T, D]</code></p>
+</li>
+<li>
+<p>因果掩码保证&quot;只能看过去&quot;，位置编码保证&quot;知道在哪&quot;</p>
+</li>
+<li>
+<p><code>tiny</code> 配置：<code>n_embd=64</code>、<code>n_head=4</code>（head_dim=16）、<code>n_layer=2</code>、<code>block_size=32</code>，约 11 万参数，CPU 上几分钟就能跑一轮训练</p>
+</li>
+<li>
+<p>下一课：写训练循环（前向 → 算损失 → 反向传播 → 更新参数），让这个 GPT 真的学会生成文本！</p>
+</li>
+</ul>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-11/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-13/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a></div></div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

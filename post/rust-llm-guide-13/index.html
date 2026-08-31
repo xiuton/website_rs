@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 13 课：训练循环 —— 让模型真正开始学习 - 干徒</title>
+    <meta name="description" content="编写完整的训练循环：前向、损失计算、反向传播与参数更新。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 训练">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-13">
+    <meta property="og:title" content="第 13 课：训练循环 —— 让模型真正开始学习 - 干徒">
+    <meta property="og:description" content="编写完整的训练循环：前向、损失计算、反向传播与参数更新。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-13">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 13 课：训练循环 —— 让模型真正开始学习 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 13 课：训练循环 —— 让模型真正开始学习 - 干徒">
+    <meta name="twitter:description" content="编写完整的训练循环：前向、损失计算、反向传播与参数更新。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 13 课：训练循环 —— 让模型真正开始学习","description":"编写完整的训练循环：前向、损失计算、反向传播与参数更新。","url":"https://ganto.me/post/rust-llm-guide-13","datePublished":"2026-09-14","dateModified":"2026-09-14","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 训练","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-c64c465a01d82915.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 13 课：训练循环 —— 让模型真正开始学习</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-14</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">训练</span></div>
+                <div class="blog-content">
+<h1><a href="#第-13-课训练循环--让模型真正开始学习" aria-hidden="true" class="anchor" id="user-content-第-13-课训练循环--让模型真正开始学习"></a>第 13 课：训练循环 —— 让模型真正开始学习</h1>
+<blockquote>
+<p>代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/train.rs">src/train.rs</a>
+演示入口：<a href="file:///d:/Code/Rust/llm_from_scratch/src/main.rs">src/main.rs</a></p>
+</blockquote>
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li>训练一个模型，代码上到底要做哪几步？顺序为什么不能乱？</li>
+<li><code>loss.backward()</code> 到底做了什么？为什么调用一次，所有参数的梯度就都有了？</li>
+<li>梯度爆炸是什么？<code>clip_grad_norm</code> 是怎么防止它的？</li>
+<li>为什么每步训练结束都要&quot;清零梯度&quot;？不清零会怎样？</li>
+</ol>
+<h2><a href="#2-训练循环总览六步走" aria-hidden="true" class="anchor" id="user-content-2-训练循环总览六步走"></a>2. 训练循环总览：六步走</h2>
+<p>训练 = 把&quot;前向 → 算损失 → 反向 → 更新&quot;这个动作反复执行成千上万次。
+<code>train_gpt</code> 里每一次循环（一个 step）严格按下面的顺序执行：</p>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>动作</th>
+<th>代码</th>
+<th>干什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>采样 batch</td>
+<td><code>loader.sample_batch(rng)</code></td>
+<td>从语料里随机取一批 (x, y) 训练对</td>
+</tr>
+<tr>
+<td>2</td>
+<td>前向 + 损失</td>
+<td><code>model.forward(...)</code> → <code>cross_entropy_loss(...)</code></td>
+<td>让模型预测一遍，算出&quot;错得有多离谱&quot;</td>
+</tr>
+<tr>
+<td>3</td>
+<td>反向</td>
+<td><code>loss.backward()</code></td>
+<td>沿计算图把损失对每个参数的偏导（梯度）算出来</td>
+</tr>
+<tr>
+<td>4</td>
+<td>梯度裁剪</td>
+<td><code>clip_grad_norm(&amp;params, 1.0)</code></td>
+<td>总梯度范数超阈值就等比缩小，防梯度爆炸</td>
+</tr>
+<tr>
+<td>5</td>
+<td>更新参数</td>
+<td><code>opt.step()</code></td>
+<td>按梯度方向调整每个参数，让损失变小</td>
+</tr>
+<tr>
+<td>6</td>
+<td>清零梯度</td>
+<td><code>opt.zero_grad()</code></td>
+<td>把梯度归零，为下一步重新计算做准备</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>顺序不能乱</strong>：前向必须发生在反向之前（没有前向就没有计算图）；更新必须发生在反向之后（没有梯度就没东西可更新）；清零必须放在最后（否则下一步的梯度会叠加在旧梯度上）。</p>
+</blockquote>
+<p>对应代码（<a href="file:///d:/Code/Rust/llm_from_scratch/src/train.rs">src/train.rs</a> 中的 <code>train_gpt</code>，省略了日志打印）：</p>
+<pre><code class="language-rust">for step in 0..steps {
+    // 1. 采样 batch
+    let (x, y) = loader.sample_batch(rng);
+    let b = batch_size;
+    let t = block_size;
+
+    // 2. 前向 + 损失
+    let logits = model.forward(&amp;x, b, t, None);
+    let loss = cross_entropy_loss(&amp;logits, &amp;y);
+
+    // 3. 反向
+    loss.backward();
+
+    // 4. 梯度裁剪
+    clip_grad_norm(&amp;params, 1.0);
+
+    // 5. 更新参数（设置当前学习率）
+    opt.lr = scheduler.lr();
+    opt.step();
+
+    // 6. 清零梯度
+    opt.zero_grad();
+    scheduler.step();
+}
+</code></pre>
+<p>下面把这六步逐一拆开讲。</p>
+<h2><a href="#3-准备阶段参数优化器学习率调度器" aria-hidden="true" class="anchor" id="user-content-3-准备阶段参数优化器学习率调度器"></a>3. 准备阶段：参数、优化器、学习率调度器</h2>
+<p>进入循环前，<code>train_gpt</code> 先做了三件准备工作：</p>
+<pre><code class="language-rust">let params = model.parameters();                 // 收集模型所有参数
+let mut opt = AdamW::new(max_lr, params.clone(), 0.01);   // 优化器（第 17 课详述）
+let mut scheduler = LRScheduler::new(warmup_steps, steps, max_lr, max_lr * 0.1); // 学习率调度（第 20 课详述）
+</code></pre>
+<ul>
+<li><code>parameters()</code>：通过第 5 课实现的 <code>Module</code> trait，把模型里所有可训练张量（embedding、每层 Linear、LayerNorm 的权重与偏置）收进一个 <code>Vec&lt;Tensor&gt;</code>。优化器更新和梯度裁剪都靠这份清单。</li>
+<li><code>AdamW</code>：负责&quot;怎么更新参数&quot;，内部为每个参数维护动量 m 和二阶动量 v（第 17 课专门讲）。</li>
+<li><code>LRScheduler</code>：决定每一步用多大的学习率——前期 warmup 从 0 线性爬升，后期 cosine 衰减。本课只需知道它输出一个学习率、赋值给 <code>opt.lr</code> 即可。</li>
+</ul>
+<h2><a href="#4-第一步采样-batch" aria-hidden="true" class="anchor" id="user-content-4-第一步采样-batch"></a>4. 第一步：采样 batch</h2>
+<pre><code class="language-rust">let (x, y) = loader.sample_batch(rng);
+</code></pre>
+<p><code>x</code> 是一批&quot;输入 token&quot;，<code>y</code> 是&quot;标准答案&quot;（下一个 token）。它们怎么来的、<code>batch_size</code> 和 <code>block_size</code> 是什么意思，是<strong>第 14 课</strong>的主题，本课先把它当黑盒：每次调用就得到一批新的 (x, y)。</p>
+<h2><a href="#5-第二步前向--损失" aria-hidden="true" class="anchor" id="user-content-5-第二步前向--损失"></a>5. 第二步：前向 + 损失</h2>
+<pre><code class="language-rust">let logits = model.forward(&amp;x, b, t, None);          // [B*T, vocab_size]
+let loss = cross_entropy_loss(&amp;logits, &amp;y);           // 标量
+</code></pre>
+<ul>
+<li><code>model.forward</code> 让数据走一遍整个 Transformer，输出 <code>logits</code>：每个位置&quot;预测下一个 token&quot;的分数（未归一化），形状 <code>[B*T, vocab_size]</code>。</li>
+<li><code>cross_entropy_loss</code>（第 6 课已实现）比较预测与标准答案 y：</li>
+</ul>
+<pre><code>loss = -mean( log softmax(logits)[i, y[i]] )
+</code></pre>
+<p>模型给正确 token 的概率越高，loss 越小；loss 为 0 意味着预测完全正确。训练的目标就是把这个数压到最低。</p>
+<h2><a href="#6-第三步反向--lossbackward-做了什么" aria-hidden="true" class="anchor" id="user-content-6-第三步反向--lossbackward-做了什么"></a>6. 第三步：反向 —— <code>loss.backward()</code> 做了什么</h2>
+<p>这是自动微分（第 2 课）的核心。看 <a href="file:///d:/Code/Rust/llm_from_scratch/src/tensor.rs">src/tensor.rs</a> 里的实现：</p>
+<pre><code class="language-rust">pub fn backward(&amp;self) {
+    assert_eq!(self.rank(), 0, &quot;backward() 只支持标量（0 维）输出&quot;);
+    // 1. 先把输出自身的梯度设为 1（d loss / d loss = 1）
+    g[0] = 1.0;
+
+    // 2. DFS 遍历计算图，得到&quot;拓扑序&quot;（先子节点后父节点）
+    fn dfs(t: &amp;Tensor, order: &amp;mut Vec&lt;Tensor&gt;, visited: &amp;mut HashSet&lt;usize&gt;) {
+        let key = Rc::as_ptr(&amp;t.data) as usize;
+        if !visited.insert(key) { return; }
+        for p in t.parents.iter() { dfs(p, order, visited); }
+        order.push(t.clone());
+    }
+
+    // 3. 把拓扑序反过来：从 loss 开始，一层一层往回传梯度
+    for t in order.iter().rev() {
+        if let Some(b) = &amp;t.backward { b(); }
+    }
+}
+</code></pre>
+<p>拆开看有三步：</p>
+<ol>
+<li><strong>初始化</strong>：把 loss 自己的梯度设为 1.0。因为我们要算的是 <code>∂loss/∂θ</code>，链式法则的起点就是 <code>∂loss/∂loss = 1</code>。</li>
+<li><strong>拓扑排序</strong>：前向时每个中间结果都记住了自己的 <code>parents</code>（谁算出了我）和 <code>backward</code>（如何把梯度传回给我的输入）。DFS 从 loss 出发往下走到所有叶子节点，得到&quot;先依赖、后被依赖&quot;的拓扑序。</li>
+<li><strong>逆序传播</strong>：按拓扑序的反向（从 loss 往参数方向）依次调用每个节点的 <code>backward</code> 闭包。每个节点把自己的梯度 <code>g</code> 按链式法则乘上局部导数，<strong>累加</strong>到它的输入（包括参数）的梯度上。</li>
+</ol>
+<pre><code>loss ──► softmax ──► matmul ──► ... ──► Linear(W) ──► embedding
+  g=1     累积到输入     累积到输入          累积到 W         累积到表
+</code></pre>
+<blockquote>
+<p>为什么是&quot;累加&quot;而不是&quot;赋值&quot;？因为一个参数会被计算图中很多地方共用（比如同一个权重矩阵被整批样本共享），每个分支的贡献都要加在一起，这才是真正的偏导数。</p>
+</blockquote>
+<p>所以调用一次 <code>loss.backward()</code>，<strong>模型里所有参数</strong>（<code>params</code> 里每个张量）的 <code>.grad()</code> 就都拿到了 <code>∂loss/∂θ</code>。</p>
+<h2><a href="#7-第四步梯度裁剪-clip_grad_norm" aria-hidden="true" class="anchor" id="user-content-7-第四步梯度裁剪-clip_grad_norm"></a>7. 第四步：梯度裁剪 <code>clip_grad_norm</code></h2>
+<p><strong>问题：梯度爆炸。</strong> 深层网络 + 长序列训练时，链式法则连乘会导致梯度呈指数级放大，一步更新就可能把参数&quot;推飞&quot;，loss 直接变成 NaN/无穷大。</p>
+<p><strong>对策：</strong> 在更新参数之前，先检查所有参数梯度的总范数；如果超过阈值 <code>max_norm</code>，就<strong>整体等比缩放</strong>，让方向不变、大小受控。</p>
+<p>代码（<a href="file:///d:/Code/Rust/llm_from_scratch/src/train.rs">src/train.rs</a>）：</p>
+<pre><code class="language-rust">pub fn clip_grad_norm(params: &amp;[Tensor], max_norm: f32) {
+    // 1. 算总范数：所有梯度元素的平方和，再开根号
+    let mut total = 0.0f32;
+    for p in params {
+        let g = p.grad();
+        for &amp;v in &amp;g { total += v * v; }
+    }
+    let norm = total.sqrt();
+
+    // 2. 超过阈值才裁剪：整体乘 scale = max_norm / norm
+    if norm &gt; max_norm {
+        let scale = max_norm / norm;
+        for p in params {
+            let g = p.grad();
+            let scaled: Vec&lt;f32&gt; = g.iter().map(|&amp;v| v * scale).collect();
+            p.grad_set(scaled);   // 覆盖写回（tensor.rs 里专为裁剪提供的 API）
+        }
+    }
+}
+</code></pre>
+<p>对应公式：</p>
+<pre><code>norm = sqrt( Σ gᵢ² )
+gᵢ' = gᵢ · min(1, max_norm / norm)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>norm ≤ max_norm</code></td>
+<td>梯度正常，什么都不做</td>
+</tr>
+<tr>
+<td><code>norm &gt; max_norm</code></td>
+<td>所有梯度乘 <code>max_norm / norm</code>，总范数被压回 <code>max_norm</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>注意 <code>max_norm</code> 这里取 1.0，训练 LLM 时这是很常见的取值。裁剪<strong>不改变梯度方向</strong>，只是限制步长上限——这比粗暴地调低学习率更精准。</p>
+</blockquote>
+<h2><a href="#8-第五步更新参数-optstep" aria-hidden="true" class="anchor" id="user-content-8-第五步更新参数-optstep"></a>8. 第五步：更新参数 <code>opt.step()</code></h2>
+<pre><code class="language-rust">opt.lr = scheduler.lr();   // 这一步用多大的学习率，由调度器决定
+opt.step();                // 按梯度更新所有参数
+</code></pre>
+<p>本课用的是 AdamW（第 17 课详述），核心更新规则（简写）：</p>
+<pre><code>m ← β₁·m + (1-β₁)·g           一阶动量（记住梯度方向）
+v ← β₂·v + (1-β₂)·g²          二阶动量（感知坡度陡缓）
+θ ← θ - lr·m̂/(√v̂ + ε) - lr·wd·θ
+</code></pre>
+<p>直觉：<strong>沿着梯度的反方向迈一小步</strong>，步子大小由学习率和&quot;历史上梯度的大小&quot;共同决定。与最朴素的 SGD（θ = θ - lr·g，第 6 课）相比，AdamW 对每个参数自适应地调整步长，训练更稳。</p>
+<h2><a href="#9-第六步清零梯度-optzero_grad" aria-hidden="true" class="anchor" id="user-content-9-第六步清零梯度-optzero_grad"></a>9. 第六步：清零梯度 <code>opt.zero_grad()</code></h2>
+<pre><code class="language-rust">opt.zero_grad();   // 内部就是对每个参数调用 p.zero_grad()
+</code></pre>
+<p>为什么必须清零？回顾第 6 节：反向传播是<strong>累加</strong>梯度。如果不清零，下一步前向+反向得到的梯度会<strong>叠加上一步的旧梯度</strong>，参数更新方向就被污染了，loss 会来回震荡甚至发散。</p>
+<p>正确的时间线（注意第 3 步的累加发生在&quot;同一步内、多次贡献之间&quot;，第 6 步的清零发生在&quot;不同步之间&quot;）：</p>
+<pre><code>step 0:  梯度 = 0 → 前向 → 反向(累加) → 裁剪 → 更新 → 清零 → 梯度 = 0
+step 1:  梯度 = 0 → 前向 → 反向(累加) → 裁剪 → 更新 → 清零 → 梯度 = 0
+...
+</code></pre>
+<h2><a href="#10-看训练日志loss-在下降" aria-hidden="true" class="anchor" id="user-content-10-看训练日志loss-在下降"></a>10. 看训练日志：loss 在下降</h2>
+<p><code>train_gpt</code> 末尾每隔 <code>eval_every</code> 步打印一行（main.rs 里每 100 步一次）：</p>
+<pre><code>step     0 | lr 0.00006 | loss 3.4658
+step   100 | lr 0.00138 | loss 1.8701
+step   200 | lr 0.00228 | loss 1.4210
+...
+step   599 | lr 0.00030 | loss 0.8142
+</code></pre>
+<p>判读方法：</p>
+<ul>
+<li><strong>loss 总体下降</strong> → 模型在学习，六步循环工作正常；</li>
+<li><strong>loss 出现 NaN/剧烈抖动</strong> → 大概率梯度爆炸，检查 <code>clip_grad_norm</code> 的阈值或调低 <code>max_lr</code>；</li>
+<li><strong>loss 降得很慢/不降</strong> → 学习率太小，或数据/模型配置有问题（下一课会讲数据怎么来）。</li>
+</ul>
+<h2><a href="#11-动手练习" aria-hidden="true" class="anchor" id="user-content-11-动手练习"></a>11. 动手练习</h2>
+<ol>
+<li>把 <code>clip_grad_norm(&amp;params, 1.0)</code> 这一行注释掉再跑 <code>cargo run</code>，观察 loss 是否更容易出现剧烈波动（体会它到底在防什么）。</li>
+<li>把 <code>max_norm</code> 从 1.0 改成 0.01 再训练，对比收敛速度（阈值太小会&quot;拖慢&quot;训练）。</li>
+<li>试着删掉 <code>opt.zero_grad()</code>，观察 loss 曲线会发生什么，并解释原因（提示：梯度在跨步累加）。</li>
+<li>在循环里打印第 5 步更新前后某个参数 <code>params[0].data()[0]</code> 的变化，验证&quot;更新确实发生在 step 之后&quot;。</li>
+</ol>
+<h2><a href="#12-本课总结" aria-hidden="true" class="anchor" id="user-content-12-本课总结"></a>12. 本课总结</h2>
+<ul>
+<li>训练循环六步，顺序固定：<strong>采样 → 前向 → 损失 → 反向 → 裁剪 → 更新 → 清零</strong>（裁剪是防爆炸的保险，可视为第 3.5 步）</li>
+<li><code>loss.backward()</code>：置初值 → DFS 拓扑排序 → 逆序沿链式法则累加梯度，一次调用搞定所有参数</li>
+<li><code>clip_grad_norm</code>：总梯度范数超阈值就等比缩放，只限大小、不改方向</li>
+<li><code>opt.zero_grad()</code>：跨步清零，防止梯度污染</li>
+<li>下一步（第 14 课）：搞清楚循环第一步 <code>sample_batch</code> 返回的 x/y 到底是怎么从语料里构造出来的</li>
+</ul>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-12/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-14/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a></div></div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

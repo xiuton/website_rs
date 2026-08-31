@@ -759,6 +759,14 @@ pre code.hljs {
   align-items: center;
   position: relative;
 }
+#main .app .navbar-sticky-wrap .nav-item-with-sub::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 8px;
+}
 #main .app .navbar-sticky-wrap .nav-item-with-sub:hover .nav-submenu {
   display: block;
 }
@@ -1300,6 +1308,15 @@ pre code.hljs {
   font-weight: 600;
   flex-shrink: 0;
 }
+#main .app .main-content .blog-container .blog-list .blog-posts .blog-preview .preview-header .preview-series-badge {
+  background: var(--bg-subtle);
+  border: 1px dashed var(--border-default);
+  color: var(--text-tertiary);
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
 #main .app .main-content .blog-container .blog-list .blog-posts .blog-preview .preview-meta {
   display: flex;
   align-items: center;
@@ -1557,6 +1574,143 @@ pre code.hljs {
   font-size: 0.85rem;
   color: var(--text-tertiary);
   margin-bottom: 0.75rem;
+}
+#main .app .main-content .blog-container .blog-post .series-nav {
+  margin-top: 2rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-sm);
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-header svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-header .series-nav-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-header .series-nav-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-header .series-nav-count {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 1rem;
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-list .series-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: all 0.15s;
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-list .series-nav-item .series-nav-item-index {
+  flex-shrink: 0;
+  width: 1.4rem;
+  height: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--bg-subtle);
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-list .series-nav-item .series-nav-item-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-list .series-nav-item .series-nav-item-now {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-full);
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-list .series-nav-item:hover {
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-list .series-nav-item.active {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-list .series-nav-item.active .series-nav-item-index {
+  background: var(--accent);
+  color: #fff;
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 0.9rem;
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-pager .series-nav-page {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: all 0.15s;
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-pager .series-nav-page .series-nav-page-label {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-pager .series-nav-page .series-nav-page-title {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-pager .series-nav-page:hover {
+  background: var(--accent-soft);
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-pager .series-nav-page.next {
+  align-items: flex-end;
+  text-align: right;
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-pager .series-nav-page.disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+#main .app .main-content .blog-container .blog-post .series-nav .series-nav-pager .series-nav-page.disabled:hover {
+  background: var(--bg-subtle);
 }
 #main .app .main-content .blog-container .blog-post .blog-tags {
   display: flex;

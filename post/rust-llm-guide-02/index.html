@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 2 课：自动微分 Autograd —— 让模型学会自我修正 - 干徒</title>
+    <meta name="description" content="实现反向传播所需的梯度计算：grad、backward 与各运算的反向传播实现。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 自动微分">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-02">
+    <meta property="og:title" content="第 2 课：自动微分 Autograd —— 让模型学会自我修正 - 干徒">
+    <meta property="og:description" content="实现反向传播所需的梯度计算：grad、backward 与各运算的反向传播实现。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-02">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 2 课：自动微分 Autograd —— 让模型学会自我修正 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 2 课：自动微分 Autograd —— 让模型学会自我修正 - 干徒">
+    <meta name="twitter:description" content="实现反向传播所需的梯度计算：grad、backward 与各运算的反向传播实现。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 2 课：自动微分 Autograd —— 让模型学会自我修正","description":"实现反向传播所需的梯度计算：grad、backward 与各运算的反向传播实现。","url":"https://ganto.me/post/rust-llm-guide-02","datePublished":"2026-09-03","dateModified":"2026-09-03","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 自动微分","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-c64c465a01d82915.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 2 课：自动微分 Autograd —— 让模型学会自我修正</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-03</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">自动微分</span></div>
+                <div class="blog-content">
+<h1><a href="#第-2-课自动微分-autograd--让模型学会自我修正" aria-hidden="true" class="anchor" id="user-content-第-2-课自动微分-autograd--让模型学会自我修正"></a>第 2 课：自动微分 Autograd —— 让模型学会&quot;自我修正&quot;</h1>
+<blockquote>
+<p>代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/tensor.rs">src/tensor.rs</a>（本章新增：grad / parents / backward / sum / 各运算的反向实现）
+演示入口：<a href="file:///d:/Code/Rust/llm_from_scratch/src/main.rs">src/main.rs</a></p>
+</blockquote>
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li>什么是梯度？为什么&quot;梯度下降&quot;能让模型学习？</li>
+<li>链式法则是怎么回事？为什么反向传播比正向求导更高效？</li>
+<li>怎么用 Rust 把&quot;求导&quot;自动化，让代码自动算出每个参数的梯度？</li>
+</ol>
+<h2><a href="#2-从拟合直线说起" aria-hidden="true" class="anchor" id="user-content-2-从拟合直线说起"></a>2. 从&quot;拟合直线&quot;说起</h2>
+<p>上一课我们实现了矩阵乘法。现在想象一个最简单的&quot;学习&quot;任务：
+已知一些点 (x, y)，它们近似满足 <code>y = 2x + 1</code>，但参数 w、b 未知。怎么让程序<strong>自己找到</strong> w=2、b=1？</p>
+<p>思路：先随便给个初始值（比如 w=0, b=0），然后：</p>
+<ol>
+<li>算出预测值和真实值的差距 → <strong>损失 loss</strong></li>
+<li>问：<strong>如果我调大一点 w，loss 会变大还是变小？</strong> → 这个方向就叫<strong>梯度</strong></li>
+<li>沿着&quot;让 loss 变小的方向&quot;微调 w、b</li>
+<li>重复直到 loss 足够小</li>
+</ol>
+<p>第 2 步里的&quot;损失随参数的变化率&quot;，数学上叫<strong>偏导数</strong>。所有参数偏导数的集合叫<strong>梯度</strong>。</p>
+<h2><a href="#3-梯度下降公式" aria-hidden="true" class="anchor" id="user-content-3-梯度下降公式"></a>3. 梯度下降公式</h2>
+<p>对参数 θ，更新规则只有一行：</p>
+<pre><code>θ = θ - 学习率 × ∂loss/∂θ
+</code></pre>
+<ul>
+<li><code>∂loss/∂θ &gt; 0</code>：θ 增大 loss 也增大 → 所以减去它，θ 变小</li>
+<li><code>∂loss/∂θ &lt; 0</code>：θ 增大 loss 减小 → 减去它，θ 变大</li>
+<li>学习率（learning rate）控制每次迈多大步子，太小太慢、太大震荡</li>
+</ul>
+<p>我们采用的损失是 MSE（均方误差）：</p>
+<pre><code>loss = Σ (pred - y)²        # pred = x·w + b
+</code></pre>
+<h2><a href="#4-链式法则复合函数求导的关键" aria-hidden="true" class="anchor" id="user-content-4-链式法则复合函数求导的关键"></a>4. 链式法则：复合函数求导的关键</h2>
+<p>问题来了：loss 是复合函数，<code>loss = g(pred)</code>，而 <code>pred = f(w)</code>。
+要求 <code>∂loss/∂w</code>，不能直接求，需要一层层拆开：</p>
+<p><strong>链式法则</strong>：如果 <code>z = g(f(x))</code>，那么</p>
+<pre><code>dz/dx = (dg/df) × (df/dx)
+</code></pre>
+<p>类比&quot;流水线&quot;：损失一路流经 pred 再到 w，每一段的&quot;变化率&quot;相乘就是总的&quot;变化率&quot;。</p>
+<p>例：<code>z = x*y + w</code>，各梯度是：</p>
+<pre><code>∂z/∂x = y      （对 x 求导时把 y 当常数）
+∂z/∂y = x      （对 y 求导时把 x 当常数）
+∂z/∂w = 1      （加法求导是 1）
+</code></pre>
+<p>程序输出正是 <code>dz/dx=3, dz/dy=2, dz/dw=1</code> ✓</p>
+<h2><a href="#5-反向传播把链式法则批量自动化" aria-hidden="true" class="anchor" id="user-content-5-反向传播把链式法则批量自动化"></a>5. 反向传播：把链式法则批量自动化</h2>
+<p>手工对每个参数求导太累，模型参数动辄百万个。怎么办？</p>
+<p><strong>核心思想</strong>：前向传播时，把每一步运算记录下来，形成一张<strong>计算图</strong>；反向传播时，从 loss 出发，把梯度沿图<strong>逐层往回传</strong>，每层的梯度都复用上一层的结果。</p>
+<pre><code>前向（边算边记）：  x ──┐
+                     mul ──► t ──┐
+                     y ──┘         add ──► z = 7
+                     w ───────────┘
+
+反向（梯度倒流）：  x ◄── grad=3
+                     t ◄── grad=1 ──► w ◄── grad=1
+                     y ◄── grad=2
+</code></pre>
+<p>关键好处：每个中间结果<strong>只算一次梯度</strong>，总计算量与前向相当，而不是对每个参数各算一次前向（那样要 O(参数个数) 倍计算）。这就是反向传播比&quot;数值微分&quot;快的原因。</p>
+<h2><a href="#6-rust-实现每个张量背一个反向函数" aria-hidden="true" class="anchor" id="user-content-6-rust-实现每个张量背一个反向函数"></a>6. Rust 实现：每个张量背一个&quot;反向函数&quot;</h2>
+<p>我们把张量升级成计算图节点：</p>
+<pre><code class="language-rust">pub struct Tensor {
+    data: Rc&lt;RefCell&lt;Vec&lt;f32&gt;&gt;&gt;,   // 数值（共享可变）
+    shape: Vec&lt;usize&gt;,
+    grad: Rc&lt;RefCell&lt;Vec&lt;f32&gt;&gt;&gt;,   // 梯度，初始全 0，反向时累加
+    requires_grad: bool,           // 这个张量是否需要梯度（参数=true，数据=false）
+    parents: Vec&lt;Tensor&gt;,          // 我是由哪些张量算出来的
+    backward: Option&lt;BackwardFn&gt;,  // 我的反向函数：把梯度传给我的父母
+}
+</code></pre>
+<p>用到的 Rust 核心特性：</p>
+<ul>
+<li><strong><code>Rc&lt;T&gt;</code>（引用计数）</strong>：计算图里一个节点可能被多个运算共享，Rc 让多份句柄指向同一份数据</li>
+<li><strong><code>RefCell&lt;T&gt;</code>（内部可变性）</strong>：让&quot;共享数据&quot;同时可以&quot;可变借用&quot;，这是 Rust 所有权模型下实现可变共享的标准手法</li>
+<li>每定义一个运算，就写两个东西：<strong>前向</strong>（算结果）+ <strong>反向</strong>（算梯度传给输入）</li>
+</ul>
+<h2><a href="#7-各运算的反向规则背下这几条" aria-hidden="true" class="anchor" id="user-content-7-各运算的反向规则背下这几条"></a>7. 各运算的反向规则（背下这几条）</h2>
+<table>
+<thead>
+<tr>
+<th>前向</th>
+<th>反向（g 是输出的梯度）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>c = a + b</code></td>
+<td><code>∂a += g</code>，<code>∂b += g</code></td>
+</tr>
+<tr>
+<td><code>c = a - b</code></td>
+<td><code>∂a += g</code>，<code>∂b -= g</code></td>
+</tr>
+<tr>
+<td><code>c = a * b</code></td>
+<td><code>∂a += g*b</code>，<code>∂b += g*a</code></td>
+</tr>
+<tr>
+<td><code>c = a * s</code></td>
+<td><code>∂a += g*s</code></td>
+</tr>
+<tr>
+<td><code>c = a @ b</code></td>
+<td><code>∂a += g @ bᵀ</code>，<code>∂b += aᵀ @ g</code></td>
+</tr>
+<tr>
+<td><code>c = sum(a)</code></td>
+<td><code>∂a += g</code>（每个元素都加同一个 g）</td>
+</tr>
+</tbody>
+</table>
+<p>以乘法为例看代码（注意累加 <code>+=</code>，因为一个张量可能被多条路径使用，梯度要累加）：</p>
+<pre><code class="language-rust">pub fn mul(&amp;self, other: &amp;Tensor) -&gt; Tensor {
+    // —— 前向 ——
+    let data = /* self * other 逐元素 */;
+    let mut result = Tensor::new(data, shape, self.requires_grad || other.requires_grad);
+    if result.requires_grad {
+        // 捕获需要的句柄
+        let rg = result.grad.clone();       // 读：自己的梯度
+        let sg = self.grad.clone();          // 写：给 self 累加梯度
+        let og = other.grad.clone();
+        let sd = self.data.clone();          // 读：self 的数值（计算 g*b 需要）
+        let od = other.data.clone();
+        result.backward = Some(Rc::new(move || {
+            let g = rg.borrow();             // 拿到&quot;传到我这的梯度&quot;
+            let sd_b = sd.borrow();
+            let od_b = od.borrow();
+            let mut sgm = sg.borrow_mut();
+            let mut ogm = og.borrow_mut();
+            for i in 0..g.len() {
+                sgm[i] += g[i] * od_b[i];    // ∂a = g * b
+                ogm[i] += g[i] * sd_b[i];    // ∂b = g * a
+            }
+        }));
+    }
+    result
+}
+</code></pre>
+<h2><a href="#8-反向传播主流程拓扑排序" aria-hidden="true" class="anchor" id="user-content-8-反向传播主流程拓扑排序"></a>8. 反向传播主流程：拓扑排序</h2>
+<p>图是有向无环图（DAG）。要保证&quot;子节点先算，父节点后算&quot;，需要<strong>拓扑排序</strong>：</p>
+<pre><code class="language-rust">pub fn backward(&amp;self) {
+    // 1. loss 自己的梯度 = 1（d loss / d loss = 1）
+    self.grad[0] = 1.0;
+    // 2. DFS 收集拓扑序：父在前，子在后
+    dfs(self, &amp;mut order, &amp;mut visited);
+    // 3. 逆序遍历，逐个调用 backward 闭包：梯度从子流向父
+    for t in order.iter().rev() { t.backward()? }
+}
+</code></pre>
+<p>用 <code>Rc::as_ptr(&amp;t.data)</code> 作为节点的唯一编号做去重（一个节点被多个运算共享时不能重复入队）。</p>
+<h2><a href="#9-训练循环四步舞" aria-hidden="true" class="anchor" id="user-content-9-训练循环四步舞"></a>9. 训练循环：四步舞</h2>
+<p>一次&quot;学习&quot;包含四步（也是所有深度学习框架训练循环的骨架）：</p>
+<pre><code class="language-rust">// 1. 前向：算预测和损失
+let loss = x.matmul(&amp;w).sub(&amp;y).mul(...).sum();
+// 2. 反向：自动算每个参数的梯度
+loss.backward();
+// 3. 更新：w -= lr * 梯度（这里手动实现，展示底层）
+w.set_data(vec![w.data()[0] - lr * w.grad()[0], ...]);
+// 4. 清零梯度：否则下一轮会把旧梯度累加上去
+w.zero_grad();
+</code></pre>
+<p>运行 <code>cargo run</code> 可以看到损失从 285 一路降到 0，w→2.00、b→1.00，模型&quot;学会&quot;了 y=2x+1。</p>
+<h2><a href="#10-一个重要的细节梯度累加" aria-hidden="true" class="anchor" id="user-content-10-一个重要的细节梯度累加"></a>10. 一个重要的细节：梯度累加</h2>
+<p>为什么用 <code>+=</code> 而不是 <code>=</code>？因为一个张量可能被多条路径使用。</p>
+<p>例：<code>z = x*x</code>。求梯度时 x 有两条路径（<code>z</code> 对第一个 x 的导数是第二个 x，对第二个 x 的导数是第一个 x），必须相加：<code>∂x = g*x + g*x = 2gx</code>。</p>
+<p>代码里我们用 <code>Rc::ptr_eq(&amp;sg, &amp;og)</code> 判断两个父节点是不是同一个张量，是的话就合并累加。这也是测试 <code>test_grad_accumulation_and_zero</code> 验证的内容。</p>
+<h2><a href="#11-运行与测试" aria-hidden="true" class="anchor" id="user-content-11-运行与测试"></a>11. 运行与测试</h2>
+<pre><code class="language-bash">cargo test     # 8 个测试全部通过
+cargo run      # 演示：链式法则验证 + 线性回归训练
+</code></pre>
+<h2><a href="#12-动手练习" aria-hidden="true" class="anchor" id="user-content-12-动手练习"></a>12. 动手练习</h2>
+<ol>
+<li>给张量加一个 <code>pow(n)</code> 运算（<code>c = a^n</code>），推导并实现它的反向传播（提示：<code>∂a = g * n * a^(n-1)</code>）。</li>
+<li>思考：为什么 loss 必须是标量（0 维）才能调用 <code>backward()</code>？如果不是标量会怎样？</li>
+<li>把学习率从 0.001 改成 1.0，观察 loss 曲线，解释发生了什么（振荡/发散）。</li>
+<li>这是本项目的&quot;心脏&quot;。试着不看代码，自己画出 <code>loss = (x·w - y)²</code> 的计算图并手算 <code>∂loss/∂w</code>。</li>
+</ol>
+<h2><a href="#13-本课总结" aria-hidden="true" class="anchor" id="user-content-13-本课总结"></a>13. 本课总结</h2>
+<ul>
+<li>梯度 = 损失对参数的&quot;变化方向&quot;，梯度下降就是沿着反方向走</li>
+<li>链式法则 + 计算图 = 反向传播，一次性高效算出所有梯度</li>
+<li>Rust 用 <code>Rc&lt;RefCell&gt;</code> + 闭包实现了可自动求导的张量</li>
+<li>亲手跑通了第一个&quot;会学习&quot;的程序：线性回归</li>
+<li>下一课：补齐张量运算（广播、softmax 等），为神经网络打基础</li>
+</ul>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-01/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-03/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a></div></div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

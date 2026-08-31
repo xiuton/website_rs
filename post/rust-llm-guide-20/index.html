@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结 - 干徒</title>
+    <meta name="description" content="实现 warmup 与 cosine decay 学习率调度，并对整个从零实现大模型系列做总结。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 训练">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-20">
+    <meta property="og:title" content="第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结 - 干徒">
+    <meta property="og:description" content="实现 warmup 与 cosine decay 学习率调度，并对整个从零实现大模型系列做总结。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-20">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结 - 干徒">
+    <meta name="twitter:description" content="实现 warmup 与 cosine decay 学习率调度，并对整个从零实现大模型系列做总结。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结","description":"实现 warmup 与 cosine decay 学习率调度，并对整个从零实现大模型系列做总结。","url":"https://ganto.me/post/rust-llm-guide-20","datePublished":"2026-09-21","dateModified":"2026-09-21","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 训练","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-c64c465a01d82915.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-21</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">训练</span></div>
+                <div class="blog-content">
+<h1><a href="#第-20-课学习率调度与收尾--warmupcosine-decay-与-20-课总结" aria-hidden="true" class="anchor" id="user-content-第-20-课学习率调度与收尾--warmupcosine-decay-与-20-课总结"></a>第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</h1>
+<blockquote>
+<p>代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/train.rs">src/train.rs</a>（<code>LRScheduler</code>、<code>train_gpt</code>）
+调用处：<a href="file:///d:/Code/Rust/llm_from_scratch/src/main.rs">src/main.rs</a>（<code>demo_gpt</code> 里的训练配置）
+配套代码：<a href="file:///d:/Code/Rust/llm_from_scratch/src/optim.rs">src/optim.rs</a>（<code>AdamW</code>，第 17 课）</p>
+</blockquote>
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li>学习率为什么不能&quot;一步到位&quot;？固定 lr 训练会出什么问题？</li>
+<li>warmup 是干什么的？&quot;前 50 步 lr 从 0 线性升到 max&quot; 在代码里怎么写的？</li>
+<li>cosine decay 长什么样？为什么末期要用越来越小的学习率？</li>
+<li><code>LRScheduler</code> 的 <code>lr()</code> / <code>step()</code> 到底怎么算、怎么用？</li>
+<li>训练日志里的 <code>lr 0.00012 → 0.003 → 0.00030</code> 是怎么来的？</li>
+<li>20 课全部学完，我手里有什么？下一步该往哪走？</li>
+</ol>
+<h2><a href="#2-为什么需要学习率调度" aria-hidden="true" class="anchor" id="user-content-2-为什么需要学习率调度"></a>2. 为什么需要学习率调度</h2>
+<p>第 6 课我们学过梯度下降：<code>θ = θ - lr·g</code>，学习率 <code>lr</code> 决定每一步走多大。那&quot;全程用一个固定的 lr&quot;行不行？看看两种极端：</p>
+<table>
+<thead>
+<tr>
+<th>策略</th>
+<th>优点</th>
+<th>缺点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>固定大 lr（如 0.01）</td>
+<td>前期下降快</td>
+<td>后期在最优解附近<strong>来回震荡</strong>，loss 下不去，甚至发散</td>
+</tr>
+<tr>
+<td>固定小 lr（如 0.0001）</td>
+<td>后期能精细收敛</td>
+<td>前期爬得太慢，训练时间翻几倍</td>
+</tr>
+<tr>
+<td><strong>动态 lr（本课）</strong></td>
+<td>前期稳、中期快、后期细</td>
+<td>多两个超参数要调（warmup 步数、总步数）</td>
+</tr>
+</tbody>
+</table>
+<p>理想的 lr 轨迹是一条&quot;倒 U 形&quot;：</p>
+<pre><code>lr
+ │          ╭────────────────╮
+ │         ╱                  ╲
+ │        ╱                    ╲
+ │  ╱────╱                      ╲
+ │ ╱                             ╲
+ └──────────────────────────────────▶ step
+   0     warmup 结束           训练结束
+         （lr 达到 max）       （lr 降到 min）
+</code></pre>
+<ul>
+<li><strong>初期</strong>：lr 从很小开始（warmup），保护刚起步、还很脆弱的参数；</li>
+<li><strong>中期</strong>：lr 维持在最大值附近，快速下降；</li>
+<li><strong>后期</strong>：lr 逐渐变小（cosine decay），在损失曲面的&quot;沟底&quot;精细收敛，不会跳过最优解。</li>
+</ul>
+<p>这就是本课 <code>LRScheduler</code> 做的事情：<strong>先 warmup 线性爬升，再 cosine 曲线衰减</strong>。</p>
+<h2><a href="#3-warmup先热个身" aria-hidden="true" class="anchor" id="user-content-3-warmup先热个身"></a>3. Warmup：先热个身</h2>
+<h3><a href="#31-公式" aria-hidden="true" class="anchor" id="user-content-31-公式"></a>3.1 公式</h3>
+<p>warmup 阶段（<code>step &lt; warmup_steps</code>），学习率从 0 线性升到最大值：</p>
+<pre><code>lr(step) = max_lr × (step + 1) / warmup_steps
+</code></pre>
+<p>注意分子里的 <strong><code>step + 1</code></strong>：<code>step</code> 从 0 开始数，<code>step + 1</code> 保证第 0 步的 lr 是 <code>max_lr / warmup_steps</code>（而不是 0），
+到第 <code>warmup_steps - 1</code> 步时 lr 正好是 <code>max_lr × warmup_steps / warmup_steps = max_lr</code>。</p>
+<h3><a href="#32-为什么训练初期要用小学习率" aria-hidden="true" class="anchor" id="user-content-32-为什么训练初期要用小学习率"></a>3.2 为什么训练初期要用小学习率</h3>
+<table>
+<thead>
+<tr>
+<th>原因</th>
+<th>解释</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>初始参数是随机的</td>
+<td><code>Linear::new</code> 用均匀分布初始化，此时梯度方向&quot;噪声很大&quot;，大步子容易把参数推飞</td>
+</tr>
+<tr>
+<td>AdamW 的二阶动量还没&quot;热&quot;</td>
+<td>第 17 课：AdamW 的 <code>v</code> 从 0 开始，前几步偏差修正后 <code>√v̂</code> 很小，有效步长会被放大——<strong>初期 Adam 反而更激进</strong>，需要小 lr 压住</td>
+</tr>
+<tr>
+<td>大模型训练的标配</td>
+<td>GPT-3、LLaMA 等真实大模型训练都用 warmup，是公认的稳定性技巧</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>直觉：刚上冰面的新手滑冰，先小步慢走找平衡（warmup），站稳了再加速（大 lr）。</p>
+</blockquote>
+<h2><a href="#4-cosine-decay按余弦曲线收尾" aria-hidden="true" class="anchor" id="user-content-4-cosine-decay按余弦曲线收尾"></a>4. Cosine decay：按余弦曲线收尾</h2>
+<h3><a href="#41-公式" aria-hidden="true" class="anchor" id="user-content-41-公式"></a>4.1 公式</h3>
+<p>warmup 结束后，学习率按<strong>半个余弦周期</strong>从 <code>max_lr</code> 衰减到 <code>min_lr</code>：</p>
+<pre><code>progress = (step - warmup_steps) / (total_steps - warmup_steps)     // 0 → 1
+cosine   = 0.5 × (1 + cos(π × progress))                            // 1 → 0
+lr(step) = min_lr + (max_lr - min_lr) × cosine
+</code></pre>
+<h3><a href="#42-关键点" aria-hidden="true" class="anchor" id="user-content-42-关键点"></a>4.2 关键点</h3>
+<table>
+<thead>
+<tr>
+<th>progress</th>
+<th>cos(π·progress)</th>
+<th>cosine 系数</th>
+<th>lr 取值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0（刚出 warmup）</td>
+<td>cos 0 = 1</td>
+<td>1</td>
+<td><code>max_lr</code></td>
+</tr>
+<tr>
+<td>0.25</td>
+<td>cos(π/4) ≈ 0.707</td>
+<td>0.854</td>
+<td><code>min + 0.854·(max-min)</code></td>
+</tr>
+<tr>
+<td>0.5（半程）</td>
+<td>cos(π/2) = 0</td>
+<td>0.5</td>
+<td><code>(max_lr + min_lr) / 2</code></td>
+</tr>
+<tr>
+<td>0.75</td>
+<td>cos(3π/4) ≈ -0.707</td>
+<td>0.146</td>
+<td><code>min + 0.146·(max-min)</code></td>
+</tr>
+<tr>
+<td>1（训练结束）</td>
+<td>cos π = -1</td>
+<td>0</td>
+<td><code>min_lr</code></td>
+</tr>
+</tbody>
+</table>
+<p>余弦曲线在两端（progress ≈ 0 和 ≈ 1）<strong>斜率平缓</strong>、在中间（progress ≈ 0.5）<strong>斜率最陡</strong>，翻译成 lr 就是：</p>
+<ul>
+<li>刚离开 warmup 时 lr 在 max 附近&quot;多停留一会儿&quot;（给足中期快速下降的时间）；</li>
+<li>训练后期 lr 平缓地逼近 <code>min_lr</code>（在沟底精细搜索，不震荡）。</li>
+</ul>
+<blockquote>
+<p>为什么末期要小 lr？损失曲面在高维空间里像&quot;沟壑&quot;，大 lr 会在沟底来回弹跳；小 lr 才能贴着沟底慢慢走到最低点。
+而且末期 loss 下降本来就慢，用小 lr 不会拖慢多少，却能让最终 loss 更漂亮。</p>
+</blockquote>
+<p>我们的代码里 <code>min_lr</code> 取的是 <code>max_lr × 0.1</code>（见 5.3 节），即最终学习率衰减到最大值的十分之一。</p>
+<h2><a href="#5-lrscheduler-实现讲解" aria-hidden="true" class="anchor" id="user-content-5-lrscheduler-实现讲解"></a>5. <code>LRScheduler</code> 实现讲解</h2>
+<h3><a href="#51-结构体" aria-hidden="true" class="anchor" id="user-content-51-结构体"></a>5.1 结构体</h3>
+<p><code>src/train.rs</code> 第 20 课小节：</p>
+<pre><code class="language-rust">/// 学习率调度器：warmup + cosine decay
+pub struct LRScheduler {
+    warmup_steps: usize,
+    total_steps: usize,
+    max_lr: f32,
+    min_lr: f32,
+    step: usize,
+}
+
+impl LRScheduler {
+    pub fn new(warmup_steps: usize, total_steps: usize, max_lr: f32, min_lr: f32) -&gt; Self {
+        LRScheduler {
+            warmup_steps,
+            total_steps,
+            max_lr,
+            min_lr,
+            step: 0,
+        }
+    }
+    // ...
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>warmup_steps</code></td>
+<td>warmup 持续多少步（前 N 步线性爬升）</td>
+</tr>
+<tr>
+<td><code>total_steps</code></td>
+<td>训练总步数（cosine 衰减的终点）</td>
+</tr>
+<tr>
+<td><code>max_lr</code></td>
+<td>学习率峰值</td>
+</tr>
+<tr>
+<td><code>min_lr</code></td>
+<td>学习率下限（衰减终点）</td>
+</tr>
+<tr>
+<td><code>step</code></td>
+<td><strong>当前已走到的步数计数</strong>（内部状态，从 0 开始）</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#52-lr按阶段算当前学习率" aria-hidden="true" class="anchor" id="user-content-52-lr按阶段算当前学习率"></a>5.2 <code>lr()</code>：按阶段算当前学习率</h3>
+<pre><code class="language-rust">pub fn lr(&amp;self) -&gt; f32 {
+    if self.step &lt; self.warmup_steps {
+        // 线性 warmup
+        self.max_lr * (self.step as f32 + 1.0) / self.warmup_steps.max(1) as f32
+    } else {
+        // cosine 衰减：从 max_lr 平滑降到 min_lr
+        let progress = (self.step - self.warmup_steps) as f32
+            / (self.total_steps - self.warmup_steps).max(1) as f32;
+        let progress = progress.min(1.0);
+        let cosine = 0.5 * (1.0 + (std::f32::consts::PI * progress).cos());
+        self.min_lr + (self.max_lr - self.min_lr) * cosine
+    }
+}
+</code></pre>
+<p>公式 ↔ 代码对照表：</p>
+<table>
+<thead>
+<tr>
+<th>公式</th>
+<th>Rust 代码</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lr = max_lr·(step+1)/warmup_steps</code></td>
+<td><code>self.max_lr * (self.step as f32 + 1.0) / self.warmup_steps.max(1) as f32</code></td>
+<td>warmup 分支。<code>.max(1)</code> 防止 <code>warmup_steps = 0</code> 时除零</td>
+</tr>
+<tr>
+<td><code>progress = (step-warmup)/(total-warmup)</code></td>
+<td><code>(self.step - self.warmup_steps) as f32 / (self.total_steps - self.warmup_steps).max(1) as f32</code></td>
+<td>cosine 分支的进度，范围 <code>[0,1]</code></td>
+</tr>
+<tr>
+<td><code>progress = min(progress, 1)</code></td>
+<td><code>let progress = progress.min(1.0);</code></td>
+<td>万一总步数被改小、<code>step</code> 超过 <code>total_steps</code>，progress 封顶 1，lr 停在 <code>min_lr</code> 不再下降</td>
+</tr>
+<tr>
+<td><code>cosine = 0.5(1+cos(π·progress))</code></td>
+<td><code>0.5 * (1.0 + (std::f32::consts::PI * progress).cos())</code></td>
+<td>半个余弦周期，从 1 平滑到 0</td>
+</tr>
+<tr>
+<td><code>lr = min_lr + (max_lr-min_lr)·cosine</code></td>
+<td><code>self.min_lr + (self.max_lr - self.min_lr) * cosine</code></td>
+<td>在 <code>[min_lr, max_lr]</code> 之间插值</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>注意分支边界：当 <code>step == warmup_steps</code> 时走 cosine 分支，此时 <code>progress = 0</code>、<code>cosine = 1</code>，lr 恰好等于 <code>max_lr</code>——
+warmup 的终点和 cosine 的起点<strong>无缝衔接</strong>，lr 曲线没有断点。</p>
+</blockquote>
+<h3><a href="#53-step-与在训练循环里的用法" aria-hidden="true" class="anchor" id="user-content-53-step-与在训练循环里的用法"></a>5.3 <code>step()</code> 与在训练循环里的用法</h3>
+<pre><code class="language-rust">pub fn step(&amp;mut self) {
+    self.step += 1;
+}
+</code></pre>
+<p><code>step()</code> 每训练一步调用一次，把内部计数 +1，从而推动 <code>lr()</code> 前进。在 <code>train_gpt</code> 里和 AdamW 配合：</p>
+<pre><code class="language-rust">// src/train.rs train_gpt
+let mut opt = AdamW::new(max_lr, params.clone(), 0.01);
+let mut scheduler = LRScheduler::new(warmup_steps, steps, max_lr, max_lr * 0.1);
+// ...
+for step in 0..steps {
+    // ... 前向、反向、梯度裁剪 ...
+    opt.lr = scheduler.lr();   // 把&quot;当前步的学习率&quot;写进优化器（AdamW.lr 是 pub 字段）
+    opt.step();                // 优化器用这个 lr 更新参数
+    opt.zero_grad();
+    scheduler.step();          // 步数 +1，为下一步准备新的 lr
+    // ...
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>代码</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AdamW::new(max_lr, params.clone(), 0.01)</code></td>
+<td>优化器初始 lr 就是 <code>max_lr</code>，<code>weight_decay = 0.01</code></td>
+</tr>
+<tr>
+<td><code>LRScheduler::new(warmup_steps, steps, max_lr, max_lr * 0.1)</code></td>
+<td><strong><code>min_lr</code> 直接取 <code>max_lr × 0.1</code></strong>，不用额外传</td>
+</tr>
+<tr>
+<td><code>opt.lr = scheduler.lr()</code></td>
+<td>每步把调度器算好的 lr 塞给优化器——<code>AdamW.lr</code> 是 <code>pub</code> 字段，可以直接赋值</td>
+</tr>
+<tr>
+<td><code>scheduler.step()</code></td>
+<td>计数器前进，下一轮循环 <code>lr()</code> 就是新的学习率</td>
+</tr>
+</tbody>
+</table>
+<p><strong>配合逻辑一句话</strong>：调度器负责&quot;算 lr&quot;，优化器负责&quot;用 lr 更新参数&quot;，两者通过 <code>opt.lr = scheduler.lr()</code> 对接。</p>
+<h2><a href="#6-训练日志解读lr-000012--0003--000030" aria-hidden="true" class="anchor" id="user-content-6-训练日志解读lr-000012--0003--000030"></a>6. 训练日志解读：<code>lr 0.00012 → 0.003 → 0.00030</code></h2>
+<h3><a href="#61-我们的训练配置" aria-hidden="true" class="anchor" id="user-content-61-我们的训练配置"></a>6.1 我们的训练配置</h3>
+<p><code>src/main.rs</code> 的 <code>demo_gpt</code> 调用（注意参数顺序）：</p>
+<pre><code class="language-rust">train::train_gpt(&amp;model, &amp;tokenizer, &amp;loader, 600, 8, 3e-3, 50, 100, &amp;mut rng);
+//                                          steps  batch  max_lr  warmup  eval_every
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>值</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>steps</code></td>
+<td>600</td>
+<td>训练总步数</td>
+</tr>
+<tr>
+<td><code>batch_size</code></td>
+<td>8</td>
+<td>每步 8 个样本</td>
+</tr>
+<tr>
+<td><code>max_lr</code></td>
+<td><code>3e-3</code> = 0.003</td>
+<td>学习率峰值</td>
+</tr>
+<tr>
+<td><code>warmup_steps</code></td>
+<td>50</td>
+<td>前 50 步线性爬升</td>
+</tr>
+<tr>
+<td><code>eval_every</code></td>
+<td>100</td>
+<td>每 100 步打印一次日志</td>
+</tr>
+</tbody>
+</table>
+<p>于是 <code>train_gpt</code> 内部：<code>min_lr = max_lr × 0.1 = 0.0003</code>，调度器为 <code>LRScheduler::new(50, 600, 0.003, 0.0003)</code>。</p>
+<h3><a href="#62-日志打印的时机容易看错" aria-hidden="true" class="anchor" id="user-content-62-日志打印的时机容易看错"></a>6.2 日志打印的时机（容易看错）</h3>
+<p><code>train_gpt</code> 里打印在 <strong><code>scheduler.step()</code> 之后</strong>：</p>
+<pre><code class="language-rust">opt.zero_grad();
+scheduler.step();                       // 先计数 +1
+if step % eval_every == 0 || step == steps - 1 {
+    println!(&quot;step {:&gt;5} | lr {:.5} | loss {:.4}&quot;, step, scheduler.lr(), loss.data()[0]);
+}
+</code></pre>
+<p>所以<strong>日志里打印的 <code>lr</code> 是&quot;下一步将使用的学习率&quot;</strong>（计数 = 当前迭代号 + 1），
+而本步实际用于参数更新的 lr 是 <code>opt.lr = scheduler.lr()</code> 取到的那一份（计数 = 当前迭代号）。</p>
+<h3><a href="#63-三个关键值怎么来的" aria-hidden="true" class="anchor" id="user-content-63-三个关键值怎么来的"></a>6.3 三个关键值怎么来的</h3>
+<p><strong>① 第一次打印 <code>0.00012</code>（step 0）</strong></p>
+<p>第 0 次迭代结束时 <code>scheduler.step()</code> 把计数推到 1，于是打印：</p>
+<pre><code>lr = max_lr × (step + 1) / warmup_steps = 0.003 × (1 + 1) / 50 = 0.00012   ✓
+</code></pre>
+<p>（本步真正用来更新参数的 lr 是 0.003 × 1 / 50 = 0.00006。）</p>
+<p><strong>② warmup 峰值 ≈ <code>0.003</code></strong></p>
+<p>warmup 终点（计数 = 50）时：</p>
+<pre><code>lr = 0.003 × (50 + 1) / 50 = 0.00306 ≈ 0.003
+</code></pre>
+<p>紧接着 cosine 分支起点（progress = 0）的 lr 恰好等于 <code>max_lr = 0.003</code>，两者无缝衔接。
+（日志里看不到 0.00306 这个值——打印间隔 100 步，而 warmup 只有 50 步，warmup 段只有 step 0 一个打印点。）</p>
+<p><strong>③ 最终 <code>0.00030</code>（step 599）</strong></p>
+<p>最后一步 progress 封顶到 1，<code>cosine = 0.5 × (1 + cos π) = 0</code>：</p>
+<pre><code>lr = min_lr + (max_lr - min_lr) × 0 = min_lr = 0.0003   ✓
+</code></pre>
+<h3><a href="#64-完整日志序列估算" aria-hidden="true" class="anchor" id="user-content-64-完整日志序列估算"></a>6.4 完整日志序列（估算）</h3>
+<p>打印点是 <code>step = 0, 100, 200, 300, 400, 500, 599</code>（<code>%100==0</code> 或最后一轮），对应日志 lr（按 6.3 的公式推算）：</p>
+<table>
+<thead>
+<tr>
+<th>日志 step</th>
+<th>调度器计数</th>
+<th>阶段</th>
+<th>lr（约）</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>1</td>
+<td>warmup</td>
+<td><strong>0.00012</strong></td>
+<td>起步：<code>0.003×2/50</code></td>
+</tr>
+<tr>
+<td>100</td>
+<td>101</td>
+<td>cosine</td>
+<td>0.00294</td>
+<td>刚从峰值下来一点</td>
+</tr>
+<tr>
+<td>200</td>
+<td>201</td>
+<td>cosine</td>
+<td>0.00253</td>
+<td>平稳下滑</td>
+</tr>
+<tr>
+<td>300</td>
+<td>301</td>
+<td>cosine</td>
+<td>0.00183</td>
+<td>过半程，接近 (max+min)/2 = 0.00165</td>
+</tr>
+<tr>
+<td>400</td>
+<td>401</td>
+<td>cosine</td>
+<td>0.00108</td>
+<td>明显变小</td>
+</tr>
+<tr>
+<td>500</td>
+<td>501</td>
+<td>cosine</td>
+<td>0.00051</td>
+<td>逼近下限</td>
+</tr>
+<tr>
+<td>599</td>
+<td>600</td>
+<td>cosine 末</td>
+<td><strong>0.00030</strong></td>
+<td>落到 <code>min_lr</code></td>
+</tr>
+</tbody>
+</table>
+<p>这条曲线正是第 4.2 节那张表：<strong>先平、中陡、末缓</strong>。对比 loss 日志：前期 loss 快速下降（lr 大），
+后期 loss 缓慢逼近平台（lr 小、精细收敛）——这就是&quot;调度&quot;在训练曲线上留下的痕迹。</p>
+<blockquote>
+<p>小技巧：<code>cargo run</code> 后盯着日志的 <code>lr</code> 列看，前 50 步它在线性爬升（但只打印了一次），
+之后按余弦曲线一路衰减到 0.0003。改 <code>eval_every</code>（比如改成 10）就能看到 warmup 段更密的 lr 变化。</p>
+</blockquote>
+<h2><a href="#7-全项目-20-课总结回顾" aria-hidden="true" class="anchor" id="user-content-7-全项目-20-课总结回顾"></a>7. 全项目 20 课总结回顾</h2>
+<p>对照 <a href="file:///d:/Code/Rust/llm_from_scratch/docs/00-%E5%AD%A6%E4%B9%A0%E8%AE%A1%E5%88%92.md">docs/00-学习计划.md</a> 的六个阶段，我们把&quot;从零写一个 LLM&quot;拆成了 20 课。回顾一下每阶段的成果：</p>
+<h3><a href="#阶段一地基--张量与自动微分第-1-4-课" aria-hidden="true" class="anchor" id="user-content-阶段一地基--张量与自动微分第-1-4-课"></a>阶段一：地基 —— 张量与自动微分（第 1-4 课）</h3>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>成果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>01</td>
+<td>张量 Tensor</td>
+<td><code>Tensor{data, shape}</code>，行优先存储、逐元素运算、矩阵乘法（<code>src/tensor.rs</code>）</td>
+</tr>
+<tr>
+<td>02</td>
+<td>自动微分 Autograd</td>
+<td>计算图 + <code>backward</code>，链式法则自动求梯度</td>
+</tr>
+<tr>
+<td>03</td>
+<td>张量运算扩展</td>
+<td>广播、sum/mean、softmax、广播减法</td>
+</tr>
+<tr>
+<td>04</td>
+<td>模块化重构</td>
+<td>张量库独立成模块，为上层打基础</td>
+</tr>
+</tbody>
+</table>
+<p><strong>里程碑</strong>：只靠标准库就实现了深度学习框架的&quot;张量 + 自动微分&quot;核心，<code>cargo test</code> 一路绿灯。</p>
+<h3><a href="#阶段二神经网络基础第-5-7-课" aria-hidden="true" class="anchor" id="user-content-阶段二神经网络基础第-5-7-课"></a>阶段二：神经网络基础（第 5-7 课）</h3>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>成果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>05</td>
+<td>线性层与激活函数</td>
+<td><code>Linear</code>、ReLU/Sigmoid/Tanh，参数管理与初始化（<code>src/layers.rs</code>）</td>
+</tr>
+<tr>
+<td>06</td>
+<td>损失函数与优化器</td>
+<td>交叉熵、MSE、SGD（<code>src/loss.rs</code>、<code>src/optim.rs</code>）</td>
+</tr>
+<tr>
+<td>07</td>
+<td>第一个 MLP</td>
+<td>2→4→2 的 MLP <strong>100% 学会 XOR</strong>（<code>demo_xor</code>），验证了反向传播正确</td>
+</tr>
+</tbody>
+</table>
+<p><strong>里程碑</strong>：一个从零手写的神经网络成功收敛，证明自动微分没写错。</p>
+<h3><a href="#阶段三分词器第-8-课" aria-hidden="true" class="anchor" id="user-content-阶段三分词器第-8-课"></a>阶段三：分词器（第 8 课）</h3>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>成果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>08</td>
+<td>BPE 分词器</td>
+<td>字节级 BPE：词表 256 起步、迭代合并 400 次，<code>&quot;the garden&quot;</code> 被压缩成高频子词（<code>src/tokenizer.rs</code>）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>里程碑</strong>：文本 → token id 的通路打通，<code>CharTokenizer</code> 为小语料演示服务。</p>
+<h3><a href="#阶段四transformer-架构第-9-12-课" aria-hidden="true" class="anchor" id="user-content-阶段四transformer-架构第-9-12-课"></a>阶段四：Transformer 架构（第 9-12 课）</h3>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>成果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>09</td>
+<td>注意力机制</td>
+<td>缩放点积注意力 <code>softmax(Q·Kᵀ/√d_k)</code>、因果掩码</td>
+</tr>
+<tr>
+<td>10</td>
+<td>多头注意力</td>
+<td><code>MultiHeadAttention</code>：拆头、并行打分、拼接投影（<code>src/model.rs</code>）</td>
+</tr>
+<tr>
+<td>11</td>
+<td>位置编码与归一化</td>
+<td>正弦位置编码、LayerNorm、残差连接、pre-norm</td>
+</tr>
+<tr>
+<td>12</td>
+<td>完整 GPT 模型</td>
+<td><code>GPT</code>：token embedding + 位置编码 + N 层 Block + 输出头，<code>GPTConfig::tiny</code>（n_embd=64, n_head=4, n_layer=2, block_size=32）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>里程碑</strong>：GPT 的骨架完整成形——注意力找相关性、MLP 加工信息、归一化稳住数值、残差保梯度畅通。</p>
+<h3><a href="#阶段五训练与推理第-13-16-课" aria-hidden="true" class="anchor" id="user-content-阶段五训练与推理第-13-16-课"></a>阶段五：训练与推理（第 13-16 课）</h3>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>成果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>13</td>
+<td>训练循环</td>
+<td><code>train_gpt</code>：采样→前向→反向→梯度裁剪（<code>clip_grad_norm</code>）→更新→清零（<code>src/train.rs</code>）</td>
+</tr>
+<tr>
+<td>14</td>
+<td>数据加载</td>
+<td><code>DataLoader</code>：随机切窗口，x/y 平移一位配对（<code>src/data.rs</code>）</td>
+</tr>
+<tr>
+<td>15</td>
+<td>推理与采样</td>
+<td>temperature / top-k / top-p 采样，<code>sample_token</code> + <code>generate</code>（<code>src/sample.rs</code>）</td>
+</tr>
+<tr>
+<td>16</td>
+<td>训练小 GPT</td>
+<td>600 步训练后能生成有模有样的英文短文本</td>
+</tr>
+</tbody>
+</table>
+<p><strong>里程碑</strong>：<code>cargo run</code> 一次跑通&quot;训练 → 生成&quot;，模型真的会&quot;写&quot;了。</p>
+<h3><a href="#阶段六进阶优化第-17-20-课" aria-hidden="true" class="anchor" id="user-content-阶段六进阶优化第-17-20-课"></a>阶段六：进阶优化（第 17-20 课）</h3>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>成果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>17</td>
+<td>AdamW 优化器</td>
+<td>一阶/二阶动量、偏差修正、解耦权重衰减（<code>src/optim.rs</code>）</td>
+</tr>
+<tr>
+<td>18</td>
+<td>KV Cache</td>
+<td>推理时缓存历史 K/V，逐步生成只算新 token（<code>KVCache</code>，<code>src/model.rs</code>）</td>
+</tr>
+<tr>
+<td>19</td>
+<td>RoPE 旋转位置编码</td>
+<td><code>rotary</code> 前向/反向 + <code>test_rotary</code>（<code>src/tensor.rs</code>）</td>
+</tr>
+<tr>
+<td>20</td>
+<td>学习率调度与收尾</td>
+<td><code>LRScheduler</code>：warmup + cosine decay（<code>src/train.rs</code>）</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#一路走下来的核心收获" aria-hidden="true" class="anchor" id="user-content-一路走下来的核心收获"></a>一路走下来的核心收获</h3>
+<table>
+<thead>
+<tr>
+<th>能力</th>
+<th>对应课程</th>
+<th>一句话总结</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>张量与自动微分</td>
+<td>1-4</td>
+<td>一切框架魔法的底层原理</td>
+</tr>
+<tr>
+<td>神经网络与优化</td>
+<td>5-7、17</td>
+<td>前向/反向/更新三板斧 + AdamW</td>
+</tr>
+<tr>
+<td>文本处理</td>
+<td>8</td>
+<td>BPE 让模型学会&quot;拆词&quot;</td>
+</tr>
+<tr>
+<td>Transformer</td>
+<td>9-12</td>
+<td>注意力 + 归一化 + 残差 + 位置编码</td>
+</tr>
+<tr>
+<td>工程化训练</td>
+<td>13-16、18、20</td>
+<td>数据、训练循环、采样、KV cache、lr 调度</td>
+</tr>
+<tr>
+<td>现代技巧</td>
+<td>17-20</td>
+<td>AdamW / KV cache / RoPE / 调度，都是真实大模型在用的东西</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>验收标准（来自学习计划）：<code>cargo run</code> 正常输出 XOR 正确率、BPE 词表、训练日志与两段生成文本；
+MLP 在 XOR 上收敛；小 GPT 生成通顺短文本——<strong>全部达成</strong>。</p>
+</blockquote>
+<h2><a href="#8-后续展望从这里出发" aria-hidden="true" class="anchor" id="user-content-8-后续展望从这里出发"></a>8. 后续展望：从这里出发</h2>
+<p>20 课只是&quot;入门级 GPT&quot;的终点，却是真实 LLM 世界的起点。按性价比排序，值得继续的方向：</p>
+<h3><a href="#81-数据和规模" aria-hidden="true" class="anchor" id="user-content-81-数据和规模"></a>8.1 数据和规模</h3>
+<table>
+<thead>
+<tr>
+<th>方向</th>
+<th>现状</th>
+<th>下一步</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>语料</td>
+<td><code>CORPUS</code> 只是一小段英文故事（约 700 字符）</td>
+<td>换成更大语料（如 WikiText、OpenWebText 子集），模型才能学到真实语言结构</td>
+</tr>
+<tr>
+<td>模型规模</td>
+<td><code>GPTConfig::tiny</code>：64 维、2 层</td>
+<td>增大 <code>n_embd</code>/<code>n_layer</code>/<code>block_size</code>（先换 GPU）</td>
+</tr>
+<tr>
+<td>训练步数</td>
+<td>600 步 × batch 8</td>
+<td>上万步 + 更大 batch，loss 才能逼近语料的理论下限</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#82-直接能做的代码级改进" aria-hidden="true" class="anchor" id="user-content-82-直接能做的代码级改进"></a>8.2 直接能做的代码级改进</h3>
+<ul>
+<li><strong>RoPE 接入</strong>（最顺手的下一步）：第 19 课 <code>rotary</code> 已实现，把它接进 <code>MultiHeadAttention</code>（先修反向符号），替换掉正弦 <code>pos_emb</code>；</li>
+<li><strong>RMSNorm</strong>：把 LayerNorm 的均值项去掉，更快且效果相当（LLaMA 在用）；</li>
+<li><strong>GQA / MQA</strong>：多头共享 KV，配合 KV cache 大幅省显存；</li>
+<li><strong>更好的分词器</strong>：加大 BPE 合并次数 / 词表，或换 SentencePiece 风格。</li>
+</ul>
+<h3><a href="#83-架构前沿了解即可" aria-hidden="true" class="anchor" id="user-content-83-架构前沿了解即可"></a>8.3 架构前沿（了解即可）</h3>
+<ul>
+<li><strong>MoE（混合专家）</strong>：把每个 Block 的 MLP 换成多个&quot;专家&quot; + 一个路由器，每个 token 只激活少数专家。
+参数量大幅增加但计算量可控（Mixtral、DeepSeek 系列就是代表）；</li>
+<li><strong>长度外推</strong>：RoPE 训练长度外会失效，用 NTK-aware scaling、YaRN 等方法把上下文&quot;撑&quot;长；</li>
+<li><strong>稀疏注意力 / Flash Attention</strong>：优化注意力本身的计算与 IO，长上下文必备。</li>
+</ul>
+<h3><a href="#84-真正的并行从单机-cpu-到多卡-gpu" aria-hidden="true" class="anchor" id="user-content-84-真正的并行从单机-cpu-到多卡-gpu"></a>8.4 真正的并行（从单机 CPU 到多卡 GPU）</h3>
+<p>我们现在是<strong>单线程 CPU、零依赖</strong>的教学实现，真实训练要靠并行：</p>
+<table>
+<thead>
+<tr>
+<th>并行方式</th>
+<th>切分维度</th>
+<th>一句话</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>数据并行</td>
+<td>batch</td>
+<td>每张卡算一份 batch 的梯度，然后 all-reduce 求和，大家参数保持一致</td>
+</tr>
+<tr>
+<td>张量并行</td>
+<td>矩阵</td>
+<td>把单个 <code>Linear</code> 的权重按列/按行切到多张卡，一起算一次前向</td>
+</tr>
+<tr>
+<td>流水线并行</td>
+<td>层</td>
+<td>把 12 层切成几段，卡 1 算 1-4 层、卡 2 算 5-8 层……</td>
+</tr>
+</tbody>
+</table>
+<p>想实战的话，可以先把本项目移植到 <code>candle</code> / <code>burn</code> 等 Rust 深度学习框架上（它们封装了 GPU 和 autograd），
+或者用 <code>rayon</code> 给张量运算加上多线程——那是&quot;工程优化&quot;的另一个故事了。</p>
+<blockquote>
+<p>学习这条路没有终点：<strong>从手写张量到训练小 GPT，你走完了框架背后的 90% 黑盒；剩下的 10% 是工程与规模。</strong></p>
+</blockquote>
+<h2><a href="#9-动手练习" aria-hidden="true" class="anchor" id="user-content-9-动手练习"></a>9. 动手练习</h2>
+<ol>
+<li><strong>改 warmup 步数</strong>：把 <code>main.rs</code> 里的 <code>warmup_steps</code> 从 50 改成 0（注意 <code>lr()</code> 里 <code>.max(1)</code> 会兜底，不会除零）和 200，分别训练，观察 loss 曲线差异——warmup 太短初期是否震荡？太长是否拖慢中期？</li>
+<li><strong>改 min_lr 比例</strong>：把 <code>train_gpt</code> 里的 <code>max_lr * 0.1</code> 改成 <code>max_lr * 0.01</code> 和 <code>max_lr * 0.5</code>，对比最终 loss。想想 min_lr 设太高会有什么后果（后期&quot;精细收敛&quot;没了）。</li>
+<li><strong>绘制 lr 曲线</strong>：写个 10 行小程序（或用 6.4 的公式在表格/脚本里算一遍），以 step 为横轴画出 600 步的 lr 曲线，确认它是&quot;先线性爬升、再余弦衰减&quot;的倒 U 形。</li>
+<li><strong>对比固定 lr</strong>：把 <code>train_gpt</code> 改成固定 <code>opt.lr = max_lr</code>（不调 <code>scheduler</code>），训练 600 步对比 loss——体会调度带来的&quot;同样的步数，更好的收敛&quot;。</li>
+<li><strong>看懂日志</strong>：把 <code>eval_every</code> 从 100 改成 10，重新 <code>cargo run</code>，观察 warmup 段的 lr 爬升——它每步增加 <code>max_lr/warmup_steps = 0.003/50 = 0.00006</code>，所以每 10 步增加 0.0006（0.00012 → 0.00072 → 0.00132 → …），确认和公式一致。</li>
+<li><strong>给 20 课写总结</strong>：按第 7 节的表格，自己列一份&quot;我掌握了什么&quot;清单，找出最薄弱的一课回去重读——这是收尾课最重要的作业。</li>
+</ol>
+<h2><a href="#10-本课总结也是全项目的结语" aria-hidden="true" class="anchor" id="user-content-10-本课总结也是全项目的结语"></a>10. 本课总结（也是全项目的结语）</h2>
+<ul>
+<li><strong>为什么需要调度</strong>：固定大 lr 后期震荡、固定小 lr 前期太慢，动态 lr 兼顾&quot;稳、快、细&quot;。</li>
+<li><strong>warmup</strong>：前 <code>warmup_steps</code> 步 <code>lr = max_lr × (step+1)/warmup_steps</code> 线性爬升，保护训练初期的随机参数和 AdamW 未热身的动量。</li>
+<li><strong>cosine decay</strong>：<code>lr = min_lr + (max_lr - min_lr) × 0.5 × (1 + cos(π·progress))</code>，从 <code>max_lr</code> 平滑衰减到 <code>min_lr</code>（本项目取 <code>max_lr × 0.1</code>）。</li>
+<li><strong><code>LRScheduler</code></strong>：<code>lr()</code> 按 <code>step</code> 计数选分支算 lr，<code>step()</code> 推进一步；在 <code>train_gpt</code> 里通过 <code>opt.lr = scheduler.lr()</code> 喂给 AdamW。</li>
+<li><strong>日志解读</strong>：<code>0.00012</code>（第 0 步打印，<code>0.003×2/50</code>）→ warmup 峰值 ≈ <code>0.003</code> → 终点 <code>0.00030</code>（<code>min_lr</code>），打印发生在 <code>scheduler.step()</code> 之后，所以显示的是&quot;下一步的 lr&quot;。</li>
+<li><strong>20 课全回顾</strong>：地基（张量/自动微分）→ 神经网络 → 分词器 → Transformer → 训练推理 → 现代技巧（AdamW/KV cache/RoPE/调度），<code>cargo run</code> 达成全部验收标准。</li>
+<li><strong>展望</strong>：更大语料与模型、RoPE 接入、MoE、真正的并行（数据/张量/流水线）、RMSNorm/GQA/外推技巧——每一步都能在这个项目上继续长出来。</li>
+</ul>
+<blockquote>
+<p>最后一句：<strong>一个能跑的、完全由你手写的小 GPT，就是打开大模型世界最好的钥匙。</strong>
+20 课结束，学习才刚刚开始。祝玩得开心！</p>
+</blockquote>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span><span class="series-nav-item-now">本篇</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-19/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><span class="series-nav-page disabled">已经是最后一章</span></div></div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

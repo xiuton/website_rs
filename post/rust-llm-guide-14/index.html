@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 14 课：数据加载 —— 文本如何变成训练样本 - 干徒</title>
+    <meta name="description" content="实现语料库与 DataLoader，把文本切分为输入-目标训练样本。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 数据">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-14">
+    <meta property="og:title" content="第 14 课：数据加载 —— 文本如何变成训练样本 - 干徒">
+    <meta property="og:description" content="实现语料库与 DataLoader，把文本切分为输入-目标训练样本。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-14">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 14 课：数据加载 —— 文本如何变成训练样本 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 14 课：数据加载 —— 文本如何变成训练样本 - 干徒">
+    <meta name="twitter:description" content="实现语料库与 DataLoader，把文本切分为输入-目标训练样本。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 14 课：数据加载 —— 文本如何变成训练样本","description":"实现语料库与 DataLoader，把文本切分为输入-目标训练样本。","url":"https://ganto.me/post/rust-llm-guide-14","datePublished":"2026-09-15","dateModified":"2026-09-15","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 数据","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-c64c465a01d82915.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 14 课：数据加载 —— 文本如何变成训练样本</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-15</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">数据</span></div>
+                <div class="blog-content">
+<h1><a href="#第-14-课数据加载--文本如何变成训练样本" aria-hidden="true" class="anchor" id="user-content-第-14-课数据加载--文本如何变成训练样本"></a>第 14 课：数据加载 —— 文本如何变成训练样本</h1>
+<blockquote>
+<p>代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/data.rs">src/data.rs</a>
+训练入口：<a href="file:///d:/Code/Rust/llm_from_scratch/src/train.rs">src/train.rs</a>（第 13 课）</p>
+</blockquote>
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li>语言模型的训练数据长什么样？一篇文章怎么变成一条条&quot;题目&quot;？</li>
+<li>什么是自监督学习？为什么训练 GPT 不需要人工标注？</li>
+<li>训练样本里的 x 和 y 是怎么配对的？为什么说 y 是 x 平移一位？</li>
+<li><code>batch_size</code> 和 <code>block_size</code> 到底是什么含义？代码里怎么体现？</li>
+</ol>
+<h2><a href="#2-从文本到训练数据三步走" aria-hidden="true" class="anchor" id="user-content-2-从文本到训练数据三步走"></a>2. 从文本到训练数据：三步走</h2>
+<p>训练 GPT 不需要人工标注，只需要<strong>大量纯文本</strong>。数据流水线是：</p>
+<pre><code>原始文本（CORPUS）
+   │ ① 分词 tokenize（第 8 课：CharTokenizer.encode）
+   ▼
+token id 序列  [t₀, t₁, t₂, t₃, ...]
+   │ ② 切窗口：每 block_size 个 token 一段
+   ▼
+输入窗口 x
+   │ ③ 配答案：x 右移一位得到 y
+   ▼
+训练样本 (x, y)
+</code></pre>
+<p>本项目的语料是内置在 <a href="file:///d:/Code/Rust/llm_from_scratch/src/data.rs">src/data.rs</a> 里的一个英文小故事：</p>
+<pre><code class="language-rust">pub const CORPUS: &amp;str = &quot;\
+Once upon a time in a small village, there lived a curious little fox named Red. \
+... every adventure begins with a single step.&quot;;
+</code></pre>
+<h2><a href="#3-第一步文本--token-id" aria-hidden="true" class="anchor" id="user-content-3-第一步文本--token-id"></a>3. 第一步：文本 → token id</h2>
+<p>模型只认识数字，所以先用第 8 课的 <code>CharTokenizer</code>（字符级分词）把文本变成 id 序列：</p>
+<pre><code class="language-rust">let tokenizer = CharTokenizer::new(CORPUS);   // 词表 = 语料中所有出现过的字符
+let tokens = tokenizer.encode(text);          // &quot;Once&quot; -&gt; [O, n, c, e] 的 id 序列
+</code></pre>
+<p>在本项目中每个字符就是一个 token（一个 <code>usize</code>），例如故事开头的 id 序列就是：</p>
+<pre><code>'O' 'n' 'c' 'e' ' ' 'u' 'p' 'o' 'n' ' ' 'a' ' ' 't' 'i' 'm' 'e' ' ' ...
+ 0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15   4  ...
+</code></pre>
+<h2><a href="#4-自监督预测下一个-token" aria-hidden="true" class="anchor" id="user-content-4-自监督预测下一个-token"></a>4. 自监督：预测下一个 token</h2>
+<p><strong>训练目标一句话：给一段前缀，让模型预测下一个 token 是什么。</strong></p>
+<pre><code>输入：Once upon a ti
+输出：m     ← 下一个字符（来自原文）
+
+输入：Once upon a tim
+输出：e     ← 下一个字符
+
+输入：Once upon a time
+输出：空格  ← 下一个字符
+</code></pre>
+<p>这为什么叫<strong>自监督</strong>？因为&quot;标准答案&quot;就藏在文本自己身上——预测&quot;下一个 token&quot;，标签就是原文里紧跟其后的那个 token，<strong>不需要任何人去标注</strong>。模型只要在海量文本上反复做这件事，就能学会语法、语义和世界知识。这也是 ChatGPT 这类大模型训练的第一阶段。</p>
+<h2><a href="#5-第二步--第三步xy-配对平移一位" aria-hidden="true" class="anchor" id="user-content-5-第二步--第三步xy-配对平移一位"></a>5. 第二步 + 第三步：x/y 配对（平移一位）</h2>
+<p><code>DataLoader::sample_batch</code> 的核心逻辑（<a href="file:///d:/Code/Rust/llm_from_scratch/src/data.rs">src/data.rs</a>）：</p>
+<pre><code class="language-rust">pub fn sample_batch(&amp;self, rng: &amp;mut Rng) -&gt; (Vec&lt;usize&gt;, Vec&lt;usize&gt;) {
+    let max_start = self.tokens.len() - self.block_size - 1;
+    let mut x = Vec::with_capacity(self.batch_size * self.block_size);
+    let mut y = Vec::with_capacity(self.batch_size * self.block_size);
+    for _ in 0..self.batch_size {
+        let start = rng.choice(max_start);          // 随机选一个起点
+        for j in 0..self.block_size {
+            x.push(self.tokens[start + j]);         // 窗口 [start, start+T)
+            y.push(self.tokens[start + j + 1]);     // 窗口 [start+1, start+T+1)
+        }
+    }
+    (x, y)
+}
+</code></pre>
+<p>关键就两行：</p>
+<ul>
+<li><code>x.push(tokens[start + j])</code>：x 的第 j 个 token 是窗口里的第 j 个</li>
+<li><code>y.push(tokens[start + j + 1])</code>：y 的第 j 个 token 是 x 的第 j 个 token 的<strong>下一个</strong></li>
+</ul>
+<p>所以 y 恰好是 x 向右平移一位，一一对应：</p>
+<pre><code>位置:  0   1   2   3   4   5  ...  T-1
+x:   [t₀  t₁  t₂  t₃  t₄  t₅  ...  t_{T-1}]
+y:   [t₁  t₂  t₃  t₄  t₅  t₆  ...  t_T    ]
+       ↑   ↑   ↑
+      x[0]的下一个 = y[0]，x[1]的下一个 = y[1]，……
+</code></pre>
+<h2><a href="#6-具体例子窗口从语料中切出来" aria-hidden="true" class="anchor" id="user-content-6-具体例子窗口从语料中切出来"></a>6. 具体例子：窗口从语料中切出来</h2>
+<p>设 <code>block_size = 16</code>，随机起点 <code>start = 0</code>，故事开头 17 个字符为
+<code>Once upon a time</code>（注意末尾还有个空格）。则这一个样本是：</p>
+<pre><code>x = tokens[0..16]  = O n c e ' ' u p o n ' ' a ' ' t i m
+y = tokens[1..17]  = n c e ' ' u p o n ' ' a ' ' t i m e
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>x（输入）</th>
+<th>y（答案）</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>O</code></td>
+<td><code>n</code></td>
+<td>看到 &quot;O&quot;，预测 &quot;n&quot;</td>
+</tr>
+<tr>
+<td><code>n</code></td>
+<td><code>c</code></td>
+<td>看到 &quot;On&quot;，预测 &quot;c&quot;</td>
+</tr>
+<tr>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr>
+<td><code>m</code></td>
+<td><code>e</code></td>
+<td>看到 &quot;Once upon a tim&quot;，预测 &quot;e&quot;</td>
+</tr>
+</tbody>
+</table>
+<p>模型在这个样本上要同时做 T=16 次&quot;预测下一个 token&quot;，<code>cross_entropy_loss</code> 对它们取平均（第 13 课）。</p>
+<blockquote>
+<p><strong>为什么同一段文本要重复利用？</strong> 一个长度为 700+ 字符的语料，可以切成几百个<strong>互相重叠</strong>的窗口（起点 0、1、2、……都可以），一份语料就被&quot;榨出&quot;远超自身长度的训练样本。</p>
+</blockquote>
+<h2><a href="#7-batch_size-与-block_size两个容易混淆的概念" aria-hidden="true" class="anchor" id="user-content-7-batch_size-与-block_size两个容易混淆的概念"></a>7. <code>batch_size</code> 与 <code>block_size</code>：两个容易混淆的概念</h2>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>英文含义</th>
+<th>含义</th>
+<th>代码中的体现</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>block_size</code></td>
+<td>序列长度（上下文窗口）</td>
+<td>每个样本里有多少个 token，也就是模型一次&quot;看&quot;多长的历史</td>
+<td><code>x.push(tokens[start + j])</code> 循环 <code>0..block_size</code></td>
+</tr>
+<tr>
+<td><code>batch_size</code></td>
+<td>批大小</td>
+<td>一次训练同时处理多少个独立样本</td>
+<td>外层 <code>for _ in 0..self.batch_size</code></td>
+</tr>
+</tbody>
+</table>
+<p>它们合起来决定了一次前向的输入规模：</p>
+<pre><code>一次前向的输入张量：[B*T] 展平 → model.forward 里 reshape 成 [B, T, D]
+</code></pre>
+<p>其中 <code>B = batch_size</code>（样本数）、<code>T = block_size</code>（每个样本的 token 数）。在 <code>train_gpt</code> 里：</p>
+<pre><code class="language-rust">let (x, y) = loader.sample_batch(rng);
+let b = batch_size;      // B = 8
+let t = block_size;      // T = 32（GPTConfig::tiny 的默认值）
+let logits = model.forward(&amp;x, b, t, None);   // [B*T, vocab_size]
+</code></pre>
+<p>用一张图理解 B 和 T：</p>
+<pre><code>batch_size = 2, block_size = 4 时的一次采样：
+
+         ┌───── 第 1 个样本（起点 start=0）─────┐
+x = [ t0  t1  t2  t3 ]   y = [ t1  t2  t3  t4 ]
+         ┌───── 第 2 个样本（起点 start=57）────┐
+x = [ t57 t58 t59 t60 ]  y = [ t58 t59 t60 t61 ]
+         └──────────────────────────────┘
+         展平后 x 是长度 B*T = 8 的一维数组
+</code></pre>
+<blockquote>
+<p>两个起点之间没有关系——每个样本是<strong>独立</strong>从语料里随机切的，这正是&quot;随机梯度下降&quot;里&quot;随机&quot;二字的来源。</p>
+</blockquote>
+<h2><a href="#8-一个隐藏的断言语料不能太短" aria-hidden="true" class="anchor" id="user-content-8-一个隐藏的断言语料不能太短"></a>8. 一个隐藏的断言：语料不能太短</h2>
+<pre><code class="language-rust">assert!(tokens.len() &gt; block_size, &quot;语料太短，无法切出完整序列&quot;);
+</code></pre>
+<p><code>sample_batch</code> 里 <code>max_start = tokens.len() - block_size - 1</code> 还额外要求至少留 1 个 token 当 y 的尾巴（因为 y 比 x 多取一位）。如果语料比 <code>block_size</code> 还短，就切不出任何完整窗口，直接 panic 提示——这是第 1 课就强调的&quot;出错早、出错明显&quot;的防御性编程习惯。</p>
+<h2><a href="#9-动手练习" aria-hidden="true" class="anchor" id="user-content-9-动手练习"></a>9. 动手练习</h2>
+<ol>
+<li>手动算一遍：语料有 700 个 token，<code>block_size = 32</code>，<code>max_start</code> 是多少？一共能切出多少个不同的起点？（答案：668）</li>
+<li>把 <code>batch_size</code> 从 8 改成 1 再训练，观察 loss 曲线的抖动幅度（batch 越小噪声越大）。</li>
+<li>把 <code>block_size</code> 改成 64（注意 <code>GPTConfig</code> 的 block_size 也要一起改）再训练，对比效果和训练速度。</li>
+<li>思考：为什么 y 要比 x 多取一个 token（<code>tokens[start + block_size]</code>）？如果只取 <code>tokens[start..start+block_size]</code> 当 y 会有什么问题？</li>
+</ol>
+<h2><a href="#10-本课总结" aria-hidden="true" class="anchor" id="user-content-10-本课总结"></a>10. 本课总结</h2>
+<ul>
+<li>数据流水线：<strong>文本 → token id → 切窗口 → 配答案</strong></li>
+<li>自监督：预测下一个 token，标签来自文本自身，无需人工标注</li>
+<li>配对方式：y 是 x 右移一位，<code>y[j] = x[j] 的下一个 token</code></li>
+<li><code>block_size</code> 控制&quot;看多长&quot;，<code>batch_size</code> 控制&quot;一次看几段&quot;，两者相乘是一次前向的 token 总数</li>
+<li><code>sample_batch</code> 随机选起点切重叠窗口，把一份语料复用出大量样本</li>
+<li>下一步（第 15 课）：训练好模型后，如何从输出的 logits 里&quot;采样&quot;出通顺、不呆板的文本</li>
+</ul>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-13/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-15/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a></div></div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

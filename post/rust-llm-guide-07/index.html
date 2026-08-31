@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 7 课：第一个 MLP —— 教会神经网络算 XOR - 干徒</title>
+    <meta name="description" content="用前面实现的层组合出第一个多层感知机，成功训练它学会 XOR 异或运算。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, MLP">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-07">
+    <meta property="og:title" content="第 7 课：第一个 MLP —— 教会神经网络算 XOR - 干徒">
+    <meta property="og:description" content="用前面实现的层组合出第一个多层感知机，成功训练它学会 XOR 异或运算。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-07">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 7 课：第一个 MLP —— 教会神经网络算 XOR - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 7 课：第一个 MLP —— 教会神经网络算 XOR - 干徒">
+    <meta name="twitter:description" content="用前面实现的层组合出第一个多层感知机，成功训练它学会 XOR 异或运算。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 7 课：第一个 MLP —— 教会神经网络算 XOR","description":"用前面实现的层组合出第一个多层感知机，成功训练它学会 XOR 异或运算。","url":"https://ganto.me/post/rust-llm-guide-07","datePublished":"2026-09-08","dateModified":"2026-09-08","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, MLP","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-c64c465a01d82915.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 7 课：第一个 MLP —— 教会神经网络算 XOR</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-08</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">MLP</span></div>
+                <div class="blog-content">
+<h1><a href="#第-7-课第一个-mlp--教会神经网络算-xor" aria-hidden="true" class="anchor" id="user-content-第-7-课第一个-mlp--教会神经网络算-xor"></a>第 7 课：第一个 MLP —— 教会神经网络算 XOR</h1>
+<blockquote>
+<p>代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/main.rs">src/main.rs</a>（<code>demo_xor</code> 函数）
+前置知识：第 5 课 Linear / 激活函数、第 6 课 CrossEntropy / SGD</p>
+</blockquote>
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li>XOR 为什么&quot;看着简单却学不会&quot;？什么是<strong>线性不可分</strong>？</li>
+<li>为什么必须加隐藏层和非线性激活？</li>
+<li><code>demo_xor</code> 的每一行代码在干什么？</li>
+<li>为什么 XOR 训练到 4/4 就能证明<strong>反向传播是对的</strong>？</li>
+</ol>
+<h2><a href="#2-xor简单到一眼看穿难到一条直线搞不定" aria-hidden="true" class="anchor" id="user-content-2-xor简单到一眼看穿难到一条直线搞不定"></a>2. XOR：简单到&quot;一眼看穿&quot;，难到&quot;一条直线搞不定&quot;</h2>
+<p><strong>异或（XOR）</strong>：两个输入相同输出 0，不同输出 1。</p>
+<table>
+<thead>
+<tr>
+<th>输入 x1</th>
+<th>输入 x2</th>
+<th>输出 y</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>0</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td>1</td>
+<td>0</td>
+<td>1</td>
+</tr>
+<tr>
+<td>1</td>
+<td>1</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>把四个点画在平面上（● = 输出 1，○ = 输出 0）：</p>
+<pre><code>x2
+1 ─  ●(0,1)   ○(1,1)
+   │
+0 ─  ○(0,0)   ●(1,0)
+   └──────────────── x1
+</code></pre>
+<p>问题来了：<strong>能不能画一条直线，把 ● 和 ○ 分开？不能。</strong> 一条直线最多把平面分成两半，而两个 ● 在对角线上——无论直线怎么放，总有一侧同时混着 ● 和 ○。这就是<strong>线性不可分</strong>。</p>
+<h2><a href="#3-为什么必须非线性单层线性模型必败" aria-hidden="true" class="anchor" id="user-content-3-为什么必须非线性单层线性模型必败"></a>3. 为什么必须非线性：单层线性模型必败</h2>
+<ul>
+<li>第 2 课的线性回归只有一层：<code>pred = xW + b</code>，它学出的边界本质是一条直线</li>
+<li>对 XOR，直线永远分不开 → 单层模型最多只能对 3 个样本正确（3/4），永远到不了 4/4</li>
+<li>解法：<strong>隐藏层 + 非线性激活</strong>（第 5 课的 ReLU）。非线性可以把输入空间&quot;折叠 / 扭曲&quot;，让原本线性不可分的点在高层变得线性可分</li>
+</ul>
+<p>直觉（4 个样本为什么能学会）：</p>
+<ul>
+<li>隐藏层 4 个神经元 ≈ 学出 4 种&quot;特征组合&quot;</li>
+<li>ReLU 让每个特征可以&quot;开关&quot;（x &gt; 0 才激活）</li>
+<li>第二层再线性组合这些特征，就能画出&quot;折线&quot;边界，把四个点完美分开</li>
+</ul>
+<h2><a href="#4-数据集与网络结构2--4--2" aria-hidden="true" class="anchor" id="user-content-4-数据集与网络结构2--4--2"></a>4. 数据集与网络结构：2 → 4 → 2</h2>
+<p><strong>数据集</strong>（4 个样本，一次全部喂入，batch = 4）：</p>
+<pre><code class="language-rust">// 数据集：4 个样本
+let x_data = Tensor::from_vec(
+    vec![0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0],
+    vec![4, 2],
+);
+let y_targets = vec![0usize, 1, 1, 0]; // XOR 真值表
+</code></pre>
+<ul>
+<li><code>x_data</code>：[4, 2]，四行正好是 (0,0)、(0,1)、(1,0)、(1,1)</li>
+<li><code>y_targets</code>：对应输出 0、1、1、0</li>
+</ul>
+<p><strong>网络</strong>（两个 Linear 叠成 MLP）：</p>
+<pre><code class="language-rust">let fc1 = Linear::new(2, 4, &amp;mut rng);   // 输入 2 维 → 隐藏层 4 维
+let fc2 = Linear::new(4, 2, &amp;mut rng);   // 隐藏层 4 维 → 输出 2 维
+</code></pre>
+<p>结构图：</p>
+<pre><code>x [4,2] ─► fc1 (2→4) ─► ReLU ─► h [4,4] ─► fc2 (4→2) ─► logits [4,2]
+</code></pre>
+<ul>
+<li>输出层是 <strong>2 个神经元</strong>：第 0 个是&quot;类别 0 的分数&quot;，第 1 个是&quot;类别 1 的分数&quot;</li>
+<li>为什么不直接用 1 个输出（0 或 1）？因为配合 CrossEntropy 分类更自然，两个分数取 argmax 就是预测</li>
+</ul>
+<p><strong>收集参数 + 创建优化器</strong>：</p>
+<pre><code class="language-rust">let params: Vec&lt;Tensor&gt; = {
+    let mut ps = fc1.parameters();
+    ps.extend(fc2.parameters());
+    ps
+};
+let opt = SGD::new(0.5, params);
+</code></pre>
+<ul>
+<li><code>fc1.parameters()</code> + <code>fc2.parameters()</code>：共 2×4+4 + 4×2+2 = <strong>22 个参数</strong></li>
+<li>学习率 0.5：XOR 问题简单，步长可以大一点</li>
+<li>随机种子固定为 42（<code>Rng::new(42)</code>），每次运行初始化相同、结果可复现</li>
+</ul>
+<h2><a href="#5-训练循环1000-步" aria-hidden="true" class="anchor" id="user-content-5-训练循环1000-步"></a>5. 训练循环：1000 步</h2>
+<pre><code class="language-rust">for step in 0..1000 {
+    // 前向：relu(x @ W1 + b1) @ W2 + b2
+    let h = relu(&amp;fc1.forward(&amp;x_data));
+    let logits = fc2.forward(&amp;h);
+    let loss = cross_entropy_loss(&amp;logits, &amp;y_targets);
+
+    loss.backward();
+    opt.step();
+    opt.zero_grad();
+
+    if step % 200 == 0 {
+        println!(&quot;  step {:&gt;4} | loss {:.4}&quot;, step, loss.data()[0]);
+    }
+}
+</code></pre>
+<p>对应第 6 课的&quot;四步舞&quot;：</p>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>代码</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>前向</td>
+<td><code>fc1.forward(&amp;x_data)</code> → <code>relu</code> → <code>fc2.forward(&amp;h)</code></td>
+<td>4 个样本一次算完</td>
+</tr>
+<tr>
+<td>损失</td>
+<td><code>cross_entropy_loss(&amp;logits, &amp;y_targets)</code></td>
+<td>分类交叉熵</td>
+</tr>
+<tr>
+<td>反向</td>
+<td><code>loss.backward()</code></td>
+<td>自动微分算出 22 个参数的梯度</td>
+</tr>
+<tr>
+<td>更新</td>
+<td><code>opt.step()</code></td>
+<td>θ = θ − 0.5·g</td>
+</tr>
+<tr>
+<td>清零</td>
+<td><code>opt.zero_grad()</code></td>
+<td>防止梯度跨轮累加</td>
+</tr>
+</tbody>
+</table>
+<p><strong>观察 loss</strong>：每 200 步打印一次，趋势是单调下降并趋近 0（具体数值由种子 42 的初始化决定，不必纠结；刚初始化时接近随机猜，2 类问题约等于 −ln 0.5 ≈ 0.69）。</p>
+<h2><a href="#6-验证44-才算赢" aria-hidden="true" class="anchor" id="user-content-6-验证44-才算赢"></a>6. 验证：4/4 才算赢</h2>
+<p>训练完要&quot;考试&quot;：</p>
+<pre><code class="language-rust">// 验证正确率
+let h = relu(&amp;fc1.forward(&amp;x_data));
+let logits = fc2.forward(&amp;h);
+let data = logits.data();
+let mut correct = 0;
+for i in 0..4 {
+    let pred = if data[i * 2] &gt; data[i * 2 + 1] { 0 } else { 1 };
+    if pred == y_targets[i] {
+        correct += 1;
+    }
+}
+println!(&quot;  训练后正确率：{}/4（100% 说明反向传播正确）\n&quot;, correct);
+</code></pre>
+<ul>
+<li>对每个样本取 <strong>argmax</strong>：类别 0 的分数 <code>data[i*2]</code> 大于类别 1 的分数 <code>data[i*2+1]</code> → 预测 0，否则预测 1</li>
+<li>期望输出：<code>训练后正确率：4/4</code></li>
+</ul>
+<h2><a href="#7-为什么-44-就能证明反向传播正确" aria-hidden="true" class="anchor" id="user-content-7-为什么-44-就能证明反向传播正确"></a>7. 为什么 4/4 就能证明反向传播正确</h2>
+<p>推理链条：</p>
+<ol>
+<li><strong>参数是随机初始化的</strong>（种子 42），绝不是&quot;碰巧答对&quot;；</li>
+<li><strong>梯度完全来自自动微分</strong>：任何一个运算（matmul / add / relu / softmax / log / sum ...）的反向实现出错，梯度就会偏一点，参数越走越偏，1000 步后必然累积成大错；</li>
+<li><strong>XOR 没有捷径</strong>：它是&quot;必须两层非线性&quot;的问题，梯度要穿透 ReLU 的 mask、两层 matmul 的转置路径、softmax 的雅可比路径——整条反向传播链路被真实训练&quot;压测&quot;了一遍；</li>
+<li>结果 100% 正确 + loss 单调下降，还同时验证了<strong>优化器</strong>（SGD 的 <code>set_data</code> 写回）和<strong>训练循环</strong>（backward → step → zero_grad 的顺序）都是对的。</li>
+</ol>
+<p>换句话说：<strong>XOR 训练收敛到 4/4，等于对&quot;张量库 + 网络层 + 损失 + 优化器&quot;整条链路做了一次端到端集成测试</strong>。</p>
+<h2><a href="#8-运行" aria-hidden="true" class="anchor" id="user-content-8-运行"></a>8. 运行</h2>
+<pre><code class="language-bash">cargo run
+</code></pre>
+<p>输出第一段（loss 数值随种子确定，趋势如下）：</p>
+<pre><code>=== 演示 1：MLP 学习 XOR（第 7 课）===
+  step    0 | loss ...
+  step  200 | loss ...
+  step  400 | loss ...
+  step  600 | loss ...
+  step  800 | loss ...
+  训练后正确率：4/4（100% 说明反向传播正确）
+</code></pre>
+<h2><a href="#9-动手练习" aria-hidden="true" class="anchor" id="user-content-9-动手练习"></a>9. 动手练习</h2>
+<ol>
+<li>把隐藏层大小从 4 改成 2（<code>Linear::new(2, 2, ...)</code>），观察还能不能到 4/4（提示：2 个隐藏神经元很可能不够）。</li>
+<li>把 <code>relu</code> 换成 <code>tanh</code> 或 <code>gelu</code>，其他不变，观察收敛速度差异。</li>
+<li>把学习率改成 0.05 和 5.0，对比 loss 下降曲线（太小慢、太大震荡）。</li>
+<li>去掉 <code>relu</code>（<code>h = fc1.forward(&amp;x_data)</code> 直接喂给 fc2），验证&quot;没有非线性就学不会 XOR&quot;，观察正确率卡在 3/4。</li>
+<li>把训练步数改成 100（可能还没收敛）和 10000（数据只有 4 个样本，看会不会过拟合），观察 loss 与正确率。</li>
+</ol>
+<h2><a href="#10-本课总结" aria-hidden="true" class="anchor" id="user-content-10-本课总结"></a>10. 本课总结</h2>
+<ul>
+<li>XOR <strong>线性不可分</strong> → 必须隐藏层 + 非线性激活</li>
+<li><code>demo_xor</code> 完整走通：数据集 → 网络 2→4→2 → 训练 1000 步 → 验证 4/4</li>
+<li><strong>4/4 = 反向传播正确的强证据</strong>（端到端集成测试）</li>
+<li>从现在起，我们有了一个能训练任意小分类问题的完整工具箱</li>
+<li>下一课：给模型喂真正的文本——BPE 分词器</li>
+</ul>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-06/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-08/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a></div></div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

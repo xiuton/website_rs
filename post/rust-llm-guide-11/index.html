@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 11 课：位置编码与归一化 —— 让序列带上位置感 - 干徒</title>
+    <meta name="description" content="引入正弦位置编码与 LayerNorm 层归一化，配合残差连接稳定训练。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 注意力">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-11">
+    <meta property="og:title" content="第 11 课：位置编码与归一化 —— 让序列带上位置感 - 干徒">
+    <meta property="og:description" content="引入正弦位置编码与 LayerNorm 层归一化，配合残差连接稳定训练。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-11">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 11 课：位置编码与归一化 —— 让序列带上位置感 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 11 课：位置编码与归一化 —— 让序列带上位置感 - 干徒">
+    <meta name="twitter:description" content="引入正弦位置编码与 LayerNorm 层归一化，配合残差连接稳定训练。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 11 课：位置编码与归一化 —— 让序列带上位置感","description":"引入正弦位置编码与 LayerNorm 层归一化，配合残差连接稳定训练。","url":"https://ganto.me/post/rust-llm-guide-11","datePublished":"2026-09-12","dateModified":"2026-09-12","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 注意力","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-c64c465a01d82915.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 11 课：位置编码与归一化 —— 让序列带上位置感</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-12</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">注意力</span></div>
+                <div class="blog-content">
+<h1><a href="#第-11-课位置编码与归一化--让序列带上位置感" aria-hidden="true" class="anchor" id="user-content-第-11-课位置编码与归一化--让序列带上位置感"></a>第 11 课：位置编码与归一化 —— 让序列带上&quot;位置感&quot;</h1>
+<blockquote>
+<p>代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/model.rs">src/model.rs</a>（正弦位置编码 <code>sinusoidal_positions</code>、<code>TransformerBlock</code> 里的残差连接）
+代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/layers.rs">src/layers.rs</a>（<code>LayerNorm</code>）
+演示入口：<a href="file:///d:/Code/Rust/llm_from_scratch/src/main.rs">src/main.rs</a></p>
+</blockquote>
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li>注意力机制天生&quot;看不见位置&quot;，为什么？怎么补救？</li>
+<li>正弦位置编码的公式 <code>PE(pos, 2i) = sin(pos / 10000^(2i/d))</code> 到底在算什么？</li>
+<li>LayerNorm 是怎么把数据&quot;拉回&quot;标准分布的？它和 BatchNorm 有什么区别？</li>
+<li>残差连接为什么能让我们放心地把网络加深？</li>
+</ol>
+<h2><a href="#2-为什么需要位置编码" aria-hidden="true" class="anchor" id="user-content-2-为什么需要位置编码"></a>2. 为什么需要位置编码</h2>
+<p>先回忆第 9-10 课的注意力公式：</p>
+<pre><code>scores = (Q · Kᵀ) / √d_k      # Q、K 由每个 token 的内容算出来
+attn   = softmax(scores)
+out    = attn · V
+</code></pre>
+<p>注意：<strong>Q、K、V 全部只由 token 的内容（embedding）计算而来</strong>。点积 <code>q·k</code> 衡量的是&quot;两个 token 的内容有多相关&quot;，
+跟&quot;它们相隔多远、谁在前谁在后&quot;没有任何关系。</p>
+<p>这带来一个致命问题：<strong>注意力是&quot;排列不变&quot;（permutation invariant）的</strong>。看一个例子：</p>
+<table>
+<thead>
+<tr>
+<th>输入序列</th>
+<th>模型看到的相关性</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&quot;猫 追 狗&quot;</td>
+<td>&quot;猫&quot;↔&quot;狗&quot;</td>
+</tr>
+<tr>
+<td>&quot;狗 追 猫&quot;</td>
+<td>&quot;猫&quot;↔&quot;狗&quot;</td>
+</tr>
+</tbody>
+</table>
+<p>两个句子语义完全相反，但注意力打分一模一样（因为每个词的内容没变）。如果模型只看注意力，
+它永远分不清&quot;猫追狗&quot;和&quot;狗追猫&quot;。</p>
+<blockquote>
+<p>通俗理解：注意力是个&quot;走神的学生&quot;，它只知道&quot;这两个词好像有关&quot;，但不知道&quot;谁在左、谁在右&quot;。
+语言是<strong>顺序敏感</strong>的，所以必须把位置信息塞进去。</p>
+</blockquote>
+<p><strong>解决方案</strong>：给每个位置的 token embedding <strong>加上一个位置向量</strong>：</p>
+<pre><code>x = token_embedding + position_embedding
+</code></pre>
+<p>位置向量就是&quot;第 0 个位置长什么样、第 1 个位置长什么样……&quot;的一组向量。加上之后，同一个词在不同位置就有了不同的表示。</p>
+<h2><a href="#3-正弦位置编码" aria-hidden="true" class="anchor" id="user-content-3-正弦位置编码"></a>3. 正弦位置编码</h2>
+<h3><a href="#31-公式" aria-hidden="true" class="anchor" id="user-content-31-公式"></a>3.1 公式</h3>
+<p>原版 Transformer 论文（Attention Is All You Need）提出用<strong>不同频率的正弦波</strong>来编码位置：</p>
+<pre><code>PE(pos, 2i)   = sin(pos / 10000^(2i/d))
+PE(pos, 2i+1) = cos(pos / 10000^(2i/d))
+</code></pre>
+<ul>
+<li><code>pos</code>：位置（0, 1, 2, ...）</li>
+<li><code>i</code>：embedding 里的维度下标（0, 1, 2, ..., d-1）</li>
+<li><code>d</code>：embedding 维度（我们的模型里就是 <code>n_embd</code>）</li>
+</ul>
+<p>位置 <code>pos</code> 的向量长这样：</p>
+<pre><code>pos_emb[pos] = [ sin(pos/1), cos(pos/1), sin(pos/10000^(2/d)), cos(pos/10000^(2/d)), ... ]
+                  └── i=0 ──┘  └── i=1 ──┘      └── i=2 ──┘       └── i=3 ──┘
+</code></pre>
+<p><strong>关键点</strong>：维度下标 <code>i</code> 越小，频率越高（波形越密）；<code>i</code> 越大，频率越低（波形越平缓）。
+也就是说，编码向量的&quot;前半段&quot;负责记录精细的相对位置，&quot;后半段&quot;负责记录大致的绝对位置。</p>
+<h3><a href="#32-手算一个例子" aria-hidden="true" class="anchor" id="user-content-32-手算一个例子"></a>3.2 手算一个例子</h3>
+<p>设 <code>d = 4</code>，即每个位置只有 4 个维度（i = 0, 1, 2, 3）：</p>
+<table>
+<thead>
+<tr>
+<th>pos</th>
+<th>2i=0：sin(pos/1)</th>
+<th>2i=1：cos(pos/1)</th>
+<th>2i=2：sin(pos/100)</th>
+<th>2i=3：cos(pos/100)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>sin(0) = 0</td>
+<td>cos(0) = 1</td>
+<td>sin(0) = 0</td>
+<td>cos(0) = 1</td>
+</tr>
+<tr>
+<td>1</td>
+<td>sin(1) ≈ 0.841</td>
+<td>cos(1) ≈ 0.540</td>
+<td>sin(0.01) ≈ 0.010</td>
+<td>cos(0.01) ≈ 1.000</td>
+</tr>
+<tr>
+<td>2</td>
+<td>sin(2) ≈ 0.909</td>
+<td>cos(2) ≈ -0.416</td>
+<td>sin(0.02) ≈ 0.020</td>
+<td>cos(0.02) ≈ 1.000</td>
+</tr>
+<tr>
+<td>3</td>
+<td>sin(3) ≈ 0.141</td>
+<td>cos(3) ≈ -0.990</td>
+<td>sin(0.03) ≈ 0.030</td>
+<td>cos(0.03) ≈ 1.000</td>
+</tr>
+</tbody>
+</table>
+<p>可以看到：i = 0/1 的波形变化剧烈（区分相邻位置），i = 2/3 的波形几乎不动（区分远距离）。</p>
+<h3><a href="#33-为什么选正弦波" aria-hidden="true" class="anchor" id="user-content-33-为什么选正弦波"></a>3.3 为什么选正弦波</h3>
+<table>
+<thead>
+<tr>
+<th>性质</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>每个位置的向量都不同</td>
+<td><code>pos</code> 不同，三角函数取值就不同，模型能区分位置</td>
+</tr>
+<tr>
+<td>相对位置可&quot;计算&quot;</td>
+<td>利用三角恒等式，<code>PE(pos+k)</code> 可以表示为 <code>PE(pos)</code> 的线性组合，模型容易学到&quot;相对距离&quot;的概念</td>
+</tr>
+<tr>
+<td>值域固定</td>
+<td>所有值都在 [-1, 1]，加到 embedding 上不会把数值范围撑爆</td>
+</tr>
+<tr>
+<td>不需要学习</td>
+<td>位置编码是<strong>固定的常数</strong>，不用训练就能用；而且序列再长也能&quot;算&quot;出来（外推性）</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#34-对应代码" aria-hidden="true" class="anchor" id="user-content-34-对应代码"></a>3.4 对应代码</h3>
+<p><code>src/model.rs</code> 里的实现：</p>
+<pre><code class="language-rust">/// 正弦位置编码（第 11 课）
+///
+/// PE(pos, 2i)   = sin(pos / 10000^(2i/D))
+/// PE(pos, 2i+1) = cos(pos / 10000^(2i/D))
+fn sinusoidal_positions(max_len: usize, d: usize) -&gt; Vec&lt;f32&gt; {
+    let mut data = vec![0.0f32; max_len * d];
+    for pos in 0..max_len {
+        for i in 0..d {
+            let freq = 10000f32.powf((2 * (i / 2)) as f32 / d as f32);
+            let angle = pos as f32 / freq;
+            data[pos * d + i] = if i % 2 == 0 { angle.sin() } else { angle.cos() };
+        }
+    }
+    data
+}
+</code></pre>
+<p>逐行对照公式：</p>
+<table>
+<thead>
+<tr>
+<th>代码</th>
+<th>对应公式</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>10000f32.powf((2 * (i / 2)) as f32 / d as f32)</code></td>
+<td><code>10000^(2i/d)</code></td>
+<td>注意这里的 <code>2i</code> 指<strong>偶数维下标</strong>。因为 <code>i / 2</code> 是整数除法，当 <code>i=2</code> 和 <code>i=3</code> 时 <code>i/2</code> 都等于 1，所以下标 2 和 3 共享同一个频率——这正是公式里 <code>(2i, 2i+1)</code> 一对维度用同一个 <code>10000^(2i/d)</code> 的做法</td>
+</tr>
+<tr>
+<td><code>let angle = pos as f32 / freq;</code></td>
+<td><code>pos / 10000^(2i/d)</code></td>
+<td>把位置除以频率，得到角度</td>
+</tr>
+<tr>
+<td><code>if i % 2 == 0 { angle.sin() } else { angle.cos() }</code></td>
+<td><code>PE(pos, 2i) = sin(...)</code>、<code>PE(pos, 2i+1) = cos(...)</code></td>
+<td>偶数维用 sin，奇数维用 cos</td>
+</tr>
+</tbody>
+</table>
+<p>在 <code>GPT::new</code> 里把它变成一个 <code>[block_size, n_embd]</code> 的张量存起来：</p>
+<pre><code class="language-rust">let pos_emb = Tensor::from_vec(
+    sinusoidal_positions(cfg.block_size, cfg.n_embd),
+    vec![cfg.block_size, cfg.n_embd],
+);
+</code></pre>
+<p><code>GPT</code> 结构体里它的类型是普通 <code>Tensor</code> 而不是 <code>Tensor::param(...)</code>：</p>
+<pre><code class="language-rust">pos_emb: Tensor, // 正弦位置编码 [block_size, D]（常数，不参与训练）
+</code></pre>
+<blockquote>
+<p>它不在 <code>parameters()</code> 里，反向传播时不会产生梯度——<strong>位置编码是常数</strong>，这正是正弦编码对比&quot;可学习位置编码&quot;的一大优点。</p>
+</blockquote>
+<h3><a href="#35-怎么用加到-token-embedding-上" aria-hidden="true" class="anchor" id="user-content-35-怎么用加到-token-embedding-上"></a>3.5 怎么用：加到 token embedding 上</h3>
+<p>在 <code>GPT::forward</code> 里，用 <code>gather_rows</code> 按位置取行，再和 token embedding 相加：</p>
+<pre><code class="language-rust">// 1. token embedding
+let tok = self.tok_emb.forward(idx).reshape(vec![b, t, d]);
+// 2. 位置编码：KV cache 推理时，当前位置从缓存长度开始
+let pos_emb = self.pos_emb.gather_rows(&amp;positions).reshape(vec![b, t, d]);
+let x = tok.add(&amp;pos_emb);
+</code></pre>
+<p><code>x</code> 的每个元素 = 词的语义（token embedding）+ 词的位置（pos embedding），后续所有层都在这个&quot;带位置信息&quot;的表示上工作。</p>
+<h2><a href="#4-layernorm层归一化" aria-hidden="true" class="anchor" id="user-content-4-layernorm层归一化"></a>4. LayerNorm：层归一化</h2>
+<h3><a href="#41-公式" aria-hidden="true" class="anchor" id="user-content-41-公式"></a>4.1 公式</h3>
+<p>LayerNorm 对<strong>最后一维</strong>（每个样本自己）做归一化，再缩放平移：</p>
+<pre><code>y = (x - μ) / √(σ² + ε) · γ + β
+</code></pre>
+<ul>
+<li><code>μ</code>：x 在最后一维上的均值</li>
+<li><code>σ²</code>：x 在最后一维上的方差</li>
+<li><code>ε</code>：一个极小的数（防除零，我们的代码里用 <code>1e-5</code>）</li>
+<li><code>γ</code>（gamma）、<code>β</code>（beta）：<strong>可学习的参数</strong>，初始 γ=1、β=0</li>
+</ul>
+<p>直觉：先把每个样本拉成&quot;均值 0、方差 1&quot;的标准分布（稳定数值范围），再让模型<strong>自己决定</strong>要不要缩放平移回去（恢复表达能力）。</p>
+<h3><a href="#42-对应代码逐行拆解" aria-hidden="true" class="anchor" id="user-content-42-对应代码逐行拆解"></a>4.2 对应代码逐行拆解</h3>
+<p><code>src/layers.rs</code> 里的实现：</p>
+<pre><code class="language-rust">pub struct LayerNorm {
+    pub gamma: Tensor, // [d] 可学习缩放
+    pub beta: Tensor,  // [d] 可学习平移
+    pub eps: f32,
+}
+
+impl LayerNorm {
+    pub fn new(d: usize, eps: f32) -&gt; Self {
+        LayerNorm {
+            gamma: Tensor::param(vec![1.0; d], vec![d]),
+            beta: Tensor::param(vec![0.0; d], vec![d]),
+            eps,
+        }
+    }
+
+    pub fn forward(&amp;self, x: &amp;Tensor) -&gt; Tensor {
+        let d = x.shape()[x.rank() - 1];
+        // 均值 μ：[..., 1]（保持维度，方便广播）
+        let mean = x.sum_last_dim().mul_scalar(1.0 / d as f32);
+        // 中心化
+        let centered = x.sub(&amp;mean);
+        // 方差 σ²：中心化后平方再取均值
+        let var = centered
+            .mul(&amp;centered)
+            .sum_last_dim()
+            .mul_scalar(1.0 / d as f32);
+        // 归一化
+        let norm = centered.div(&amp;var.add_scalar(self.eps).sqrt());
+        // 缩放平移（γ、β 是 [d]，广播到 [..., d]）
+        norm.mul(&amp;self.gamma).add(&amp;self.beta)
+    }
+}
+</code></pre>
+<p>公式 ↔ 代码对照表：</p>
+<table>
+<thead>
+<tr>
+<th>公式步骤</th>
+<th>Rust 代码</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>μ = mean(x)</code></td>
+<td><code>x.sum_last_dim().mul_scalar(1.0 / d as f32)</code></td>
+<td>第 1 课学的 <code>sum_last_dim</code> 把最后一维求和，结果形状是 <code>[..., 1]</code>（最后一位变成 1，<strong>维度没有消失</strong>），再除以 <code>d</code> 就是均值。保持 <code>[..., 1]</code> 是为了后面能和 <code>[..., d]</code> 直接广播相减</td>
+</tr>
+<tr>
+<td><code>x - μ</code></td>
+<td><code>x.sub(&amp;mean)</code></td>
+<td>中心化：减去均值</td>
+</tr>
+<tr>
+<td><code>σ² = mean((x-μ)²)</code></td>
+<td><code>centered.mul(&amp;centered).sum_last_dim().mul_scalar(1.0 / d as f32)</code></td>
+<td>先逐元素平方，再 <code>sum_last_dim</code> 求和、除以 <code>d</code></td>
+</tr>
+<tr>
+<td><code>√(σ² + ε)</code></td>
+<td><code>var.add_scalar(self.eps).sqrt()</code></td>
+<td>加一个小数防除零，再开方</td>
+</tr>
+<tr>
+<td><code>(x-μ) / √(σ²+ε)</code></td>
+<td><code>centered.div(&amp;...)</code></td>
+<td>归一化</td>
+</tr>
+<tr>
+<td><code>· γ + β</code></td>
+<td><code>norm.mul(&amp;self.gamma).add(&amp;self.beta)</code></td>
+<td>可学习缩放平移；<code>gamma</code>、<code>beta</code> 形状是 <code>[d]</code>，广播到 <code>[..., d]</code></td>
+</tr>
+</tbody>
+</table>
+<p>注意一个细节：均值、方差是用 <code>sum_last_dim</code> 求的，所以归一化是<strong>逐样本、逐序列位置</strong>独立进行的——
+对输入 <code>[B, T, D]</code> 来说，就是沿着最后一维 <code>D</code> 归一把每个 <code>B×T</code> 的&quot;行&quot;。</p>
+<h3><a href="#43-layernorm-vs-batchnorm" aria-hidden="true" class="anchor" id="user-content-43-layernorm-vs-batchnorm"></a>4.3 LayerNorm vs BatchNorm</h3>
+<table>
+<thead>
+<tr>
+<th>对比项</th>
+<th>LayerNorm（我们用这个）</th>
+<th>BatchNorm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>对哪个维度归一化</td>
+<td>最后一维（每个样本自己）</td>
+<td>特征维（跨 batch 的所有样本）</td>
+</tr>
+<tr>
+<td>依赖 batch 吗</td>
+<td>不依赖，batch size=1 也能用</td>
+<td>依赖，batch 太小会不准</td>
+</tr>
+<tr>
+<td>训练/推理行为</td>
+<td>完全一致，公式不变</td>
+<td>推理时用训练期累积的统计量</td>
+</tr>
+<tr>
+<td>需要&quot;当前 batch&quot;统计量吗</td>
+<td>不需要</td>
+<td>需要（还要额外维护 running mean/var）</td>
+</tr>
+<tr>
+<td>适合场景</td>
+<td>NLP / Transformer（序列长度、batch 多变）</td>
+<td>CV / CNN（固定尺寸图像）</td>
+</tr>
+<tr>
+<td>对 Transformer 的意义</td>
+<td>因果掩码下不同位置长度不同，逐位置归一化天然合适</td>
+<td>长度不一很难处理</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>记忆口诀：<strong>LayerNorm 归一化&quot;每一行&quot;，BatchNorm 归一化&quot;每一列&quot;。</strong>
+GPT 选 LayerNorm 还有一个重要原因：它不引入&quot;batch 内样本之间的相互依赖&quot;，行为可预测、实现简单（公式就 5 步）。</p>
+</blockquote>
+<h3><a href="#44-在模型里用在哪" aria-hidden="true" class="anchor" id="user-content-44-在模型里用在哪"></a>4.4 在模型里用在哪</h3>
+<p><code>TransformerBlock</code> 里有两个（<code>ln1</code> 在注意力前、<code>ln2</code> 在 MLP 前），模型末尾还有一个 <code>ln_f</code>：</p>
+<pre><code class="language-rust">// TransformerBlock::new
+ln1: LayerNorm::new(cfg.n_embd, 1e-5),
+ln2: LayerNorm::new(cfg.n_embd, 1e-5),
+// GPT::new
+ln_f: LayerNorm::new(n_embd, 1e-5),
+</code></pre>
+<p>三个归一化层都在<strong>层的最前面</strong>（pre-norm 结构，下一课细讲），<code>eps</code> 统一用 <code>1e-5</code>。</p>
+<h2><a href="#5-残差连接residual-connection" aria-hidden="true" class="anchor" id="user-content-5-残差连接residual-connection"></a>5. 残差连接（Residual Connection）</h2>
+<h3><a href="#51-公式与直觉" aria-hidden="true" class="anchor" id="user-content-51-公式与直觉"></a>5.1 公式与直觉</h3>
+<p>残差连接就是在子层的输出上<strong>加上输入本身</strong>：</p>
+<pre><code>y = x + F(x)
+</code></pre>
+<p>其中 <code>F(x)</code> 是任意子层（注意力、MLP……）。直觉上，<code>F(x)</code> 只负责&quot;学一个增量/修正&quot;，而 <code>x</code> 这条&quot;高速公路&quot;原封不动地把信息送到下一层。</p>
+<h3><a href="#52-为什么解决梯度消失" aria-hidden="true" class="anchor" id="user-content-52-为什么解决梯度消失"></a>5.2 为什么解决梯度消失</h3>
+<p>先回忆反向传播：梯度从 loss 一层层往回传，<strong>每过一层就要乘一次该层的导数</strong>。如果网络有 N 层，梯度大概要被乘 N 次：</p>
+<pre><code>∂loss/∂x₀ = ∂loss/∂xₙ · ∂xₙ/∂xₙ₋₁ · ... · ∂x₁/∂x₀
+</code></pre>
+<p>如果每层的导数都小于 1（比如常见激活函数的导数 ≤ 1），乘几十层后梯度指数级衰减，几乎变成 0——<strong>前面的层根本学不到东西</strong>，这就是&quot;梯度消失&quot;。</p>
+<p>有了残差连接，情况完全不同。<code>y = x + F(x)</code> 对 x 求导：</p>
+<pre><code>∂y/∂x = 1 + ∂F/∂x
+</code></pre>
+<ul>
+<li>多出来的那个 <code>1</code> 是恒等映射的导数，<strong>永远在</strong>。</li>
+<li>反向传播时梯度传过残差块，至少保留一份&quot;原样拷贝&quot;：</li>
+</ul>
+<pre><code>∂loss/∂x = ∂loss/∂y · (1 + ∂F/∂x) = ∂loss/∂y + ∂loss/∂y · ∂F/∂x
+</code></pre>
+<p>不管 <code>F</code> 的导数多小，梯度里始终有一个 <code>∂loss/∂y</code> 直接传回上一层，不会衰减成 0。</p>
+<h3><a href="#53-为什么能加深网络" aria-hidden="true" class="anchor" id="user-content-53-为什么能加深网络"></a>5.3 为什么能加深网络</h3>
+<ul>
+<li>对<strong>梯度</strong>：恒等映射让深层的梯度能&quot;直达&quot;浅层，解决了训练困难。</li>
+<li>对<strong>信息</strong>：每一层都能&quot;无损地&quot;跳过不需要的变换。即使某个子层学不到有用的东西，模型也可以把它当成恒等映射（<code>F(x) ≈ 0</code>），至少不劣化，所以我们可以放心堆很多层。</li>
+</ul>
+<blockquote>
+<p>一句话：<strong>残差连接 = 梯度的高速公路 + 信息的保险丝。</strong></p>
+</blockquote>
+<h3><a href="#54-对应代码" aria-hidden="true" class="anchor" id="user-content-54-对应代码"></a>5.4 对应代码</h3>
+<p><code>TransformerBlock::forward</code> 里残差连接就两处 <code>add</code>：</p>
+<pre><code class="language-rust">fn forward(&amp;self, x: &amp;Tensor, mask: &amp;Tensor, kv_cache: Option&lt;&amp;mut KVCache&gt;) -&gt; Tensor {
+    // 注意力子层 + 残差连接
+    let h = self.attn.forward(&amp;self.ln1.forward(x), mask, kv_cache);
+    let x = x.add(&amp;h);   // ← 残差连接 ①：x + Attention(LN(x))
+    // 前馈子层 + 残差连接
+    let h = self.ln2.forward(&amp;x);
+    let h = gelu(&amp;self.mlp_linear1.forward(&amp;h));
+    let h = self.mlp_linear2.forward(&amp;h);
+    x.add(&amp;h)            // ← 残差连接 ②：x + MLP(LN(x))
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>子层</th>
+<th>公式</th>
+<th>代码</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>注意力块</td>
+<td><code>x + Attention(LayerNorm(x))</code></td>
+<td><code>let x = x.add(&amp;h);</code></td>
+</tr>
+<tr>
+<td>前馈块</td>
+<td><code>x + MLP(LayerNorm(x))</code></td>
+<td><code>x.add(&amp;h)</code></td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#55-和-layernorm-的组合pre-norm" aria-hidden="true" class="anchor" id="user-content-55-和-layernorm-的组合pre-norm"></a>5.5 和 LayerNorm 的组合：pre-norm</h3>
+<p>注意到顺序是 <strong>先 LayerNorm、再子层、最后加残差</strong>（<code>LN → 子层 → +</code>），这叫 <strong>pre-norm</strong>（归一化在子层前）。对比早期 Transformer 的 post-norm（<code>子层 → + → LN</code>）：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>pre-norm（GPT-2 风格，我们用这个）</th>
+<th>post-norm（原版 Transformer）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>残差路径上的数据</td>
+<td>直接是&quot;干净&quot;的 x，不做归一化</td>
+<td>每层都过 LN，数值被反复缩放</td>
+</tr>
+<tr>
+<td>梯度传播</td>
+<td>恒等路径无干扰，更稳</td>
+<td>更容易出现训练不稳</td>
+</tr>
+<tr>
+<td>深层堆叠</td>
+<td>更容易训练（GPT 系列深度更大也能训）</td>
+<td>需要 warmup 等技巧</td>
+</tr>
+</tbody>
+</table>
+<h2><a href="#6-三者如何协作" aria-hidden="true" class="anchor" id="user-content-6-三者如何协作"></a>6. 三者如何协作</h2>
+<p>一个 Transformer Block 里，位置编码负责&quot;把位置信息喂进来&quot;，LayerNorm 负责&quot;稳住数值分布&quot;，残差连接负责&quot;让梯度和信息畅通无阻&quot;：</p>
+<pre><code>x (带位置编码的 embedding)
+ │
+ ├─ 残差①： x + Attention( LN1(x) )        ← LN 归一化 → 注意力找相关性 → 加回原 x
+ │
+ └─ 残差②： x + MLP( LN2(x) )              ← LN 归一化 → MLP 加工信息 → 加回原 x
+ │
+ └─ 送到下一层
+</code></pre>
+<h2><a href="#7-动手练习" aria-hidden="true" class="anchor" id="user-content-7-动手练习"></a>7. 动手练习</h2>
+<ol>
+<li><strong>手算 LayerNorm</strong>：对向量 <code>x = [1.0, 2.0, 3.0, 4.0]</code>，手算 μ、σ²、（σ²+ε）开方后的归一化结果（ε=1e-5），再用 <code>src/layers.rs</code> 里的 <code>LayerNorm::new(4, 1e-5)</code>（γ=1、β=0 时）跑一遍对比，应该完全一致。</li>
+<li><strong>改频率基数</strong>：把 <code>sinusoidal_positions</code> 里的 <code>10000</code> 改成 <code>10</code> 或 <code>1000000</code>，想想会怎样？（提示：<code>10</code> 让所有频率都变高、位置区分更&quot;拥挤&quot;；<code>1000000</code> 让波形几乎不动。跑训练对比 loss 曲线。）</li>
+<li><strong>去掉残差</strong>：把 <code>TransformerBlock::forward</code> 里的 <code>x.add(&amp;h)</code> 改成直接 <code>h</code>（两个子层都改），跑训练观察 loss 是否下降明显变慢——亲身感受梯度消失。</li>
+<li><strong>思考</strong>：位置编码为什么是&quot;加&quot;而不是&quot;拼接&quot;（concat）？（提示：加法让每个维度只&quot;混入&quot;一个位置信号，且不改变维度数；拼接会让维度翻倍、参数爆炸。）</li>
+<li><strong>思考</strong>：LayerNorm 里为什么用 <code>sum_last_dim</code> 求均值而不是 <code>sum</code>？如果 <code>sum</code> 把所有元素加一起会怎样？</li>
+</ol>
+<h2><a href="#8-本课总结" aria-hidden="true" class="anchor" id="user-content-8-本课总结"></a>8. 本课总结</h2>
+<ul>
+<li>
+<p>注意力是<strong>位置盲</strong>的，必须把位置信息加进输入 → 正弦位置编码 <code>PE(pos,2i)=sin(pos/10000^(2i/d))</code></p>
+</li>
+<li>
+<p>正弦编码用不同频率的波形区分位置，是<strong>常数</strong>（不参与训练），实现就一个双重循环</p>
+</li>
+<li>
+<p>LayerNorm 对最后一维做 <code>y=(x-μ)/√(σ²+ε)·γ+β</code>，用 <code>sum_last_dim</code> 求均值方差，γ/β 可学习</p>
+</li>
+<li>
+<p>LayerNorm 与 BatchNorm 的核心区别：<strong>归一行 vs 归一系列</strong>，NLP 用前者</p>
+</li>
+<li>
+<p>残差连接 <code>y = x + F(x)</code> 让梯度里永远保留一份 <code>∂loss/∂y</code>，解决梯度消失、支持深网络</p>
+</li>
+<li>
+<p>pre-norm（LN → 子层 → 残差）是 GPT 系列的标准结构</p>
+</li>
+<li>
+<p>下一课：把这些积木全部拼起来，组成完整的 GPT 模型！</p>
+</li>
+</ul>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-10/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-12/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a></div></div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

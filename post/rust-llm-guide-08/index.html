@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 8 课：BPE 分词器 —— 让模型读懂文字 - 干徒</title>
+    <meta name="description" content="实现 BPE（Byte Pair Encoding）分词器，将文本切分为模型可处理的 token。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 分词器">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-08">
+    <meta property="og:title" content="第 8 课：BPE 分词器 —— 让模型读懂文字 - 干徒">
+    <meta property="og:description" content="实现 BPE（Byte Pair Encoding）分词器，将文本切分为模型可处理的 token。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-08">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 8 课：BPE 分词器 —— 让模型读懂文字 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 8 课：BPE 分词器 —— 让模型读懂文字 - 干徒">
+    <meta name="twitter:description" content="实现 BPE（Byte Pair Encoding）分词器，将文本切分为模型可处理的 token。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 8 课：BPE 分词器 —— 让模型读懂文字","description":"实现 BPE（Byte Pair Encoding）分词器，将文本切分为模型可处理的 token。","url":"https://ganto.me/post/rust-llm-guide-08","datePublished":"2026-09-09","dateModified":"2026-09-09","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 分词器","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-c64c465a01d82915.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 8 课：BPE 分词器 —— 让模型读懂文字</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-09</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">分词器</span></div>
+                <div class="blog-content">
+<h1><a href="#第-8-课bpe-分词器--让模型读懂文字" aria-hidden="true" class="anchor" id="user-content-第-8-课bpe-分词器--让模型读懂文字"></a>第 8 课：BPE 分词器 —— 让模型&quot;读懂&quot;文字</h1>
+<blockquote>
+<p>代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/tokenizer.rs">src/tokenizer.rs</a>
+演示入口：<a href="file:///d:/Code/Rust/llm_from_scratch/src/main.rs">src/main.rs</a>（<code>demo_bpe</code>）
+语料：<a href="file:///d:/Code/Rust/llm_from_scratch/src/data.rs">src/data.rs</a>（<code>CORPUS</code>）</p>
+</blockquote>
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li>模型只能吃数字，文字怎么变成数字？</li>
+<li>按词切、按字符切，各有什么问题？有没有更好的方案？</li>
+<li>BPE 到底是什么算法？训练、编码、解码分别怎么做？</li>
+</ol>
+<h2><a href="#2-为什么需要分词" aria-hidden="true" class="anchor" id="user-content-2-为什么需要分词"></a>2. 为什么需要分词</h2>
+<p>大语言模型的输入输出都是<strong>数字</strong>：输入是一串 token id（<code>usize</code>），输出是对每个 token id 的预测分数。所以第一步要解决的问题是：<strong>把人类语言变成一串整数</strong>。</p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>词表大小</th>
+<th>优点</th>
+<th>缺点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>按词切分</td>
+<td>数十万</td>
+<td>语义单元完整</td>
+<td>词表巨大；遇到没见过的词（OOV）直接抓瞎；run / ran / running 是 3 个互不相干的 token</td>
+</tr>
+<tr>
+<td>按字符切分</td>
+<td>几十</td>
+<td>词表极小、无 OOV</td>
+<td>序列变长 5~10 倍；&quot;lowest&quot; 被拆成 6 个字符，丢失&quot;这是 low 的最高级&quot;这种结构信息</td>
+</tr>
+<tr>
+<td><strong>子词切分（BPE）</strong></td>
+<td>几千~几万</td>
+<td>常见词 1 个 token，罕见词拆成子词</td>
+<td>算法比前两者复杂（本课重点）</td>
+</tr>
+</tbody>
+</table>
+<p>核心思想一句话：<strong>高频出现的片段合并成一个 token，低频内容用更小的片段表示。</strong></p>
+<h2><a href="#3-字符级分词-chartokenizer对照组" aria-hidden="true" class="anchor" id="user-content-3-字符级分词-chartokenizer对照组"></a>3. 字符级分词 CharTokenizer（对照组）</h2>
+<h3><a href="#31-结构" aria-hidden="true" class="anchor" id="user-content-31-结构"></a>3.1 结构</h3>
+<pre><code class="language-rust">pub struct CharTokenizer {
+    chars: Vec&lt;char&gt;,            // 词表：语料中出现过的所有字符
+    stoi: HashMap&lt;char, usize&gt;,  // 字符 -&gt; id
+}
+</code></pre>
+<h3><a href="#32-构建词表" aria-hidden="true" class="anchor" id="user-content-32-构建词表"></a>3.2 构建词表</h3>
+<p><code>new(text)</code> 扫描语料，<strong>按字符首次出现的顺序</strong>收集去重：</p>
+<pre><code class="language-rust">for c in text.chars() {
+    if seen.insert(c) {
+        chars.push(c);
+    }
+}
+</code></pre>
+<p>比如对 <code>&quot;hello world hello&quot;</code>：</p>
+<ul>
+<li>从左到右第一次遇到的字符依次是 h, e, l, o, ' ', w, r, d → 词表就是这 8 个字符</li>
+<li><code>stoi = {h:0, e:1, l:2, o:3, ' ':4, w:5, r:6, d:7}</code>，<code>vocab_size() == 8</code></li>
+</ul>
+<h3><a href="#33-编码--解码" aria-hidden="true" class="anchor" id="user-content-33-编码--解码"></a>3.3 编码 / 解码</h3>
+<pre><code class="language-rust">// 文本 -&gt; id 序列（每个字符查表）
+pub fn encode(&amp;self, text: &amp;str) -&gt; Vec&lt;usize&gt; {
+    text.chars()
+        .map(|c| {
+            *self
+                .stoi
+                .get(&amp;c)
+                .unwrap_or_else(|| panic!(&quot;词表中没有字符 '{}'&quot;, c))
+        })
+        .collect()
+}
+
+// id 序列 -&gt; 文本（按 id 反查字符）
+pub fn decode(&amp;self, ids: &amp;[usize]) -&gt; String {
+    ids.iter().map(|&amp;i| self.chars[i]).collect()
+}
+</code></pre>
+<p>编码和解码互为逆运算：<code>decode(encode(text)) == text</code>（单元测试 <code>test_char_tokenizer_roundtrip</code> 验证了这一点）。</p>
+<blockquote>
+<p>注意：字符级编码遇到词表外的字符会<strong>直接 panic</strong>——这是它最大的短板。
+演示程序里 <code>CharTokenizer::new(CORPUS)</code> 得到 <strong>35</strong> 个字符的词表，<code>&quot;fox&quot;</code> 编码为 <code>[20, 7, 21]</code>。</p>
+</blockquote>
+<h2><a href="#4-bpe-的直觉把高频-pair-焊在一起" aria-hidden="true" class="anchor" id="user-content-4-bpe-的直觉把高频-pair-焊在一起"></a>4. BPE 的直觉：把高频 pair &quot;焊&quot;在一起</h2>
+<p>BPE（Byte Pair Encoding，字节对编码）源自数据压缩算法，规则很简单：<strong>反复找到出现次数最多的相邻符号对，把它们合并成一个新符号。</strong></p>
+<p>以单元测试的语料 <code>&quot;low low low low low lowest lowest newest newest newest&quot;</code> 为例：</p>
+<table>
+<thead>
+<tr>
+<th>轮次</th>
+<th>最高频相邻对</th>
+<th>出现次数</th>
+<th>合并成</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>(l, o)</code></td>
+<td>7（5 个 low + 2 个 lowest）</td>
+<td>id 256</td>
+<td>每个 <code>low</code> 变成 <code>[256, w]</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>(256, w)</code></td>
+<td>7（同上）</td>
+<td>id 257</td>
+<td><code>low</code> 被压成一个 token <code>[257]</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>(' ', 257)</code></td>
+<td>5（4 个词间空格 + 1 个 lowest 前空格）</td>
+<td>id 258</td>
+<td>连&quot;空格 + low&quot;这样的跨词片段也能合并</td>
+</tr>
+</tbody>
+</table>
+<p>经过两轮合并，出现 7 次的常用子词 &quot;low&quot; 从 3 个字节压缩成了 <strong>1 个 token</strong>——这就是&quot;用更少的 token 表示更多文本&quot;。</p>
+<h2><a href="#5-bpe-训练train" aria-hidden="true" class="anchor" id="user-content-5-bpe-训练train"></a>5. BPE 训练：train()</h2>
+<h3><a href="#51-初始化字节级词表" aria-hidden="true" class="anchor" id="user-content-51-初始化字节级词表"></a>5.1 初始化：字节级词表</h3>
+<pre><code class="language-rust">assert!(target_vocab &gt;= 256, &quot;BPE 词表至少 256（字节级）&quot;);
+// 初始：每个 token 就是一个字节
+let mut vocab: Vec&lt;Vec&lt;u8&gt;&gt; = (0u16..=255).map(|b| vec![b as u8]).collect();
+let mut merges: Vec&lt;(u16, u16)&gt; = Vec::new();
+
+// 语料 -&gt; 字节 -&gt; id 序列
+let mut ids: Vec&lt;u16&gt; = corpus.as_bytes().iter().map(|&amp;b| b as u16).collect();
+</code></pre>
+<p>初始词表 = <strong>256 个字节</strong>（0~255），每个 token 恰好是一个字节。为什么用字节而不是字符？</p>
+<ul>
+<li>任何 UTF-8 文本都可以拆成字节，<strong>不存在&quot;词表外&quot;字符</strong>（OOV = 0）</li>
+<li>中文等多语言文本也能直接编码（一个汉字是 3 个字节）</li>
+<li>GPT-2 等真实模型用的就是字节级 BPE</li>
+</ul>
+<h3><a href="#52-训练主循环统计--选择--合并--替换" aria-hidden="true" class="anchor" id="user-content-52-训练主循环统计--选择--合并--替换"></a>5.2 训练主循环：统计 → 选择 → 合并 → 替换</h3>
+<pre><code class="language-rust">while vocab.len() &lt; target_vocab {
+    // 1. 统计相邻 pair 频率
+    let mut pair_freq: HashMap&lt;(u16, u16), usize&gt; = HashMap::new();
+    for pair in ids.windows(2) {
+        *pair_freq.entry((pair[0], pair[1])).or_insert(0) += 1;
+    }
+    // 2. 找最高频的 pair（频率相同取 pair 值小者，保证确定性）
+    let Some(&amp;best) = pair_freq
+        .iter()
+        .max_by(|a, b| a.1.cmp(b.1).then_with(|| b.0.cmp(a.0)))
+        .map(|(k, _)| k)
+    else {
+        break; // 没有可合并的 pair 了
+    };
+    // 3. 合并：新符号 = 两个符号的字节拼接
+    let new_id = vocab.len() as u16;
+    let mut new_bytes = vocab[best.0 as usize].clone();
+    new_bytes.extend_from_slice(&amp;vocab[best.1 as usize]);
+    vocab.push(new_bytes);
+    merges.push(best);
+
+    // 4. 替换 ids 中所有该 pair
+    let mut new_ids: Vec&lt;u16&gt; = Vec::with_capacity(ids.len());
+    let mut i = 0;
+    while i &lt; ids.len() {
+        if i + 1 &lt; ids.len() &amp;&amp; ids[i] == best.0 &amp;&amp; ids[i + 1] == best.1 {
+            new_ids.push(new_id);
+            i += 2;               // 一次吞掉两个符号
+        } else {
+            new_ids.push(ids[i]);
+            i += 1;
+        }
+    }
+    ids = new_ids;
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>代码</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>① 统计</td>
+<td><code>ids.windows(2)</code> 滑窗</td>
+<td>每相邻两个 id 组成 pair，用 HashMap 计数</td>
+</tr>
+<tr>
+<td>② 选择</td>
+<td><code>pair_freq.iter().max_by(...)</code></td>
+<td>频率最高者；<strong>频率相同取 pair 数值更小的</strong>（保证结果确定）</td>
+</tr>
+<tr>
+<td>③ 合并</td>
+<td><code>vocab.push</code> + <code>merges.push</code></td>
+<td>新符号的内容 = 两个旧符号内容拼接；id = 当前词表长度（从 256 起）</td>
+</tr>
+<tr>
+<td>④ 替换</td>
+<td>单遍 while 扫描</td>
+<td>把序列里所有该 pair 替换成新 id，再进入下一轮</td>
+</tr>
+</tbody>
+</table>
+<p>训练结束后得到两份&quot;产物&quot;：</p>
+<ul>
+<li><strong><code>vocab: Vec&lt;Vec&lt;u8&gt;&gt;</code></strong>：token id → 它代表的字节序列（解码要用）</li>
+<li><strong><code>merges: Vec&lt;(u16, u16)&gt;</code></strong>：合并规则表，按下标顺序排列（<strong>越早合并优先级越高</strong>，编码要用）</li>
+</ul>
+<p>词表大小 = 256 + 合并次数。演示里 <code>BPETokenizer::train(CORPUS, 400)</code> 得到 <strong>400 = 256 字节 + 144 次合并</strong>。</p>
+<h2><a href="#6-bpe-编码encode" aria-hidden="true" class="anchor" id="user-content-6-bpe-编码encode"></a>6. BPE 编码：encode()</h2>
+<p>编码 = 对新文本执行<strong>同样的贪心合并</strong>。但合并顺序必须和训练时一致：训练时越早合并的规则优先级越高（它对应的 token id 更小）。</p>
+<pre><code class="language-rust">pub fn encode(&amp;self, text: &amp;str) -&gt; Vec&lt;usize&gt; {
+    let mut ids: Vec&lt;u16&gt; = text.as_bytes().iter().map(|&amp;b| b as u16).collect();
+    loop {
+        // 找到 ids 中优先级最高（merge 下标最小）的可合并 pair
+        let mut best_merge: Option&lt;usize&gt; = None;
+        let mut pos = 0;
+        for i in 0..ids.len().saturating_sub(1) {
+            let pair = (ids[i], ids[i + 1]);
+            if let Some(idx) = self.merges.iter().position(|&amp;m| m == pair) {
+                if best_merge.map_or(true, |b| idx &lt; b) {
+                    best_merge = Some(idx);
+                    pos = i;
+                }
+            }
+        }
+        let Some(idx) = best_merge else { break; };
+        let new_id = (256 + idx) as u16;
+        ids[pos] = new_id;
+        ids.remove(pos + 1);
+    }
+    ids.into_iter().map(|x| x as usize).collect()
+}
+</code></pre>
+<p>要点：</p>
+<ul>
+<li>每次找<strong>当前序列里可合并且 merge 下标最小</strong>的 pair，替换后重新找，直到没有可合并的 pair</li>
+<li><code>new_id = 256 + idx</code>：merge 下标 idx 直接映射成 token id——因为训练时第 idx 次合并恰好产生 id <code>256 + idx</code></li>
+<li>字节 id（0~255）直接复用训练时的字节 → id 映射</li>
+<li>演示里 <code>&quot;the garden&quot;</code> 编码后只有 <strong>2 个 token</strong>（&quot;the&quot; 和 &quot; garden&quot; 都被压缩成了单个 token）</li>
+</ul>
+<p>以 <code>&quot;lowest&quot;</code> 为例走一遍：字节 <code>[l,o,w,e,s,t]</code> → 合并 <code>(l,o)</code> → <code>[256,w,e,s,t]</code> → 合并 <code>(256,w)</code> → <code>[257,e,s,t]</code> → 继续合并 <code>(e,s)</code>、<code>(s,t)</code>……最终 6 个字节被压成 3 个 token（单元测试要求 <code>&quot;low&quot;</code> 编码后不超过 3 个 token）。</p>
+<h2><a href="#7-bpe-解码decode" aria-hidden="true" class="anchor" id="user-content-7-bpe-解码decode"></a>7. BPE 解码：decode()</h2>
+<p>解码是查表 + 拼接：每个 id 查到它代表的字节序列，拼起来还原文本。</p>
+<pre><code class="language-rust">pub fn decode(&amp;self, ids: &amp;[usize]) -&gt; String {
+    let mut bytes: Vec&lt;u8&gt; = Vec::new();
+    for &amp;id in ids {
+        bytes.extend_from_slice(&amp;self.vocab[id]);
+    }
+    String::from_utf8_lossy(&amp;bytes).to_string()
+}
+</code></pre>
+<ul>
+<li><code>vocab[id]</code>：id → 字节序列（0~255 是单字节，256+ 是合并出来的多字节序列）</li>
+<li><code>String::from_utf8_lossy</code>：万一拼出非法 UTF-8，用替换字符 <code>�</code> 顶替而不是 panic——<strong>decode 永不失败</strong></li>
+</ul>
+<blockquote>
+<p>完整闭环：<code>decode(encode(&quot;lowest new&quot;)) == &quot;lowest new&quot;</code>（单元测试 <code>test_bpe_roundtrip</code> 验证）。</p>
+</blockquote>
+<h2><a href="#8-训练--编码--解码-对照总结" aria-hidden="true" class="anchor" id="user-content-8-训练--编码--解码-对照总结"></a>8. 训练 / 编码 / 解码 对照总结</h2>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>一句话</th>
+<th>关键代码</th>
+<th>产物/结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>训练 train</td>
+<td>从语料学合并规则</td>
+<td>统计 pair → 合并最高频 → 替换（循环至目标词表大小）</td>
+<td><code>merges</code>（规则）+ <code>vocab</code>（字节序列）</td>
+</tr>
+<tr>
+<td>编码 encode</td>
+<td>对新文本按规则贪心合并</td>
+<td>反复找 merge 下标最小的可合并 pair 并替换</td>
+<td>一串 token id</td>
+</tr>
+<tr>
+<td>解码 decode</td>
+<td>id → 字节序列拼接</td>
+<td><code>vocab[id]</code> 逐个拼接 + <code>from_utf8_lossy</code></td>
+<td>还原的文本</td>
+</tr>
+</tbody>
+</table>
+<p>三者关系：<strong>编码必须复现训练时的合并顺序</strong>，解码只是查表，所以编码、解码天然互逆，<code>decode(encode(x)) == x</code>。</p>
+<h2><a href="#9-运行与测试" aria-hidden="true" class="anchor" id="user-content-9-运行与测试"></a>9. 运行与测试</h2>
+<pre><code class="language-bash">cargo test   # 15 个测试全部通过，其中 tokenizer 的 2 个验证了编解码互逆
+cargo run    # 演示 2（BPE）：词表 400（256 + 144 次合并）；&quot;Red&quot; -&gt; [82, 101, 100]；&quot;the garden&quot; -&gt; 2 个 token
+</code></pre>
+<h2><a href="#10-动手练习" aria-hidden="true" class="anchor" id="user-content-10-动手练习"></a>10. 动手练习</h2>
+<ol>
+<li>把语料换成中文句子（如 <code>&quot;机器学习机器学习深度学习&quot;</code>），跑一遍 <code>BPETokenizer::train</code>，观察&quot;机器&quot;&quot;学习&quot;是否会被合并成单个 token（提示：中文 UTF-8 每字 3 字节，BPE 依然适用）。</li>
+<li>修改 <code>train</code> 的 <code>target_vocab</code>，分别用 256 / 300 / 500，比较 <code>encode(&quot;lowest&quot;)</code> 的 token 数变化。</li>
+<li>思考：<code>encode</code> 为什么必须按&quot;merge 下标最小&quot;合并，而不是按&quot;频率最高&quot;合并？（提示：训练时的合并顺序决定了 id 分配，编码必须复现同一顺序才能保证解码还原）</li>
+<li>思考：<code>CharTokenizer</code> 遇到词表外字符会 panic，BPE 为什么永远不会有这个问题？</li>
+</ol>
+<h2><a href="#11-本课总结" aria-hidden="true" class="anchor" id="user-content-11-本课总结"></a>11. 本课总结</h2>
+<ul>
+<li>模型只认数字，分词器负责&quot;文字 ↔ id&quot;的转换</li>
+<li>字符级分词：简单直观，但序列长、有词表外字符；词级分词：词表大、仍有 OOV</li>
+<li>BPE：字节级底座（256 个字节起步，零 OOV）+ 反复合并最高频相邻 pair</li>
+<li>训练产出 <code>merges</code>（合并规则）和 <code>vocab</code>（id → 字节序列）；编码贪心复现合并；解码查表拼接</li>
+<li>下一课：token 变成向量之后，怎么让它们&quot;互相看&quot;？——注意力机制！</li>
+</ul>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-07/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-09/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 9 课：注意力机制 —— 让 token 互相看</span></a></div></div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

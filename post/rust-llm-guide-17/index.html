@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长 - 干徒</title>
+    <meta name="description" content="实现 AdamW 优化器，融合动量与自适应学习率，并与 SGD 对比。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 优化器">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-17">
+    <meta property="og:title" content="第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长 - 干徒">
+    <meta property="og:description" content="实现 AdamW 优化器，融合动量与自适应学习率，并与 SGD 对比。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-17">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长 - 干徒">
+    <meta name="twitter:description" content="实现 AdamW 优化器，融合动量与自适应学习率，并与 SGD 对比。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长","description":"实现 AdamW 优化器，融合动量与自适应学习率，并与 SGD 对比。","url":"https://ganto.me/post/rust-llm-guide-17","datePublished":"2026-09-18","dateModified":"2026-09-18","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 优化器","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-c64c465a01d82915.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-18</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">优化器</span></div>
+                <div class="blog-content">
+<h1><a href="#第-17-课adamw-优化器--给梯度下降装上惯性和自适应步长" aria-hidden="true" class="anchor" id="user-content-第-17-课adamw-优化器--给梯度下降装上惯性和自适应步长"></a>第 17 课：AdamW 优化器 —— 给梯度下降装上&quot;惯性&quot;和&quot;自适应步长&quot;</h1>
+<blockquote>
+<p>代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/optim.rs">src/optim.rs</a>（<code>SGD</code> / <code>AdamW</code>）
+代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/train.rs">src/train.rs</a>（<code>train_gpt</code> 中 AdamW 的用法）
+演示入口：<a href="file:///d:/Code/Rust/llm_from_scratch/src/main.rs">src/main.rs</a>（演示 3：训练小 GPT）</p>
+</blockquote>
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li>朴素 SGD 有什么致命弱点？为什么深度模型上它不够用？</li>
+<li>Adam 的一阶动量 m、二阶动量 v 分别&quot;记忆&quot;了什么？对应公式怎么写？</li>
+<li>为什么需要偏差修正（除以 1-β^t）？前几步不修会怎样？</li>
+<li>权重衰减&quot;解耦&quot;（decoupled weight decay）和传统的 L2 正则化有什么区别？</li>
+<li><code>AdamW::step</code> 的每一行代码分别对应公式里的哪一项？</li>
+</ol>
+<h2><a href="#2-先复习sgd-的局限" aria-hidden="true" class="anchor" id="user-content-2-先复习sgd-的局限"></a>2. 先复习：SGD 的局限</h2>
+<p>第 6 课实现的 SGD 是整个故事的原点：</p>
+<pre><code class="language-rust">/// 更新一步：θ = θ - lr * g
+pub fn step(&amp;self) {
+    for p in &amp;self.params {
+        let g = p.grad();
+        let d = p.data();
+        let updated: Vec&lt;f32&gt; = d.iter().zip(&amp;g).map(|(v, g)| v - self.lr * g).collect();
+        p.set_data(updated);
+    }
+}
+</code></pre>
+<p>公式只有一个：</p>
+<pre><code>θ ← θ - lr · g
+</code></pre>
+<p>它有两个致命弱点：</p>
+<table>
+<thead>
+<tr>
+<th>弱点</th>
+<th>表现</th>
+<th>直观理解</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>梯度震荡</strong></td>
+<td>参数在最优解附近来回横跳，收敛慢</td>
+<td>下山时每一步都只看&quot;当前脚下&quot;的坡度，方向忽左忽右，没有&quot;惯性&quot;</td>
+</tr>
+<tr>
+<td><strong>步长不会自适应</strong></td>
+<td>所有参数共用同一个 lr</td>
+<td>有的维度坡缓（需要大步长），有的维度坡陡/噪声大（需要小步长），SGD 一刀切</td>
+</tr>
+</tbody>
+</table>
+<p>现实世界的梯度方向总是带噪声的（batch 采样引入的随机性、损失面本身的崎岖），只信&quot;当前这一下&quot;的 SGD 在深度网络上要么太慢、要么震荡发散。</p>
+<h2><a href="#3-adam-的核心思想一阶动量--二阶动量" aria-hidden="true" class="anchor" id="user-content-3-adam-的核心思想一阶动量--二阶动量"></a>3. Adam 的核心思想：一阶动量 + 二阶动量</h2>
+<p>Adam（Adaptive Moment Estimation）给每个参数维护两个额外状态，公式如下：</p>
+<pre><code>一阶动量（梯度的指数移动平均，记住&quot;方向&quot;）：
+    m_t = β1 · m_{t-1} + (1 - β1) · g_t
+
+二阶动量（梯度平方的指数移动平均，感知&quot;陡峭程度&quot;）：
+    v_t = β2 · v_{t-1} + (1 - β2) · g_t²
+
+参数更新：
+    θ_t = θ_{t-1} - lr · m̂_t / (√v̂_t + ε)
+</code></pre>
+<p>直觉对应：</p>
+<table>
+<thead>
+<tr>
+<th>状态</th>
+<th>记忆的内容</th>
+<th>类比</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>一阶动量 <code>m</code></td>
+<td>梯度的<strong>平均值</strong>（带方向）</td>
+<td>小球下坡的<strong>惯性</strong>：过去几步都往东偏，这次也往东多走点</td>
+<td>平滑梯度、抵消震荡</td>
+</tr>
+<tr>
+<td>二阶动量 <code>v</code></td>
+<td>梯度<strong>平方</strong>的平均值（无方向，恒正）</td>
+<td>对坡度的<strong>感知</strong>：某个维度长期坡陡，说明这里&quot;水深&quot;，步子要小</td>
+<td>每个参数独立缩放步长</td>
+</tr>
+</tbody>
+</table>
+<p>注意 <code>m</code>、<code>v</code> 都是<strong>逐参数、逐元素</strong>维护的（<code>AdamW</code> 里 <code>m: Vec&lt;Vec&lt;f32&gt;&gt;</code>、<code>v: Vec&lt;Vec&lt;f32&gt;&gt;</code>，和每个参数张量形状一一对应），所以&quot;自适应步长&quot;是精细到每个标量权重的。</p>
+<h3><a href="#为什么用指数移动平均而不是简单平均" aria-hidden="true" class="anchor" id="user-content-为什么用指数移动平均而不是简单平均"></a>为什么用指数移动平均而不是简单平均</h3>
+<p>因为只需要记住 <code>m_{t-1}</code> 和 <code>v_{t-1}</code> 两个状态就能增量更新，不需要存全部历史梯度；<code>β1=0.9</code> 意味着过去约 10 步的梯度主导，<code>β2=0.999</code> 意味着过去约 1000 步的梯度平方主导——<strong>越靠前的历史衰减得越厉害</strong>。</p>
+<h2><a href="#4-偏差修正除以-1---βt" aria-hidden="true" class="anchor" id="user-content-4-偏差修正除以-1---βt"></a>4. 偏差修正：除以 (1 - β^t)</h2>
+<p>问题：<code>m_0 = 0</code>、<code>v_0 = 0</code>，训练第一步 <code>m_1 = (1-β1)·g_1</code>，只有真实梯度的 10%（β1=0.9 时）。训练初期 <code>m</code>、<code>v</code> 被严重&quot;低估&quot;，直接使用会导致起步步长偏小。</p>
+<p>修正办法：把 <code>m_t</code>、<code>v_t</code> 除以各自的累积衰减系数：</p>
+<pre><code>m̂_t = m_t / (1 - β1^t)
+v̂_t = v_t / (1 - β2^t)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>t</th>
+<th>1 - β1^t（β1=0.9）</th>
+<th>1 - β2^t（β2=0.999）</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>0.1</td>
+<td>0.001</td>
+<td>修正最狠：<code>m̂ = m/0.1 = 10×m</code>，<code>v̂ = v/0.001 = 1000×v</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td>1 - 0.9¹⁰ ≈ 0.651</td>
+<td>1 - 0.999¹⁰ ≈ 0.00995</td>
+<td>仍在修正</td>
+</tr>
+<tr>
+<td>100</td>
+<td>1 - 0.9¹⁰⁰ ≈ 1.0</td>
+<td>1 - 0.999¹⁰⁰ ≈ 0.095</td>
+<td>m 基本不用修，v 还要修</td>
+</tr>
+<tr>
+<td>1000</td>
+<td>≈ 1.0</td>
+<td>≈ 0.632</td>
+<td>v 接近不需要修</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>关键观察：<code>t</code> 越大，<code>β^t</code> 越接近 0，修正系数越接近 1——<strong>偏差修正只在训练初期起作用</strong>。而且 <code>m</code> 的 β1 小、修正结束得快，<code>v</code> 的 β2 接近 1、修正持续得更久。这正是代码里两个系数分开算的原因。</p>
+</blockquote>
+<h2><a href="#5-权重衰减解耦decoupled-weight-decay" aria-hidden="true" class="anchor" id="user-content-5-权重衰减解耦decoupled-weight-decay"></a>5. 权重衰减解耦（decoupled weight decay）</h2>
+<p>正则化思想：每步更新时，额外把参数往 0 拉一点点，防止权重过大、过拟合。</p>
+<p><strong>传统做法（L2 正则化）</strong>：把 <code>λ·θ</code> 加进损失再求导，相当于梯度变成 <code>g + λ·θ</code>，然后被 Adam 的&quot;自适应步长&quot;一通缩放——<code>λ·θ</code> 这个衰减项也被 <code>1/√v̂</code> 缩放了，<strong>衰减强度随梯度历史变化，不受控制</strong>。</p>
+<p><strong>AdamW 的解耦做法</strong>：权重衰减<strong>独立于梯度</strong>，作为一个单独的减法项：</p>
+<pre><code>θ ← θ - lr · m̂/(√v̂ + ε)  -  lr · wd · θ
+     └──── Adam 步长 ────┘   └─ 解耦的权重衰减 ─┘
+</code></pre>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>传统 L2（Adam+L2）</th>
+<th>AdamW（decoupled）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>衰减项怎么来</td>
+<td>进损失函数求导，混进梯度 <code>g+λθ</code></td>
+<td>不进梯度，更新时单独减 <code>lr·wd·θ</code></td>
+</tr>
+<tr>
+<td>是否被自适应步长缩放</td>
+<td>是（被 <code>1/√v̂</code> 缩放，强度不稳定）</td>
+<td>否（恒定 <code>lr·wd</code>，与梯度历史无关）</td>
+</tr>
+<tr>
+<td>实际效果</td>
+<td>衰减幅度时大时小，难调</td>
+<td>衰减可预期、好调超参</td>
+</tr>
+</tbody>
+</table>
+<p>在现代 LLM 训练里（GPT 系列等）几乎都用 AdamW，就是因为这个&quot;可预期&quot;的衰减。</p>
+<h2><a href="#6-adamwstep-逐行讲解" aria-hidden="true" class="anchor" id="user-content-6-adamwstep-逐行讲解"></a>6. AdamW::step 逐行讲解</h2>
+<p>完整代码（<code>src/optim.rs</code>）：</p>
+<pre><code class="language-rust">pub fn step(&amp;mut self) {
+    self.t += 1;
+    // 偏差修正系数（训练初期 t 小，修正大）
+    let bc1 = 1.0 - self.beta1.powi(self.t as i32);
+    let bc2 = 1.0 - self.beta2.powi(self.t as i32);
+
+    for (i, p) in self.params.iter().enumerate() {
+        let g = p.grad();
+        let d = p.data();
+        let mut updated = vec![0.0f32; d.len()];
+        for j in 0..d.len() {
+            let gv = g[j];
+            // 1. 更新动量
+            self.m[i][j] = self.beta1 * self.m[i][j] + (1.0 - self.beta1) * gv;
+            self.v[i][j] = self.beta2 * self.v[i][j] + (1.0 - self.beta2) * gv * gv;
+            // 2. 偏差修正
+            let m_hat = self.m[i][j] / bc1;
+            let v_hat = self.v[i][j] / bc2;
+            // 3. 更新：θ -= lr * m_hat/(√v_hat + eps) + lr * wd * θ（权重衰减解耦）
+            let step = self.lr * m_hat / (v_hat.sqrt() + self.eps);
+            let decay = self.lr * self.weight_decay * d[j];
+            updated[j] = d[j] - step - decay;
+        }
+        p.set_data(updated);
+    }
+}
+</code></pre>
+<p>逐行对应公式：</p>
+<table>
+<thead>
+<tr>
+<th>代码</th>
+<th>对应公式</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>self.t += 1;</code></td>
+<td>——</td>
+<td>步数计数，偏差修正要用到 t</td>
+</tr>
+<tr>
+<td><code>bc1 = 1.0 - self.beta1.powi(t)</code></td>
+<td><code>1 - β1^t</code></td>
+<td>一阶动量修正系数（t 从 1 开始）</td>
+</tr>
+<tr>
+<td><code>bc2 = 1.0 - self.beta2.powi(t)</code></td>
+<td><code>1 - β2^t</code></td>
+<td>二阶动量修正系数</td>
+</tr>
+<tr>
+<td><code>self.m[i][j] = self.beta1 * self.m[i][j] + (1.0 - self.beta1) * gv;</code></td>
+<td><code>m_t = β1·m_{t-1} + (1-β1)·g_t</code></td>
+<td>一阶动量：新旧梯度按 9:1 加权</td>
+</tr>
+<tr>
+<td><code>self.v[i][j] = self.beta2 * self.v[i][j] + (1.0 - self.beta2) * gv * gv;</code></td>
+<td><code>v_t = β2·v_{t-1} + (1-β2)·g_t²</code></td>
+<td>二阶动量：梯度<strong>平方</strong>，恒正</td>
+</tr>
+<tr>
+<td><code>m_hat = self.m[i][j] / bc1;</code></td>
+<td><code>m̂_t = m_t/(1-β1^t)</code></td>
+<td>修正初期被低估的一阶动量</td>
+</tr>
+<tr>
+<td><code>v_hat = self.v[i][j] / bc2;</code></td>
+<td><code>v̂_t = v_t/(1-β2^t)</code></td>
+<td>修正初期被低估的二阶动量</td>
+</tr>
+<tr>
+<td><code>step = self.lr * m_hat / (v_hat.sqrt() + self.eps);</code></td>
+<td><code>lr·m̂/(√v̂+ε)</code></td>
+<td>Adam 更新步长：方向 m̂，大小被 √v̂ 自适应缩放</td>
+</tr>
+<tr>
+<td><code>decay = self.lr * self.weight_decay * d[j];</code></td>
+<td><code>lr·wd·θ</code></td>
+<td>解耦的权重衰减，<strong>不经过 √v̂ 缩放</strong></td>
+</tr>
+<tr>
+<td><code>updated[j] = d[j] - step - decay;</code></td>
+<td><code>θ ← θ - step - decay</code></td>
+<td>参数更新 = 旧值 - Adam 步长 - 衰减</td>
+</tr>
+<tr>
+<td><code>p.set_data(updated);</code></td>
+<td>——</td>
+<td>写回参数张量</td>
+</tr>
+</tbody>
+</table>
+<p>四个值得停下来想一想的细节：</p>
+<ol>
+<li><strong>为什么 <code>v_hat.sqrt()</code> 要加 <code>eps</code></strong>：防止 <code>v_hat ≈ 0</code>（训练初期）时除零，数值稳定性用。<code>eps = 1e-8</code> 是 Adam 论文的标准值。</li>
+<li><strong><code>lr</code> 是 <code>pub</code> 字段</strong>：<code>src/train.rs</code> 里每步都改它——
+<pre><code class="language-rust">opt.lr = scheduler.lr();   // 第 20 课：warmup + cosine 调度
+opt.step();
+</code></pre>
+调度器只负责改 <code>lr</code>，AdamW 的 <code>m</code>、<code>v</code> 状态跨步累积、完全不受影响。</li>
+<li><strong>权重衰减项用的是 <code>d[j]</code>（更新前的旧参数）</strong>：这就是&quot;解耦&quot;——衰减直接作用在参数本身，而不是作用在梯度上。</li>
+<li><strong><code>m</code>、<code>v</code> 与参数逐元素对齐</strong>：<code>AdamW::new</code> 里 <code>params.iter().map(|p| vec![0.0f32; p.numel()])</code>，每个参数张量配一个同长度的一阶/二阶动量数组，更新时按 <code>j</code> 同步遍历。</li>
+</ol>
+<h2><a href="#7-adamw-的超参数" aria-hidden="true" class="anchor" id="user-content-7-adamw-的超参数"></a>7. AdamW 的超参数</h2>
+<p><code>AdamW::new</code> 里的默认值就是论文标准：</p>
+<pre><code class="language-rust">AdamW {
+    lr,
+    beta1: 0.9,
+    beta2: 0.999,
+    eps: 1e-8,
+    weight_decay,
+    t: 0,
+    params,
+    m,
+    v,
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>超参数</th>
+<th>值</th>
+<th>含义</th>
+<th>调参经验</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>beta1</code></td>
+<td>0.9</td>
+<td>一阶动量衰减系数</td>
+<td>一般不动，范围 0.8~0.95</td>
+</tr>
+<tr>
+<td><code>beta2</code></td>
+<td>0.999</td>
+<td>二阶动量衰减系数</td>
+<td>一般不动；训练不稳时有人降到 0.95</td>
+</tr>
+<tr>
+<td><code>eps</code></td>
+<td>1e-8</td>
+<td>除零保护</td>
+<td>一般不动</td>
+</tr>
+<tr>
+<td><code>weight_decay</code></td>
+<td>0.01（本项目）</td>
+<td>权重衰减强度</td>
+<td>常用 0.01~0.1；越大正则化越强</td>
+</tr>
+<tr>
+<td><code>lr</code></td>
+<td>调度器控制</td>
+<td>基础步长</td>
+<td>配合 warmup/cosine（第 20 课）</td>
+</tr>
+</tbody>
+</table>
+<p>本项目在 <code>train_gpt</code> 里这样接入：</p>
+<pre><code class="language-rust">let mut opt = AdamW::new(max_lr, params.clone(), 0.01);   // wd = 0.01
+...
+clip_grad_norm(&amp;params, 1.0);   // 先裁剪梯度（防止个别大梯度冲坏 m、v 的估计）
+opt.lr = scheduler.lr();        // 再设置当前学习率
+opt.step();                     // 最后更新
+opt.zero_grad();
+</code></pre>
+<blockquote>
+<p>顺序值得注意：<strong>梯度裁剪在 <code>AdamW::step</code> 之前</strong>。因为 Adam 的 m、v 是梯度历史的长期记忆，如果某步梯度爆炸没被裁掉，它会污染 m/v 很久。先裁剪、再进优化器，是 LLM 训练的标准顺序。</p>
+</blockquote>
+<h2><a href="#8-动手练习" aria-hidden="true" class="anchor" id="user-content-8-动手练习"></a>8. 动手练习</h2>
+<ol>
+<li><strong>对比 SGD vs AdamW</strong>：临时把 <code>train_gpt</code> 里的 <code>AdamW::new(...)</code> 换成 <code>SGD::new(0.01, params.clone())</code>（去掉 <code>opt.lr = scheduler.lr()</code> 那行，因为 <code>SGD::lr</code> 是私有字段），跑 600 步看 loss——体会 AdamW 在小语料上的收敛速度优势。</li>
+<li><strong>手推第一步</strong>：假设某参数 <code>θ=1.0</code>、<code>g=0.5</code>、<code>lr=0.001</code>、<code>wd=0.01</code>，手算 <code>t=1</code> 时 <code>m_hat</code>、<code>v_hat</code>、<code>step</code>、<code>decay</code>，再在 <code>AdamW::step</code> 里加一行 <code>println!</code> 验证。</li>
+<li><strong>看偏差修正的效果</strong>：把 <code>bc1</code>、<code>bc2</code> 改成恒为 1.0（不修正），训练对比 loss 曲线——训练初期应该明显变慢。</li>
+<li><strong>调权重衰减</strong>：把 <code>wd</code> 从 0.01 改成 0.1 和 0.0，观察训练后 loss 与生成文本的差异，体会正则化的作用。</li>
+<li><strong>思考</strong>：为什么 <code>v</code> 存的是 <code>g²</code> 而不是 <code>|g|</code>？如果某个维度的梯度长期是 +0.1/-0.1 交替（震荡），<code>m</code> 和 <code>v</code> 分别是什么表现？（提示：m 会被抵消趋近 0，v 会累积为正——这就是 Adam 抑制震荡的机制。）</li>
+</ol>
+<h2><a href="#9-本课总结" aria-hidden="true" class="anchor" id="user-content-9-本课总结"></a>9. 本课总结</h2>
+<ul>
+<li>
+<p>SGD 只有 <code>θ -= lr·g</code>，既没有惯性（震荡）也不能自适应步长（一刀切）</p>
+</li>
+<li>
+<p>Adam 用一阶动量 <code>m = β1·m + (1-β1)·g</code> 平滑方向，用二阶动量 <code>v = β2·v + (1-β2)·g²</code> 感知陡峭度，更新为 <code>θ -= lr·m̂/(√v̂+ε)</code></p>
+</li>
+<li>
+<p>偏差修正除以 <code>1-β^t</code>：只在训练初期起作用，补偿 m/v 从 0 起步的低估</p>
+</li>
+<li>
+<p>AdamW 把权重衰减<strong>解耦</strong>成独立项 <code>θ -= lr·wd·θ</code>，不受自适应步长干扰，衰减强度可预期</p>
+</li>
+<li>
+<p><code>AdamW::step</code> 的每行代码都能在公式里找到对应项：<code>t</code> → 修正系数 → 逐元素动量 → 修正 → 步长/衰减 → 写回</p>
+</li>
+<li>
+<p>下一课：推理加速神器 KV Cache——为什么生成时要缓存 K/V，怎么做到&quot;每步只算 1 个 token&quot;。</p>
+</li>
+</ul>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-16/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-18/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a></div></div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

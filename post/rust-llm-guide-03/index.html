@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法 - 干徒</title>
+    <meta name="description" content="扩展张量运算能力：广播规则、归约、softmax 与批量矩阵乘法。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 张量">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-03">
+    <meta property="og:title" content="第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法 - 干徒">
+    <meta property="og:description" content="扩展张量运算能力：广播规则、归约、softmax 与批量矩阵乘法。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-03">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法 - 干徒">
+    <meta name="twitter:description" content="扩展张量运算能力：广播规则、归约、softmax 与批量矩阵乘法。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法","description":"扩展张量运算能力：广播规则、归约、softmax 与批量矩阵乘法。","url":"https://ganto.me/post/rust-llm-guide-03","datePublished":"2026-09-04","dateModified":"2026-09-04","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 张量","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-c64c465a01d82915.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-04</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">张量</span></div>
+                <div class="blog-content">
+<h1><a href="#第-3-课张量运算扩展--广播归约softmax批量矩阵乘法" aria-hidden="true" class="anchor" id="user-content-第-3-课张量运算扩展--广播归约softmax批量矩阵乘法"></a>第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</h1>
+<blockquote>
+<p>代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/tensor.rs">src/tensor.rs</a>（本章新增：broadcast_shapes / broadcast_map / binary / sum / sum_last_dim / softmax_last_dim / permute / gather_rows / 3D matmul）
+演示入口：<a href="file:///d:/Code/Rust/llm_from_scratch/src/main.rs">src/main.rs</a></p>
+</blockquote>
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li>两个形状不同的张量怎么直接相加？&quot;广播&quot;到底是什么规则？</li>
+<li>&quot;求和&quot;这个简单的操作，反向传播时梯度应该怎么分？</li>
+<li>softmax 为什么要&quot;先减最大值&quot;？不减会出什么问题？</li>
+<li>形状重排（permute）、按行取数（gather_rows）的梯度怎么传回去？</li>
+<li>一批矩阵同时做乘法（3D 批量 matmul）是怎么实现的？</li>
+</ol>
+<h2><a href="#2-广播-broadcasting形状不同也能做运算" aria-hidden="true" class="anchor" id="user-content-2-广播-broadcasting形状不同也能做运算"></a>2. 广播 Broadcasting：形状不同也能做运算</h2>
+<h3><a href="#21-为什么需要广播" aria-hidden="true" class="anchor" id="user-content-21-为什么需要广播"></a>2.1 为什么需要广播</h3>
+<p>上一课的 <code>add</code> 要求两个张量<strong>形状完全相同</strong>。但神经网络里处处是&quot;小形状 + 大形状&quot;的运算：</p>
+<ul>
+<li>给一批数据加偏置：<code>[B, D] + [D]</code></li>
+<li>给一批样本各自乘一个标量：<code>[B, D] * []</code></li>
+<li>线性层 <code>y = xW + b</code>：<code>[B, D] @ [D, out] + [out]</code></li>
+</ul>
+<p>如果每次都要求形状一致，我们就得手动把 <code>[D]</code> 复制成 <code>[B, D]</code> 再算。<strong>广播（broadcasting）</strong> 就是自动完成这件事：只要形状&quot;兼容&quot;，Rust 帮你把小张量&quot;展开&quot;到大张量的形状再逐元素运算。</p>
+<h3><a href="#22-numpy-广播的三条规则" aria-hidden="true" class="anchor" id="user-content-22-numpy-广播的三条规则"></a>2.2 numpy 广播的三条规则</h3>
+<p>我们的实现完全遵循 numpy 的广播规则：</p>
+<table>
+<thead>
+<tr>
+<th>规则</th>
+<th>说明</th>
+<th>例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>① 右对齐</td>
+<td>从<strong>最后一个维度</strong>开始，逐对比较两个形状的维度</td>
+<td><code>[2, 3]</code> 与 <code>[3]</code> → 对齐成 <code>[2,3]</code> vs <code>[1,3]</code></td>
+</tr>
+<tr>
+<td>② 相等或为 1</td>
+<td>每一对维度要么相等，要么<strong>其中一个为 1</strong>（1 可以扩展成另一个）</td>
+<td><code>2</code> vs <code>1</code> → 结果 <code>2</code></td>
+</tr>
+<tr>
+<td>③ 都不满足则失败</td>
+<td>两个都大于 1 且不相等 → 无法广播，报错</td>
+<td><code>[2, 3]</code> 与 <code>[2, 4]</code> → <code>None</code></td>
+</tr>
+</tbody>
+</table>
+<p>几个直观例子（<code>1</code> 表示&quot;这一维可以复制&quot;）：</p>
+<table>
+<thead>
+<tr>
+<th>a 形状</th>
+<th>b 形状</th>
+<th>逐对比较</th>
+<th>广播结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[2, 3]</code></td>
+<td><code>[3]</code></td>
+<td><code>2 vs 1</code>（b 补 1），<code>3 vs 3</code></td>
+<td><code>[2, 3]</code></td>
+</tr>
+<tr>
+<td><code>[2, 3]</code></td>
+<td><code>[2, 1]</code></td>
+<td><code>2 vs 2</code>，<code>3 vs 1</code></td>
+<td><code>[2, 3]</code></td>
+</tr>
+<tr>
+<td><code>[3]</code></td>
+<td><code>[1]</code></td>
+<td><code>3 vs 1</code></td>
+<td><code>[3]</code></td>
+</tr>
+<tr>
+<td><code>[2, 3]</code></td>
+<td><code>[2, 4]</code></td>
+<td><code>3 vs 4</code> 都不为 1</td>
+<td>❌ 失败</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#23-broadcast_shapes把规则变成代码" aria-hidden="true" class="anchor" id="user-content-23-broadcast_shapes把规则变成代码"></a>2.3 <code>broadcast_shapes</code>：把规则变成代码</h3>
+<pre><code class="language-rust">/// 计算两个形状广播后的形状（numpy 广播规则，从右向左对齐）：
+/// - 维度相等或其中一个为 1 即可广播
+fn broadcast_shapes(a: &amp;[usize], b: &amp;[usize]) -&gt; Option&lt;Vec&lt;usize&gt;&gt; {
+    let n = a.len().max(b.len());
+    let mut out = vec![1usize; n];
+    for i in 0..n {
+        // 从右往左对齐：i 从 0 数到 n-1 时，i+n-1 正好指向&quot;倒数第 n-i 个维度&quot;
+        // 如果 i + len 超出本形状的维度范围，就当作&quot;前面补了 1&quot;
+        let da = if i + a.len() &gt;= n { a[i + a.len() - n] } else { 1 };
+        let db = if i + b.len() &gt;= n { b[i + b.len() - n] } else { 1 };
+        if da == db {
+            out[i] = da;
+        } else if da == 1 {
+            out[i] = db;
+        } else if db == 1 {
+            out[i] = da;
+        } else {
+            return None;   // 规则 ③：无法广播
+        }
+    }
+    Some(out)
+}
+</code></pre>
+<p>要点：</p>
+<ul>
+<li><code>i + a.len() &gt;= n</code> 判断&quot;对齐后当前位是否越过了 a 的最左端&quot;，越过了说明 a 在这一维没有对应维度，视作补 <code>1</code>（规则 ① 的&quot;右对齐&quot;实现）。</li>
+<li>三条分支对应规则 ②：相等取它、一方为 1 取另一方、都不满足返回 <code>None</code>。</li>
+<li>返回 <code>Option</code> 而不是直接 panic，把&quot;能不能广播&quot;的判定权交给调用方。</li>
+</ul>
+<p>验证一下 <code>[2,3]</code> 与 <code>[3]</code>（<code>n = 2</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>i</th>
+<th>da</th>
+<th>db</th>
+<th>判定</th>
+<th>out</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td><code>a[0] = 2</code>（<code>0+2&gt;=2</code>）</td>
+<td>b 越界 → 1</td>
+<td><code>db == 1</code></td>
+<td>2</td>
+</tr>
+<tr>
+<td>1</td>
+<td><code>a[1] = 3</code></td>
+<td><code>b[0] = 3</code>（<code>1+1&gt;=2</code>）</td>
+<td>相等</td>
+<td>3</td>
+</tr>
+</tbody>
+</table>
+<p>结果 <code>[2, 3]</code> ✓</p>
+<h3><a href="#24-broadcast_map数据怎么搬" aria-hidden="true" class="anchor" id="user-content-24-broadcast_map数据怎么搬"></a>2.4 <code>broadcast_map</code>：数据怎么搬</h3>
+<p>光知道&quot;结果形状&quot;还不够——结果每个位置的值要<strong>从源数据的哪里取</strong>。<code>broadcast_map</code> 就是干这个的：给定源形状 <code>src</code> 和目标形状 <code>target</code>，返回一张映射表 <code>map</code>，<code>map[t]</code> = 目标第 <code>t</code> 个元素对应的源展平下标。</p>
+<pre><code class="language-rust">/// 计算源形状 src 广播到目标形状 target 时，每个目标元素对应的源展平下标。
+/// src 的维度必须 &lt;= target 且右对齐；src 中大小为 1 的维度索引固定为 0。
+fn broadcast_map(target: &amp;[usize], src: &amp;[usize]) -&gt; Vec&lt;usize&gt; {
+    let offset = target.len() - src.len();       // 右对齐：源前面补 offset 个&quot;伪维度&quot;
+    let total: usize = target.iter().product();
+    let mut map = vec![0usize; total];
+    for flat in 0..total {
+        // 第一步：把目标的一维下标反解成多维下标（行优先）
+        let mut r = flat;
+        let mut t_idx = vec![0usize; target.len()];
+        for d in (0..target.len()).rev() {
+            t_idx[d] = r % target[d];
+            r /= target[d];
+        }
+        // 第二步：多维下标映射回源的多维下标，再展平成源的一维下标
+        let mut s_flat = 0usize;
+        for d in 0..src.len() {
+            let td = t_idx[d + offset];          // 源的第 d 维对应目标的第 d+offset 维
+            let sd = if src[d] == 1 { 0 } else { td };  // 源大小为 1 的维度，索引固定为 0
+            s_flat = s_flat * src[d] + sd;       // 行优先展平
+        }
+        map[flat] = s_flat;
+    }
+    map
+}
+</code></pre>
+<p><strong>反解多维下标</strong>：行优先存储下，一维下标 <code>flat</code> 的分解是&quot;从最后一个维度开始取余、整除&quot;：</p>
+<pre><code>t_idx[d] = r % target[d];  r /= target[d];    // d 从大到小
+</code></pre>
+<p>比如目标形状 <code>[2, 3]</code>，<code>flat = 4</code> → <code>t_idx[1] = 4%3 = 1</code>，<code>r = 1</code> → <code>t_idx[0] = 1</code>，即位置 <code>(1, 1)</code>。</p>
+<p><strong>映射到源</strong>：<code>src</code> 的第 <code>d</code> 维对应目标第 <code>d + offset</code> 维；若源该维大小为 1，则无论目标索引多大，都取下标 0（这就是&quot;复制&quot;）。</p>
+<p>例：<code>src = [3]</code> 广播到 <code>target = [2, 3]</code>（相当于每行复制同一个向量）：</p>
+<table>
+<thead>
+<tr>
+<th>目标位置 (i, j)</th>
+<th>flat</th>
+<th>映射到源下标</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(0, 0)</td>
+<td>0</td>
+<td>0</td>
+<td>取 b[0]</td>
+</tr>
+<tr>
+<td>(0, 1)</td>
+<td>1</td>
+<td>1</td>
+<td>取 b[1]</td>
+</tr>
+<tr>
+<td>(0, 2)</td>
+<td>2</td>
+<td>2</td>
+<td>取 b[2]</td>
+</tr>
+<tr>
+<td>(1, 0)</td>
+<td>3</td>
+<td>0</td>
+<td>第二行<strong>还是</strong>取 b[0]</td>
+</tr>
+<tr>
+<td>(1, 1)</td>
+<td>4</td>
+<td>1</td>
+<td>取 b[1]</td>
+</tr>
+<tr>
+<td>(1, 2)</td>
+<td>5</td>
+<td>2</td>
+<td>取 b[2]</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#25-binary把广播装进逐元素运算" aria-hidden="true" class="anchor" id="user-content-25-binary把广播装进逐元素运算"></a>2.5 <code>binary</code>：把广播装进&quot;逐元素运算&quot;</h3>
+<p><code>broadcast_plan</code> 先判断两个张量是否同形状：同形状就直接逐位对齐（无需映射），不同形状才计算两个 <code>broadcast_map</code>：</p>
+<pre><code class="language-rust">fn broadcast_plan(&amp;self, other: &amp;Tensor) -&gt; (Vec&lt;usize&gt;, Option&lt;Vec&lt;usize&gt;&gt;, Option&lt;Vec&lt;usize&gt;&gt;) {
+    if self.shape == other.shape {
+        (self.shape.clone(), None, None)          // 同形状：没有 map
+    } else {
+        let target = broadcast_shapes(&amp;self.shape, &amp;other.shape)
+            .unwrap_or_else(|| panic!(&quot;形状无法广播：{:?} vs {:?}&quot;, self.shape, other.shape));
+        let map_a = if self.shape == target { None } else { Some(broadcast_map(&amp;target, &amp;self.shape)) };
+        let map_b = if other.shape == target { None } else { Some(broadcast_map(&amp;target, &amp;other.shape)) };
+        (target, map_a, map_b)
+    }
+}
+</code></pre>
+<p><code>add / sub / mul / div</code> 四个运算全部复用同一个通用函数 <code>binary</code>：</p>
+<pre><code class="language-rust">fn binary(
+    &amp;self,
+    other: &amp;Tensor,
+    fwd: impl Fn(f32, f32) -&gt; f32 + 'static,          // 前向：c = f(a, b)
+    back: impl Fn(f32, f32) -&gt; (f32, f32) + 'static,  // 反向：返回 (∂c/∂a, ∂c/∂b)
+) -&gt; Tensor {
+    let (target_shape, map_a, map_b) = self.broadcast_plan(other);
+    let sa = self.data.borrow();
+    let sb = other.data.borrow();
+    let total: usize = target_shape.iter().product();
+    let mut out_data = vec![0.0f32; total];
+    for t in 0..total {
+        let ia = match &amp;map_a { Some(m) =&gt; m[t], None =&gt; t };   // 没有 map 就是一一对应
+        let ib = match &amp;map_b { Some(m) =&gt; m[t], None =&gt; t };
+        out_data[t] = fwd(sa[ia], sb[ib]);                     // 按映射取数做运算
+    }
+    drop(sa);
+    drop(sb);
+    // …… 构造结果节点，注册反向闭包（见下）……
+}
+</code></pre>
+<p><strong>反向传播</strong>：广播的梯度遵循&quot;谁被复制了，梯度就累加回谁&quot;。因为一个源元素可能对应多个输出位置，<code>∂loss/∂x = Σ_t (∂loss/∂out_t)·(∂out_t/∂x)</code>，所以必须<strong>累加</strong>（<code>+=</code>）：</p>
+<pre><code class="language-rust">result.backward = Some(Rc::new(move || {
+    let g = rg.borrow();
+    let (ga, gb) = if same_shape &amp;&amp; Rc::ptr_eq(&amp;sg, &amp;og) {
+        // 同一张量参与运算（如 x*x）：两条路径的梯度合并（第 2 课讲过）
+        // ……（合并累加逻辑，返回 (true, true)）
+        (true, true)
+    } else {
+        let mut sgm = sg.borrow_mut();
+        let mut ogm = og.borrow_mut();
+        for t in 0..g.len() {
+            let ia = match &amp;map_a_c { Some(m) =&gt; m[t], None =&gt; t };
+            let ib = match &amp;map_b_c { Some(m) =&gt; m[t], None =&gt; t };
+            let (da, db) = back(sd_b[ia], od_b[ib]);
+            sgm[ia] += g[t] * da;      // 梯度累加到&quot;源位置&quot;，而不是输出位置
+            ogm[ib] += g[t] * db;
+        }
+        (false, false)
+    };
+    let _ = (ga, gb);
+}));
+</code></pre>
+<p>用测试验证（<code>test_broadcast_add</code>）：</p>
+<pre><code class="language-rust">// [2,3] + [3] 广播：b 的每个元素被两行&quot;共享&quot;
+let a = Tensor::param(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![2, 3]);
+let b = Tensor::param(vec![10.0, 20.0, 30.0], vec![3]);
+let loss = a.add(&amp;b).sum();
+loss.backward();
+// b 的每个元素被广播两次，梯度应为 2
+assert_eq!(b.grad(), vec![2.0, 2.0, 2.0]);
+assert_eq!(a.grad(), vec![1.0; 6]);
+</code></pre>
+<p><code>b[0]</code> 参与了输出的两个位置 <code>(0,0)</code> 和 <code>(1,0)</code>，两个位置的梯度各 1，累加起来就是 2。✓</p>
+<h2><a href="#3-归约sum--sum_last_dim--mean" aria-hidden="true" class="anchor" id="user-content-3-归约sum--sum_last_dim--mean"></a>3. 归约：sum / sum_last_dim / mean</h2>
+<p>&quot;归约&quot;（reduction）就是把一堆数<strong>合并成一个数</strong>。神经网络里损失函数 <code>loss</code> 几乎总是某种归约的结果（<code>loss.backward()</code> 要求标量，所以归约是自动微分的必经之路）。</p>
+<h3><a href="#31-sum全部求和成标量" aria-hidden="true" class="anchor" id="user-content-31-sum全部求和成标量"></a>3.1 <code>sum</code>：全部求和成标量</h3>
+<pre><code class="language-rust">/// 求和成标量，梯度均匀传给每个元素
+pub fn sum(&amp;self) -&gt; Tensor {
+    let total = self.data.borrow().iter().sum();
+    let mut result = Tensor::new(vec![total], vec![], self.requires_grad);
+    if self.requires_grad {
+        // ……
+        result.backward = Some(Rc::new(move || {
+            let g = rg.borrow()[0];
+            let mut sgm = sg.borrow_mut();
+            for v in sgm.iter_mut() {
+                *v += g;          // 每个元素的梯度都是 g（因为 ∂sum/∂x_i = 1）
+            }
+        }));
+    }
+    result
+}
+</code></pre>
+<p>反向逻辑一句话：<strong>求和把每个元素的梯度都变成同一个 g</strong>。因为 <code>sum(x) = x₀ + x₁ + …</code>，对每个 <code>x_i</code> 求导都是 1，所以 <code>∂loss/∂x_i = g·1</code>。</p>
+<h3><a href="#32-sum_last_dim沿最后一维求和保持维度" aria-hidden="true" class="anchor" id="user-content-32-sum_last_dim沿最后一维求和保持维度"></a>3.2 <code>sum_last_dim</code>：沿最后一维求和，<strong>保持维度</strong></h3>
+<p><code>scores [B, D]</code> 想按行求和得到 <code>[B, 1]</code>（注意最后一维保留为 1，而不是塌缩成 <code>[B]</code>），就用它：</p>
+<pre><code class="language-rust">/// 沿最后一维求和，**保持维度**：[..., D] -&gt; [..., 1]
+/// 反向：梯度广播回最后一维
+pub fn sum_last_dim(&amp;self) -&gt; Tensor {
+    assert!(self.rank() &gt;= 1, &quot;sum_last_dim 需要至少 1 维&quot;);
+    let (pre, d) = (self.numel() / self.shape[self.rank() - 1], self.shape[self.rank() - 1]);
+    // pre = 最后一维之前的所有元素数，d = 最后一维大小
+    let sd = self.data.borrow();
+    let mut out_data = vec![0.0f32; pre];
+    for p in 0..pre {
+        let mut s = 0.0;
+        for j in 0..d {
+            s += sd[p * d + j];   // 每 d 个连续元素求和
+        }
+        out_data[p] = s;
+    }
+    drop(sd);
+    let mut new_shape = self.shape.clone();
+    *new_shape.last_mut().unwrap() = 1;   // 最后一维改成 1，保持维度
+    // ……
+    result.backward = Some(Rc::new(move || {
+        let g = rg.borrow();
+        let mut sgm = sg.borrow_mut();
+        for p in 0..pre {
+            for j in 0..d {
+                sgm[p * d + j] += g[p];   // 反向：把 g[p] 广播回这一行的 d 个位置
+            }
+        }
+    }));
+}
+</code></pre>
+<p>把 <code>[2, 3]</code> 变成 <code>[2, 1]</code>，前向和反向正好是&quot;一对&quot;：</p>
+<pre><code>前向： [1 2 3]   sum -&gt; [6]
+       [4 5 6]          [15]
+
+反向： g = [2, 3]  broadcast -&gt; [2 2 2]
+                               [3 3 3]
+</code></pre>
+<h3><a href="#33-mean用-sum--mul_scalar-组合出来" aria-hidden="true" class="anchor" id="user-content-33-mean用-sum--mul_scalar-组合出来"></a>3.3 mean：用 sum + mul_scalar 组合出来</h3>
+<p>我们的库<strong>没有单独的 <code>mean</code> 算子</strong>——均值就是&quot;求和再除以元素数&quot;，用现成的算子组合即可。看 <code>loss.rs</code> 里 MSE 的实现：</p>
+<pre><code class="language-rust">pub fn mse_loss(pred: &amp;Tensor, target: &amp;Tensor) -&gt; Tensor {
+    pred.sub(target)
+        .pow(2.0)
+        .sum()                                  // Σ (pred - target)²
+        .mul_scalar(1.0 / pred.numel() as f32)  // ÷ N，就是 mean
+}
+</code></pre>
+<p>这体现了&quot;<strong>先保证运算集合最小、用组合满足需求</strong>&quot;的设计哲学：少一个算子 = 少一段前向 + 反向代码 = 少一类 bug。</p>
+<p>三种归约对比：</p>
+<table>
+<thead>
+<tr>
+<th>运算</th>
+<th>输入 → 输出</th>
+<th>反向梯度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sum()</code></td>
+<td><code>[D1, D2, …] → []</code> 标量</td>
+<td>每个元素都 <code>+= g</code></td>
+</tr>
+<tr>
+<td><code>sum_last_dim()</code></td>
+<td><code>[…, D] → […, 1]</code> 保持维度</td>
+<td>把 <code>g[p]</code> 广播回第 p 行的 d 个位置</td>
+</tr>
+<tr>
+<td><code>mean</code>（组合实现）</td>
+<td>同上</td>
+<td>同 sum，再乘 <code>1/N</code></td>
+</tr>
+</tbody>
+</table>
+<h2><a href="#4-softmax_last_dim数值稳定的-softmax" aria-hidden="true" class="anchor" id="user-content-4-softmax_last_dim数值稳定的-softmax"></a>4. softmax_last_dim：数值稳定的 softmax</h2>
+<h3><a href="#41-公式与直觉" aria-hidden="true" class="anchor" id="user-content-41-公式与直觉"></a>4.1 公式与直觉</h3>
+<p>softmax 把一行任意实数分数变成<strong>概率分布</strong>（每个数在 0~1 之间，和为 1），是分类问题（以及 Transformer 注意力）的核心：</p>
+<pre><code>softmax(x)_i = e^{x_i} / Σ_j e^{x_j}      （对每一行独立做）
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>x</th>
+<th>e^x</th>
+<th>归一化后</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>2.718</td>
+<td>0.0900</td>
+</tr>
+<tr>
+<td>2</td>
+<td>7.389</td>
+<td>0.2447</td>
+</tr>
+<tr>
+<td>3</td>
+<td>20.086</td>
+<td>0.6652</td>
+</tr>
+</tbody>
+</table>
+<p>这就是测试 <code>test_softmax</code> 验证的结果：<code>softmax([1,2,3]) = [0.0900, 0.2447, 0.6652]</code>。</p>
+<h3><a href="#42-数值爆炸不先减-max-会怎样" aria-hidden="true" class="anchor" id="user-content-42-数值爆炸不先减-max-会怎样"></a>4.2 数值爆炸：不先减 max 会怎样</h3>
+<p><code>e^x</code> 增长极快：<code>e^88.7</code> 就已经超过 f32 能表示的最大值（约 3.4×10³⁸），再大就是 <code>inf</code>。而神经网络的 logits 动辄上百，直接 <code>exp</code> 会溢出，除以 <code>inf</code> 得到 <code>NaN</code>，整个训练直接崩掉。</p>
+<h3><a href="#43-减最大值技巧" aria-hidden="true" class="anchor" id="user-content-43-减最大值技巧"></a>4.3 &quot;减最大值&quot;技巧</h3>
+<p>数学上 softmax 对&quot;整体平移&quot;不敏感，因为分子分母可以同乘一个常数：</p>
+<pre><code>softmax(x)_i = e^{x_i} / Σ_j e^{x_j}
+             = e^{-m}·e^{x_i} / (e^{-m}·Σ_j e^{x_j})
+             = e^{x_i - m} / Σ_j e^{x_j - m}         其中 m = max_j x_j
+</code></pre>
+<p>取 <code>m = max(x)</code> 后，<code>x_i - m ≤ 0</code>，<code>e^{x_i-m} ∈ (0, 1]</code>，<strong>永远不会溢出</strong>。代码里就是三步：找每行 max → exp(x - max) → 除以行和：</p>
+<pre><code class="language-rust">pub fn softmax_last_dim(&amp;self) -&gt; Tensor {
+    assert!(self.rank() &gt;= 1, &quot;softmax_last_dim 需要至少 1 维&quot;);
+    let (rows, d) = (self.numel() / self.shape[self.rank() - 1], self.shape[self.rank() - 1]);
+    let sd = self.data.borrow();
+    let mut out_data = vec![0.0f32; rows * d];
+    // 先存 softmax 结果（反向需要）
+    for r in 0..rows {
+        let mut maxv = f32::NEG_INFINITY;
+        for j in 0..d {
+            maxv = maxv.max(sd[r * d + j]);            // ① 找每行最大值
+        }
+        let mut sum = 0.0;
+        for j in 0..d {
+            out_data[r * d + j] = (sd[r * d + j] - maxv).exp();  // ② 减 max 再 exp
+            sum += out_data[r * d + j];
+        }
+        for j in 0..d {
+            out_data[r * d + j] /= sum;                // ③ 归一化
+        }
+    }
+    drop(sd);
+    // ……（反向见下）……
+}
+</code></pre>
+<blockquote>
+<p>注：<code>f32::NEG_INFINITY</code> 作为&quot;比任何数都小&quot;的初始值，保证第一个元素就能更新 max。</p>
+</blockquote>
+<h3><a href="#44-softmax-的反向传播" aria-hidden="true" class="anchor" id="user-content-44-softmax-的反向传播"></a>4.4 softmax 的反向传播</h3>
+<p>softmax 的输出互相耦合（每个 <code>s_i</code> 都依赖所有 <code>x_j</code>），梯度公式（<code>s</code> 是输出，<code>g</code> 是输出梯度）：</p>
+<pre><code>∂loss/∂x_i = s_i · (g_i - Σ_j g_j·s_j)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>记号</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>s_i</code></td>
+<td>softmax 输出的第 i 个分量</td>
+</tr>
+<tr>
+<td><code>g_i</code></td>
+<td>上一层传下来的梯度（对输出的梯度）</td>
+</tr>
+<tr>
+<td><code>dot = Σ_j g_j·s_j</code></td>
+<td>梯度与输出的点积（对每一行只算一次）</td>
+</tr>
+</tbody>
+</table>
+<p>代码和公式一一对应：</p>
+<pre><code class="language-rust">result.backward = Some(Rc::new(move || {
+    let g = rg.borrow();
+    let mut sgm = sg.borrow_mut();
+    for r in 0..rows {
+        // dot = Σ_j g_j * s_j
+        let mut dot = 0.0;
+        for j in 0..d {
+            dot += g[r * d + j] * out_data[r * d + j];
+        }
+        for i in 0..d {
+            sgm[r * d + i] += out_data[r * d + i] * (g[r * d + i] - dot);  // s_i(g_i - dot)
+        }
+    }
+}));
+</code></pre>
+<blockquote>
+<p>推导速览（供参考）：<code>∂s_i/∂x_j = s_i(δ_ij - s_j)</code>（δ 是克罗内克记号），再用链式法则
+<code>∂loss/∂x_i = Σ_j g_j·∂s_j/∂x_i = Σ_j g_j·s_j(δ_ji - s_i) = g_i·s_i - s_i·Σ_j g_j·s_j</code>。</p>
+</blockquote>
+<h2><a href="#5-permute任意维重排" aria-hidden="true" class="anchor" id="user-content-5-permute任意维重排"></a>5. permute：任意维重排</h2>
+<h3><a href="#51-和-reshape-的区别" aria-hidden="true" class="anchor" id="user-content-51-和-reshape-的区别"></a>5.1 和 reshape 的区别</h3>
+<ul>
+<li><code>reshape</code>：<strong>只改解释方式，不改数据顺序</strong>。<code>[1,2,3,4,5,6]</code> 排成 2×3 还是 3×2，内存里还是那 6 个数。</li>
+<li><code>permute</code>：<strong>真的把数据搬家</strong>。把某个维度整体挪到另一个位置（<code>transpose</code> 就是 2 维的 <code>permute([1,0])</code>）。</li>
+</ul>
+<p><code>permute(&amp;[0, 2, 1])</code> 的意思是&quot;新张量的第 0 维 = 旧张量的第 0 维，新第 1 维 = 旧第 2 维，新第 2 维 = 旧第 1 维&quot;。</p>
+<p>看测试 <code>test_permute</code>：<code>[2, 3]</code> 用 <code>permute([1, 0])</code> 变成 <code>[3, 2]</code>，数据从 <code>[1,2,3,4,5,6]</code> 变成 <code>[1,4,2,5,3,6]</code>：</p>
+<pre><code>原始 [2,3]:          permute([1,0]) 后 [3,2]:
+[1 2 3]              [1 4]
+[4 5 6]              [2 5]
+                     [3 6]
+</code></pre>
+<h3><a href="#52-用逆映射实现" aria-hidden="true" class="anchor" id="user-content-52-用逆映射实现"></a>5.2 用&quot;逆映射&quot;实现</h3>
+<p>要算 <code>out[of] = src[?]</code>，思路是：先反解 <code>of</code> 的多维坐标 <code>out_idx</code>，再问&quot;源的第 d 维应该取输出的哪一维&quot;——答案就是 <code>inv[d]</code>，其中 <code>inv</code> 是 <code>perm</code> 的逆映射：</p>
+<pre><code class="language-rust">// 反解 permute 的逆映射：inv[perm[i]] = i
+let mut inv = vec![0usize; self.rank()];
+for (i, &amp;d) in dims.iter().enumerate() {
+    inv[d] = i;
+}
+// 前向：out_flat -&gt; src_flat
+let mut map = vec![0usize; total];
+for out_flat in 0..total {
+    // ① 反解输出多维下标（行优先）
+    let mut r = out_flat;
+    let mut out_idx = vec![0usize; self.rank()];
+    for d in (0..self.rank()).rev() {
+        out_idx[d] = r % new_shape[d];
+        r /= new_shape[d];
+    }
+    // ② 源的第 d 维来自输出的第 inv[d] 维
+    let mut src_flat = 0usize;
+    for d in 0..self.rank() {
+        let sd = out_idx[inv[d]];
+        src_flat = src_flat * self.shape[d] + sd;
+    }
+    map[out_flat] = src_flat;
+}
+// ③ 按映射搬运数据
+let mut out_data = vec![0.0f32; total];
+for (of, &amp;sf) in map.iter().enumerate() {
+    out_data[of] = sd[sf];
+}
+</code></pre>
+<p><strong>反向</strong>：和广播类似——<code>permute</code> 也是&quot;每个源元素只去一个地方&quot;，但方向反过来，梯度要&quot;放回原位&quot;。用同一张 <code>map</code>，把输出的梯度 <code>g[of]</code> 累加到 <code>sgm[sf]</code>：</p>
+<pre><code class="language-rust">result.backward = Some(Rc::new(move || {
+    let g = rg.borrow();
+    let mut sgm = sg.borrow_mut();
+    for (of, &amp;sf) in map.iter().enumerate() {
+        sgm[sf] += g[of];        // 梯度&quot;原路返回&quot;
+    }
+}));
+</code></pre>
+<blockquote>
+<p>为什么是 <code>+=</code>？因为 permute 之后可能还有别的运算把梯度送到同一个源位置，或者源张量被多处共享，梯度必须累加（全项目统一约定）。</p>
+</blockquote>
+<h2><a href="#6-gather_rows按行取数embedding-的基石" aria-hidden="true" class="anchor" id="user-content-6-gather_rows按行取数embedding-的基石"></a>6. gather_rows：按行取数（Embedding 的基石）</h2>
+<h3><a href="#61-语义" aria-hidden="true" class="anchor" id="user-content-61-语义"></a>6.1 语义</h3>
+<p>词嵌入（Embedding）的本质就是&quot;查表&quot;：一张 <code>[V, D]</code> 的表格（V 个词的向量），给定一堆词的下标，把对应行拿出来：</p>
+<pre><code>table [V, D] + indices [N]  -&gt;  out [N, D]
+out[i, :] = table[indices[i], :]
+</code></pre>
+<p>前向代码：</p>
+<pre><code class="language-rust">pub fn gather_rows(&amp;self, indices: &amp;[usize]) -&gt; Tensor {
+    assert_eq!(self.rank(), 2, &quot;gather_rows 的 table 必须为 2 维&quot;);
+    let (v, d) = (self.shape[0], self.shape[1]);
+    let n = indices.len();
+    let sd = self.data.borrow();
+    let mut out_data = vec![0.0f32; n * d];
+    for (i, &amp;idx) in indices.iter().enumerate() {
+        assert!(idx &lt; v, &quot;gather 索引越界：{} &gt;= {}&quot;, idx, v);
+        for j in 0..d {
+            out_data[i * d + j] = sd[idx * d + j];   // 复制第 idx 行
+        }
+    }
+    // ……
+}
+</code></pre>
+<p>测试 <code>test_gather_rows</code>：<code>table[3,2]</code> 取第 0、2 行 → <code>[1,2,5,6]</code> ✓</p>
+<h3><a href="#62-反向scatter-add散射累加" aria-hidden="true" class="anchor" id="user-content-62-反向scatter-add散射累加"></a>6.2 反向：scatter-add（散射累加）</h3>
+<p>一行可能被取多次（两个位置都引用同一行），所以反向时梯度<strong>累加</strong>回表格对应行：</p>
+<pre><code class="language-rust">result.backward = Some(Rc::new(move || {
+    let g = rg.borrow();
+    let mut sgm = sg.borrow_mut();
+    for i in 0..idx_vec.len() {
+        let row = idx_vec[i];                 // 输出第 i 行来自表格第 row 行
+        for j in 0..d2 {
+            sgm[row * d2 + j] += g[i * d2 + j];   // 累加，不覆盖！
+        }
+    }
+}));
+</code></pre>
+<p>测试验证：</p>
+<pre><code class="language-rust">let t = Tensor::param(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![3, 2]);
+let g = t.gather_rows(&amp;[0, 2]);
+let loss = g.sum();
+loss.backward();
+// 第 0 行梯度 1，第 2 行梯度 1，第 1 行梯度 0
+assert_eq!(t.grad(), vec![1.0, 1.0, 0.0, 0.0, 1.0, 1.0]);
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>表格行</th>
+<th>被引用次数</th>
+<th>梯度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>1 次（indices[0]）</td>
+<td>1</td>
+</tr>
+<tr>
+<td>1</td>
+<td>0 次</td>
+<td>0</td>
+</tr>
+<tr>
+<td>2</td>
+<td>1 次（indices[1]）</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p>如果 <code>indices = [0, 0]</code>，第 0 行的梯度就是 2——这就是&quot;scatter <strong>add</strong>&quot;里 add 的含义。</p>
+<h2><a href="#7-3d-批量-matmul" aria-hidden="true" class="anchor" id="user-content-7-3d-批量-matmul"></a>7. 3D 批量 matmul</h2>
+<h3><a href="#71-从-2d-到-3d" aria-hidden="true" class="anchor" id="user-content-71-从-2d-到-3d"></a>7.1 从 2D 到 3D</h3>
+<p>第 1 课学过 2D 矩阵乘法 <code>C[m,n] = A[m,k] @ B[k,n]</code>。真实模型里我们通常同时处理<strong>一批</strong>样本，就变成了 3D 批量版本：前两个维度完全一样（都是 <code>B</code>），第三个、第四个维度才是矩阵的 m、k、n：</p>
+<pre><code>2D:   C[m,n]     = A[m,k]     @ B[k,n]
+3D:   C[B,m,n]   = A[B,m,k]   @ B[B,k,n]     每个 batch 独立做一次 2D 乘法
+</code></pre>
+<p>批量维度 <code>B</code> 必须一致，内维 <code>k</code> 也必须一致，输出是 <code>[B, m, n]</code>。</p>
+<h3><a href="#72-前向代码" aria-hidden="true" class="anchor" id="user-content-72-前向代码"></a>7.2 前向代码</h3>
+<p>就是&quot;对每个 batch 跑一遍第 1 课的三重循环&quot;：</p>
+<pre><code class="language-rust">pub fn matmul(&amp;self, other: &amp;Tensor) -&gt; Tensor {
+    assert!(
+        (self.rank() == 2 &amp;&amp; other.rank() == 2) || (self.rank() == 3 &amp;&amp; other.rank() == 3),
+        &quot;matmul 只支持 2D 或 3D（批量），当前 {}-D x {}-D&quot;, self.rank(), other.rank()
+    );
+    if self.rank() == 2 {
+        return self.matmul_2d(other);        // 2D 走老路
+    }
+    // 3D 批量
+    assert_eq!(self.shape[0], other.shape[0], &quot;批量维度必须一致&quot;);
+    let (b, m, k1) = (self.shape[0], self.shape[1], self.shape[2]);
+    let (_, k2, n) = (other.shape[0], other.shape[1], other.shape[2]);
+    assert_eq!(k1, k2, &quot;矩阵乘法维度不匹配&quot;);
+
+    let sd = self.data.borrow();
+    let od = other.data.borrow();
+    let mut out_data = vec![0.0f32; b * m * n];
+    for bi in 0..b {                      // 多了一层 batch 循环
+        for i in 0..m {
+            for j in 0..n {
+                let mut s = 0.0;
+                for k in 0..k1 {
+                    s += sd[(bi * m + i) * k1 + k] * od[(bi * k1 + k) * n + j];
+                }
+                out_data[(bi * m + i) * n + j] = s;
+            }
+        }
+    }
+    // ……
+}
+</code></pre>
+<p>下标规律：每个 batch 内的下标公式和 2D 完全一样，只是多加了 <code>bi * m * k1</code>（A）和 <code>bi * k1 * n</code>（B）的批内偏移。看测试 <code>test_matmul_3d</code>：</p>
+<pre><code>A [2,1,2] = [[1,2],[3,4]]      B [2,2,1] = [[5],[6]] , [[7],[8]]
+C [2,1,1] = [[1·5+2·6=17], [3·7+4·8=53]]   →  [17, 53] ✓
+</code></pre>
+<h3><a href="#73-反向公式对每个-batch-独立成立" aria-hidden="true" class="anchor" id="user-content-73-反向公式对每个-batch-独立成立"></a>7.3 反向公式（对每个 batch 独立成立）</h3>
+<p>第 2 课的反向公式在批量下逐 batch 套用：</p>
+<table>
+<thead>
+<tr>
+<th>输入</th>
+<th>梯度公式</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A</td>
+<td><code>∂A = g @ Bᵀ</code></td>
+<td>输出梯度乘 B 的转置</td>
+</tr>
+<tr>
+<td>B</td>
+<td><code>∂B = Aᵀ @ g</code></td>
+<td>A 的转置乘输出梯度</td>
+</tr>
+</tbody>
+</table>
+<p>代码里就是三重循环写成 <code>+=</code> 累加（<code>sgm[(bi*m+i)*k1+k] += Σ_j g[...]·od[...]</code>），并且保留了 <code>Rc::ptr_eq</code> 判断（<code>x @ x</code> 这种自乘场景两条路径合并）。<strong>注意维度细节</strong>：<code>∂A</code> 是 <code>[B,m,k]</code>（和 A 同形状），<code>∂B</code> 是 <code>[B,k,n]</code>，所以两个循环的累加下标不同：</p>
+<pre><code class="language-rust">// ∂A：sgm 用 (bi, i, k) 定位，对 j 求和
+sgm[(bi * m + i) * k1 + k] += s;      // s = Σ_j g[bi,i,j] * B[bi,k,j]
+// ∂B：ogm 用 (bi, k, j) 定位，对 i 求和
+ogm[(bi * k1 + k) * n + j] += s;      // s = Σ_i A[bi,i,k] * g[bi,i,j]
+</code></pre>
+<h2><a href="#8-运行与测试" aria-hidden="true" class="anchor" id="user-content-8-运行与测试"></a>8. 运行与测试</h2>
+<pre><code class="language-bash">cargo test     # 全部测试通过（含新增：广播、3D matmul、softmax、permute、gather_rows）
+cargo run      # 运行演示
+</code></pre>
+<p>重点测试与验证内容：</p>
+<table>
+<thead>
+<tr>
+<th>测试</th>
+<th>验证什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_broadcast_add</code></td>
+<td><code>[2,3] + [3]</code> 前向正确，且 b 的梯度是 2（被广播两次）</td>
+</tr>
+<tr>
+<td><code>test_matmul_3d</code></td>
+<td><code>[2,1,2] @ [2,2,1] = [2,1,1]</code>，数据 <code>[17, 53]</code></td>
+</tr>
+<tr>
+<td><code>test_softmax</code></td>
+<td>输出和为 1，与手算值 <code>[0.0900, 0.2447, 0.6652]</code> 一致</td>
+</tr>
+<tr>
+<td><code>test_permute</code></td>
+<td><code>[2,3]</code> permute 成 <code>[3,2]</code>，数据 <code>[1,4,2,5,3,6]</code></td>
+</tr>
+<tr>
+<td><code>test_gather_rows</code></td>
+<td>查表结果正确，且只有被引用行有梯度</td>
+</tr>
+</tbody>
+</table>
+<h2><a href="#9-动手练习" aria-hidden="true" class="anchor" id="user-content-9-动手练习"></a>9. 动手练习</h2>
+<ol>
+<li>手推一遍 <code>[2,3] + [1,3]</code> 的广播：画两个张量，标出 b 的每个元素被复制到哪些位置；再画反向时梯度如何累加回 b。</li>
+<li>用 <code>sum_last_dim</code> 和 <code>mul_scalar</code> 组合实现&quot;按行求均值&quot;（<code>[B, D] -&gt; [B, 1]</code>），并推导梯度。</li>
+<li>设 d=2，手推 softmax 反向公式：<code>s = softmax([x0, x1])</code>，写出 <code>∂loss/∂x0</code> 和 <code>∂loss/∂x1</code> 的具体表达式。</li>
+<li>思考：<code>permute</code> 之后做 <code>sum()</code>，源张量的梯度是什么？为什么说 permute 只改变数据的&quot;排列&quot;而不改变&quot;信息&quot;？</li>
+<li>挑战题：<code>gather_rows</code> 若允许同一行被取两次（如 <code>indices=[0,0]</code>），反向时该行梯度是多少？这提示了 Embedding 的梯度为什么必须用 <code>+=</code>。</li>
+</ol>
+<h2><a href="#10-本课总结" aria-hidden="true" class="anchor" id="user-content-10-本课总结"></a>10. 本课总结</h2>
+<ul>
+<li>广播：右对齐、维度相等或一方为 1、否则失败；<code>broadcast_shapes</code> 定形状，<code>broadcast_map</code> 定搬数路线</li>
+<li>广播的反向 = 梯度<strong>累加</strong>回源位置（谁被复制，谁收多份梯度）</li>
+<li>归约：<code>sum</code> 变标量、<code>sum_last_dim</code> 保持维度；mean 用 sum + 除法组合</li>
+<li>softmax：减 max 保证数值稳定（数学等价、永不溢出），反向公式 <code>s_i(g_i - dot)</code></li>
+<li>permute / gather_rows：都是&quot;搬家&quot;运算，反向用同一张映射表把梯度放回原位（累加）</li>
+<li>3D matmul：批量维度不变，内层逐 batch 做 2D matmul，反向逐 batch 套 <code>g@Bᵀ</code> / <code>Aᵀ@g</code></li>
+<li>下一课：把项目拆成独立模块，并深入理解支撑这一切的 <code>Rc&lt;RefCell&gt;</code> 架构</li>
+</ul>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-02/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-04/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a></div></div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

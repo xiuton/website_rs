@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力 - 干徒</title>
+    <meta name="description" content="实现 RoPE 旋转位置编码，将相对位置信息直接编码进注意力分数。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 注意力">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-19">
+    <meta property="og:title" content="第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力 - 干徒">
+    <meta property="og:description" content="实现 RoPE 旋转位置编码，将相对位置信息直接编码进注意力分数。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-19">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力 - 干徒">
+    <meta name="twitter:description" content="实现 RoPE 旋转位置编码，将相对位置信息直接编码进注意力分数。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力","description":"实现 RoPE 旋转位置编码，将相对位置信息直接编码进注意力分数。","url":"https://ganto.me/post/rust-llm-guide-19","datePublished":"2026-09-20","dateModified":"2026-09-20","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 注意力","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-c64c465a01d82915.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-20</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">注意力</span></div>
+                <div class="blog-content">
+<h1><a href="#第-19-课rope-旋转位置编码--把相对位置揉进注意力" aria-hidden="true" class="anchor" id="user-content-第-19-课rope-旋转位置编码--把相对位置揉进注意力"></a>第 19 课：RoPE 旋转位置编码 —— 把&quot;相对位置&quot;揉进注意力</h1>
+<blockquote>
+<p>代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/tensor.rs">src/tensor.rs</a>（<code>rotary</code> 方法、&quot;旋转位置编码（第 19 课）&quot;小节、<code>test_rotary</code> 测试）
+配套代码：<a href="file:///d:/Code/Rust/llm_from_scratch/src/model.rs">src/model.rs</a>（第 18 课 KV cache、第 11 课正弦编码 <code>sinusoidal_positions</code>）
+配套文档：<a href="file:///d:/Code/Rust/llm_from_scratch/docs/11-%E4%BD%8D%E7%BD%AE%E7%BC%96%E7%A0%81%E4%B8%8E%E5%BD%92%E4%B8%80%E5%8C%96.md">docs/11-位置编码与归一化.md</a></p>
+</blockquote>
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li>第 11 课的正弦位置编码有什么缺陷？为什么现代 LLM（LLaMA、Qwen、Gemma……）几乎清一色用 RoPE？</li>
+<li>&quot;旋转&quot;怎么把位置信息编码进向量？公式 <code>x'_{2i} = x_{2i}·cosθ - x_{2i+1}·sinθ</code> 是怎么来的？</li>
+<li>为什么说旋转是<strong>正交变换</strong>？范数不变这个性质重要在哪？</li>
+<li>为什么 RoPE 的点积只与&quot;位置差&quot;有关？相比正弦编码强在哪？</li>
+<li>为什么 RoPE 和 KV cache 是&quot;天生一对&quot;？推理时为什么只需要旋转新 token？</li>
+<li><code>src/tensor.rs</code> 里 <code>rotary</code> 的前向、反向具体怎么实现？<code>test_rotary</code> 测了什么？</li>
+</ol>
+<h2><a href="#2-先回顾正弦位置编码的两个局限" aria-hidden="true" class="anchor" id="user-content-2-先回顾正弦位置编码的两个局限"></a>2. 先回顾：正弦位置编码的两个局限</h2>
+<p>第 11 课我们实现了正弦位置编码，把位置向量<strong>加到</strong> token embedding 上：</p>
+<pre><code>x = token_embedding + pos_emb
+</code></pre>
+<p>它解决了&quot;注意力看不见位置&quot;的问题，但有两个不足：</p>
+<h3><a href="#21-编码的是绝对位置模型得自己推断相对关系" aria-hidden="true" class="anchor" id="user-content-21-编码的是绝对位置模型得自己推断相对关系"></a>2.1 编码的是&quot;绝对位置&quot;，模型得自己推断相对关系</h3>
+<p>正弦编码给每个绝对位置 <code>pos</code> 一个固定向量，加到输入上。模型面对的其实是&quot;内容 + 绝对位置&quot;的混合表示，
+<strong>&quot;A 在第 3 位、B 在第 7 位&quot; 这个信息是间接的</strong>——模型需要自己学会&quot;位置 7 减去位置 3 = 距离 4&quot;。</p>
+<p>原论文证明了 <code>PE(pos+k)</code> 可以表示为 <code>PE(pos)</code> 的线性组合（三角恒等式），即&quot;理论上模型能学到相对距离&quot;，
+但<strong>这只是给了模型一个机会，不是保证</strong>——要靠训练把这种规律学出来。</p>
+<blockquote>
+<p>直觉：正弦编码像给每个座位发一张写着&quot;座位号&quot;的号牌，模型得自己学会&quot;6 号和 2 号的号牌之差 = 隔了 4 排&quot;。
+RoPE 的做法是直接把&quot;隔了几排&quot;编码进打分公式里，模型不用学这一步。</p>
+</blockquote>
+<h3><a href="#22-外推extrapolation差" aria-hidden="true" class="anchor" id="user-content-22-外推extrapolation差"></a>2.2 外推（extrapolation）差</h3>
+<p>我们的模型 <code>block_size = 32</code>（<code>GPTConfig::tiny</code>），训练时位置只见过 <code>0..32</code>。如果推理时生成更长的序列：</p>
+<ul>
+<li>位置 32、33…… 的 pos_emb 向量虽然能算出来（正弦函数对任意 pos 都有定义），</li>
+<li>但模型<strong>从没见过这种输入分布</strong>，注意力分数可能畸变，输出质量断崖式下跌。</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>对比项</th>
+<th>正弦编码（第 11 课）</th>
+<th>RoPE（本课）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>注入方式</td>
+<td>位置向量<strong>加</strong>到输入 embedding</td>
+<td>对 Q/K 向量做<strong>旋转</strong></td>
+</tr>
+<tr>
+<td>编码的信息</td>
+<td>绝对位置（相对关系靠模型自己学）</td>
+<td>相对位置（点积直接只依赖位置差）</td>
+</tr>
+<tr>
+<td>作用位置</td>
+<td>模型输入（所有层共享一份）</td>
+<td>注意力内部（每层的 Q/K 各自旋转）</td>
+</tr>
+<tr>
+<td>是否改变范数</td>
+<td>加一个固定向量，范数会变</td>
+<td>旋转保范数，输入表示&quot;只转向、不变长&quot;</td>
+</tr>
+<tr>
+<td>KV cache 配合</td>
+<td>也兼容，但位置信息&quot;粘&quot;在输入上</td>
+<td>只需旋转新 token 的 Q/K，天然契合</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>补充：RoPE 也不是&quot;万能外推药&quot;。角度随位置线性增长，训练长度之外同样会失效。
+业界用 <strong>NTK-aware scaling、YaRN</strong> 等技巧做长度外推，那是后话，本课先把 RoPE 本身讲透。</p>
+</blockquote>
+<h2><a href="#3-rope-原理把-d-维拆成-d2-对来旋转" aria-hidden="true" class="anchor" id="user-content-3-rope-原理把-d-维拆成-d2-对来旋转"></a>3. RoPE 原理：把 d 维拆成 d/2 对来旋转</h2>
+<p>RoPE 出自论文 <em>RoFormer: Enhanced Transformer with Rotary Position Embedding</em>（Su et al., 2021）。</p>
+<h3><a href="#31-二维旋转回顾" aria-hidden="true" class="anchor" id="user-content-31-二维旋转回顾"></a>3.1 二维旋转回顾</h3>
+<p>在二维平面上，把向量 <code>(a, b)</code> 绕原点逆时针旋转角度 <code>θ</code>：</p>
+<pre><code>a' = a·cosθ - b·sinθ
+b' = a·sinθ + b·cosθ
+</code></pre>
+<p>写成矩阵就是旋转矩阵 <code>R(θ) = [[cosθ, -sinθ], [sinθ, cosθ]]</code>。</p>
+<h3><a href="#32-把-d-维向量看成-d2-个二维向量" aria-hidden="true" class="anchor" id="user-content-32-把-d-维向量看成-d2-个二维向量"></a>3.2 把 d 维向量看成 d/2 个二维向量</h3>
+<p>一个 <code>d</code> 维向量（d 必须为偶数），按<strong>相邻两两配对</strong>：</p>
+<pre><code>(x₀, x₁), (x₂, x₃), (x₄, x₅), ..., (x_{d-2}, x_{d-1})
+</code></pre>
+<p>每一对看作平面上的一个点，第 <code>i</code> 对 <code>(x_{2i}, x_{2i+1})</code> 绕原点旋转角度：</p>
+<pre><code>θ_i = pos / 10000^(2i/d)      i = 0, 1, ..., d/2 - 1
+</code></pre>
+<p>旋转后：</p>
+<pre><code>x'_{2i}   = x_{2i}·cosθ_i - x_{2i+1}·sinθ_i
+x'_{2i+1} = x_{2i}·sinθ_i + x_{2i+1}·cosθ_i
+</code></pre>
+<blockquote>
+<p>注意频率方案 <code>10000^(2i/d)</code> 和正弦编码一模一样（第 11 课）：<code>i</code> 越小频率越高（角度变化快，管近处的精细位置），
+<code>i</code> 越大频率越低（角度变化慢，管远处的粗略位置）。这样&quot;近距离靠高维、远距离靠低维&quot;的分工被保留了下来。</p>
+</blockquote>
+<h3><a href="#33-手算一个例子" aria-hidden="true" class="anchor" id="user-content-33-手算一个例子"></a>3.3 手算一个例子</h3>
+<p>设 <code>d = 4</code>、位置 <code>pos = 1</code>，则有两对：</p>
+<table>
+<thead>
+<tr>
+<th>对</th>
+<th>i</th>
+<th>θ_i = 1 / 10000^(2i/4)</th>
+<th>cos θ_i</th>
+<th>sin θ_i</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(x₀, x₁)</td>
+<td>0</td>
+<td>1 / 1 = 1.0 rad</td>
+<td>0.5403</td>
+<td>0.8415</td>
+</tr>
+<tr>
+<td>(x₂, x₃)</td>
+<td>1</td>
+<td>1 / 10000^0.5 = 1/100 = 0.01 rad</td>
+<td>≈ 0.99995</td>
+<td>≈ 0.01</td>
+</tr>
+</tbody>
+</table>
+<p>于是：</p>
+<pre><code>x'₀ = x₀·0.5403 - x₁·0.8415
+x'₁ = x₀·0.8415 + x₁·0.5403
+x'₂ ≈ x₂·0.99995 - x₃·0.01
+x'₃ ≈ x₂·0.01 + x₃·0.99995
+</code></pre>
+<p>第一对被旋转了整整 1 弧度（幅度很大，专门区分相邻位置），第二对几乎没动（幅度极小，负责长距离）。
+<strong>同一个向量，位置不同旋转角度就不同</strong>——位置信息就这样被&quot;揉&quot;进了向量本身。</p>
+<h2><a href="#4-旋转是正交变换范数不变" aria-hidden="true" class="anchor" id="user-content-4-旋转是正交变换范数不变"></a>4. 旋转是正交变换：范数不变</h2>
+<p>旋转矩阵满足 <code>R(θ)ᵀ·R(θ) = I</code>（转置乘自己等于单位阵），且 <code>|det R| = 1</code>，因此它是<strong>正交矩阵</strong>：</p>
+<pre><code>‖R(θ)·x‖² = (R(θ)x)ᵀ(R(θ)x) = xᵀR(θ)ᵀR(θ)x = xᵀx = ‖x‖²
+</code></pre>
+<p>也就是说<strong>旋转只改变向量的方向，不改变长度（范数）</strong>。这带来两个直接好处：</p>
+<table>
+<thead>
+<tr>
+<th>好处</th>
+<th>解释</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>数值稳定</td>
+<td>旋转前后的数值范围一模一样，不会像&quot;加一个固定向量&quot;那样撑大或压扁激活值</td>
+</tr>
+<tr>
+<td>不破坏归一化</td>
+<td>向量进注意力之前刚过 LayerNorm，旋转不改范数，归一化统计量不会被破坏</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>对比一下：正弦编码是&quot;加法&quot;，加完 <code>‖x + pos_emb‖</code> 和 <code>‖x‖</code> 一般不同，多多少少会扰动数值分布；
+RoPE 是&quot;乘法&quot;（乘以正交矩阵），<strong>只转不拉</strong>，范数严格不变。</p>
+</blockquote>
+<p>更妙的是：正交矩阵的逆就是它的转置，而转置恰好等于<strong>负角度旋转</strong>：</p>
+<pre><code>R(θ)ᵀ = R(-θ)
+</code></pre>
+<p>这个性质在反向传播里极其好用——梯度回传时把角度取反再旋转一次就行（详见第 8 节）。</p>
+<h2><a href="#5-核心性质相对位置点积只与位置差有关" aria-hidden="true" class="anchor" id="user-content-5-核心性质相对位置点积只与位置差有关"></a>5. 核心性质：相对位置（点积只与位置差有关）</h2>
+<h3><a href="#51-先看-d--2-的情形" aria-hidden="true" class="anchor" id="user-content-51-先看-d--2-的情形"></a>5.1 先看 d = 2 的情形</h3>
+<p>设查询在位置 <code>m</code>：<code>q_m = R(mθ)·q</code>；键在位置 <code>n</code>：<code>k_n = R(nθ)·k</code>。注意力分数是它们的点积：</p>
+<pre><code>q_m · k_n = (R(mθ)q)ᵀ · (R(nθ)k)
+          = qᵀ · R(mθ)ᵀ · R(nθ) · k
+          = qᵀ · R(-mθ) · R(nθ) · k      （Rᵀ = R⁻¹ = 负角度）
+          = qᵀ · R((n - m)θ) · k          （旋转矩阵乘法 = 角度相加）
+</code></pre>
+<p><strong>结果只依赖 <code>n - m</code>，与 m、n 各自的值无关！</strong></p>
+<h3><a href="#52-推广到-d-维" aria-hidden="true" class="anchor" id="user-content-52-推广到-d-维"></a>5.2 推广到 d 维</h3>
+<p>d 维的旋转矩阵是<strong>块对角矩阵</strong>：</p>
+<pre><code>R(θ) = diag( R(θ₀), R(θ₁), ..., R(θ_{d/2-1}) )
+</code></pre>
+<p>块对角矩阵相乘等于各块分别相乘，所以 d 维下同样成立：</p>
+<pre><code>q_m · k_n = Σ_i  q_{2i}ᵀ · R((n-m)·θ_i) · k_{2i}    只依赖 n - m
+</code></pre>
+<h3><a href="#53-为什么这比正弦编码强" aria-hidden="true" class="anchor" id="user-content-53-为什么这比正弦编码强"></a>5.3 为什么这比正弦编码强</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>正弦编码</th>
+<th>RoPE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>打分时依赖</td>
+<td>绝对位置（模型要从 <code>pos_emb[m] + pos_emb[n]</code> 里反推相对关系）</td>
+<td>直接就是相对位置 <code>n - m</code></td>
+</tr>
+<tr>
+<td>模型要学吗</td>
+<td>要额外学&quot;位置减法&quot;这一课</td>
+<td>数学上已经编死，无需学</td>
+</tr>
+<tr>
+<td>训练样本外</td>
+<td>外推差</td>
+<td>同样有外推问题，但相对性质使配合插值技巧更容易</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>一句话总结：<strong>正弦编码把位置塞进&quot;表示&quot;里，RoPE 把位置塞进&quot;打分&quot;里。</strong>
+而注意力唯一关心位置的地方就是打分（q·k），所以 RoPE 做到了&quot;精确投放&quot;。</p>
+</blockquote>
+<h2><a href="#6-与-kv-cache-天然兼容只旋转新-token" aria-hidden="true" class="anchor" id="user-content-6-与-kv-cache-天然兼容只旋转新-token"></a>6. 与 KV cache 天然兼容：只旋转新 token</h2>
+<p>回顾第 18 课的 KV cache 推理流程（<code>src/sample.rs</code> 的 <code>generate</code> + <code>src/model.rs</code> 的 <code>KVCache</code>）：</p>
+<ul>
+<li>第一次：把整个 prompt 喂给模型，算出所有位置的 K/V 存入缓存；</li>
+<li>之后每步：<strong>只前向最新 1 个 token</strong>，历史的 K/V 直接从缓存取。</li>
+</ul>
+<p>RoPE 和这个流程是无缝衔接的：</p>
+<pre><code>新 token 的绝对位置 = 缓存长度 base + 它在当前窗口里的下标 j
+</code></pre>
+<p>在 <code>GPT::forward</code> 里，<code>positions</code> 本来就是这么构造的（第 18 课的代码）：</p>
+<pre><code class="language-rust">let base = kv_cache.as_ref().map(|c| c.first().map(|k| k.seq_len()).unwrap_or(0)).unwrap_or(0);
+let mut positions = Vec::with_capacity(b * t);
+for _ in 0..b {
+    for j in 0..t {
+        positions.push(base + j);
+    }
+}
+</code></pre>
+<p>于是接入 RoPE 时：</p>
+<table>
+<thead>
+<tr>
+<th>谁</th>
+<th>怎么处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>新 token 的 Q</td>
+<td>按当前位置 <code>base + j</code> 旋转</td>
+</tr>
+<tr>
+<td>新 token 的 K</td>
+<td>按当前位置 <code>base + j</code> 旋转，再 append 进缓存</td>
+</tr>
+<tr>
+<td>缓存里的历史 K</td>
+<td>早就旋转好了，<strong>原样复用，绝不再动</strong></td>
+</tr>
+</tbody>
+</table>
+<p>因为旋转只依赖&quot;位置号&quot;，而每个 token 的位置号在生成时是唯一确定的，所以<strong>历史上每个 K 只旋转一次、终身有效</strong>。
+相比&quot;每次生成都要重新取一段 pos_emb 加进输入&quot;的加法式编码，RoPE 是&quot;随算随旋&quot;，不需要任何历史重算。</p>
+<blockquote>
+<p>另一个视角：RoPE 在注意力内部旋转 Q/K，位置信息不会污染 token 的&quot;内容表示&quot;（残差流上的 x 始终是纯语义），
+这也让每一层的 Q/K 都能用&quot;本层自己的位置感&quot;去打分。</p>
+</blockquote>
+<h2><a href="#7-前向实现讲解rotary" aria-hidden="true" class="anchor" id="user-content-7-前向实现讲解rotary"></a>7. 前向实现讲解：<code>rotary</code></h2>
+<p><code>src/tensor.rs</code> 第 19 课小节里只有一个公开方法：</p>
+<pre><code class="language-rust">pub fn rotary(&amp;self, positions: &amp;[usize]) -&gt; Tensor {
+    assert_eq!(self.rank(), 2, &quot;rotary 输入应为 [rows, D]&quot;);
+    assert_eq!(self.shape[0], positions.len(), &quot;positions 数量必须等于行数&quot;);
+    let (rows, d) = (self.shape[0], self.shape[1]);
+    assert_eq!(d % 2, 0, &quot;最后一维必须为偶数才能两两配对旋转&quot;);
+
+    let sd = self.data.borrow();
+    let mut out_data = vec![0.0f32; rows * d];
+    for r in 0..rows {
+        let pos = positions[r] as f32;
+        for i in 0..d / 2 {
+            let theta = pos / 10000f32.powf((2 * i) as f32 / d as f32);
+            let (c, s) = (theta.cos(), theta.sin());
+            let (a, b) = (sd[r * d + 2 * i], sd[r * d + 2 * i + 1]);
+            out_data[r * d + 2 * i] = a * c - b * s;
+            out_data[r * d + 2 * i + 1] = a * s + b * c;
+        }
+    }
+    drop(sd);
+    let positions_vec = positions.to_vec();
+
+    let mut result = Tensor::new(out_data, self.shape.clone(), self.requires_grad);
+    if self.requires_grad {
+        let rg = result.grad.clone();
+        let sg = self.grad.clone();
+        result.parents = Rc::new(vec![self.clone()]);
+        result.backward = Some(Rc::new(move || {
+            // ...（第 8 节讲）
+        }));
+    }
+    result
+}
+</code></pre>
+<p>逐行对照公式：</p>
+<table>
+<thead>
+<tr>
+<th>代码</th>
+<th>对应公式</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>assert_eq!(self.rank(), 2, ...)</code></td>
+<td>—</td>
+<td>输入必须是 2 维 <code>[rows, D]</code>：每行是一个待旋转的向量</td>
+</tr>
+<tr>
+<td><code>assert_eq!(self.shape[0], positions.len(), ...)</code></td>
+<td>—</td>
+<td><code>positions[r]</code> 就是第 <code>r</code> 行的位置，数量必须一一对应</td>
+</tr>
+<tr>
+<td><code>assert_eq!(d % 2, 0, ...)</code></td>
+<td>—</td>
+<td>最后一维必须是偶数，才能两两配对</td>
+</tr>
+<tr>
+<td><code>let theta = pos / 10000f32.powf((2 * i) as f32 / d as f32);</code></td>
+<td><code>θ_i = pos / 10000^(2i/d)</code></td>
+<td>第 <code>i</code> 对的旋转角度，注意 <code>i</code> 的范围是 <code>0..d/2</code></td>
+</tr>
+<tr>
+<td><code>let (c, s) = (theta.cos(), theta.sin());</code></td>
+<td><code>cosθ_i, sinθ_i</code></td>
+<td>一次算出，避免重复调用三角函数</td>
+</tr>
+<tr>
+<td><code>let (a, b) = (sd[r*d + 2*i], sd[r*d + 2*i + 1]);</code></td>
+<td><code>(x_{2i}, x_{2i+1})</code></td>
+<td>取出第 r 行第 i 对的两个元素</td>
+</tr>
+<tr>
+<td><code>out_data[r*d + 2*i] = a * c - b * s;</code></td>
+<td><code>x'_{2i} = x_{2i}·cosθ - x_{2i+1}·sinθ</code></td>
+<td>旋转后的第一个分量</td>
+</tr>
+<tr>
+<td><code>out_data[r*d + 2*i + 1] = a * s + b * c;</code></td>
+<td><code>x'_{2i+1} = x_{2i}·sinθ + x_{2i+1}·cosθ</code></td>
+<td>旋转后的第二个分量</td>
+</tr>
+</tbody>
+</table>
+<p>几个值得注意的设计点：</p>
+<ol>
+<li><strong>三重循环的次序</strong>：外层按行 <code>r</code>、内层按对 <code>i</code>，把&quot;取出 a、b → 旋转 → 写回&quot;一气呵成，每对只算一次三角函数。</li>
+<li><strong><code>drop(sd)</code></strong>：读完输入数据后立刻释放借用，之后才创建结果张量和反向闭包——避免闭包捕获时和 <code>self.data</code> 的借用纠缠。</li>
+<li><strong><code>requires_grad</code> 分支</strong>：如果输入不需要梯度（比如纯推理），就直接返回普通结果，不建 <code>parents</code>/<code>backward</code>，省下计算图的维护开销。这和第 18 课 KV cache 推理时&quot;纯数据拼接、无梯度&quot;的思路一致。</li>
+<li><strong>反向里三角函数重算</strong>：反向闭包为了&quot;自包含&quot;（只捕获 <code>positions_vec</code>、<code>rg</code>、<code>sg</code> 这几个 Rc），重新算了一遍 <code>theta/cos/sin</code>。代价可忽略，好处是闭包不依赖前向的中间量。</li>
+</ol>
+<h2><a href="#8-反向实现讲解正交矩阵的梯度" aria-hidden="true" class="anchor" id="user-content-8-反向实现讲解正交矩阵的梯度"></a>8. 反向实现讲解：正交矩阵的梯度</h2>
+<h3><a href="#81-理论梯度用转置回传" aria-hidden="true" class="anchor" id="user-content-81-理论梯度用转置回传"></a>8.1 理论：梯度用&quot;转置&quot;回传</h3>
+<p>设 <code>y = R(θ)·x</code>（旋转一对）。根据链式法则：</p>
+<pre><code>∂L/∂x = R(θ)ᵀ · ∂L/∂y
+</code></pre>
+<p>因为旋转矩阵正交，<code>R(θ)ᵀ = R(-θ)</code>，所以<strong>梯度回传 = 把梯度按负角度再旋转一次</strong>。这就是方法注释里写的：</p>
+<blockquote>
+<p>&quot;每个 pair 的旋转矩阵正交，梯度用其转置（即负角度旋转）回传。&quot;</p>
+</blockquote>
+<p>展开来写，若记 <code>(ga, gb) = (∂L/∂y_{2i}, ∂L/∂y_{2i+1})</code>，则正确回传是：</p>
+<pre><code>∂L/∂x_{2i}   = ga·cosθ + gb·sinθ
+∂L/∂x_{2i+1} = -ga·sinθ + gb·cosθ
+</code></pre>
+<blockquote>
+<p>验证（也可以硬算）：<code>y₀ = a·c - b·s</code>、<code>y₁ = a·s + b·c</code>，
+<code>∂L/∂a = ga·(∂y₀/∂a) + gb·(∂y₁/∂a) = ga·c + gb·s</code> ✓
+<code>∂L/∂b = ga·(∂y₀/∂b) + gb·(∂y₁/∂b) = -ga·s + gb·c</code> ✓</p>
+</blockquote>
+<h3><a href="#82-代码实际怎么写的已按正确形式实现" aria-hidden="true" class="anchor" id="user-content-82-代码实际怎么写的已按正确形式实现"></a>8.2 代码实际怎么写的（已按正确形式实现）</h3>
+<p><code>src/tensor.rs</code> 里反向闭包的循环体是：</p>
+<pre><code class="language-rust">let (ga, gb) = (g[r * d + 2 * i], g[r * d + 2 * i + 1]);
+// 反向 = 前向旋转矩阵的转置 R(θ)ᵀ：grad = (ga·c + gb·s, -ga·s + gb·c)
+sgm[r * d + 2 * i] += ga * c + gb * s;
+sgm[r * d + 2 * i + 1] += -ga * s + gb * c;
+</code></pre>
+<p>与 8.1 的结论逐行对应：第一行 <code>ga·c + gb·s</code>、第二行 <code>-ga·s + gb·c</code>，正是 <code>R(θ)ᵀ·g</code>。</p>
+<blockquote>
+<p>💡 <strong>陷阱提示</strong>：反向回传必须用<strong>转置</strong>（即负角度旋转）。写代码时容易手滑把符号写成正角度旋转
+<code>(ga·c - gb·s, ga·s + gb·c)</code>——方向错了但梯度<strong>范数不变</strong>（正交变换保范数），
+只校验范数的测试发现不了。所以测试要&quot;既测范数、又测方向&quot;（见第 9 节 <code>test_rotary_grad_exact</code>）。
+本仓库初版实现确实写反过，已修复并补了逐元素断言。</p>
+</blockquote>
+<p>对训练的影响：<code>rotary</code> 目前还没有被 <code>src/model.rs</code> 的注意力调用（模型仍用正弦编码 <code>pos_emb</code>），
+函数本身已就绪、测试全绿，接入注意力即可用。</p>
+<h2><a href="#9-test_rotary-测试讲解" aria-hidden="true" class="anchor" id="user-content-9-test_rotary-测试讲解"></a>9. <code>test_rotary</code> 测试讲解</h2>
+<p>测试在 <code>src/tensor.rs</code> 的 <code>mod tests</code> 里，共三个断言，分别验证三件事：</p>
+<pre><code class="language-rust">#[test]
+fn test_rotary() {
+    // 1. 旋转是正交变换：范数不变
+    let x = Tensor::param(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![1, 6]);
+    let r = x.rotary(&amp;[3]);
+    let orig_norm: f32 = x.data().iter().map(|v| v * v).sum();
+    let rot_norm: f32 = r.data().iter().map(|v| v * v).sum();
+    assert!((orig_norm - rot_norm).abs() &lt; 1e-3, &quot;范数应守恒：{} vs {}&quot;, orig_norm, rot_norm);
+
+    // 2. pos=0 时所有角度为 0，等于恒等变换
+    let x2 = Tensor::param(vec![1.0, 2.0, 3.0, 4.0], vec![1, 4]);
+    let r2 = x2.rotary(&amp;[0]);
+    assert!((r2.data()[0] - 1.0).abs() &lt; 1e-5);
+    assert!((r2.data()[3] - 4.0).abs() &lt; 1e-5);
+
+    // 3. 梯度：sum 的梯度是单位向量，经正交矩阵回传后范数不变（= 元素数）
+    let x3 = Tensor::param(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![1, 6]);
+    let loss = x3.rotary(&amp;[2]).sum();
+    loss.backward();
+    let g: Vec&lt;f32&gt; = x3.grad();
+    assert!((g.iter().map(|v| v * v).sum::&lt;f32&gt;() - 6.0).abs() &lt; 1e-3, &quot;梯度范数应为 6&quot;);
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>测试项</th>
+<th>输入</th>
+<th>断言</th>
+<th>原理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>① 范数不变</td>
+<td><code>[1,2,3,4,5,6]</code>（1×6），位置 <code>[3]</code></td>
+<td>旋转前后范数平方相等（容差 1e-3）</td>
+<td>旋转是正交变换，<code>‖Rx‖ = ‖x‖</code></td>
+</tr>
+<tr>
+<td>② pos=0 恒等</td>
+<td><code>[1,2,3,4]</code>（1×4），位置 <code>[0]</code></td>
+<td>输出第 0、3 个元素不变</td>
+<td><code>θ_i = 0/… = 0</code>，<code>cos0=1, sin0=0</code>，<code>R(0)=I</code></td>
+</tr>
+<tr>
+<td>③ 梯度回传</td>
+<td><code>[1,2,3,4,5,6]</code>，位置 <code>[2]</code>，<code>loss = sum</code></td>
+<td>梯度范数平方 = 6（= 元素数）</td>
+<td><code>sum</code> 的梯度是 <code>[1,1,...,1]</code>（范数平方 6），经正交矩阵回传后范数不变</td>
+</tr>
+</tbody>
+</table>
+<p>测试 ③ 的思路很巧妙：<code>∂sum/∂y</code> 是&quot;全是 1&quot;的单位向量，只要反向实现用的是正交矩阵（无论正角度还是负角度），
+回传后梯度范数平方必然还是元素数 6。它验证了&quot;<strong>正交性</strong>&quot;，但正如 8.2 所说，验证不了&quot;<strong>方向</strong>&quot;。</p>
+<p>仓库里还补了一个 <code>test_rotary_grad_exact</code>，专测<strong>方向</strong>：<code>d=2</code>、<code>pos=1</code> 时 <code>θ₀=1</code> rad，
+对 <code>x=[1,2]</code>、<code>loss=sum</code>，期望梯度是 <code>R(θ)ᵀ·[1,1] = (cos1+sin1, -sin1+cos1) = (1.3818, -0.3012)</code>，
+逐元素断言。有了它，反向符号写反会立刻红：</p>
+<pre><code class="language-rust">#[test]
+fn test_rotary_grad_exact() {
+    let x = Tensor::param(vec![1.0, 2.0], vec![1, 2]);
+    let loss = x.rotary(&amp;[1]).sum();
+    loss.backward();
+    let (c, s) = (1f32.cos(), 1f32.sin());
+    let (ga, gb) = (c + s, -s + c);
+    assert!((x.grad()[0] - ga).abs() &lt; 1e-5, &quot;grad[0] = {}&quot;, x.grad()[0]);
+    assert!((x.grad()[1] - gb).abs() &lt; 1e-5, &quot;grad[1] = {}&quot;, x.grad()[1]);
+}
+</code></pre>
+<p>运行测试：</p>
+<pre><code class="language-bash">cargo test test_rotary    # 跑全部 rotary 测试
+</code></pre>
+<h2><a href="#10-如何接入注意力对-qk-应用" aria-hidden="true" class="anchor" id="user-content-10-如何接入注意力对-qk-应用"></a>10. 如何接入注意力：对 Q/K 应用</h2>
+<h3><a href="#101-为什么只旋转-q-和-k不旋转-v" aria-hidden="true" class="anchor" id="user-content-101-为什么只旋转-q-和-k不旋转-v"></a>10.1 为什么只旋转 Q 和 K，不旋转 V</h3>
+<p>注意力分数是 <code>q·k</code>（点积），位置信息只有在这里才&quot;有用武之地&quot;。而输出 <code>out = softmax(scores)·V</code> 是<strong>内容</strong>的加权求和，
+V 是&quot;被加权的内容&quot;，不需要带位置信息。所以标准做法是：<strong>只旋转 Q 和 K，V 保持原样</strong>。</p>
+<h3><a href="#102-接入点multiheadattentionforward" aria-hidden="true" class="anchor" id="user-content-102-接入点multiheadattentionforward"></a>10.2 接入点：<code>MultiHeadAttention::forward</code></h3>
+<p>在 <code>src/model.rs</code> 的 <code>MultiHeadAttention::forward</code> 里，Q/K/V 投影出来后是这样的：</p>
+<pre><code class="language-rust">let q = self.c_q.forward(x).reshape(vec![b, t, d]); // [B, T, D]
+let k = self.c_k.forward(x).reshape(vec![b, t, d]);
+let v = self.c_v.forward(x).reshape(vec![b, t, d]);
+</code></pre>
+<p>RoPE 有两个可选的接入时机：</p>
+<table>
+<thead>
+<tr>
+<th>时机</th>
+<th>形状</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>拆头之前</td>
+<td><code>q/k</code> 是 <code>[B, T, D]</code></td>
+<td>把整个 batch 展平成 <code>[B*T, D]</code> 一次旋转，代码最省事</td>
+</tr>
+<tr>
+<td>拆头之后</td>
+<td>每个头是 <code>[T, head_dim]</code></td>
+<td>逐头旋转，更贴近&quot;每头各转各的&quot;的原始论文写法</td>
+</tr>
+</tbody>
+</table>
+<p>我们的 <code>rotary</code> 接口（输入 <code>[rows, D]</code> + 每行的 <code>positions</code>）两种都支持，只要最后一维是偶数即可——
+<code>GPTConfig::tiny</code> 里 <code>n_embd=64</code>、<code>head_dim=16</code>，都满足。</p>
+<h3><a href="#103-最小接入示意" aria-hidden="true" class="anchor" id="user-content-103-最小接入示意"></a>10.3 最小接入示意</h3>
+<blockquote>
+<p>以下为<strong>示意代码</strong>（当前仓库的 <code>src/model.rs</code> 尚未接入 RoPE，模型仍在用第 11 课的正弦编码 <code>pos_emb</code>）。
+接入思路：把 <code>MultiHeadAttention::forward</code> 加上 <code>base</code>（缓存长度）参数，在 KV cache 拼接<strong>之前</strong>旋转 Q/K。</p>
+</blockquote>
+<pre><code class="language-rust">// 示意：在 MultiHeadAttention::forward 内，拆头前对 Q/K 应用 RoPE
+// base 来自 GPT::forward（缓存长度），每个 batch 里 T 个位置是 base, base+1, ..., base+t-1
+let mut pos_rows = Vec::with_capacity(b * t);
+for _ in 0..b {
+    pos_rows.extend((base..base + t).map(|p| p as usize));
+}
+
+// 先旋转，再进 KV cache / 拆头
+let q = q.reshape(vec![b * t, d]).rotary(&amp;pos_rows).reshape(vec![b, t, d]);
+let k = k.reshape(vec![b * t, d]).rotary(&amp;pos_rows).reshape(vec![b, t, d]);
+
+// 之后照旧：cache.append(&amp;k, &amp;v)（缓存里存的就是旋转后的 K）
+</code></pre>
+<p>要点：</p>
+<ol>
+<li><strong><code>positions</code> 长度必须等于行数</strong>（<code>rotary</code> 里 <code>assert_eq!(self.shape[0], positions.len())</code>），这里行数是 <code>b*t</code>，所以 batch 内每个样本的同一列位置相同、要重复 <code>b</code> 次。</li>
+<li><strong>旋转发生在 append 之前</strong>：缓存里存的是&quot;已旋转的 K&quot;，历史 K 直接复用，符合第 6 节的兼容性约定。</li>
+<li><strong>Q 没有缓存</strong>（推理时 Q 永远只有新 token 一个），所以 Q 总是用当前位置旋转，天然正确。</li>
+<li>由于 K/V 已旋转并缓存，接入后<strong>推理模式（KV cache）和训练模式行为一致</strong>，不会像正弦编码那样需要区分两套位置逻辑。</li>
+<li><code>rotary</code> 的反向已按 <code>R(θ)ᵀ</code> 实现并通过 <code>test_rotary_grad_exact</code> 逐元素验证，接入后无需再改。</li>
+</ol>
+<blockquote>
+<p>替换还是叠加？可以二选一：</p>
+<ul>
+<li><strong>替换</strong>：删掉 <code>GPT::forward</code> 里的 <code>pos_emb</code>（<code>sinusoidal_positions</code> 不再使用），位置信息完全由 RoPE 提供；</li>
+<li><strong>叠加</strong>：保留 <code>pos_emb</code> 再加 RoPE，两套位置信号并存（一般没必要，且会稀释 RoPE 的相对位置特性）。</li>
+</ul>
+</blockquote>
+<h2><a href="#11-动手练习" aria-hidden="true" class="anchor" id="user-content-11-动手练习"></a>11. 动手练习</h2>
+<ol>
+<li><strong>手算一对旋转</strong>：设 <code>d = 2</code>、<code>pos = 1</code>，对向量 <code>[1.0, 0.0]</code> 手算 <code>rotary</code> 的输出
+（提示：<code>θ₀ = 1/10000^0 = 1</code> rad，<code>cos1 ≈ 0.5403, sin1 ≈ 0.8415</code>），再用 <code>x.rotary(&amp;[1])</code> 验证。</li>
+<li><strong>验证梯度方向</strong>：<code>rotary</code> 的反向已修复为 <code>R(θ)ᵀ</code>（见第 8.2 节）。自己动手把测试改成&quot;正角度旋转&quot;的错误版本，
+跑 <code>test_rotary</code> 和 <code>test_rotary_grad_exact</code>，观察只有后者能发现错误——体会&quot;既测范数、又测方向&quot;的价值。</li>
+<li><strong>接入注意力</strong>：按第 10.3 节的示意，把 RoPE 接入 <code>src/model.rs</code> 的 <code>MultiHeadAttention</code>（替换正弦编码），
+<code>cargo run</code> 训练并对比 loss 曲线与生成效果。注意需要先把 <code>base</code> 传入 <code>MultiHeadAttention::forward</code>。</li>
+<li><strong>验证相对位置性质</strong>：写一个测试——取同一个 <code>q</code>，在位置 <code>m</code> 旋转；取同一个 <code>k</code>，在位置 <code>n</code> 旋转，
+断言 <code>q_m · k_n</code> 只和 <code>n - m</code> 有关（对固定的位置差 <code>d</code>，换不同的 <code>m</code> 结果应相同）。这正是第 5 节推导的代码验证。</li>
+<li><strong>思考外推</strong>：把 <code>block_size</code> 从 32 改成 64 重新训练，再让模型生成超过训练长度的文本，
+观察 RoPE（接入后）和正弦编码谁退化得更慢，想想为什么。</li>
+<li><strong>思考</strong>：为什么 <code>θ_i = pos / 10000^(2i/d)</code> 里的 <code>10000</code> 和 <code>d</code> 与正弦编码一模一样？
+如果把它改成 <code>10</code> 会怎样？（提示：所有维度频率变高，近距离区分更敏感、远距离更早&quot;打满&quot;一圈。）</li>
+</ol>
+<h2><a href="#12-本课总结" aria-hidden="true" class="anchor" id="user-content-12-本课总结"></a>12. 本课总结</h2>
+<ul>
+<li>
+<p>正弦编码的两个局限：编码<strong>绝对位置</strong>（相对关系要模型自己学）、<strong>外推差</strong>（训练长度外没见过的输入分布）。</p>
+</li>
+<li>
+<p>RoPE 把 d 维拆成 <strong>d/2 对</strong>，第 i 对按 <code>θ_i = pos / 10000^(2i/d)</code> 旋转：
+<code>x'_{2i} = x_{2i}·cosθ - x_{2i+1}·sinθ</code>、<code>x'_{2i+1} = x_{2i}·sinθ + x_{2i+1}·cosθ</code>。</p>
+</li>
+<li>
+<p>旋转是<strong>正交变换</strong>：<code>R(θ)ᵀR(θ) = I</code>，范数不变 → 数值稳定、不破坏 LayerNorm。</p>
+</li>
+<li>
+<p><strong>相对位置性质</strong>：<code>q_m · k_n = qᵀR((n-m)θ)k</code>，点积只与位置差 <code>n - m</code> 有关——位置被&quot;编死&quot;进了打分公式。</p>
+</li>
+<li>
+<p>与 <strong>KV cache 天然兼容</strong>：新 token 按 <code>base + j</code> 旋转自己的 Q/K，历史 K 已旋转、直接复用。</p>
+</li>
+<li>
+<p><code>src/tensor.rs</code> 的 <code>rotary</code>：前向三重循环逐对旋转；反向按正交矩阵的转置 <code>R(θ)ᵀ</code> 回传（已修复并通过 <code>test_rotary_grad_exact</code> 验证）。</p>
+</li>
+<li>
+<p><code>test_rotary</code> 三个断言分别验证：正交性（范数不变）、<code>pos=0</code> 恒等、梯度范数守恒；<code>test_rotary_grad_exact</code> 逐元素验证梯度方向。</p>
+</li>
+<li>
+<p>接入方式：在 <code>MultiHeadAttention</code> 拆头前对 Q/K 旋转（只转 Q/K、不转 V），当前仓库尚未接入，作为练习。</p>
+</li>
+<li>
+<p>下一课（第 20 课）：收尾——学习率调度（warmup + cosine decay）与整个项目的总结回顾！</p>
+</li>
+</ul>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-18/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-20/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div></div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>

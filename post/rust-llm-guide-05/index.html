@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 5 课：线性层与激活函数 —— 神经网络的积木 - 干徒</title>
+    <meta name="description" content="实现 Linear 层、ReLU/GELU/Tanh/Softmax 激活函数与 Module trait 参数管理。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 神经网络">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-05">
+    <meta property="og:title" content="第 5 课：线性层与激活函数 —— 神经网络的积木 - 干徒">
+    <meta property="og:description" content="实现 Linear 层、ReLU/GELU/Tanh/Softmax 激活函数与 Module trait 参数管理。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-05">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 5 课：线性层与激活函数 —— 神经网络的积木 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 5 课：线性层与激活函数 —— 神经网络的积木 - 干徒">
+    <meta name="twitter:description" content="实现 Linear 层、ReLU/GELU/Tanh/Softmax 激活函数与 Module trait 参数管理。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 5 课：线性层与激活函数 —— 神经网络的积木","description":"实现 Linear 层、ReLU/GELU/Tanh/Softmax 激活函数与 Module trait 参数管理。","url":"https://ganto.me/post/rust-llm-guide-05","datePublished":"2026-09-06","dateModified":"2026-09-06","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 神经网络","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-c64c465a01d82915.css">
+    <style>
+
+        :root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+        .dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+        #main-skeleton { transition: opacity 0.2s ease; }
+        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
+        .sk-page { display: none; }
+        .sk-page.active { display: contents; }
+        .sk-fallback { display: none; }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0.35rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            width: fit-content;
+        }
+        @keyframes skeleton-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .skeleton-nav-item {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            border-radius: calc(var(--radius-md) - 4px);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
+        .skeleton-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            background: var(--bg-elevated);
+            margin-bottom: 1rem;
+        }
+        .skeleton-line {
+            height: 0.85rem;
+            border-radius: var(--radius-sm);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+            margin-bottom: 0.75rem;
+        }
+        .skeleton-line--long { width: 85%; }
+        .skeleton-line--medium { width: 60%; }
+        .skeleton-line--short { width: 35%; }
+        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
+        .skeleton-tag {
+            display: inline-block;
+            width: 4rem;
+            height: 1.5rem;
+            border-radius: var(--radius-full);
+            background: var(--border-default);
+            animation: skeleton-pulse 1.8s ease-in-out infinite;
+        }
+        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
+        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
+        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
+        .sk-search-input { margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .skeleton-card { padding: 1.1rem; }
+        }
+    
+    </style>
+    <style>
+        .prerender-nav {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }
+        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
+        .prerender-nav .site-title:hover { color: var(--accent); }
+        .prerender-nav .nav-links { display: flex; gap: 1rem; }
+        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+        .prerender-nav .nav-links a:hover { color: var(--accent); }
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+    </style>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 5 课：线性层与激活函数 —— 神经网络的积木</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-06</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">神经网络</span></div>
+                <div class="blog-content">
+<h1><a href="#第-5-课线性层与激活函数--神经网络的积木" aria-hidden="true" class="anchor" id="user-content-第-5-课线性层与激活函数--神经网络的积木"></a>第 5 课：线性层与激活函数 —— 神经网络的&quot;积木&quot;</h1>
+<blockquote>
+<p>代码位置：</p>
+<ul>
+<li><a href="file:///d:/Code/Rust/llm_from_scratch/src/layers.rs">src/layers.rs</a>（Linear 层、ReLU / GELU / Tanh / Softmax）</li>
+<li><a href="file:///d:/Code/Rust/llm_from_scratch/src/module.rs">src/module.rs</a>（Module trait 参数管理）</li>
+<li><a href="file:///d:/Code/Rust/llm_from_scratch/src/rng.rs">src/rng.rs</a>（xorshift64 随机数生成器，权重初始化用）</li>
+</ul>
+<p>演示入口：<a href="file:///d:/Code/Rust/llm_from_scratch/src/main.rs">src/main.rs</a></p>
+</blockquote>
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li>什么是&quot;层&quot;（layer）？为什么神经网络要由层堆叠而成？</li>
+<li>Linear 层的数学本质 <code>y = xW + b</code> 是什么？代码怎么写？</li>
+<li>权重为什么要初始化？xavier 风格的 <code>±1/√in</code> 是怎么来的？</li>
+<li>激活函数是干什么的？ReLU / GELU / Tanh 的公式和反向导数各是什么？</li>
+<li>怎么统一管理所有可训练参数？—— Module trait</li>
+</ol>
+<h2><a href="#2-从一个参数到一层" aria-hidden="true" class="anchor" id="user-content-2-从一个参数到一层"></a>2. 从&quot;一个参数&quot;到&quot;一层&quot;</h2>
+<p>第 2 课我们用手写更新 w、b 的方式学会了 <code>y = 2x + 1</code>。但真实问题（图像分类、语言模型）输入是几千维的向量、输出是几万个类别，不可能靠手写公式。</p>
+<p>于是我们把&quot;一批神经元&quot;打包成一个<strong>层（layer）</strong>：</p>
+<ul>
+<li>每个神经元：对输入做<strong>加权和 + 偏置</strong>，再过一层<strong>非线性函数</strong></li>
+<li>一层 = 很多个这样的神经元，它们的权重堆在一起就是矩阵 W</li>
+</ul>
+<p>神经网络 = 一层一层地堆叠。这一课实现最基本的积木：<strong>Linear 层</strong>和<strong>激活函数</strong>。</p>
+<h2><a href="#3-linear-层y--xw--b" aria-hidden="true" class="anchor" id="user-content-3-linear-层y--xw--b"></a>3. Linear 层：y = xW + b</h2>
+<p>Linear 又叫&quot;全连接层 / 稠密层&quot;。它把输入向量线性变换成另一个向量：</p>
+<table>
+<thead>
+<tr>
+<th>名字</th>
+<th>形状</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>x</td>
+<td>[B, in]（或 [B, T, in]）</td>
+<td>输入</td>
+</tr>
+<tr>
+<td>W（weight）</td>
+<td>[in, out]</td>
+<td>权重</td>
+</tr>
+<tr>
+<td>b（bias）</td>
+<td>[out]</td>
+<td>偏置</td>
+</tr>
+<tr>
+<td>y</td>
+<td>[B, out]（或 [B, T, out]）</td>
+<td>输出</td>
+</tr>
+</tbody>
+</table>
+<p><strong>数学公式</strong>（对每个样本 i）：</p>
+<pre><code>y[i, j] = Σ_k x[i, k] · W[k, j] + b[j]
+</code></pre>
+<p>等价写法：<code>y = x @ W + b</code>（这就是第 1 课学的矩阵乘法 + 第 3 课学的广播加法）。</p>
+<p>对应的 Rust 结构（<code>layers.rs</code>）：</p>
+<pre><code class="language-rust">/// 线性层：y = x @ W + b
+///
+/// - weight: [in_features, out_features]
+/// - bias:   [out_features]
+pub struct Linear {
+    pub weight: Tensor,
+    pub bias: Tensor,
+}
+</code></pre>
+<p>前向计算的核心就一行：</p>
+<pre><code class="language-rust">// y = x @ W + b（b 是 [out]，与 [B, out] 广播相加）
+let y = x.matmul(&amp;self.weight).add(&amp;self.bias);
+</code></pre>
+<p>两个关键点：</p>
+<ul>
+<li><code>weight</code> 和 <code>bias</code> 都用 <code>Tensor::param(...)</code> 构造（<code>requires_grad = true</code>），反向传播时自动得到梯度；</li>
+<li><code>bias</code> 形状是 <code>[out]</code>，和结果 <code>[B, out]</code> 相加时按广播规则每一行都加上同一个偏置——这正是第 3 课广播的用武之地。</li>
+</ul>
+<h2><a href="#4-权重初始化为什么是-1in" aria-hidden="true" class="anchor" id="user-content-4-权重初始化为什么是-1in"></a>4. 权重初始化：为什么是 ±1/√in</h2>
+<p><code>Linear::new</code> 创建时给权重赋随机初始值：</p>
+<pre><code class="language-rust">pub fn new(in_features: usize, out_features: usize, rng: &amp;mut Rng) -&gt; Self {
+    let bound = 1.0 / (in_features as f32).sqrt();
+    let w: Vec&lt;f32&gt; = (0..in_features * out_features)
+        .map(|_| rng.uniform(-bound, bound))
+        .collect();
+    let b: Vec&lt;f32&gt; = (0..out_features).map(|_| rng.uniform(-bound, bound)).collect();
+    Linear {
+        weight: Tensor::param(w, vec![in_features, out_features]),
+        bias: Tensor::param(b, vec![out_features]),
+    }
+}
+</code></pre>
+<p>也就是从均匀分布 <code>U(-bound, bound)</code> 采样，<code>bound = 1/√in</code>（代码注释里称为 xavier/kaiming 风格的初始化）。</p>
+<p><strong>为什么不能随便初始化？</strong></p>
+<table>
+<thead>
+<tr>
+<th>初始化方式</th>
+<th>后果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>全 0</td>
+<td>所有神经元输出相同、梯度相同，永远学不出差异</td>
+</tr>
+<tr>
+<td>太大（如 ±5）</td>
+<td>激活值迅速膨胀 → 数值溢出 / 梯度爆炸</td>
+</tr>
+<tr>
+<td>太小（如 ±1e-4）</td>
+<td>梯度极小 → 收敛慢如蜗牛</td>
+</tr>
+<tr>
+<td>±1/√in</td>
+<td>激活值的<strong>量级随层数基本不放大</strong>，训练稳定</td>
+</tr>
+</tbody>
+</table>
+<p><strong>直觉推导</strong>：假设输入 x 的方差为 1，输出是 in 个项 <code>wᵢxᵢ</code> 的和。若 <code>wᵢ ~ U(-b, b)</code>，则 <code>Var(wᵢ) = b²/3</code>，于是：</p>
+<pre><code>Var(Σ wᵢxᵢ) ≈ in · Var(wᵢ) · Var(x) = in · b²/3
+</code></pre>
+<p>想让方差保持不变，需要 <code>b = √(3/in)</code>；代码取 <code>b = 1/√in</code>（更保守），核心思想一致——<strong>让每一层的输出量级都保持在 1 附近</strong>。</p>
+<p>随机数从哪来？标准库没有 RNG，我们自己在 <code>rng.rs</code> 实现了一个 <strong>xorshift64</strong>（几十行位运算，零依赖、可复现）：</p>
+<pre><code class="language-rust">/// 生成 [lo, hi) 的均匀浮点数
+pub fn uniform(&amp;mut self, lo: f32, hi: f32) -&gt; f32 {
+    lo + (hi - lo) * self.next_f32()
+}
+</code></pre>
+<p>用固定种子创建（如第 7 课的 <code>Rng::new(42)</code>），每次运行得到的初始化完全相同，实验结果可复现。</p>
+<h2><a href="#5-支持-2d-与-3d-输入" aria-hidden="true" class="anchor" id="user-content-5-支持-2d-与-3d-输入"></a>5. 支持 2D 与 3D 输入</h2>
+<p>一个 batch 的输入通常是 2D（<code>[B, in]</code>）；但语言模型里一批数据是 3D（<code>[B, T, in]</code>，B=batch、T=序列长度）。Linear 的 <code>forward</code> 两者都支持：</p>
+<pre><code class="language-rust">pub fn forward(&amp;self, x: &amp;Tensor) -&gt; Tensor {
+    // 支持 [B, in] 和 [B, T, in]；3D 输入在内部展平计算，输出保持 3D
+    let is_3d = x.rank() == 3;
+    let orig_shape = x.shape().to_vec();
+    let x = match x.rank() {
+        2 =&gt; x.clone(),
+        3 =&gt; x.reshape(vec![x.shape()[0] * x.shape()[1], x.shape()[2]]),
+        _ =&gt; panic!(&quot;Linear 输入必须为 2D 或 3D&quot;),
+    };
+    let y = x.matmul(&amp;self.weight).add(&amp;self.bias);
+    if is_3d {
+        // 3D 输入 [B, T, in] -&gt; 输出 [B, T, out]（最后一维换成 out_features）
+        let mut out_shape = orig_shape;
+        let n = out_shape.len();
+        out_shape[n - 1] = self.weight.shape()[1];
+        y.reshape(out_shape)
+    } else {
+        y
+    }
+}
+</code></pre>
+<p>处理方式：3D 先 <code>reshape</code> 成 <code>[B·T, in]</code> 当 2D 算，算完再把最后一维换回 <code>out</code> 并 <code>reshape</code> 成 <code>[B, T, out]</code>。</p>
+<table>
+<thead>
+<tr>
+<th>输入形状</th>
+<th>内部计算形状</th>
+<th>输出形状</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>[B, in]</td>
+<td>[B, in]（原样）</td>
+<td>[B, out]</td>
+</tr>
+<tr>
+<td>[B, T, in]</td>
+<td>[B·T, in]（展平）</td>
+<td>[B, T, out]</td>
+</tr>
+</tbody>
+</table>
+<p><code>reshape</code> 不改变数据顺序，梯度也能 1:1 传回，所以这个&quot;展平再恢复&quot;的技巧在自动微分下完全安全。</p>
+<h2><a href="#6-参数管理module-trait" aria-hidden="true" class="anchor" id="user-content-6-参数管理module-trait"></a>6. 参数管理：Module trait</h2>
+<p>深度学习里一切&quot;可训练的结构&quot;都是模块。我们定义统一的接口（<code>module.rs</code>）：</p>
+<pre><code class="language-rust">/// 模块接口：任何可训练结构都实现它
+pub trait Module {
+    /// 返回模块的所有参数（含嵌套子模块）
+    fn parameters(&amp;self) -&gt; Vec&lt;Tensor&gt;;
+}
+
+/// 便捷方法：清零所有参数的梯度
+pub fn zero_grad_all(module: &amp;dyn Module) {
+    for p in module.parameters() {
+        p.zero_grad();
+    }
+}
+</code></pre>
+<p><code>Linear</code> 的实现（<code>layers.rs</code>）：</p>
+<pre><code class="language-rust">impl Module for Linear {
+    fn parameters(&amp;self) -&gt; Vec&lt;Tensor&gt; {
+        vec![self.weight.clone(), self.bias.clone()]
+    }
+}
+</code></pre>
+<p><strong>为什么需要这个 trait？</strong> 因为优化器（第 6 课）只认&quot;参数列表&quot;。多个模块拼在一起时：</p>
+<pre><code class="language-rust">let params: Vec&lt;Tensor&gt; = {
+    let mut ps = fc1.parameters();
+    ps.extend(fc2.parameters());
+    ps
+};
+let opt = SGD::new(0.5, params);   // 优化器拿到全部 22 个参数
+</code></pre>
+<p>有了 <code>Module</code>，今后 LayerNorm、Embedding、Transformer Block 都能用同一套方式&quot;一键收集参数&quot;，这正是第 7 课 demo_xor 的做法。</p>
+<h2><a href="#7-激活函数没有它多层等于一层" aria-hidden="true" class="anchor" id="user-content-7-激活函数没有它多层等于一层"></a>7. 激活函数：没有它，多层等于一层</h2>
+<p>先想一个问题：如果只有线性层会怎样？</p>
+<pre><code>f(x) = (xW1 + b1)·W2 + b2 = x·(W1W2) + (b1W2 + b2)
+</code></pre>
+<p>两个线性变换复合还是一个线性变换！<strong>堆多少层都等价于一层</strong>。所以必须夹入<strong>非线性</strong>激活函数，多层才有意义。</p>
+<p><code>layers.rs</code> 提供了三个激活函数（都是对第 4 课 <code>tensor.rs</code> 中张量方法的薄包装）：</p>
+<pre><code class="language-rust">/// ReLU：max(0, x)，简单、计算快、缓解梯度消失
+pub fn relu(x: &amp;Tensor) -&gt; Tensor { x.relu() }
+
+/// GELU：GPT 系列的默认激活，用 tanh 近似，比 ReLU 更平滑
+pub fn gelu(x: &amp;Tensor) -&gt; Tensor { x.gelu() }
+
+/// Tanh：S 型，输出 (-1, 1)
+pub fn tanh(x: &amp;Tensor) -&gt; Tensor { x.tanh() }
+</code></pre>
+<h3><a href="#71-relu" aria-hidden="true" class="anchor" id="user-content-71-relu"></a>7.1 ReLU</h3>
+<p><strong>公式与导数</strong>：</p>
+<pre><code>c = max(0, x)
+dc/dx = 1  (x &gt; 0)
+      = 0  (x ≤ 0)
+</code></pre>
+<p><strong>对应代码</strong>（<code>tensor.rs</code> 中的 <code>relu</code>，核心是反向用 mask 乘梯度）：</p>
+<pre><code class="language-rust">// 前向：c = max(0, x)；同时记录 mask：x &gt; 0 的位置为 1，其余为 0
+let mask: Vec&lt;f32&gt; = sd.iter().map(|&amp;a| if a &gt; 0.0 { 1.0 } else { 0.0 }).collect();
+// 反向：∂x = g * mask（即 g * (x&gt;0)）
+sgm[i] += g[i] * mask[i];
+</code></pre>
+<p>特点：计算最快；x&lt;0 时梯度为 0（优点：缓解梯度消失；缺点：可能&quot;神经元死亡&quot;）。</p>
+<h3><a href="#72-gelu" aria-hidden="true" class="anchor" id="user-content-72-gelu"></a>7.2 GELU</h3>
+<p><strong>公式</strong>（tanh 近似，GPT 系列默认激活）：</p>
+<pre><code>c = 0.5·x·(1 + tanh(√(2/π)·(x + 0.044715·x³)))
+</code></pre>
+<p><strong>反向导数</strong>（令 <code>a = √(2/π)(x + 0.044715x³)</code>，<code>t = tanh(a)</code>）：</p>
+<pre><code>da/dx = √(2/π) · (1 + 3·0.044715·x²)
+dc/dx = 0.5·(1 + t) + 0.5·x·(1 - t²)·da/dx
+</code></pre>
+<p><strong>对应代码</strong>（<code>tensor.rs</code> 中的 <code>gelu</code>，前向缓存 <code>t</code> 供反向复用）：</p>
+<pre><code class="language-rust">const SQRT_2_PI: f32 = 0.797_884_560_8; // sqrt(2/π)
+const COEF: f32 = 0.044_715;
+// 前向：t_vals 缓存 tanh(a)
+let a = SQRT_2_PI * (x + COEF * x * x * x);
+let t = a.tanh();
+t_vals[i] = t;
+data[i] = 0.5 * x * (1.0 + t);
+// 反向
+let da_dx = SQRT_2_PI * (1.0 + 3.0 * COEF * x * x);
+let dy_dx = 0.5 * (1.0 + t) + 0.5 * x * (1.0 - t * t) * da_dx;
+sgm[i] += g[i] * dy_dx;
+</code></pre>
+<p>特点：处处可导、比 ReLU 平滑，x=0 附近没有&quot;尖角&quot;。</p>
+<h3><a href="#73-tanh" aria-hidden="true" class="anchor" id="user-content-73-tanh"></a>7.3 Tanh</h3>
+<p><strong>公式与导数</strong>：</p>
+<pre><code>c = tanh(x) = (e^x - e^-x) / (e^x + e^-x)
+dc/dx = 1 - tanh²(x) = 1 - c²
+</code></pre>
+<p><strong>对应代码</strong>（<code>tensor.rs</code> 中的 <code>tanh</code>，反向直接用前向输出值 c 算 <code>1-c²</code>）：</p>
+<pre><code class="language-rust">// 前向：c = tanh(x)
+// 反向：∂x = g * (1 - c²)
+sgm[i] += g[i] * (1.0 - data[i] * data[i]);
+</code></pre>
+<p>特点：S 形，输出落在 (-1, 1)，需要居中输出时好用；两端梯度趋近 0。</p>
+<h3><a href="#74-三种激活对比" aria-hidden="true" class="anchor" id="user-content-74-三种激活对比"></a>7.4 三种激活对比</h3>
+<table>
+<thead>
+<tr>
+<th>激活</th>
+<th>输出范围</th>
+<th>公式</th>
+<th>反向导数</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ReLU</td>
+<td>[0, +∞)</td>
+<td>max(0, x)</td>
+<td>1（x&gt;0）否则 0</td>
+<td>最快，隐藏层最常用</td>
+</tr>
+<tr>
+<td>GELU</td>
+<td>约 (-0.17, +∞)</td>
+<td>0.5x(1+tanh(√(2/π)(x+0.044715x³)))</td>
+<td>见 7.2</td>
+<td>平滑，GPT 系列默认</td>
+</tr>
+<tr>
+<td>Tanh</td>
+<td>(-1, 1)</td>
+<td>(e<sup>x−e</sup>-x)/(e<sup>x+e</sup>-x)</td>
+<td>1−c²</td>
+<td>输出居中，两端饱和</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>补充：<code>layers.rs</code> 里还有一个 <code>softmax</code>（把一组分数变成概率分布），它是 CrossEntropy 的一部分，下一课会用到。学习计划表里第 5 课原写的是&quot;Sigmoid&quot;，实际代码中用 GELU 取代了它（GPT 时代更常用），ReLU / Tanh 均已实现。</p>
+</blockquote>
+<h2><a href="#8-运行与测试" aria-hidden="true" class="anchor" id="user-content-8-运行与测试"></a>8. 运行与测试</h2>
+<pre><code class="language-bash">cargo test     # 测试全部通过（含 relu 梯度、softmax、线性回归收敛等）
+cargo run      # 演示 1：MLP 学习 XOR（第 7 课完整讲解）
+</code></pre>
+<h2><a href="#9-动手练习" aria-hidden="true" class="anchor" id="user-content-9-动手练习"></a>9. 动手练习</h2>
+<ol>
+<li>把 <code>Linear::new</code> 里的 <code>bound</code> 改成 0.01 或 5.0，跑第 7 课的 demo_xor，观察收敛速度变化，解释原因。</li>
+<li>给 Linear 加一个&quot;无 bias&quot;选项（bias 全 0 且不出现在 <code>parameters()</code> 里），想想 <code>parameters()</code> 该怎么改。</li>
+<li>手动推导：GELU 在 x=0 处的值（应为 0）和导数；tanh 在 x=0 处的导数（应为 1）。</li>
+<li>思考：代码里 ReLU 在 x=0 处的梯度定义为 0（<code>a &gt; 0</code> 才为 1）。如果定义为 1 会怎样？训练结果会有区别吗？</li>
+<li>（选做）查资料对比 xavier 与 kaiming 初始化，并解释为什么 Embedding 用 0.02 的 bound（见 <code>layers.rs</code> 的 <code>Embedding::new</code>）。</li>
+</ol>
+<h2><a href="#10-本课总结" aria-hidden="true" class="anchor" id="user-content-10-本课总结"></a>10. 本课总结</h2>
+<ul>
+<li><strong>Linear</strong>：y = xW + b，weight <code>[in, out]</code>、bias <code>[out]</code>，支持 2D / 3D 输入</li>
+<li><strong>初始化</strong>：均匀分布 ±1/√in（xavier 风格），保证激活量级不随层数放大</li>
+<li><strong>Module trait</strong>：<code>parameters()</code> 统一收集参数，优化器直接消费</li>
+<li><strong>激活函数</strong>：ReLU / GELU / Tanh，公式、反向导数与代码一一对应</li>
+<li>下一课：损失函数与优化器，让模型&quot;知道自己错在哪、怎么改&quot;</li>
+</ul>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-04/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-06/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a></div></div>
+            </article>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>
