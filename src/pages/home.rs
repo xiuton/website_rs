@@ -167,9 +167,14 @@ pub fn Home() -> Element {
                 } else {
                     div { class: "blog-posts",
                         {current_page_posts().iter().map(|(post, chapter_count)| {
+                            let series_slug = if !post.catalog.is_empty() { post.catalog } else { post.slug };
                             rsx! {
                                 div { class: "blog-preview",
-                                    Link { to: Route::BlogPostView { slug: post.slug.to_string() },
+                                    Link { to: if *chapter_count > 0 {
+                                        Route::SeriesView { slug: series_slug.to_string() }
+                                    } else {
+                                        Route::BlogPostView { slug: post.slug.to_string() }
+                                    },
                                         div { class: "preview-header",
                                             h2 { class: "preview-title", {post.title} }
                                             if *chapter_count > 0 {

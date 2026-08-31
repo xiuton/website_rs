@@ -273,6 +273,10 @@ pub fn BlogPostView(slug: String) -> Element {
                         let total = chapters.len();
                         let prev = if *idx > 0 { Some(chapters[*idx - 1]) } else { None };
                         let next = chapters.get(*idx + 1);
+                        let series_slug = {
+                            let entry = chapters[0];
+                            if entry.catalog.is_empty() { entry.slug } else { entry.catalog }
+                        };
                         rsx! {
                             div { class: "series-nav",
                                 div { class: "series-nav-header",
@@ -287,7 +291,11 @@ pub fn BlogPostView(slug: String) -> Element {
                                         path { d: "M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" }
                                     }
                                     div { class: "series-nav-heading",
-                                        span { class: "series-nav-title", "{series}" }
+                                        Link {
+                                            to: Route::SeriesView { slug: series_slug.to_string() },
+                                            class: "series-nav-title-link",
+                                            span { class: "series-nav-title", "{series}" }
+                                        }
                                         span { class: "series-nav-count", "共 {total} 章" }
                                     }
                                 }

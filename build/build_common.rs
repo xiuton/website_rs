@@ -16,6 +16,9 @@ pub struct PostData {
     pub series: String,
     /// 章节在系列中的顺序，缺省为 0
     pub order: i32,
+    /// 系列目录页自定义路径段（可选，如 "rust-llm" → /series/rust-llm），
+    /// 空串则回退到使用入口章的 slug
+    pub catalog: String,
 }
 
 pub fn escape_rust_string(s: &str) -> String {
@@ -364,6 +367,15 @@ pub fn process_post(
         .and_then(|l| l.replace("order:", "").trim().parse::<i32>().ok())
         .unwrap_or(0);
 
+    // 系列目录页自定义路径段（可选）
+    let catalog = strip_yaml_quotes(
+        &front_matter
+            .lines()
+            .find(|l| l.starts_with("catalog:"))
+            .map(|l| l.replace("catalog:", "").trim().to_string())
+            .unwrap_or_default(),
+    );
+
     let custom_slug = front_matter
         .lines()
         .find(|l| l.starts_with("slug:"))
@@ -399,6 +411,7 @@ pub fn process_post(
         summary,
         series,
         order,
+        catalog,
     });
 }
 

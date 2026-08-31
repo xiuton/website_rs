@@ -6,11 +6,13 @@
 //! 功能：
 //! 1. 读取 dist/static/posts.json（含 content_html 全文），为每篇文章生成
 //!    dist/post/<slug>/index.html —— 爬虫无需执行 JS 即可读取完整内容
-//! 2. 将 dist/index.html 复制为 dist/404.html（GitHub Pages SPA 兜底）
+//! 2. 为每个系列（series）文档生成 dist/series/<slug>/index.html 目录页
+//! 3. 将 dist/index.html 复制为 dist/404.html（GitHub Pages SPA 兜底）
 
 #[cfg(not(target_arch = "wasm32"))]
 mod prerender_impl {
     use serde::Deserialize;
+    use std::collections::BTreeSet;
     use std::fs;
     use std::path::Path;
 
@@ -35,6 +37,8 @@ mod prerender_impl {
         series: String,
         #[serde(default)]
         order: i32,
+        #[serde(default)]
+        catalog: String,
     }
 
     /// HTML 属性/文本转义
@@ -343,6 +347,137 @@ mod prerender_impl {
         )
     }
 
+    /// 生成系列（多章节文档）目录页的预渲染 HTML
+    fn series_page_html(
+        entry: &PostJson,
+        chapters: &[&PostJson],
+        series_id: &str,
+        css: &str,
+        vars_style: &str,
+    ) -> String {
+        let total = chapters.len();
+        let author = if entry.author.trim().is_empty() { "干徒" } else { &entry.author };
+        let desc = if entry.summary.trim().is_empty() {
+            format!("{} 系列文档，共 {} 章。", entry.series, total)
+        } else {
+            entry.summary.clone()
+        };
+        let url = format!("{}/series/{}", SITE, series_id);
+        let first_slug = &chapters[0].slug;
+        let last_date = chapters
+            .iter()
+            .map(|c| c.date.as_str())
+            .max()
+            .unwrap_or(&entry.date);
+
+        let mut list = String::new();
+        for (i, ch) in chapters.iter().enumerate() {
+            list.push_str(&format!(
+                "<a class=\"series-chapter-card\" href=\"/post/{}/\"><span class=\"series-chapter-index\">{}</span><div class=\"series-chapter-body\"><h3 class=\"series-chapter-title\">{}</h3><p class=\"series-chapter-summary\">{}</p><span class=\"series-chapter-date\">{}</span></div></a>",
+                ch.slug,
+                i + 1,
+                esc(&ch.title),
+                if ch.summary.trim().is_empty() { String::new() } else { esc(&ch.summary) },
+                esc(&ch.date),
+            ));
+        }
+
+        format!(
+            r#"<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{series} - 干徒</title>
+    <meta name="description" content="{desc}">
+    <meta name="author" content="{author}">
+    <link rel="canonical" href="{url}">
+    <meta property="og:title" content="{series} - 干徒">
+    <meta property="og:description" content="{desc}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{url}">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="{og_image}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{series} - 干徒">
+    <meta name="twitter:description" content="{desc}">
+    <link rel="stylesheet" href="{css}">
+    <style>
+{vars_style}
+    </style>
+    <style>
+        .prerender-nav {{
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
+            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
+        }}
+        .prerender-nav .site-title {{ font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }}
+        .prerender-nav .site-title:hover {{ color: var(--accent); }}
+        .prerender-nav .nav-links {{ display: flex; gap: 1rem; }}
+        .prerender-nav .nav-links a {{ color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }}
+        .prerender-nav .nav-links a:hover {{ color: var(--accent); }}
+        .prerender-footer {{ text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }}
+    </style>
+    <script>
+        (function() {{
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {{
+                document.documentElement.classList.add('dark');
+            }}
+        }})();
+    </script>
+</head>
+<body>
+    <div class="app">
+        <nav class="prerender-nav">
+            <a class="site-title" href="/">干徒</a>
+            <div class="nav-links">
+                <a href="/">首页</a>
+                <a href="/about">关于</a>
+                <a href="/tags">书签</a>
+                <a href="/search">搜索</a>
+            </div>
+        </nav>
+        <main class="main-content">
+            <div class="series-container">
+                <div class="series-hero">
+                    <div class="series-hero-tag">系列文档</div>
+                    <h1 class="series-hero-title">{series}</h1>
+                    <p class="series-hero-desc">{desc}</p>
+                    <div class="series-hero-meta">
+                        <span>共 {total} 章</span>
+                        <span>作者：{author}</span>
+                        <span>最后更新：{last_date}</span>
+                    </div>
+                    <a class="series-start-btn" href="/post/{first_slug}/">开始阅读 →</a>
+                </div>
+                <div class="series-chapter-list">{list}</div>
+            </div>
+        </main>
+        <footer class="prerender-footer">
+            © 干徒 (Ganto) · <a href="/">返回首页</a>
+        </footer>
+    </div>
+</body>
+</html>
+"#,
+            series = esc(&entry.series),
+            desc = esc(&desc),
+            author = esc(author),
+            url = url,
+            og_image = OG_IMAGE,
+            css = css,
+            vars_style = vars_style,
+            total = total,
+            first_slug = first_slug,
+            last_date = esc(last_date),
+            list = list,
+        )
+    }
+
     pub fn run() -> Result<(), String> {
         let dist = Path::new(DIST);
         if !dist.is_dir() {
@@ -370,10 +505,37 @@ mod prerender_impl {
             count += 1;
         }
 
+        // 系列文档目录页：每个 series 生成一个目录页（入口章 = order 最小的一章）
+        let mut series_count = 0usize;
+        let mut seen_series: BTreeSet<&String> = BTreeSet::new();
+        for post in &posts {
+            if post.series.is_empty() || post.slug.is_empty() || !seen_series.insert(&post.series) {
+                continue;
+            }
+            let mut chapters: Vec<&PostJson> =
+                posts.iter().filter(|q| q.series == post.series).collect();
+            chapters.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| b.date.cmp(&a.date)));
+            let entry = chapters[0];
+            // 目录页标识：优先用 catalog 字段，未配置则回退到入口章的 slug
+            let series_id = if entry.catalog.is_empty() {
+                entry.slug.clone()
+            } else {
+                entry.catalog.clone()
+            };
+            let out_dir = dist.join("series").join(&series_id);
+            fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
+            let page = series_page_html(entry, &chapters, &series_id, &css, &vars_style);
+            fs::write(out_dir.join("index.html"), page).map_err(|e| e.to_string())?;
+            series_count += 1;
+        }
+
         // GitHub Pages SPA 兜底：未知路径加载 404.html（内容与 index.html 一致）
         fs::copy(&index_path, dist.join("404.html")).map_err(|e| e.to_string())?;
 
-        println!("[prerender] generated {} static post pages + 404.html, css={}", count, css);
+        println!(
+            "[prerender] generated {} post pages + {} series pages + 404.html, css={}",
+            count, series_count, css
+        );
         Ok(())
     }
 }

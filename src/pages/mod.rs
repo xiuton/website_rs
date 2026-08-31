@@ -9,6 +9,7 @@ pub mod knowledge_graph;
 pub mod search;
 pub mod ai_summary;
 pub mod rss;
+pub mod series;
 #[cfg(feature = "dev-pages")]
 pub mod playground;
 #[cfg(feature = "dev-pages")]
@@ -25,6 +26,7 @@ pub use knowledge_graph::KnowledgeGraphView;
 pub use search::Search;
 pub use ai_summary::AiSummaryView;
 pub use rss::Rss;
+pub use series::SeriesView;
 #[cfg(feature = "dev-pages")]
 pub use playground::Playground;
 #[cfg(feature = "dev-pages")]
