@@ -25,10 +25,9 @@
     <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"BlogPosting","headline":"今天，学习Web Component","description":"Web Component MDN 阮一峰 web components 例子1： &lt;!DOCTYPE html&gt; &lt;html lang=&quot;en&quot;&gt; &lt;head&gt; &lt;meta charset=&quot;UTF-8&quot;&gt; &lt;meta na","url":"https://ganto.me/post/20240511","datePublished":"2024-05-11","dateModified":"2024-05-11","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"JavaScript, 技术","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
     </script>
-    <link rel="stylesheet" href="/styles-b503121987855798.css">
+    <link rel="stylesheet" href="/styles-c8721d802cd563d1.css">
     <style>
-
-        :root {
+:root {
             --bg-base: #f8f4ed;
             --bg-elevated: #fdfbf7;
             --bg-subtle: #f0ebe0;
@@ -45,7 +44,7 @@
             --radius-lg: 14px;
             --radius-full: 999px;
         }
-        .dark {
+.dark {
             --bg-base: #1b1612;
             --bg-elevated: #241e19;
             --bg-subtle: #2d2620;
@@ -58,106 +57,70 @@
             --accent-rgb: 120, 184, 96;
             --accent-soft: rgba(120, 184, 96, 0.12);
         }
-        #main-skeleton { transition: opacity 0.2s ease; }
-        #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
-        .sk-page { display: none; }
-        .sk-page.active { display: contents; }
-        .sk-fallback { display: none; }
-        .navbar-links {
-            display: flex;
-            align-items: center;
-            gap: 0;
-            padding: 0.35rem;
-            background: var(--bg-elevated);
-            border: 1px solid var(--border-default);
-            border-radius: var(--radius-md);
-            width: fit-content;
-        }
-        @keyframes skeleton-pulse {
-            0%, 100% { opacity: 0.4; }
-            50% { opacity: 0.7; }
-        }
-        .skeleton-nav-item {
-            display: inline-block;
-            padding: 0.35rem 0.85rem;
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: var(--text-tertiary);
-            border-radius: calc(var(--radius-md) - 4px);
-            animation: skeleton-pulse 1.8s ease-in-out infinite;
-        }
-        html.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
-        .skeleton-card {
-            padding: 1.5rem;
-            border: 1px solid var(--border-default);
-            border-radius: var(--radius-lg);
-            background: var(--bg-elevated);
-            margin-bottom: 1rem;
-        }
-        .skeleton-line {
-            height: 0.85rem;
-            border-radius: var(--radius-sm);
-            background: var(--border-default);
-            animation: skeleton-pulse 1.8s ease-in-out infinite;
-            margin-bottom: 0.75rem;
-        }
-        .skeleton-line--long { width: 85%; }
-        .skeleton-line--medium { width: 60%; }
-        .skeleton-line--short { width: 35%; }
-        html.dark .skeleton-line { background: rgba(176, 162, 144, 0.08); }
-        .skeleton-tag {
-            display: inline-block;
-            width: 4rem;
-            height: 1.5rem;
-            border-radius: var(--radius-full);
-            background: var(--border-default);
-            animation: skeleton-pulse 1.8s ease-in-out infinite;
-        }
-        html.dark .skeleton-tag { background: rgba(176, 162, 144, 0.08); }
-        .sk-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--border-default); animation: skeleton-pulse 1.8s ease-in-out infinite; }
-        html.dark .sk-avatar { background: rgba(176, 162, 144, 0.1); }
-        .sk-search-input { margin-bottom: 1.5rem; }
-        @media (max-width: 768px) {
-            .skeleton-card { padding: 1.1rem; }
-        }
-    
+
     </style>
     <style>
-        .prerender-nav {
-            display: flex; align-items: center; justify-content: space-between;
-            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
-            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
-        }
-        .prerender-nav .site-title { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }
-        .prerender-nav .site-title:hover { color: var(--accent); }
-        .prerender-nav .nav-links { display: flex; gap: 1rem; }
-        .prerender-nav .nav-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
-        .prerender-nav .nav-links a:hover { color: var(--accent); }
         .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
-        .prerender-article h1 { font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }
         .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
-        .prerender-footer { text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }
+        .theme-toggle .icon-sun { display: none; }
+        .dark .theme-toggle .icon-sun { display: inline; }
+        .dark .theme-toggle .icon-moon { display: none; }
     </style>
     <script>
-        (function() {
-            var theme = localStorage.getItem('theme');
-            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-            }
-        })();
+(function() {
+    if (location.pathname.length > 1 && location.pathname.endsWith('/')) {
+        history.replaceState(null, '', location.pathname.replace(/\/+$/, '') + location.search + location.hash);
+    }
+    var theme = localStorage.getItem('theme');
+    if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+    }
+    var tbtn = document.getElementById('prerender-theme-toggle');
+    if (tbtn) {
+        tbtn.addEventListener('click', function() {
+            var d = document.documentElement;
+            var dark = d.classList.toggle('dark');
+            localStorage.setItem('theme', dark ? 'dark' : 'light');
+        });
+    }
+})();
     </script>
 </head>
 <body>
-    <div class="app">
-        <nav class="prerender-nav">
-            <a class="site-title" href="/">干徒</a>
-            <div class="nav-links">
-                <a href="/">首页</a>
-                <a href="/about">关于</a>
-                <a href="/tags">书签</a>
-                <a href="/search">搜索</a>
+    <div id="main">
+        <div class="app">
+<div class="navbar-content">
+    <div class="navbar-ui">
+        <div class="navbar-title-wrapper">
+            <h1 class="navbar-title">干徒</h1>
+            <div class="navbar-glow"></div>
+        </div>
+        <div class="navbar-subtitle">这很酷</div>
+    </div>
+</div>
+<div class="navbar-sticky-wrap">
+    <div class="navbar-links">
+        <a class="nav-link nav-active" href="/">首页</a>
+        <a class="nav-link" href="/about">关于</a>
+        <a class="nav-link" href="/tags">书签</a>
+        <a class="nav-link" href="/search">搜索</a>
+        <a class="nav-link" href="/knowledge-graph">图谱</a>
+        <a class="nav-link" href="/ai-summary">AI摘要</a>
+        <div class="nav-item-with-sub">
+            <a class="nav-link" href="/dev">开发</a>
+            <div class="nav-submenu">
+                <a class="nav-sub-link" href="/circle-generator">圆形生成器</a>
             </div>
-        </nav>
+        </div>
+        <a class="nav-icon-btn rss-toggle" href="/rss" title="RSS 订阅" aria-label="RSS 订阅">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"/></svg>
+        </a>
+        <button class="nav-icon-btn theme-toggle" id="prerender-theme-toggle" aria-label="切换主题" title="切换主题">
+            <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
+            <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="16" height="16" fill="currentColor"><path d="M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"/></svg>
+        </button>
+    </div>
+</div>
         <main class="main-content">
             <article class="blog-post prerender-article">
                 <h1>今天，学习Web Component</h1>
@@ -475,9 +438,25 @@ customElements.define(&quot;my-com&quot;, MyCom);
                 
             </article>
         </main>
-        <footer class="prerender-footer">
-            © 干徒 (Ganto) · <a href="/">返回首页</a>
-        </footer>
+<footer class="footer-content">
+    <div class="copyright">
+        <span>2019-2026 </span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"/></svg>
+        <span> 干徒 / Ganto</span>
     </div>
+</footer>
+        </div>
+    </div>
+<script type="module">
+import init, * as bindings from '/web-rs-b059a239d7f0d228.js';
+const wasm = await init({ module_or_path: '/web-rs-b059a239d7f0d228_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script>
 </body>
 </html>
