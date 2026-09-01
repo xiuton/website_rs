@@ -92,7 +92,7 @@ mod prerender_impl {
     /// 从 dist/index.html 提取内置 CSS 文件名、主题变量块（:root / .dark）与 wasm 启动脚本
     /// 注意：只提取变量块，不复制 index.html 中的骨架屏等其他内联样式，
     /// 否则其中的 .navbar-links 等规则会覆盖外部 styles.css，导致导航样式错乱
-    fn extract_css_and_vars(index_html: &str) -> (String, String, String) {
+    fn extract_css_and_vars(index_html: &str) -> (String, String, String, String) {
         // CSS 文件名：href="xxx.css"
         let css = if let Some(pos) = index_html.find(".css") {
             let head = &index_html[..pos];
@@ -319,6 +319,7 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
         post: &PostJson,
         all_posts: &[PostJson],
         css: &str,
+        preloads: &str,
         vars_style: &str,
         wasm_script: &str,
     ) -> String {
@@ -572,7 +573,7 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
 
         let index_path = dist.join("index.html");
         let index_html = fs::read_to_string(&index_path).map_err(|e| e.to_string())?;
-        let (css, vars_style, wasm_script) = extract_css_and_vars(&index_html);
+        let (css, vars_style, wasm_script, preloads) = extract_css_and_vars(&index_html);
 
         let posts_path = dist.join("static").join("posts.json");
         let posts_json = fs::read_to_string(&posts_path).map_err(|e| e.to_string())?;
