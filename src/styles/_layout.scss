@@ -3115,7 +3115,7 @@ html.dark::view-transition-new(root) {
             display: inline-block;
             background: var(--accent);
             // 文字色用背景色变量：浅色模式为白字、暗色模式为深字，保证与 accent 背景对比清晰
-            color: var(--bg-elevated);
+            color: var(--bg-elevated) !important;
             font-size: 0.78rem;
             font-weight: 600;
             padding: 0.35rem 1rem;
