@@ -10,6 +10,8 @@ use crate::utils::title;
 /// 未配置 catalog 时回退为入口章（order 最小的一章）的 slug
 #[component]
 pub fn SeriesView(slug: String) -> Element {
+    // 容忍 URL 尾斜杠（预渲染静态页链接带 "/"），避免匹配失败
+    let slug = slug.trim_end_matches('/').to_string();
     // 通过入口章或目录标识反查系列信息
     let entry_post = BLOG_POSTS
         .iter()

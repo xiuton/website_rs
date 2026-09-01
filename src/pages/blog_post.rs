@@ -74,6 +74,8 @@ fn add_lazy_loading(html: &str) -> String {
 
 #[component]
 pub fn BlogPostView(slug: String) -> Element {
+    // 容忍 URL 尾斜杠（预渲染静态页链接带 "/"），避免 slug 匹配失败
+    let slug = slug.trim_end_matches('/').to_string();
     // 用信号包裹 slug，通过 use_route() 监听路由变化（prop 本身不触发 effect 重新执行）
     let mut current_slug = use_signal(|| slug.clone());
     use_effect(move || {

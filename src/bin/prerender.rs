@@ -89,8 +89,10 @@ mod prerender_impl {
         result
     }
 
-    /// 从 dist/index.html 提取内置 CSS 文件名与 <style> 块（主题变量）
-    fn extract_css_and_vars(index_html: &str) -> (String, String) {
+    /// 从 dist/index.html 提取内置 CSS 文件名、主题变量块（:root / .dark）与 wasm 启动脚本
+    /// 注意：只提取变量块，不复制 index.html 中的骨架屏等其他内联样式，
+    /// 否则其中的 .navbar-links 等规则会覆盖外部 styles.css，导致导航样式错乱
+    fn extract_css_and_vars(index_html: &str) -> (String, String, String) {
         // CSS 文件名：href="xxx.css"
         let css = if let Some(pos) = index_html.find(".css") {
             let head = &index_html[..pos];
@@ -108,11 +110,27 @@ mod prerender_impl {
             "/styles.css".to_string()
         };
 
-        // 内置样式块：<style>...</style>
-        let vars_style = if let Some(start) = index_html.find("<style>") {
-            let after = &index_html[start + "<style>".len()..];
-            if let Some(end) = after.find("</style>") {
-                after[..end].to_string()
+        // 仅提取 :root { ... } 与 .dark { ... } 两个主题变量块
+        let mut vars_style = String::new();
+        for selector in [":root", ".dark"] {
+            if let Some(start) = index_html.find(selector) {
+                if let Some(open_rel) = index_html[start..].find('{') {
+                    let open = start + open_rel;
+                    if let Some(close_rel) = index_html[open + 1..].find('}') {
+                        let close = open + 1 + close_rel;
+                        vars_style.push_str(&index_html[start..=close]);
+                        vars_style.push('\n');
+                    }
+                }
+            }
+        }
+
+        // wasm 启动脚本：<script type="module">...</script>
+        // 浏览器加载静态页后由它启动 WASM，无缝升级为完整 SPA
+        let wasm_script = if let Some(start) = index_html.find("<script type=\"module\">") {
+            let after = &index_html[start..];
+            if let Some(end) = after.find("</script>") {
+                after[..end + "</script>".len()].to_string()
             } else {
                 String::new()
             }
@@ -120,7 +138,7 @@ mod prerender_impl {
             String::new()
         };
 
-        (css, vars_style)
+        (css, vars_style, wasm_script)
     }
 
     /// 提取文章描述：优先 summary，否则从正文 HTML 取纯文本
@@ -148,6 +166,71 @@ mod prerender_impl {
             .to_string();
         text.chars().take(160).collect()
     }
+
+    /// SPA 导航栏的静态 HTML（复用同一套 .navbar-* 样式类，外观与 SPA 完全一致）
+    /// 交互降级：sticky/涟漪依赖 JS 不可用；主题切换由下方内联脚本处理
+    const NAVBAR_HTML: &str = r#"<div class="navbar-content">
+    <div class="navbar-ui">
+        <div class="navbar-title-wrapper">
+            <h1 class="navbar-title">干徒</h1>
+            <div class="navbar-glow"></div>
+        </div>
+        <div class="navbar-subtitle">这很酷</div>
+    </div>
+</div>
+<div class="navbar-sticky-wrap">
+    <div class="navbar-links">
+        <a class="nav-link nav-active" href="/">首页</a>
+        <a class="nav-link" href="/about">关于</a>
+        <a class="nav-link" href="/tags">书签</a>
+        <a class="nav-link" href="/search">搜索</a>
+        <a class="nav-link" href="/knowledge-graph">图谱</a>
+        <a class="nav-link" href="/ai-summary">AI摘要</a>
+        <div class="nav-item-with-sub">
+            <a class="nav-link" href="/dev">开发</a>
+            <div class="nav-submenu">
+                <a class="nav-sub-link" href="/circle-generator">圆形生成器</a>
+            </div>
+        </div>
+        <a class="nav-icon-btn rss-toggle" href="/rss" title="RSS 订阅" aria-label="RSS 订阅">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"/></svg>
+        </a>
+        <button class="nav-icon-btn theme-toggle" id="prerender-theme-toggle" aria-label="切换主题" title="切换主题">
+            <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
+            <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="16" height="16" fill="currentColor"><path d="M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"/></svg>
+        </button>
+    </div>
+</div>"#;
+
+    /// SPA 页脚的静态 HTML（复用 .footer-content 样式）
+    const FOOTER_HTML: &str = r#"<footer class="footer-content">
+    <div class="copyright">
+        <span>2019-2026 </span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"/></svg>
+        <span> 干徒 / Ganto</span>
+    </div>
+</footer>"#;
+
+    /// 主题初始化 + 静态页主题切换按钮（无涟漪动画）+ URL 规范化
+    /// URL 规范化：去掉路径尾斜杠（刷新时静态服务器会 301 到带斜杠地址），
+    /// 避免 WASM 启动后 SPA 路由把 slug 解析成带斜杠导致匹配失败
+    const THEME_SCRIPT: &str = r#"(function() {
+    if (location.pathname.length > 1 && location.pathname.endsWith('/')) {
+        history.replaceState(null, '', location.pathname.replace(/\/+$/, '') + location.search + location.hash);
+    }
+    var theme = localStorage.getItem('theme');
+    if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+    }
+    var tbtn = document.getElementById('prerender-theme-toggle');
+    if (tbtn) {
+        tbtn.addEventListener('click', function() {
+            var d = document.documentElement;
+            var dark = d.classList.toggle('dark');
+            localStorage.setItem('theme', dark ? 'dark' : 'light');
+        });
+    }
+})();"#;
 
     /// 生成系列章节导航 HTML（与 SPA 中的 .series-nav 结构一致）
     fn series_nav_html(post: &PostJson, all_posts: &[PostJson]) -> String {
@@ -212,7 +295,13 @@ mod prerender_impl {
     }
 
     /// 生成单篇文章的预渲染 HTML
-    fn render_page(post: &PostJson, all_posts: &[PostJson], css: &str, vars_style: &str) -> String {
+    fn render_page(
+        post: &PostJson,
+        all_posts: &[PostJson],
+        css: &str,
+        vars_style: &str,
+        wasm_script: &str,
+    ) -> String {
         let title = &post.title;
         let date: String = post.date.chars().take(10).collect();
         let author = if post.author.trim().is_empty() { "干徒" } else { &post.author };
@@ -275,41 +364,20 @@ mod prerender_impl {
 {vars_style}
     </style>
     <style>
-        .prerender-nav {{
-            display: flex; align-items: center; justify-content: space-between;
-            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
-            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
-        }}
-        .prerender-nav .site-title {{ font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }}
-        .prerender-nav .site-title:hover {{ color: var(--accent); }}
-        .prerender-nav .nav-links {{ display: flex; gap: 1rem; }}
-        .prerender-nav .nav-links a {{ color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }}
-        .prerender-nav .nav-links a:hover {{ color: var(--accent); }}
         .prerender-article {{ max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }}
-        .prerender-article h1 {{ font-size: 1.8rem; margin: 1.25rem 0 0.5rem; color: var(--text-primary); }}
         .prerender-meta {{ display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }}
-        .prerender-footer {{ text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }}
+        .theme-toggle .icon-sun {{ display: none; }}
+        .dark .theme-toggle .icon-sun {{ display: inline; }}
+        .dark .theme-toggle .icon-moon {{ display: none; }}
     </style>
     <script>
-        (function() {{
-            var theme = localStorage.getItem('theme');
-            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {{
-                document.documentElement.classList.add('dark');
-            }}
-        }})();
+{theme_script}
     </script>
 </head>
 <body>
-    <div class="app">
-        <nav class="prerender-nav">
-            <a class="site-title" href="/">干徒</a>
-            <div class="nav-links">
-                <a href="/">首页</a>
-                <a href="/about">关于</a>
-                <a href="/tags">书签</a>
-                <a href="/search">搜索</a>
-            </div>
-        </nav>
+    <div id="main">
+        <div class="app">
+{navbar}
         <main class="main-content">
             <article class="blog-post prerender-article">
                 <h1>{title}</h1>
@@ -324,10 +392,10 @@ mod prerender_impl {
                 {series_html}
             </article>
         </main>
-        <footer class="prerender-footer">
-            © 干徒 (Ganto) · <a href="/">返回首页</a>
-        </footer>
+{footer}
+        </div>
     </div>
+{wasm_script}
 </body>
 </html>
 "#,
@@ -340,10 +408,14 @@ mod prerender_impl {
             jsonld = jsonld,
             css = css,
             vars_style = vars_style,
+            theme_script = THEME_SCRIPT,
+            navbar = NAVBAR_HTML,
+            footer = FOOTER_HTML,
             date = esc(&date),
             tag_html = tag_html,
             content_html = content_html,
             series_html = series_html,
+            wasm_script = wasm_script,
         )
     }
 
@@ -354,6 +426,7 @@ mod prerender_impl {
         series_id: &str,
         css: &str,
         vars_style: &str,
+        wasm_script: &str,
     ) -> String {
         let total = chapters.len();
         let author = if entry.author.trim().is_empty() { "干徒" } else { &entry.author };
@@ -409,38 +482,18 @@ mod prerender_impl {
 {vars_style}
     </style>
     <style>
-        .prerender-nav {{
-            display: flex; align-items: center; justify-content: space-between;
-            gap: 1rem; padding: 0.9rem 1.25rem; flex-wrap: wrap;
-            background: var(--bg-elevated); border-bottom: 1px solid var(--border-default);
-        }}
-        .prerender-nav .site-title {{ font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 1.05rem; }}
-        .prerender-nav .site-title:hover {{ color: var(--accent); }}
-        .prerender-nav .nav-links {{ display: flex; gap: 1rem; }}
-        .prerender-nav .nav-links a {{ color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }}
-        .prerender-nav .nav-links a:hover {{ color: var(--accent); }}
-        .prerender-footer {{ text-align: center; padding: 2rem 1rem; color: var(--text-tertiary); border-top: 1px solid var(--border-default); font-size: 0.85rem; }}
+        .theme-toggle .icon-sun {{ display: none; }}
+        .dark .theme-toggle .icon-sun {{ display: inline; }}
+        .dark .theme-toggle .icon-moon {{ display: none; }}
     </style>
     <script>
-        (function() {{
-            var theme = localStorage.getItem('theme');
-            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {{
-                document.documentElement.classList.add('dark');
-            }}
-        }})();
+{theme_script}
     </script>
 </head>
 <body>
-    <div class="app">
-        <nav class="prerender-nav">
-            <a class="site-title" href="/">干徒</a>
-            <div class="nav-links">
-                <a href="/">首页</a>
-                <a href="/about">关于</a>
-                <a href="/tags">书签</a>
-                <a href="/search">搜索</a>
-            </div>
-        </nav>
+    <div id="main">
+        <div class="app">
+{navbar}
         <main class="main-content">
             <div class="series-container">
                 <div class="series-hero">
@@ -457,10 +510,10 @@ mod prerender_impl {
                 <div class="series-chapter-list">{list}</div>
             </div>
         </main>
-        <footer class="prerender-footer">
-            © 干徒 (Ganto) · <a href="/">返回首页</a>
-        </footer>
+{footer}
+        </div>
     </div>
+{wasm_script}
 </body>
 </html>
 "#,
@@ -471,10 +524,14 @@ mod prerender_impl {
             og_image = OG_IMAGE,
             css = css,
             vars_style = vars_style,
+            theme_script = THEME_SCRIPT,
+            navbar = NAVBAR_HTML,
+            footer = FOOTER_HTML,
             total = total,
             first_slug = first_slug,
             last_date = esc(last_date),
             list = list,
+            wasm_script = wasm_script,
         )
     }
 
@@ -486,7 +543,7 @@ mod prerender_impl {
 
         let index_path = dist.join("index.html");
         let index_html = fs::read_to_string(&index_path).map_err(|e| e.to_string())?;
-        let (css, vars_style) = extract_css_and_vars(&index_html);
+        let (css, vars_style, wasm_script) = extract_css_and_vars(&index_html);
 
         let posts_path = dist.join("static").join("posts.json");
         let posts_json = fs::read_to_string(&posts_path).map_err(|e| e.to_string())?;
@@ -500,7 +557,7 @@ mod prerender_impl {
             }
             let out_dir = dist.join("post").join(&post.slug);
             fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
-            let page = render_page(post, &posts, &css, &vars_style);
+            let page = render_page(post, &posts, &css, &vars_style, &wasm_script);
             fs::write(out_dir.join("index.html"), page).map_err(|e| e.to_string())?;
             count += 1;
         }
@@ -524,7 +581,7 @@ mod prerender_impl {
             };
             let out_dir = dist.join("series").join(&series_id);
             fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
-            let page = series_page_html(entry, &chapters, &series_id, &css, &vars_style);
+            let page = series_page_html(entry, &chapters, &series_id, &css, &vars_style, &wasm_script);
             fs::write(out_dir.join("index.html"), page).map_err(|e| e.to_string())?;
             series_count += 1;
         }
