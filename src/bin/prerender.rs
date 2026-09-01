@@ -138,7 +138,22 @@ mod prerender_impl {
             String::new()
         };
 
-        (css, vars_style, wasm_script)
+        // preload/modulepreload 链接标签：提前下载 wasm，缩短挂载前清空静态内容后的空白
+        let mut preloads = String::new();
+        let mut search_from = 0;
+        while let Some(start) = index_html[search_from..].find("<link") {
+            let abs = search_from + start;
+            let segment = &index_html[abs..];
+            let end_rel = segment.find('>').unwrap_or(segment.len());
+            let tag = &segment[..end_rel + 1];
+            if tag.contains("modulepreload") || tag.contains("preload") {
+                preloads.push_str(tag);
+                preloads.push('\n');
+            }
+            search_from = abs + end_rel + 1;
+        }
+
+        (css, vars_style, wasm_script, preloads)
     }
 
     /// 提取文章描述：优先 summary，否则从正文 HTML 取纯文本
@@ -231,6 +246,11 @@ mod prerender_impl {
         });
     }
 })();"#;
+
+    /// WASM 挂载前清空 #main 中的预渲染内容
+    /// dioxus-web 挂载容器时不会清空已有 DOM，若不清理，静态页会与 SPA 渲染结果上下重复
+    const CLEAR_SCRIPT: &str = r#"<script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
+try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
 
     /// 生成系列章节导航 HTML（与 SPA 中的 .series-nav 结构一致）
     fn series_nav_html(post: &PostJson, all_posts: &[PostJson]) -> String {
@@ -360,6 +380,7 @@ mod prerender_impl {
 {jsonld}
     </script>
     <link rel="stylesheet" href="{css}">
+{preloads}
     <style>
 {vars_style}
     </style>
@@ -395,6 +416,7 @@ mod prerender_impl {
 {footer}
         </div>
     </div>
+{clear_script}
 {wasm_script}
 </body>
 </html>
@@ -407,6 +429,7 @@ mod prerender_impl {
             og_image = OG_IMAGE,
             jsonld = jsonld,
             css = css,
+            preloads = preloads,
             vars_style = vars_style,
             theme_script = THEME_SCRIPT,
             navbar = NAVBAR_HTML,
@@ -415,6 +438,7 @@ mod prerender_impl {
             tag_html = tag_html,
             content_html = content_html,
             series_html = series_html,
+            clear_script = CLEAR_SCRIPT,
             wasm_script = wasm_script,
         )
     }
@@ -425,6 +449,7 @@ mod prerender_impl {
         chapters: &[&PostJson],
         series_id: &str,
         css: &str,
+        preloads: &str,
         vars_style: &str,
         wasm_script: &str,
     ) -> String {
@@ -478,6 +503,7 @@ mod prerender_impl {
     <meta name="twitter:title" content="{series} - 干徒">
     <meta name="twitter:description" content="{desc}">
     <link rel="stylesheet" href="{css}">
+{preloads}
     <style>
 {vars_style}
     </style>
@@ -513,6 +539,7 @@ mod prerender_impl {
 {footer}
         </div>
     </div>
+{clear_script}
 {wasm_script}
 </body>
 </html>
@@ -523,6 +550,7 @@ mod prerender_impl {
             url = url,
             og_image = OG_IMAGE,
             css = css,
+            preloads = preloads,
             vars_style = vars_style,
             theme_script = THEME_SCRIPT,
             navbar = NAVBAR_HTML,
@@ -531,6 +559,7 @@ mod prerender_impl {
             first_slug = first_slug,
             last_date = esc(last_date),
             list = list,
+            clear_script = CLEAR_SCRIPT,
             wasm_script = wasm_script,
         )
     }
@@ -557,7 +586,7 @@ mod prerender_impl {
             }
             let out_dir = dist.join("post").join(&post.slug);
             fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
-            let page = render_page(post, &posts, &css, &vars_style, &wasm_script);
+            let page = render_page(post, &posts, &css, &preloads, &vars_style, &wasm_script);
             fs::write(out_dir.join("index.html"), page).map_err(|e| e.to_string())?;
             count += 1;
         }
@@ -581,7 +610,7 @@ mod prerender_impl {
             };
             let out_dir = dist.join("series").join(&series_id);
             fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
-            let page = series_page_html(entry, &chapters, &series_id, &css, &vars_style, &wasm_script);
+            let page = series_page_html(entry, &chapters, &series_id, &css, &preloads, &vars_style, &wasm_script);
             fs::write(out_dir.join("index.html"), page).map_err(|e| e.to_string())?;
             series_count += 1;
         }
