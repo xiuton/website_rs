@@ -1,5 +1,5 @@
 ---
-title: "第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长"
+title: "第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」"
 date: "2026-09-18 09:00:00"
 author: "干徒"
 tags: ["Rust", "LLM", "优化器"]
@@ -8,11 +8,12 @@ order: 17
 slug: "rust-llm-guide-17"
 summary: "实现 AdamW 优化器，融合动量与自适应学习率，并与 SGD 对比。"
 ---
+
 # 第 17 课：AdamW 优化器 —— 给梯度下降装上"惯性"和"自适应步长"
 
-> 代码位置：[src/optim.rs](file:///d:/Code/Rust/llm_from_scratch/src/optim.rs)（`SGD` / `AdamW`）
-> 代码位置：[src/train.rs](file:///d:/Code/Rust/llm_from_scratch/src/train.rs)（`train_gpt` 中 AdamW 的用法）
-> 演示入口：[src/main.rs](file:///d:/Code/Rust/llm_from_scratch/src/main.rs)（演示 3：训练小 GPT）
+> 代码位置：[src/optim.rs](src/optim.rs)（`SGD` / `AdamW`）
+> 代码位置：[src/train.rs](src/train.rs)（`train_gpt` 中 AdamW 的用法）
+> 演示入口：[src/main.rs](src/main.rs)（演示 3：训练小 GPT）
 
 ---
 

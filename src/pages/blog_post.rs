@@ -195,10 +195,14 @@ pub fn BlogPostView(slug: String) -> Element {
         if p.series.is_empty() {
             return None;
         }
+        let series_key = if !p.catalog.is_empty() { p.catalog } else { p.series };
         let series = p.series.to_string();
         let mut chapters: Vec<&'static BlogPost> = BLOG_POSTS
             .iter()
-            .filter(|q| q.series == p.series)
+            .filter(|q| {
+                let q_key = if !q.catalog.is_empty() { q.catalog } else { q.series };
+                q_key == series_key
+            })
             .collect();
         chapters.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| b.date.cmp(&a.date)));
         let idx = chapters.iter().position(|q| q.slug == p.slug)?;

@@ -26,9 +26,13 @@ pub fn SeriesView(slug: String) -> Element {
     let info: Option<(String, Vec<&'static BlogPost>, &'static BlogPost)> =
         entry_post.map(|entry| {
             let series = entry.series.to_string();
+            let entry_key = if !entry.catalog.is_empty() { entry.catalog } else { entry.series };
             let mut chapters: Vec<&BlogPost> = BLOG_POSTS
                 .iter()
-                .filter(|p| p.series == entry.series)
+                .filter(|p| {
+                    let p_key = if !p.catalog.is_empty() { p.catalog } else { p.series };
+                    p_key == entry_key
+                })
                 .collect();
             chapters.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| b.date.cmp(&a.date)));
             let intro = chapters.first().copied().unwrap_or(entry);

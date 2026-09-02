@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::Path;
-use std::collections::HashMap;
 use comrak::ComrakOptions;
 
 pub struct PostData {
@@ -239,7 +238,6 @@ pub fn scan_dir(
     _base_dir: &Path,
     category: &str,
     posts: &mut Vec<PostData>,
-    date_count: &mut HashMap<String, i32>,
 ) {
     match fs::read_dir(dir) {
         Ok(entries) => {
@@ -251,16 +249,20 @@ pub fn scan_dir(
                             .file_name()
                             .and_then(|n| n.to_str())
                             .unwrap_or("");
-                        scan_dir(&path, _base_dir, dir_name, posts, date_count);
+                        scan_dir(&path, _base_dir, dir_name, posts);
                     } else if file_type.is_file() {
                         if let Some(ext) = path.extension() {
                             if ext == "md" {
+                                let filename = path
+                                    .file_stem()
+                                    .and_then(|n| n.to_str())
+                                    .unwrap_or("");
                                 if let Ok(content) = fs::read_to_string(&path) {
                                     process_post(
                                         &content,
                                         category,
+                                        filename,
                                         posts,
-                                        date_count,
                                     );
                                 }
                             }
@@ -278,8 +280,8 @@ pub fn scan_dir(
 pub fn process_post(
     content: &str,
     category: &str,
+    filename: &str,
     posts: &mut Vec<PostData>,
-    date_count: &mut HashMap<String, i32>,
 ) {
     let mut in_front_matter = false;
     let mut front_matter = String::new();
@@ -367,15 +369,10 @@ pub fn process_post(
         .and_then(|l| l.replace("order:", "").trim().parse::<i32>().ok())
         .unwrap_or(0);
 
-    // 系列目录页自定义路径段（可选）
-    let catalog = strip_yaml_quotes(
-        &front_matter
-            .lines()
-            .find(|l| l.starts_with("catalog:"))
-            .map(|l| l.replace("catalog:", "").trim().to_string())
-            .unwrap_or_default(),
-    );
+    // 目录页 slug：直接使用文档文件夹名称（category），不再从 front matter 读取
+    let catalog = category.to_string();
 
+    // 文章 slug：优先使用 front matter 中自定义的 slug，未定义则使用文件名
     let custom_slug = front_matter
         .lines()
         .find(|l| l.starts_with("slug:"))
@@ -385,19 +382,7 @@ pub fn process_post(
     let slug = if let Some(slug) = custom_slug {
         slug
     } else {
-        let date_parts: Vec<&str> = date.split(' ').collect();
-        let date_str = if !date_parts.is_empty() {
-            date_parts[0].replace('-', "")
-        } else {
-            "00000000".to_string()
-        };
-        let count = date_count.entry(date_str.clone()).or_insert(0);
-        *count += 1;
-        if *count > 1 {
-            format!("{}-{}", date_str, *count)
-        } else {
-            date_str
-        }
+        filename.to_string()
     };
 
     posts.push(PostData {

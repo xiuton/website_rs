@@ -594,21 +594,20 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
 
         // 系列文档目录页：每个 series 生成一个目录页（入口章 = order 最小的一章）
         let mut series_count = 0usize;
-        let mut seen_series: BTreeSet<&String> = BTreeSet::new();
+        let mut seen_series: BTreeSet<String> = BTreeSet::new();
         for post in &posts {
-            if post.series.is_empty() || post.slug.is_empty() || !seen_series.insert(&post.series) {
+            let series_key = if !post.catalog.is_empty() { post.catalog.clone() } else { post.series.clone() };
+            if series_key.is_empty() || post.slug.is_empty() || !seen_series.insert(series_key.clone()) {
                 continue;
             }
             let mut chapters: Vec<&PostJson> =
-                posts.iter().filter(|q| q.series == post.series).collect();
+                posts.iter().filter(|q| {
+                    let q_key = if !q.catalog.is_empty() { &q.catalog } else { &q.series };
+                    *q_key == series_key
+                }).collect();
             chapters.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| b.date.cmp(&a.date)));
             let entry = chapters[0];
-            // 目录页标识：优先用 catalog 字段，未配置则回退到入口章的 slug
-            let series_id = if entry.catalog.is_empty() {
-                entry.slug.clone()
-            } else {
-                entry.catalog.clone()
-            };
+            let series_id = series_key;
             let out_dir = dist.join("series").join(&series_id);
             fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
             let page = series_page_html(entry, &chapters, &series_id, &css, &preloads, &vars_style, &wasm_script);
