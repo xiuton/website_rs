@@ -596,13 +596,13 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
         let mut series_count = 0usize;
         let mut seen_series: BTreeSet<String> = BTreeSet::new();
         for post in &posts {
-            let series_key = if !post.catalog.is_empty() { post.catalog.clone() } else { post.series.clone() };
+            let series_key = if !post.series.is_empty() && !post.catalog.is_empty() { post.catalog.clone() } else { post.series.clone() };
             if series_key.is_empty() || post.slug.is_empty() || !seen_series.insert(series_key.clone()) {
                 continue;
             }
             let mut chapters: Vec<&PostJson> =
                 posts.iter().filter(|q| {
-                    let q_key = if !q.catalog.is_empty() { &q.catalog } else { &q.series };
+                    let q_key = if !q.series.is_empty() && !q.catalog.is_empty() { &q.catalog } else { &q.series };
                     *q_key == series_key
                 }).collect();
             chapters.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| b.date.cmp(&a.date)));

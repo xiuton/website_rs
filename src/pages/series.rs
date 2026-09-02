@@ -6,8 +6,8 @@ use crate::BLOG_POSTS;
 use crate::utils::title;
 
 /// 系列（多章节文档）目录页
-/// 路由：/series/:slug —— slug 为系列的目录标识（front matter 的 catalog 字段），
-/// 未配置 catalog 时回退为入口章（order 最小的一章）的 slug
+/// 路由：/series/:slug —— slug 为系列的目录标识（文件夹名，即 catalog 字段），
+/// 用于从同一文件夹（catalog）中筛选章节并展示目录
 #[component]
 pub fn SeriesView(slug: String) -> Element {
     // 容忍 URL 尾斜杠（预渲染静态页链接带 "/"），避免匹配失败
@@ -26,11 +26,11 @@ pub fn SeriesView(slug: String) -> Element {
     let info: Option<(String, Vec<&'static BlogPost>, &'static BlogPost)> =
         entry_post.map(|entry| {
             let series = entry.series.to_string();
-            let entry_key = if !entry.catalog.is_empty() { entry.catalog } else { entry.series };
+            let entry_key = if !entry.series.is_empty() && !entry.catalog.is_empty() { entry.catalog } else { entry.series };
             let mut chapters: Vec<&BlogPost> = BLOG_POSTS
                 .iter()
                 .filter(|p| {
-                    let p_key = if !p.catalog.is_empty() { p.catalog } else { p.series };
+                    let p_key = if !p.series.is_empty() && !p.catalog.is_empty() { p.catalog } else { p.series };
                     p_key == entry_key
                 })
                 .collect();

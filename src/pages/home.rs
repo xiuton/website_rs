@@ -87,7 +87,7 @@ pub fn Home() -> Element {
         let mut seen: BTreeSet<&str> = BTreeSet::new();
         let mut result: Vec<(&BlogPost, usize)> = Vec::new();
         for post in all.iter() {
-            let series_key = if !post.catalog.is_empty() { post.catalog } else { post.series };
+            let series_key = if !post.series.is_empty() && !post.catalog.is_empty() { post.catalog } else { post.series };
             if series_key.is_empty() {
                 result.push((post, 0));
             } else if !seen.contains(series_key) {
@@ -96,7 +96,7 @@ pub fn Home() -> Element {
                     .iter()
                     .copied()
                     .filter(|p| {
-                        let p_key = if !p.catalog.is_empty() { p.catalog } else { p.series };
+                        let p_key = if !p.series.is_empty() && !p.catalog.is_empty() { p.catalog } else { p.series };
                         p_key == series_key
                     })
                     .collect();

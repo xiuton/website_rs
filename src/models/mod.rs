@@ -12,7 +12,7 @@ pub struct BlogPost {
     pub series: &'static str,
     /// 章节在系列中的顺序，缺省为 0
     pub order: i32,
-    /// 系列目录页自定义路径段，空串回退到使用入口章的 slug
+    /// 系列目录页路径段（由文件夹名自动生成），空串表示根目录文章
     pub catalog: &'static str,
 }
 

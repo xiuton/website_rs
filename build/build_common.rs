@@ -15,8 +15,8 @@ pub struct PostData {
     pub series: String,
     /// 章节在系列中的顺序，缺省为 0
     pub order: i32,
-    /// 系列目录页自定义路径段（可选，如 "rust-llm" → /series/rust-llm），
-    /// 空串则回退到使用入口章的 slug
+    /// 系列目录页自定义路径段（由文件夹名自动生成），
+    /// 空串表示文章在根目录下（非系列文档）
     pub catalog: String,
 }
 
@@ -370,6 +370,7 @@ pub fn process_post(
         .unwrap_or(0);
 
     // 目录页 slug：直接使用文档文件夹名称（category），不再从 front matter 读取
+    // 对于无 series 字段的分类目录文章，catalog 仅作为分类标识，不触发系列聚合
     let catalog = category.to_string();
 
     // 文章 slug：优先使用 front matter 中自定义的 slug，未定义则使用文件名
