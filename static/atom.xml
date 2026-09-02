@@ -1,20 +1,141 @@
 <?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom"><title>干徒的博客</title><link href="https://ganto.me"/><id>https://ganto.me</id><link rel="self" href="https://ganto.me/static/atom.xml"/>
-<updated>2026-09-21T00:00:00+08:00</updated>
+<updated>2026-09-22T00:00:00+08:00</updated>
 <author><name>干徒</name></author>
 <generator uri="https://ganto.me">website-rs</generator>
 <entry>
-  <title>第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</title>
+  <title>第 21 课：GPU 加速训练与推理</title>
+  <link href="https://ganto.me/post/rust-llm-guide-21"/>
+  <id>https://ganto.me/post/rust-llm-guide-21</id>
+  <updated>2026-09-22T00:00:00+08:00</updated>
+  <published>2026-09-22T00:00:00+08:00</published>
+  <author><name>干徒</name></author>
+  <summary><![CDATA[用 wgpu 计算着色器（WGSL）把最耗时的算子搬到 GPU 上执行，支持 NVIDIA 与 Intel 核显，GPU 不可用时自动回退 CPU。]]></summary>
+  <content type="html"><![CDATA[<h1>第 21 课：GPU 加速训练与推理</h1>
+<blockquote>
+<p>目标：用 wgpu 计算着色器（WGSL）把最耗时的算子搬到 GPU 上跑，
+支持 NVIDIA 与 Intel 核显，同时保证&quot;GPU 不可用时自动回退 CPU&quot;。</p>
+</blockquote>
+<h2>1. 为什么选 wgpu</h2>
+<ul>
+<li><strong>跨平台</strong>：Windows 走 DX12 / Vulkan，NVIDIA 独显和 Intel 核显都能用；</li>
+<li><strong>纯 Rust</strong>：不依赖 CUDA，也不引入深度学习框架；</li>
+<li><strong>计算着色器</strong>：WGSL 语言手写算子，和写 CPU 的 for 循环思路一致，适合教学。</li>
+</ul>
+<h2>2. 架构总览</h2>
+<pre><code>Cargo.toml          gpu feature（可选依赖 wgpu / pollster）
+src/gpu.rs          GPU 上下文 + 4 个 WGSL 计算入口 + 同步取回
+src/tensor.rs       matmul_data()：GPU 优先，失败回退 CPU
+src/main.rs         gpu::init() + demo_gpu()（第 4 个演示）
+</code></pre>
+<ul>
+<li><code>--features gpu</code> 开启；默认零 GPU 依赖，构建轻量。</li>
+<li>初始化用 <code>OnceLock&lt;Option&lt;GpuContext&gt;&gt;</code>：失败静默置 None，后续自动走 CPU。</li>
+</ul>
+<h2>3. WGSL 计算着色器</h2>
+<p>4 个计算入口共用同一个 ShaderModule（绑定声明是 module 级的）：</p>
+<table>
+<thead>
+<tr>
+<th>入口</th>
+<th>计算</th>
+<th>绑定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>matmul_main</code></td>
+<td><code>out[B,M,N] = a[B,M,K] @ b[B,K,N]</code></td>
+<td>0:a 1:b 2:out 3:params</td>
+</tr>
+<tr>
+<td><code>scale_main</code></td>
+<td><code>out[i] = a[i] * s</code></td>
+<td>0:a 2:out 3:params</td>
+</tr>
+<tr>
+<td><code>add_main</code></td>
+<td><code>out[i] = a[i] + b[i]</code></td>
+<td>0:a 1:b 2:out 3:params</td>
+</tr>
+<tr>
+<td><code>relu_main</code></td>
+<td><code>out[i] = max(a[i], 0)</code></td>
+<td>0:a 2:out 3:params</td>
+</tr>
+</tbody>
+</table>
+<p>参数统一走 16 字节 uniform：<code>struct Params { p0: u32, p1: u32, p2: u32, p3: u32 }</code>
+（f32 标量用 <code>bitcast&lt;f32&gt;</code> 位模式传参）。</p>
+<p>matmul 用三维 workgroup：<code>@workgroup_size(16,16,1)</code>，<code>global_invocation_id</code>
+的 x/y/z 分别对应行/列/batch。<strong>tiled 版</strong>：每个 workgroup 负责一个 16×16 输出块，
+先把 A/B 的 16×16 小块载入共享内存（<code>var&lt;workgroup&gt; sh_a/sh_b: array&lt;f32,256&gt;</code>），
+再在片内做内积，把 K 维的全局内存读取从 K 次降到 K/16 次。</p>
+<blockquote>
+<p>坑：<code>sh_a</code> 的排布必须按 <code>(lid.x, lid.y)</code>（线程行对应输出行），若按习惯的
+<code>(lid.y, lid.x)</code> 会行列错乱，矩阵乘结果全错（训练 loss 卡住不下降）。
+另外不能在 barrier 之前对越界线程 <code>return</code>——dispatch 向上取整后同一 workgroup
+内控制流分歧会让 <code>workgroupBarrier()</code> 变成未定义行为，应&quot;越界读补 0、写回再保护&quot;。</p>
+</blockquote>
+<h2>4. 踩坑记录</h2>
+<ol>
+<li><strong>WGSL 变量遮蔽</strong>：<code>let b = params.p0</code> 把全局 storage 数组 <code>b</code> 遮蔽成 u32，
+再写 <code>b[...]</code> 报 <code>Invalid access into expression</code>。局部变量改名即可。</li>
+<li><strong>uniform 数组对齐</strong>：uniform 地址空间数组 stride 必须 16 字节对齐，
+<code>array&lt;u32,4&gt;</code> 实际占 64 字节；改用 4 个独立 u32 字段（16 字节）最省事。</li>
+<li><strong>绑定编号</strong>：scale/relu 不用 binding 1，但声明仍是全局的；创建 bind group
+时必须显式指定 binding 编号（0/2/3），不能从 0 连续排。</li>
+<li><strong>wgpu 30 API</strong>：<code>PipelineLayoutDescriptor</code> 无 <code>push_constant_ranges</code>（用
+<code>immediate_size</code>）、<code>bind_group_layouts</code> 元素是 <code>Option&lt;_&gt;</code>、
+<code>PollType::Wait</code> 是带字段 struct、<code>get_mapped_range()</code> 返回 <code>Result</code>。</li>
+<li><strong>沙箱限制</strong>：Windows 上 GPU 驱动会写 <code>NVIDIA DXCache</code>、<code>D3DSCache</code> 等目录，
+受限环境需要放行，否则进程会被杀（程序自身会先打印完结果）。</li>
+</ol>
+<h2>5. 运行方式</h2>
+<pre><code class="language-bash"># 普通运行（无 GPU，纯 CPU）
+cargo run --release -- demo
+
+# 开启 GPU 加速（含第 4 个演示：正确性 + 性能对比）
+cargo run --release --features gpu -- demo
+
+# 训练 / 推理加 --features gpu 即自动走 GPU
+cargo run --release --features gpu -- train --config config.json
+</code></pre>
+<p>实测（NVIDIA GeForce MX150 / Vulkan）：</p>
+<pre><code>512x512 矩阵乘：CPU 506.7ms vs GPU 57.0ms（快 8.9x）
+批量矩阵乘 CPU vs GPU 最大误差 2.86e-6
+逐元素算子（scale/relu/add）验证：通过
+</code></pre>
+<blockquote>
+<p>注意：MX150 上 512×512 从 naive 的 57.6ms 只微降到 57.0ms——该规模下每次调用的
+固定开销（上传/调度/同步取回）已接近计算时间，共享内存的收益被抵消。大模型训练
+（如 n_embd=256、block=128、batch=16）每步有几十次 GPU 矩阵乘<strong>串行同步</strong>，
+固定开销会累积，低端 GPU 上仍然偏慢。教学实现以&quot;清晰、可回退&quot;优先，不追求极致吞吐。</p>
+</blockquote>
+<h2>6. 动手练习</h2>
+<ol>
+<li>把 tiled 块从 16×16 改成 8×8 或 32×32，观察性能与占用率变化；</li>
+<li>把 LayerNorm 也写成 WGSL 着色器，减少 CPU↔GPU 往返；</li>
+<li>思考：为什么 GPU 矩阵乘没有&quot;快 50x&quot;？瓶颈在哪里（显存搬运、每次调用的同步取回）？</li>
+<li>进阶：把一次 forward/backward 的多次 dispatch 合并提交、只在最后同步一次（计算图）。</li>
+</ol>
+]]></content>
+  <category term="Rust"/>
+  <category term="LLM"/>
+  <category term="GPU"/>
+</entry>
+<entry>
+  <title>第 20 课：学习率调度与收尾 —— warmup、cosine decay 与全项目总结</title>
   <link href="https://ganto.me/post/rust-llm-guide-20"/>
   <id>https://ganto.me/post/rust-llm-guide-20</id>
   <updated>2026-09-21T00:00:00+08:00</updated>
   <published>2026-09-21T00:00:00+08:00</published>
   <author><name>干徒</name></author>
-  <summary><![CDATA[实现 warmup 与 cosine decay 学习率调度，并对整个从零实现大模型系列做总结。]]></summary>
-  <content type="html"><![CDATA[<h1>第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</h1>
+  <summary><![CDATA[实现 warmup 与 cosine decay 学习率调度，并对整个项目做总结。]]></summary>
+  <content type="html"><![CDATA[<h1>第 20 课：学习率调度与收尾 —— warmup、cosine decay 与全项目总结</h1>
 <blockquote>
-<p>代码位置：<a href="">src/train.rs</a>（<code>LRScheduler</code>、<code>train_gpt</code>）
-调用处：<a href="">src/main.rs</a>（<code>demo_gpt</code> 里的训练配置）
-配套代码：<a href="">src/optim.rs</a>（<code>AdamW</code>，第 17 课）</p>
+<p>代码位置：<a href="src/train.rs">src/train.rs</a>（<code>LRScheduler</code>、<code>train_gpt</code>）
+调用处：<a href="src/main.rs">src/main.rs</a>（<code>demo_gpt</code> 里的训练配置）
+配套代码：<a href="src/optim.rs">src/optim.rs</a>（<code>AdamW</code>，第 17 课）</p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
@@ -22,8 +143,8 @@
 <li>warmup 是干什么的？&quot;前 50 步 lr 从 0 线性升到 max&quot; 在代码里怎么写的？</li>
 <li>cosine decay 长什么样？为什么末期要用越来越小的学习率？</li>
 <li><code>LRScheduler</code> 的 <code>lr()</code> / <code>step()</code> 到底怎么算、怎么用？</li>
-<li>训练日志里的 <code>lr 0.00012 → 0.003 → 0.00030</code> 是怎么来的？</li>
-<li>20 课全部学完，我手里有什么？下一步该往哪走？</li>
+<li>训练日志里的 <code>lr 0.002947 → … → 0.000300</code> 是怎么一步步算出来的？</li>
+<li>21 课全部学完，我手里有什么？下一步该往哪走？</li>
 </ol>
 <h2>2. 为什么需要学习率调度</h2>
 <p>第 6 课我们学过梯度下降：<code>θ = θ - lr·g</code>，学习率 <code>lr</code> 决定每一步走多大。那&quot;全程用一个固定的 lr&quot;行不行？看看两种极端：</p>
@@ -281,15 +402,16 @@ warmup 的终点和 cosine 的起点<strong>无缝衔接</strong>，lr 曲线没
 </code></pre>
 <p><code>step()</code> 每训练一步调用一次，把内部计数 +1，从而推动 <code>lr()</code> 前进。在 <code>train_gpt</code> 里和 AdamW 配合：</p>
 <pre><code class="language-rust">// src/train.rs train_gpt
-let mut opt = AdamW::new(max_lr, params.clone(), 0.01);
-let mut scheduler = LRScheduler::new(warmup_steps, steps, max_lr, max_lr * 0.1);
+let mut opt = AdamW::new(cfg.max_lr, params.clone(), cfg.weight_decay);
+let mut scheduler = LRScheduler::new(cfg.warmup_steps, cfg.steps, cfg.max_lr, cfg.min_lr);
 // ...
-for step in 0..steps {
+for step in start_step..cfg.steps {
     // ... 前向、反向、梯度裁剪 ...
-    opt.lr = scheduler.lr();   // 把&quot;当前步的学习率&quot;写进优化器（AdamW.lr 是 pub 字段）
-    opt.step();                // 优化器用这个 lr 更新参数
+    let cur_lr = scheduler.lr(); // 先取当前步的学习率（scheduler.step() 之后会变成下一步的）
+    opt.lr = cur_lr;             // 把&quot;当前步的学习率&quot;写进优化器（AdamW.lr 是 pub 字段）
+    opt.step();                  // 优化器用这个 lr 更新参数
     opt.zero_grad();
-    scheduler.step();          // 步数 +1，为下一步准备新的 lr
+    scheduler.step();            // 步数 +1，为下一步准备新的 lr
     // ...
 }
 </code></pre>
@@ -302,16 +424,16 @@ for step in 0..steps {
 </thead>
 <tbody>
 <tr>
-<td><code>AdamW::new(max_lr, params.clone(), 0.01)</code></td>
-<td>优化器初始 lr 就是 <code>max_lr</code>，<code>weight_decay = 0.01</code></td>
+<td><code>AdamW::new(cfg.max_lr, params.clone(), cfg.weight_decay)</code></td>
+<td>优化器初始 lr 就是 <code>max_lr</code>，权重衰减来自 <code>TrainConfig</code></td>
 </tr>
 <tr>
-<td><code>LRScheduler::new(warmup_steps, steps, max_lr, max_lr * 0.1)</code></td>
-<td><strong><code>min_lr</code> 直接取 <code>max_lr × 0.1</code></strong>，不用额外传</td>
+<td><code>LRScheduler::new(cfg.warmup_steps, cfg.steps, cfg.max_lr, cfg.min_lr)</code></td>
+<td><code>min_lr</code> 来自 <code>TrainConfig</code>（demo 里取 <code>max_lr × 0.1 = 3e-4</code>）</td>
 </tr>
 <tr>
-<td><code>opt.lr = scheduler.lr()</code></td>
-<td>每步把调度器算好的 lr 塞给优化器——<code>AdamW.lr</code> 是 <code>pub</code> 字段，可以直接赋值</td>
+<td><code>let cur_lr = scheduler.lr(); opt.lr = cur_lr;</code></td>
+<td>每步<strong>先取当前步的 lr</strong> 再塞给优化器——<code>AdamW.lr</code> 是 <code>pub</code> 字段，可以直接赋值</td>
 </tr>
 <tr>
 <td><code>scheduler.step()</code></td>
@@ -320,11 +442,19 @@ for step in 0..steps {
 </tbody>
 </table>
 <p><strong>配合逻辑一句话</strong>：调度器负责&quot;算 lr&quot;，优化器负责&quot;用 lr 更新参数&quot;，两者通过 <code>opt.lr = scheduler.lr()</code> 对接。</p>
-<h2>6. 训练日志解读：<code>lr 0.00012 → 0.003 → 0.00030</code></h2>
+<h2>6. 训练日志解读：<code>lr 0.002947 → 0.000300</code></h2>
 <h3>6.1 我们的训练配置</h3>
-<p><code>src/main.rs</code> 的 <code>demo_gpt</code> 调用（注意参数顺序）：</p>
-<pre><code class="language-rust">train::train_gpt(&amp;model, &amp;tokenizer, &amp;loader, 600, 8, 3e-3, 50, 100, &amp;mut rng);
-//                                          steps  batch  max_lr  warmup  eval_every
+<p><code>src/main.rs</code> 的 <code>demo_gpt</code> 用 <code>TrainConfig</code> 传参（演示 3）：</p>
+<pre><code class="language-rust">let tcfg = config::TrainConfig {
+    seed: 42,
+    batch_size: 8,
+    steps: 600,
+    max_lr: 3e-3,
+    warmup_steps: 50,
+    eval_every: 100,
+    ..config::TrainConfig::default()
+};
+train::train_gpt(&amp;model, &amp;tokenizer, &amp;loader, &amp;tcfg, None, None, &amp;mut rng);
 </code></pre>
 <table>
 <thead>
@@ -360,107 +490,110 @@ for step in 0..steps {
 <td>100</td>
 <td>每 100 步打印一次日志</td>
 </tr>
+<tr>
+<td><code>min_lr</code>（默认）</td>
+<td><code>3e-4</code></td>
+<td><code>TrainConfig::default()</code> 提供，恰好 = max_lr × 0.1</td>
+</tr>
 </tbody>
 </table>
 <p>于是 <code>train_gpt</code> 内部：<code>min_lr = max_lr × 0.1 = 0.0003</code>，调度器为 <code>LRScheduler::new(50, 600, 0.003, 0.0003)</code>。</p>
-<h3>6.2 日志打印的时机（容易看错）</h3>
-<p><code>train_gpt</code> 里打印在 <strong><code>scheduler.step()</code> 之后</strong>：</p>
-<pre><code class="language-rust">opt.zero_grad();
-scheduler.step();                       // 先计数 +1
-if step % eval_every == 0 || step == steps - 1 {
-    println!(&quot;step {:&gt;5} | lr {:.5} | loss {:.4}&quot;, step, scheduler.lr(), loss.data()[0]);
+<h3>6.2 日志打印的时机（避免看错）</h3>
+<p><code>train_gpt</code> 里 <code>cur_lr</code> 在 <strong><code>scheduler.step()</code> 之前</strong>取值并用于更新：</p>
+<pre><code class="language-rust">let cur_lr = scheduler.lr();   // 取&quot;本步&quot;的学习率（scheduler 还没 +1）
+opt.lr = cur_lr;
+opt.step();
+opt.zero_grad();
+scheduler.step();              // 之后才 +1（为下一步准备计数）
+let last = step + 1 == cfg.steps;
+if (step + 1) % cfg.eval_every == 0 || last {
+    println!(
+        &quot;step {:&gt;5} | lr {:.6} | train_loss {:.4}&quot;,
+        step + 1,              // 日志从 1 开始数（显示 100、200、…）
+        cur_lr,                // 打印的是&quot;本步&quot;的 lr
+        loss.item()
+    );
 }
 </code></pre>
-<p>所以<strong>日志里打印的 <code>lr</code> 是&quot;下一步将使用的学习率&quot;</strong>（计数 = 当前迭代号 + 1），
-而本步实际用于参数更新的 lr 是 <code>opt.lr = scheduler.lr()</code> 取到的那一份（计数 = 当前迭代号）。</p>
+<p>注意两个细节：一是日志里的 <code>step</code> 是 <code>step + 1</code>（循环变量从 0 开始，打印时 +1，显示 100、200、…）；
+二是 <code>scheduler.step()</code> 虽然在打印之前执行，但打印的 <code>cur_lr</code> 是本步开头就取好的——所以<strong>日志里的 <code>lr</code> 就是&quot;本步实际用于参数更新的学习率&quot;</strong>，不存在错位（旧的实现把打印放在 <code>scheduler.step()</code> 之后、显示的是下一步的 lr，本轮修复后已对齐）。</p>
 <h3>6.3 三个关键值怎么来的</h3>
-<p><strong>① 第一次打印 <code>0.00012</code>（step 0）</strong></p>
-<p>第 0 次迭代结束时 <code>scheduler.step()</code> 把计数推到 1，于是打印：</p>
-<pre><code>lr = max_lr × (step + 1) / warmup_steps = 0.003 × (1 + 1) / 50 = 0.00012   ✓
+<p><strong>① 第一个打印点 <code>0.002947</code>（step 100）</strong></p>
+<p>demo 配置 <code>eval_every = 100</code>，所以第 100 次迭代（循环变量 step=99，scheduler 计数=99）才第一次打印：</p>
+<pre><code>progress = (99 - 50) / (600 - 50) = 49/550 ≈ 0.089
+cosine   = 0.5 × (1 + cos(π × 0.089)) ≈ 0.9805
+lr = min_lr + (max_lr - min_lr) × cosine = 0.0003 + 0.0027 × 0.9805 ≈ 0.002947   ✓
 </code></pre>
-<p>（本步真正用来更新参数的 lr 是 0.003 × 1 / 50 = 0.00006。）</p>
-<p><strong>② warmup 峰值 ≈ <code>0.003</code></strong></p>
-<p>warmup 终点（计数 = 50）时：</p>
-<pre><code>lr = 0.003 × (50 + 1) / 50 = 0.00306 ≈ 0.003
-</code></pre>
-<p>紧接着 cosine 分支起点（progress = 0）的 lr 恰好等于 <code>max_lr = 0.003</code>，两者无缝衔接。
-（日志里看不到 0.00306 这个值——打印间隔 100 步，而 warmup 只有 50 步，warmup 段只有 step 0 一个打印点。）</p>
-<p><strong>③ 最终 <code>0.00030</code>（step 599）</strong></p>
-<p>最后一步 progress 封顶到 1，<code>cosine = 0.5 × (1 + cos π) = 0</code>：</p>
+<p><strong>② warmup 段为什么看不到</strong></p>
+<p><code>eval_every = 100 &gt; warmup_steps = 50</code>，warmup 段（step 0-49）没有任何打印点，所以日志里<strong>看不到</strong> 0.00006 起步的线性爬升。把 <code>eval_every</code> 改成 10 就能看到：step 10/20/30/40 的 lr 依次是 <code>0.0006 → 0.0012 → 0.0018 → 0.0024</code>（每步增加 <code>max_lr / warmup_steps = 0.003 / 50 = 0.00006</code>，10 步就是 0.0006），然后平滑进入 cosine 段。</p>
+<p><strong>③ 最后 <code>0.000300</code>（step 600）</strong></p>
+<p>最后一步（循环变量 step=599，计数=599）progress 封顶到 1，<code>cosine = 0.5 × (1 + cos π) = 0</code>：</p>
 <pre><code>lr = min_lr + (max_lr - min_lr) × 0 = min_lr = 0.0003   ✓
 </code></pre>
-<h3>6.4 完整日志序列（估算）</h3>
-<p>打印点是 <code>step = 0, 100, 200, 300, 400, 500, 599</code>（<code>%100==0</code> 或最后一轮），对应日志 lr（按 6.3 的公式推算）：</p>
+<h3>6.4 真实日志序列（<code>cargo run --release -- demo</code> 原样输出）</h3>
 <table>
 <thead>
 <tr>
 <th>日志 step</th>
-<th>调度器计数</th>
+<th>scheduler 计数</th>
 <th>阶段</th>
-<th>lr（约）</th>
-<th>说明</th>
+<th>lr（打印值）</th>
+<th>计算过程</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>0</td>
-<td>1</td>
-<td>warmup</td>
-<td><strong>0.00012</strong></td>
-<td>起步：<code>0.003×2/50</code></td>
-</tr>
-<tr>
 <td>100</td>
-<td>101</td>
+<td>99</td>
 <td>cosine</td>
-<td>0.00294</td>
-<td>刚从峰值下来一点</td>
+<td><strong>0.002947</strong></td>
+<td>progress = 49/550 ≈ 0.089，lr ≈ 0.00295</td>
 </tr>
 <tr>
 <td>200</td>
-<td>201</td>
+<td>199</td>
 <td>cosine</td>
-<td>0.00253</td>
-<td>平稳下滑</td>
+<td>0.002540</td>
+<td>progress = 149/550 ≈ 0.271，lr ≈ 0.00254</td>
 </tr>
 <tr>
 <td>300</td>
-<td>301</td>
+<td>299</td>
 <td>cosine</td>
-<td>0.00183</td>
-<td>过半程，接近 (max+min)/2 = 0.00165</td>
+<td>0.001850</td>
+<td>progress = 249/550 ≈ 0.453，lr ≈ 0.00185</td>
 </tr>
 <tr>
 <td>400</td>
-<td>401</td>
+<td>399</td>
 <td>cosine</td>
-<td>0.00108</td>
-<td>明显变小</td>
+<td>0.001096</td>
+<td>progress = 349/550 ≈ 0.635，lr ≈ 0.00110</td>
 </tr>
 <tr>
 <td>500</td>
-<td>501</td>
+<td>499</td>
 <td>cosine</td>
-<td>0.00051</td>
-<td>逼近下限</td>
+<td>0.000518</td>
+<td>progress = 449/550 ≈ 0.816，lr ≈ 0.00052</td>
 </tr>
 <tr>
-<td>599</td>
 <td>600</td>
+<td>599</td>
 <td>cosine 末</td>
-<td><strong>0.00030</strong></td>
-<td>落到 <code>min_lr</code></td>
+<td><strong>0.000300</strong></td>
+<td>progress ≈ 0.998（接近 1），落到 <code>min_lr</code></td>
 </tr>
 </tbody>
 </table>
 <p>这条曲线正是第 4.2 节那张表：<strong>先平、中陡、末缓</strong>。对比 loss 日志：前期 loss 快速下降（lr 大），
 后期 loss 缓慢逼近平台（lr 小、精细收敛）——这就是&quot;调度&quot;在训练曲线上留下的痕迹。</p>
 <blockquote>
-<p>小技巧：<code>cargo run</code> 后盯着日志的 <code>lr</code> 列看，前 50 步它在线性爬升（但只打印了一次），
-之后按余弦曲线一路衰减到 0.0003。改 <code>eval_every</code>（比如改成 10）就能看到 warmup 段更密的 lr 变化。</p>
+<p>小技巧：把 <code>eval_every</code> 改成 10，就能看到 warmup 段每 10 步 +0.0006 的线性爬升，
+以及 cosine 段更密的 lr 变化——对照 6.3 的公式验证每一步。</p>
 </blockquote>
-<h2>7. 全项目 20 课总结回顾</h2>
-<p>对照 <a href="">docs/00-学习计划.md</a> 的六个阶段，我们把&quot;从零写一个 LLM&quot;拆成了 20 课。回顾一下每阶段的成果：</p>
+<h2>7. 全项目 21 课总结回顾</h2>
+<p>对照 <a href="docs/00-%E5%AD%A6%E4%B9%A0%E8%AE%A1%E5%88%92.md">docs/00-学习计划.md</a> 的六个阶段，我们把&quot;从零写一个 LLM&quot;拆成了 21 课。回顾一下每阶段的成果：</p>
 <h3>阶段一：地基 —— 张量与自动微分（第 1-4 课）</h3>
 <table>
 <thead>
@@ -558,7 +691,7 @@ if step % eval_every == 0 || step == steps - 1 {
 <tr>
 <td>10</td>
 <td>多头注意力</td>
-<td><code>MultiHeadAttention</code>：拆头、并行打分、拼接投影（<code>src/model.rs</code>）</td>
+<td><code>MultiHeadAttention</code>：拆头、并行打分、拼接投影（<code>src/attention.rs</code>）</td>
 </tr>
 <tr>
 <td>11</td>
@@ -606,7 +739,7 @@ if step % eval_every == 0 || step == steps - 1 {
 </tbody>
 </table>
 <p><strong>里程碑</strong>：<code>cargo run</code> 一次跑通&quot;训练 → 生成&quot;，模型真的会&quot;写&quot;了。</p>
-<h3>阶段六：进阶优化（第 17-20 课）</h3>
+<h3>阶段六：进阶优化（第 17-21 课）</h3>
 <table>
 <thead>
 <tr>
@@ -624,17 +757,22 @@ if step % eval_every == 0 || step == steps - 1 {
 <tr>
 <td>18</td>
 <td>KV Cache</td>
-<td>推理时缓存历史 K/V，逐步生成只算新 token（<code>KVCache</code>，<code>src/model.rs</code>）</td>
+<td>推理时缓存历史 K/V，逐步生成只算新 token（<code>KVCache</code>，<code>src/attention.rs</code>）</td>
 </tr>
 <tr>
 <td>19</td>
 <td>RoPE 旋转位置编码</td>
-<td><code>rotary</code> 前向/反向 + <code>test_rotary</code>（<code>src/tensor.rs</code>）</td>
+<td><code>rotary_pair</code> 一次旋转 Q/K + <code>build_cos_sin_tab</code> 预计算查表（<code>src/rope.rs</code>）</td>
 </tr>
 <tr>
 <td>20</td>
 <td>学习率调度与收尾</td>
 <td><code>LRScheduler</code>：warmup + cosine decay（<code>src/train.rs</code>）</td>
+</tr>
+<tr>
+<td>21</td>
+<td>GPU 加速（可选）</td>
+<td>wgpu 计算着色器加速 matmul/scale/add/relu，失败自动回退 CPU（<code>src/gpu.rs</code>，<code>--features gpu</code>）</td>
 </tr>
 </tbody>
 </table>
@@ -675,8 +813,8 @@ if step % eval_every == 0 || step == steps - 1 {
 </tr>
 <tr>
 <td>现代技巧</td>
-<td>17-20</td>
-<td>AdamW / KV cache / RoPE / 调度，都是真实大模型在用的东西</td>
+<td>17-21</td>
+<td>AdamW / KV cache / RoPE / 调度 / GPU，都是真实大模型在用的东西</td>
 </tr>
 </tbody>
 </table>
@@ -685,7 +823,7 @@ if step % eval_every == 0 || step == steps - 1 {
 MLP 在 XOR 上收敛；小 GPT 生成通顺短文本——<strong>全部达成</strong>。</p>
 </blockquote>
 <h2>8. 后续展望：从这里出发</h2>
-<p>20 课只是&quot;入门级 GPT&quot;的终点，却是真实 LLM 世界的起点。按性价比排序，值得继续的方向：</p>
+<p>21 课只是&quot;入门级 GPT&quot;的终点，却是真实 LLM 世界的起点。按性价比排序，值得继续的方向：</p>
 <h3>8.1 数据和规模</h3>
 <table>
 <thead>
@@ -704,7 +842,7 @@ MLP 在 XOR 上收敛；小 GPT 生成通顺短文本——<strong>全部达成<
 <tr>
 <td>模型规模</td>
 <td><code>GPTConfig::tiny</code>：64 维、2 层</td>
-<td>增大 <code>n_embd</code>/<code>n_layer</code>/<code>block_size</code>（先换 GPU）</td>
+<td>增大 <code>n_embd</code>/<code>n_layer</code>/<code>block_size</code>（可开 <code>--features gpu</code> 加速）</td>
 </tr>
 <tr>
 <td>训练步数</td>
@@ -715,7 +853,7 @@ MLP 在 XOR 上收敛；小 GPT 生成通顺短文本——<strong>全部达成<
 </table>
 <h3>8.2 直接能做的代码级改进</h3>
 <ul>
-<li><strong>RoPE 接入</strong>（最顺手的下一步）：第 19 课 <code>rotary</code> 已实现，把它接进 <code>MultiHeadAttention</code>（先修反向符号），替换掉正弦 <code>pos_emb</code>；</li>
+<li><strong>RoPE 已是完成态</strong>：第 19 课已把它接进 <code>MultiHeadAttention</code>（只旋转 Q/K、KV cache 缓存&quot;已旋转的 K&quot;），下一步可以直接试 8.3 的长度外推技巧；</li>
 <li><strong>RMSNorm</strong>：把 LayerNorm 的均值项去掉，更快且效果相当（LLaMA 在用）；</li>
 <li><strong>GQA / MQA</strong>：多头共享 KV，配合 KV cache 大幅省显存；</li>
 <li><strong>更好的分词器</strong>：加大 BPE 合并次数 / 词表，或换 SentencePiece 风格。</li>
@@ -727,8 +865,8 @@ MLP 在 XOR 上收敛；小 GPT 生成通顺短文本——<strong>全部达成<
 <li><strong>长度外推</strong>：RoPE 训练长度外会失效，用 NTK-aware scaling、YaRN 等方法把上下文&quot;撑&quot;长；</li>
 <li><strong>稀疏注意力 / Flash Attention</strong>：优化注意力本身的计算与 IO，长上下文必备。</li>
 </ul>
-<h3>8.4 真正的并行（从单机 CPU 到多卡 GPU）</h3>
-<p>我们现在是<strong>单线程 CPU、零依赖</strong>的教学实现，真实训练要靠并行：</p>
+<h3>8.4 真正的并行（从单卡到多卡 GPU）</h3>
+<p>我们现在是<strong>单线程 CPU（可选单卡 GPU）、零依赖</strong>的教学实现，真实训练要靠并行：</p>
 <table>
 <thead>
 <tr>
@@ -763,11 +901,11 @@ MLP 在 XOR 上收敛；小 GPT 生成通顺短文本——<strong>全部达成<
 <h2>9. 动手练习</h2>
 <ol>
 <li><strong>改 warmup 步数</strong>：把 <code>main.rs</code> 里的 <code>warmup_steps</code> 从 50 改成 0（注意 <code>lr()</code> 里 <code>.max(1)</code> 会兜底，不会除零）和 200，分别训练，观察 loss 曲线差异——warmup 太短初期是否震荡？太长是否拖慢中期？</li>
-<li><strong>改 min_lr 比例</strong>：把 <code>train_gpt</code> 里的 <code>max_lr * 0.1</code> 改成 <code>max_lr * 0.01</code> 和 <code>max_lr * 0.5</code>，对比最终 loss。想想 min_lr 设太高会有什么后果（后期&quot;精细收敛&quot;没了）。</li>
+<li><strong>改 min_lr</strong>：把 <code>TrainConfig::default()</code> 里的 <code>min_lr</code>（<code>3e-4</code>）改成 <code>3e-5</code> 和 <code>1.5e-3</code>，对比最终 loss。想想 min_lr 设太高会有什么后果（后期&quot;精细收敛&quot;没了）。</li>
 <li><strong>绘制 lr 曲线</strong>：写个 10 行小程序（或用 6.4 的公式在表格/脚本里算一遍），以 step 为横轴画出 600 步的 lr 曲线，确认它是&quot;先线性爬升、再余弦衰减&quot;的倒 U 形。</li>
-<li><strong>对比固定 lr</strong>：把 <code>train_gpt</code> 改成固定 <code>opt.lr = max_lr</code>（不调 <code>scheduler</code>），训练 600 步对比 loss——体会调度带来的&quot;同样的步数，更好的收敛&quot;。</li>
-<li><strong>看懂日志</strong>：把 <code>eval_every</code> 从 100 改成 10，重新 <code>cargo run</code>，观察 warmup 段的 lr 爬升——它每步增加 <code>max_lr/warmup_steps = 0.003/50 = 0.00006</code>，所以每 10 步增加 0.0006（0.00012 → 0.00072 → 0.00132 → …），确认和公式一致。</li>
-<li><strong>给 20 课写总结</strong>：按第 7 节的表格，自己列一份&quot;我掌握了什么&quot;清单，找出最薄弱的一课回去重读——这是收尾课最重要的作业。</li>
+<li><strong>对比固定 lr</strong>：把 <code>train_gpt</code> 改成固定 <code>opt.lr = cfg.max_lr</code>（不调 <code>scheduler</code>），训练 600 步对比 loss——体会调度带来的&quot;同样的步数，更好的收敛&quot;。</li>
+<li><strong>看懂日志</strong>：把 <code>eval_every</code> 从 100 改成 10，重新 <code>cargo run</code>，观察 warmup 段的 lr 爬升——它每步增加 <code>max_lr/warmup_steps = 0.003/50 = 0.00006</code>，所以每 10 步增加 0.0006（0.00006 → 0.00066 → 0.00126 → …），确认和公式一致。</li>
+<li><strong>给 21 课写总结</strong>：按第 7 节的表格，自己列一份&quot;我掌握了什么&quot;清单，找出最薄弱的一课回去重读——这是收尾课最重要的作业。</li>
 </ol>
 <h2>10. 本课总结（也是全项目的结语）</h2>
 <ul>
@@ -775,13 +913,13 @@ MLP 在 XOR 上收敛；小 GPT 生成通顺短文本——<strong>全部达成<
 <li><strong>warmup</strong>：前 <code>warmup_steps</code> 步 <code>lr = max_lr × (step+1)/warmup_steps</code> 线性爬升，保护训练初期的随机参数和 AdamW 未热身的动量。</li>
 <li><strong>cosine decay</strong>：<code>lr = min_lr + (max_lr - min_lr) × 0.5 × (1 + cos(π·progress))</code>，从 <code>max_lr</code> 平滑衰减到 <code>min_lr</code>（本项目取 <code>max_lr × 0.1</code>）。</li>
 <li><strong><code>LRScheduler</code></strong>：<code>lr()</code> 按 <code>step</code> 计数选分支算 lr，<code>step()</code> 推进一步；在 <code>train_gpt</code> 里通过 <code>opt.lr = scheduler.lr()</code> 喂给 AdamW。</li>
-<li><strong>日志解读</strong>：<code>0.00012</code>（第 0 步打印，<code>0.003×2/50</code>）→ warmup 峰值 ≈ <code>0.003</code> → 终点 <code>0.00030</code>（<code>min_lr</code>），打印发生在 <code>scheduler.step()</code> 之后，所以显示的是&quot;下一步的 lr&quot;。</li>
-<li><strong>20 课全回顾</strong>：地基（张量/自动微分）→ 神经网络 → 分词器 → Transformer → 训练推理 → 现代技巧（AdamW/KV cache/RoPE/调度），<code>cargo run</code> 达成全部验收标准。</li>
-<li><strong>展望</strong>：更大语料与模型、RoPE 接入、MoE、真正的并行（数据/张量/流水线）、RMSNorm/GQA/外推技巧——每一步都能在这个项目上继续长出来。</li>
+<li><strong>日志解读</strong>：日志显示 step 100→600，lr 从 <code>0.002947</code> 一路衰减到 <code>0.000300</code>（<code>min_lr</code>）；warmup 段（step 0-49）因 <code>eval_every=100</code> 没有打印点；打印的是<strong>本步</strong>实际用于更新的 <code>cur_lr</code>，没有错位。</li>
+<li><strong>21 课全回顾</strong>：地基（张量/自动微分）→ 神经网络 → 分词器 → Transformer → 训练推理 → 现代技巧（AdamW/KV cache/RoPE/调度/GPU），<code>cargo run</code> 达成全部验收标准。</li>
+<li><strong>展望</strong>：更大语料与模型、RMSNorm/GQA、MoE、真正的并行（数据/张量/流水线）、长度外推——每一步都能在这个项目上继续长出来。</li>
 </ul>
 <blockquote>
 <p>最后一句：<strong>一个能跑的、完全由你手写的小 GPT，就是打开大模型世界最好的钥匙。</strong>
-20 课结束，学习才刚刚开始。祝玩得开心！</p>
+21 课结束，学习才刚刚开始。祝玩得开心！</p>
 </blockquote>
 ]]></content>
   <category term="Rust"/>
@@ -789,7 +927,7 @@ MLP 在 XOR 上收敛；小 GPT 生成通顺短文本——<strong>全部达成<
   <category term="训练"/>
 </entry>
 <entry>
-  <title>第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</title>
+  <title>第 19 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</title>
   <link href="https://ganto.me/post/rust-llm-guide-19"/>
   <id>https://ganto.me/post/rust-llm-guide-19</id>
   <updated>2026-09-20T00:00:00+08:00</updated>
@@ -798,9 +936,9 @@ MLP 在 XOR 上收敛；小 GPT 生成通顺短文本——<strong>全部达成<
   <summary><![CDATA[实现 RoPE 旋转位置编码，将相对位置信息直接编码进注意力分数。]]></summary>
   <content type="html"><![CDATA[<h1>第 19 课：RoPE 旋转位置编码 —— 把&quot;相对位置&quot;揉进注意力</h1>
 <blockquote>
-<p>代码位置：<a href="">src/tensor.rs</a>（<code>rotary</code> 方法、&quot;旋转位置编码（第 19 课）&quot;小节、<code>test_rotary</code> 测试）
-配套代码：<a href="">src/model.rs</a>（第 18 课 KV cache、第 11 课正弦编码 <code>sinusoidal_positions</code>）
-配套文档：<a href="">docs/11-位置编码与归一化.md</a></p>
+<p>代码位置：<a href="src/rope.rs">src/rope.rs</a>（<code>rotary_pair</code> 生产入口 + <code>rotary</code> 测试用 + <code>test_rotary</code> / <code>test_rotary_grad_exact</code> 测试）
+配套代码：<a href="src/attention.rs">src/attention.rs</a>（RoPE 接入 <code>MultiHeadAttention</code>）
+配套文档：<a href="docs/11-%E4%BD%8D%E7%BD%AE%E7%BC%96%E7%A0%81%E4%B8%8E%E5%BD%92%E4%B8%80%E5%8C%96.md">docs/11-位置编码与归一化.md</a></p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
@@ -809,7 +947,7 @@ MLP 在 XOR 上收敛；小 GPT 生成通顺短文本——<strong>全部达成<
 <li>为什么说旋转是<strong>正交变换</strong>？范数不变这个性质重要在哪？</li>
 <li>为什么 RoPE 的点积只与&quot;位置差&quot;有关？相比正弦编码强在哪？</li>
 <li>为什么 RoPE 和 KV cache 是&quot;天生一对&quot;？推理时为什么只需要旋转新 token？</li>
-<li><code>src/tensor.rs</code> 里 <code>rotary</code> 的前向、反向具体怎么实现？<code>test_rotary</code> 测了什么？</li>
+<li><code>src/rope.rs</code> 里 <code>rotary_pair</code> 的前向、反向具体怎么实现？<code>test_rotary</code> 测了什么？</li>
 </ol>
 <h2>2. 先回顾：正弦位置编码的两个局限</h2>
 <p>第 11 课我们实现了正弦位置编码，把位置向量<strong>加到</strong> token embedding 上：</p>
@@ -1010,7 +1148,7 @@ RoPE 是&quot;乘法&quot;（乘以正交矩阵），<strong>只转不拉</stron
 而注意力唯一关心位置的地方就是打分（q·k），所以 RoPE 做到了&quot;精确投放&quot;。</p>
 </blockquote>
 <h2>6. 与 KV cache 天然兼容：只旋转新 token</h2>
-<p>回顾第 18 课的 KV cache 推理流程（<code>src/sample.rs</code> 的 <code>generate</code> + <code>src/model.rs</code> 的 <code>KVCache</code>）：</p>
+<p>回顾第 18 课的 KV cache 推理流程（<code>src/sample.rs</code> 的 <code>generate</code> + <code>src/attention.rs</code> 的 <code>KVCache</code>）：</p>
 <ul>
 <li>第一次：把整个 prompt 喂给模型，算出所有位置的 K/V 存入缓存；</li>
 <li>之后每步：<strong>只前向最新 1 个 token</strong>，历史的 K/V 直接从缓存取。</li>
@@ -1018,13 +1156,17 @@ RoPE 是&quot;乘法&quot;（乘以正交矩阵），<strong>只转不拉</stron
 <p>RoPE 和这个流程是无缝衔接的：</p>
 <pre><code>新 token 的绝对位置 = 缓存长度 base + 它在当前窗口里的下标 j
 </code></pre>
-<p>在 <code>GPT::forward</code> 里，<code>positions</code> 本来就是这么构造的（第 18 课的代码）：</p>
-<pre><code class="language-rust">let base = kv_cache.as_ref().map(|c| c.first().map(|k| k.seq_len()).unwrap_or(0)).unwrap_or(0);
+<p><code>base</code>（已缓存的位置数）由 <code>GPT::forward</code> 算出来传给每层（第 18 课的设计），<code>MultiHeadAttention::forward</code> 里 <code>positions</code> 就是这么构造的：</p>
+<pre><code class="language-rust">// src/model.rs（GPT::forward）：base = 缓存长度
+let base = kv_cache
+    .as_ref()
+    .map(|c| c.first().map(|k| k.seq_len()).unwrap_or(0))
+    .unwrap_or(0);
+
+// src/attention.rs（MultiHeadAttention::forward）：batch 内每个样本位置相同，重复 b 次
 let mut positions = Vec::with_capacity(b * t);
 for _ in 0..b {
-    for j in 0..t {
-        positions.push(base + j);
-    }
+    positions.extend(base..base + t);
 }
 </code></pre>
 <p>于是接入 RoPE 时：</p>
@@ -1056,41 +1198,57 @@ for _ in 0..b {
 <p>另一个视角：RoPE 在注意力内部旋转 Q/K，位置信息不会污染 token 的&quot;内容表示&quot;（残差流上的 x 始终是纯语义），
 这也让每一层的 Q/K 都能用&quot;本层自己的位置感&quot;去打分。</p>
 </blockquote>
-<h2>7. 前向实现讲解：<code>rotary</code></h2>
-<p><code>src/tensor.rs</code> 第 19 课小节里只有一个公开方法：</p>
-<pre><code class="language-rust">pub fn rotary(&amp;self, positions: &amp;[usize]) -&gt; Tensor {
-    assert_eq!(self.rank(), 2, &quot;rotary 输入应为 [rows, D]&quot;);
-    assert_eq!(self.shape[0], positions.len(), &quot;positions 数量必须等于行数&quot;);
-    let (rows, d) = (self.shape[0], self.shape[1]);
-    assert_eq!(d % 2, 0, &quot;最后一维必须为偶数才能两两配对旋转&quot;);
-
-    let sd = self.data.borrow();
-    let mut out_data = vec![0.0f32; rows * d];
+<h2>7. 前向实现讲解：cos/sin 表 + 查表旋转</h2>
+<p><code>src/rope.rs</code> 把实现拆成三层：先一次性<strong>预计算</strong> cos/sin 表，再用表<strong>查表旋转</strong>，Q/K 共用同一张表：</p>
+<pre><code class="language-rust">/// 预计算每个 (位置, 对偶下标) 的 cos/sin 表，长度 rows × (D/2)。
+/// 同一批 positions 的三角只算一次：前向、反向、Q/K 复用。
+fn build_cos_sin_tab(positions: &amp;[usize], d: usize) -&gt; (Vec&lt;f32&gt;, Vec&lt;f32&gt;) {
+    let rows = positions.len();
+    let mut c_tab = vec![0.0f32; rows * (d / 2)];
+    let mut s_tab = vec![0.0f32; rows * (d / 2)];
     for r in 0..rows {
         let pos = positions[r] as f32;
         for i in 0..d / 2 {
             let theta = pos / 10000f32.powf((2 * i) as f32 / d as f32);
-            let (c, s) = (theta.cos(), theta.sin());
+            c_tab[r * (d / 2) + i] = theta.cos();
+            s_tab[r * (d / 2) + i] = theta.sin();
+        }
+    }
+    (c_tab, s_tab)
+}
+
+/// 用现成的 cos/sin 表旋转一个张量（[rows, D]），每对元素按公式旋转。
+fn rotate_with_tab(x: &amp;Tensor, c_tab: &amp;[f32], s_tab: &amp;[f32]) -&gt; Tensor {
+    let (rows, d) = (x.shape[0], x.shape[1]);
+    let sd = x.data.borrow();
+    let mut out_data = vec![0.0f32; rows * d];
+    for r in 0..rows {
+        for i in 0..d / 2 {
+            let (c, s) = (c_tab[r * (d / 2) + i], s_tab[r * (d / 2) + i]);
             let (a, b) = (sd[r * d + 2 * i], sd[r * d + 2 * i + 1]);
             out_data[r * d + 2 * i] = a * c - b * s;
             out_data[r * d + 2 * i + 1] = a * s + b * c;
         }
     }
     drop(sd);
-    let positions_vec = positions.to_vec();
-
-    let mut result = Tensor::new(out_data, self.shape.clone(), self.requires_grad);
-    if self.requires_grad {
-        let rg = result.grad.clone();
-        let sg = self.grad.clone();
-        result.parents = Rc::new(vec![self.clone()]);
-        result.backward = Some(Rc::new(move || {
-            // ...（第 8 节讲）
-        }));
-    }
+    // ...（反向闭包查同一张表、按 R(θ)ᵀ 回传，见第 8 节）
     result
 }
 </code></pre>
+<p>对外只暴露两个入口——<code>rotary</code>（旋转单个张量，仅供测试）和 <code>rotary_pair</code>（一次建表同时旋转 Q/K）：</p>
+<pre><code class="language-rust">pub fn rotary_pair(&amp;self, other: &amp;Tensor, positions: &amp;[usize]) -&gt; (Tensor, Tensor) {
+    let d = self.shape[1];
+    let (c_tab, s_tab) = build_cos_sin_tab(positions, d);
+    (
+        rotate_with_tab(self, &amp;c_tab, &amp;s_tab),
+        rotate_with_tab(other, &amp;c_tab, &amp;s_tab),
+    )
+}
+</code></pre>
+<blockquote>
+<p>为什么要&quot;先建表再查表&quot;？注意力里 Q 和 K 的 <code>positions</code> 完全相同，三角函数的 <code>cos/sin</code> 只要算一遍；
+前向算一遍、反向闭包再查一遍——相比&quot;每次旋转现场重算三角&quot;，批量训练能省下可观的重复计算。</p>
+</blockquote>
 <p>逐行对照公式：</p>
 <table>
 <thead>
@@ -1145,10 +1303,10 @@ for _ in 0..b {
 </table>
 <p>几个值得注意的设计点：</p>
 <ol>
-<li><strong>三重循环的次序</strong>：外层按行 <code>r</code>、内层按对 <code>i</code>，把&quot;取出 a、b → 旋转 → 写回&quot;一气呵成，每对只算一次三角函数。</li>
+<li><strong>三重循环的次序</strong>：建表时外层按行 <code>r</code>、内层按对 <code>i</code>，<code>cos/sin</code> 每个 <code>(r, i)</code> 只算一次；旋转时同样两层循环，但只做查表乘加，不再碰任何三角函数。</li>
 <li><strong><code>drop(sd)</code></strong>：读完输入数据后立刻释放借用，之后才创建结果张量和反向闭包——避免闭包捕获时和 <code>self.data</code> 的借用纠缠。</li>
 <li><strong><code>requires_grad</code> 分支</strong>：如果输入不需要梯度（比如纯推理），就直接返回普通结果，不建 <code>parents</code>/<code>backward</code>，省下计算图的维护开销。这和第 18 课 KV cache 推理时&quot;纯数据拼接、无梯度&quot;的思路一致。</li>
-<li><strong>反向里三角函数重算</strong>：反向闭包为了&quot;自包含&quot;（只捕获 <code>positions_vec</code>、<code>rg</code>、<code>sg</code> 这几个 Rc），重新算了一遍 <code>theta/cos/sin</code>。代价可忽略，好处是闭包不依赖前向的中间量。</li>
+<li><strong>反向闭包查同一张表</strong>：反向闭包为了&quot;自包含&quot;（只捕获 <code>ct</code>/<code>st</code> 两份表拷贝 + <code>rg</code>/<code>sg</code> 两个 Rc），直接查表取值，<strong>不再重算 <code>theta/cos/sin</code></strong>。代价是闭包多持有两张表，好处是前向建的三角表被完整复用。</li>
 </ol>
 <h2>8. 反向实现讲解：正交矩阵的梯度</h2>
 <h3>8.1 理论：梯度用&quot;转置&quot;回传</h3>
@@ -1169,7 +1327,7 @@ for _ in 0..b {
 <code>∂L/∂b = ga·(∂y₀/∂b) + gb·(∂y₁/∂b) = -ga·s + gb·c</code> ✓</p>
 </blockquote>
 <h3>8.2 代码实际怎么写的（已按正确形式实现）</h3>
-<p><code>src/tensor.rs</code> 里反向闭包的循环体是：</p>
+<p><code>src/rope.rs</code> 里 <code>rotate_with_tab</code> 反向闭包的循环体是（<code>c</code>/<code>s</code> 直接查 <code>ct</code>/<code>st</code> 表）：</p>
 <pre><code class="language-rust">let (ga, gb) = (g[r * d + 2 * i], g[r * d + 2 * i + 1]);
 // 反向 = 前向旋转矩阵的转置 R(θ)ᵀ：grad = (ga·c + gb·s, -ga·s + gb·c)
 sgm[r * d + 2 * i] += ga * c + gb * s;
@@ -1182,10 +1340,10 @@ sgm[r * d + 2 * i + 1] += -ga * s + gb * c;
 只校验范数的测试发现不了。所以测试要&quot;既测范数、又测方向&quot;（见第 9 节 <code>test_rotary_grad_exact</code>）。
 本仓库初版实现确实写反过，已修复并补了逐元素断言。</p>
 </blockquote>
-<p>对训练的影响：<code>rotary</code> 目前还没有被 <code>src/model.rs</code> 的注意力调用（模型仍用正弦编码 <code>pos_emb</code>），
-函数本身已就绪、测试全绿，接入注意力即可用。</p>
+<p>对训练的影响：本课已经把 RoPE 接进了 <code>MultiHeadAttention</code>（<code>src/attention.rs</code>），训练和 KV cache 推理都用它。
+<code>GPT</code> 已不再有 <code>pos_emb</code> 字段，位置信息完全由注意力内部旋转 Q/K 提供（见第 10 节）。</p>
 <h2>9. <code>test_rotary</code> 测试讲解</h2>
-<p>测试在 <code>src/tensor.rs</code> 的 <code>mod tests</code> 里，共三个断言，分别验证三件事：</p>
+<p>测试在 <code>src/rope.rs</code> 的 <code>mod tests</code> 里，共三个断言，分别验证三件事：</p>
 <pre><code class="language-rust">#[test]
 fn test_rotary() {
     // 1. 旋转是正交变换：范数不变
@@ -1263,7 +1421,7 @@ fn test_rotary_grad_exact() {
 <p>注意力分数是 <code>q·k</code>（点积），位置信息只有在这里才&quot;有用武之地&quot;。而输出 <code>out = softmax(scores)·V</code> 是<strong>内容</strong>的加权求和，
 V 是&quot;被加权的内容&quot;，不需要带位置信息。所以标准做法是：<strong>只旋转 Q 和 K，V 保持原样</strong>。</p>
 <h3>10.2 接入点：<code>MultiHeadAttention::forward</code></h3>
-<p>在 <code>src/model.rs</code> 的 <code>MultiHeadAttention::forward</code> 里，Q/K/V 投影出来后是这样的：</p>
+<p>在 <code>src/attention.rs</code> 的 <code>MultiHeadAttention::forward</code> 里，Q/K/V 投影出来后是这样的：</p>
 <pre><code class="language-rust">let q = self.c_q.forward(x).reshape(vec![b, t, d]); // [B, T, D]
 let k = self.c_k.forward(x).reshape(vec![b, t, d]);
 let v = self.c_v.forward(x).reshape(vec![b, t, d]);
@@ -1290,40 +1448,36 @@ let v = self.c_v.forward(x).reshape(vec![b, t, d]);
 </tr>
 </tbody>
 </table>
-<p>我们的 <code>rotary</code> 接口（输入 <code>[rows, D]</code> + 每行的 <code>positions</code>）两种都支持，只要最后一维是偶数即可——
+<p>我们的 <code>rotary_pair</code> 接口（输入 <code>[rows, D]</code> + 每行的 <code>positions</code>）两种都支持，只要最后一维是偶数即可——
 <code>GPTConfig::tiny</code> 里 <code>n_embd=64</code>、<code>head_dim=16</code>，都满足。</p>
-<h3>10.3 最小接入示意</h3>
-<blockquote>
-<p>以下为<strong>示意代码</strong>（当前仓库的 <code>src/model.rs</code> 尚未接入 RoPE，模型仍在用第 11 课的正弦编码 <code>pos_emb</code>）。
-接入思路：把 <code>MultiHeadAttention::forward</code> 加上 <code>base</code>（缓存长度）参数，在 KV cache 拼接<strong>之前</strong>旋转 Q/K。</p>
-</blockquote>
-<pre><code class="language-rust">// 示意：在 MultiHeadAttention::forward 内，拆头前对 Q/K 应用 RoPE
-// base 来自 GPT::forward（缓存长度），每个 batch 里 T 个位置是 base, base+1, ..., base+t-1
-let mut pos_rows = Vec::with_capacity(b * t);
+<h3>10.3 实际接入方式（本仓库已接入）</h3>
+<p><code>src/attention.rs</code> 里，Q/K 投影之后、KV cache 拼接<strong>之前</strong>旋转：</p>
+<pre><code class="language-rust">// 位置：Q/K 投影之后、KV cache append 之前
+let mut positions = Vec::with_capacity(b * t);
 for _ in 0..b {
-    pos_rows.extend((base..base + t).map(|p| p as usize));
+    positions.extend(base..base + t);
 }
-
-// 先旋转，再进 KV cache / 拆头
-let q = q.reshape(vec![b * t, d]).rotary(&amp;pos_rows).reshape(vec![b, t, d]);
-let k = k.reshape(vec![b * t, d]).rotary(&amp;pos_rows).reshape(vec![b, t, d]);
-
+// Q/K 用同一批 positions，一次建表同时旋转（三角函数只算一遍）
+let (q, k) = q
+    .reshape(vec![b * t, d])
+    .rotary_pair(&amp;k.reshape(vec![b * t, d]), &amp;positions);
+let (q, k) = (
+    q.reshape(vec![b, t, d]),
+    k.reshape(vec![b, t, d]),
+);
 // 之后照旧：cache.append(&amp;k, &amp;v)（缓存里存的就是旋转后的 K）
 </code></pre>
 <p>要点：</p>
 <ol>
-<li><strong><code>positions</code> 长度必须等于行数</strong>（<code>rotary</code> 里 <code>assert_eq!(self.shape[0], positions.len())</code>），这里行数是 <code>b*t</code>，所以 batch 内每个样本的同一列位置相同、要重复 <code>b</code> 次。</li>
+<li><strong><code>positions</code> 长度必须等于行数</strong>（<code>rotary_pair</code> 里 <code>assert_eq!(self.shape[0], positions.len())</code>），这里行数是 <code>b*t</code>，所以 batch 内每个样本的同一列位置相同、要重复 <code>b</code> 次。</li>
 <li><strong>旋转发生在 append 之前</strong>：缓存里存的是&quot;已旋转的 K&quot;，历史 K 直接复用，符合第 6 节的兼容性约定。</li>
 <li><strong>Q 没有缓存</strong>（推理时 Q 永远只有新 token 一个），所以 Q 总是用当前位置旋转，天然正确。</li>
-<li>由于 K/V 已旋转并缓存，接入后<strong>推理模式（KV cache）和训练模式行为一致</strong>，不会像正弦编码那样需要区分两套位置逻辑。</li>
-<li><code>rotary</code> 的反向已按 <code>R(θ)ᵀ</code> 实现并通过 <code>test_rotary_grad_exact</code> 逐元素验证，接入后无需再改。</li>
+<li>由于 K/V 已旋转并缓存，<strong>推理模式（KV cache）和训练模式行为一致</strong>，不会像正弦编码那样需要区分两套位置逻辑。这一点有专门的测试守着（<code>src/model.rs</code> 的 <code>test_kv_cache_matches_full_forward</code>）。</li>
+<li><code>rotary_pair</code> 的反向按 <code>R(θ)ᵀ</code> 实现并通过 <code>test_rotary_grad_exact</code> 逐元素验证。</li>
 </ol>
 <blockquote>
-<p>替换还是叠加？可以二选一：</p>
-<ul>
-<li><strong>替换</strong>：删掉 <code>GPT::forward</code> 里的 <code>pos_emb</code>（<code>sinusoidal_positions</code> 不再使用），位置信息完全由 RoPE 提供；</li>
-<li><strong>叠加</strong>：保留 <code>pos_emb</code> 再加 RoPE，两套位置信号并存（一般没必要，且会稀释 RoPE 的相对位置特性）。</li>
-</ul>
+<p>替换还是叠加？本仓库选了<strong>替换</strong>：<code>GPT</code> 结构体里没有 <code>pos_emb</code> 字段（第 11 课的正弦编码在接入 RoPE 后已删除），
+位置信息完全由注意力内部旋转 Q/K 提供。叠加方案（保留 <code>pos_emb</code> 再加 RoPE）一般没必要，且会稀释 RoPE 的相对位置特性。</p>
 </blockquote>
 <h2>11. 动手练习</h2>
 <ol>
@@ -1331,12 +1485,12 @@ let k = k.reshape(vec![b * t, d]).rotary(&amp;pos_rows).reshape(vec![b, t, d]);
 （提示：<code>θ₀ = 1/10000^0 = 1</code> rad，<code>cos1 ≈ 0.5403, sin1 ≈ 0.8415</code>），再用 <code>x.rotary(&amp;[1])</code> 验证。</li>
 <li><strong>验证梯度方向</strong>：<code>rotary</code> 的反向已修复为 <code>R(θ)ᵀ</code>（见第 8.2 节）。自己动手把测试改成&quot;正角度旋转&quot;的错误版本，
 跑 <code>test_rotary</code> 和 <code>test_rotary_grad_exact</code>，观察只有后者能发现错误——体会&quot;既测范数、又测方向&quot;的价值。</li>
-<li><strong>接入注意力</strong>：按第 10.3 节的示意，把 RoPE 接入 <code>src/model.rs</code> 的 <code>MultiHeadAttention</code>（替换正弦编码），
-<code>cargo run</code> 训练并对比 loss 曲线与生成效果。注意需要先把 <code>base</code> 传入 <code>MultiHeadAttention::forward</code>。</li>
+<li><strong>对照实际接入</strong>：对照 10.3 节的代码，在 <code>src/attention.rs</code> 里找到 RoPE 的接入位置。
+试着把 <code>rotary_pair</code> 改成&quot;先 <code>rotary</code> 转 Q、再 <code>rotary</code> 转 K&quot;（各自建表），跑 <code>cargo test</code> 确认结果一致——体会 <code>rotary_pair</code> 一次建表省下的重复计算。</li>
 <li><strong>验证相对位置性质</strong>：写一个测试——取同一个 <code>q</code>，在位置 <code>m</code> 旋转；取同一个 <code>k</code>，在位置 <code>n</code> 旋转，
 断言 <code>q_m · k_n</code> 只和 <code>n - m</code> 有关（对固定的位置差 <code>d</code>，换不同的 <code>m</code> 结果应相同）。这正是第 5 节推导的代码验证。</li>
 <li><strong>思考外推</strong>：把 <code>block_size</code> 从 32 改成 64 重新训练，再让模型生成超过训练长度的文本，
-观察 RoPE（接入后）和正弦编码谁退化得更慢，想想为什么。</li>
+观察 RoPE 的输出质量在训练长度之外如何退化，想想为什么（角度随位置线性增长，训练长度之外照样失效）。</li>
 <li><strong>思考</strong>：为什么 <code>θ_i = pos / 10000^(2i/d)</code> 里的 <code>10000</code> 和 <code>d</code> 与正弦编码一模一样？
 如果把它改成 <code>10</code> 会怎样？（提示：所有维度频率变高，近距离区分更敏感、远距离更早&quot;打满&quot;一圈。）</li>
 </ol>
@@ -1359,13 +1513,13 @@ let k = k.reshape(vec![b * t, d]).rotary(&amp;pos_rows).reshape(vec![b, t, d]);
 <p>与 <strong>KV cache 天然兼容</strong>：新 token 按 <code>base + j</code> 旋转自己的 Q/K，历史 K 已旋转、直接复用。</p>
 </li>
 <li>
-<p><code>src/tensor.rs</code> 的 <code>rotary</code>：前向三重循环逐对旋转；反向按正交矩阵的转置 <code>R(θ)ᵀ</code> 回传（已修复并通过 <code>test_rotary_grad_exact</code> 验证）。</p>
+<p><code>src/rope.rs</code> 的实现分三层：<code>build_cos_sin_tab</code> 预计算 cos/sin 表 → <code>rotate_with_tab</code> 查表旋转 → <code>rotary_pair</code> 一次建表同时旋转 Q/K；反向按正交矩阵的转置 <code>R(θ)ᵀ</code> 回传（已修复并通过 <code>test_rotary_grad_exact</code> 验证）。</p>
 </li>
 <li>
 <p><code>test_rotary</code> 三个断言分别验证：正交性（范数不变）、<code>pos=0</code> 恒等、梯度范数守恒；<code>test_rotary_grad_exact</code> 逐元素验证梯度方向。</p>
 </li>
 <li>
-<p>接入方式：在 <code>MultiHeadAttention</code> 拆头前对 Q/K 旋转（只转 Q/K、不转 V），当前仓库尚未接入，作为练习。</p>
+<p>实际接入：在 <code>MultiHeadAttention</code> 拆头前、KV cache append 之前对 Q/K 旋转（只转 Q/K、不转 V），已完成接入；<code>GPT</code> 已无 <code>pos_emb</code> 字段（第 11 课正弦编码被替换）。</p>
 </li>
 <li>
 <p>下一课（第 20 课）：收尾——学习率调度（warmup + cosine decay）与整个项目的总结回顾！</p>
@@ -1386,9 +1540,10 @@ let k = k.reshape(vec![b * t, d]).rotary(&amp;pos_rows).reshape(vec![b, t, d]);
   <summary><![CDATA[实现 KV Cache 缓存历史键值，避免逐 token 生成时的重复计算。]]></summary>
   <content type="html"><![CDATA[<h1>第 18 课：KV Cache —— 让逐 token 生成不再重复计算</h1>
 <blockquote>
-<p>代码位置：<a href="">src/model.rs</a>（<code>KVCache</code> / <code>MultiHeadAttention</code> / <code>GPT::forward</code>）
-代码位置：<a href="">src/sample.rs</a>（<code>generate</code>）
-演示入口：<a href="">src/main.rs</a>（演示 3：生成 1 / 生成 2）</p>
+<p>代码位置：<a href="src/attention.rs">src/attention.rs</a>（<code>KVCache</code> / <code>MultiHeadAttention</code>）
+代码位置：<a href="src/model.rs">src/model.rs</a>（<code>GPT::forward</code>）
+代码位置：<a href="src/sample.rs">src/sample.rs</a>（<code>generate</code>）
+演示入口：<a href="src/main.rs">src/main.rs</a>（演示 3：生成 1 / 生成 2）</p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
@@ -1797,16 +1952,16 @@ for _ in 0..max_new {
 </thead>
 <tbody>
 <tr>
-<td>位置编码表不够长</td>
-<td><code>pos_emb</code> 是 <code>[block_size=32, D]</code> 的常数表，第 33 个位置没有编码可用</td>
+<td>训练长度之外是外推区</td>
+<td>RoPE 对任意位置都能算出旋转角（没有&quot;位置表&quot;可言），但模型训练时只见过位置 <code>0..32</code>，超出后是<strong>外推区</strong>（第 19 课讲过），注意力分数可能畸变，输出质量断崖下跌</td>
 </tr>
 <tr>
 <td>缓存无法&quot;截断&quot;</td>
 <td>全量模式可以用 <code>ids.len().saturating_sub(block_size)</code> 把窗口滑到最近 32 个 token；而 <code>KVCache</code> 只会 append、不会丢弃最早的位置（当前实现没有&quot;弹掉开头&quot;的操作）</td>
 </tr>
 <tr>
-<td>因果掩码越界</td>
-<td><code>t_total = t + base</code> 一旦超过 block_size，位置编码 gather_rows 就会越界</td>
+<td>上下文窗口硬上限</td>
+<td><code>block_size</code> 是模型的设计上下文长度（每个训练样本最长 32 个位置），<code>generate</code> 用 <code>cache[0].seq_len() &gt;= block_size</code> 把生成长度锁在训练见过的最长窗口内，不越界</td>
 </tr>
 </tbody>
 </table>
@@ -1840,7 +1995,7 @@ for _ in 0..max_new {
 <p>分布不变的原因：缓存里的 K/V 与全量模式算出的数值相同，注意力、softmax 计算路径一致</p>
 </li>
 <li>
-<p>缓存模式只拼不丢，上下文达到 <code>block_size=32</code> 必须停止（位置编码表到头 + 无法截断历史），真实输出里生成 2 止步于 32 个 token</p>
+<p>缓存模式只拼不丢，上下文达到 <code>block_size=32</code> 必须停止（训练长度外是 RoPE 外推区 + 缓存无法截断历史），真实输出里生成 2 止步于 32 个 token</p>
 </li>
 <li>
 <p>下一课：换掉正弦位置编码，用 RoPE（旋转位置编码）让位置信息融入注意力计算。</p>
@@ -1852,7 +2007,7 @@ for _ in 0..max_new {
   <category term="推理"/>
 </entry>
 <entry>
-  <title>第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</title>
+  <title>第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</title>
   <link href="https://ganto.me/post/rust-llm-guide-17"/>
   <id>https://ganto.me/post/rust-llm-guide-17</id>
   <updated>2026-09-18T00:00:00+08:00</updated>
@@ -1861,9 +2016,9 @@ for _ in 0..max_new {
   <summary><![CDATA[实现 AdamW 优化器，融合动量与自适应学习率，并与 SGD 对比。]]></summary>
   <content type="html"><![CDATA[<h1>第 17 课：AdamW 优化器 —— 给梯度下降装上&quot;惯性&quot;和&quot;自适应步长&quot;</h1>
 <blockquote>
-<p>代码位置：<a href="">src/optim.rs</a>（<code>SGD</code> / <code>AdamW</code>）
-代码位置：<a href="">src/train.rs</a>（<code>train_gpt</code> 中 AdamW 的用法）
-演示入口：<a href="">src/main.rs</a>（演示 3：训练小 GPT）</p>
+<p>代码位置：<a href="src/optim.rs">src/optim.rs</a>（<code>SGD</code> / <code>AdamW</code>）
+代码位置：<a href="src/train.rs">src/train.rs</a>（<code>train_gpt</code> 中 AdamW 的用法）
+演示入口：<a href="src/main.rs">src/main.rs</a>（演示 3：训练小 GPT）</p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
@@ -2238,30 +2393,30 @@ opt.zero_grad();
   <category term="优化器"/>
 </entry>
 <entry>
-  <title>第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</title>
+  <title>第 16 课：训练小 GPT —— 看 loss 从 1.46 一路降到 0.16</title>
   <link href="https://ganto.me/post/rust-llm-guide-16"/>
   <id>https://ganto.me/post/rust-llm-guide-16</id>
   <updated>2026-09-17T00:00:00+08:00</updated>
   <published>2026-09-17T00:00:00+08:00</published>
   <author><name>干徒</name></author>
-  <summary><![CDATA[完整训练一个小型 GPT 模型，观察 loss 从 4.06 一路下降到 0.34。]]></summary>
-  <content type="html"><![CDATA[<h1>第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</h1>
+  <summary><![CDATA[完整训练一个小型 GPT 模型，观察 loss 从 1.46 一路下降到 0.16。]]></summary>
+  <content type="html"><![CDATA[<h1>第 16 课：训练小 GPT —— 看 loss 从 1.46 一路降到 0.16</h1>
 <blockquote>
-<p>代码位置：<a href="">src/main.rs</a>（<code>demo_gpt</code>）
-代码位置：<a href="">src/train.rs</a>（<code>train_gpt</code> / <code>LRScheduler</code> / <code>clip_grad_norm</code>）
-代码位置：<a href="">src/data.rs</a>（<code>CORPUS</code> / <code>DataLoader</code>）
-代码位置：<a href="">src/sample.rs</a>（<code>generate</code> / <code>sample_token</code>）</p>
+<p>代码位置：<a href="src/main.rs">src/main.rs</a>（<code>demo_gpt</code>）
+代码位置：<a href="src/train.rs">src/train.rs</a>（<code>train_gpt</code> / <code>LRScheduler</code> / <code>clip_grad_norm</code>）
+代码位置：<a href="src/data.rs">src/data.rs</a>（<code>CORPUS</code> / <code>DataLoader</code>）
+代码位置：<a href="src/sample.rs">src/sample.rs</a>（<code>generate</code> / <code>sample_token</code>）</p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
 <li><code>demo_gpt</code> 从数据到生成文本，完整流程分哪几步？</li>
 <li>只有 669 个字符的小语料，训练日志里的 <code>step / lr / loss</code> 三列怎么读？</li>
-<li>warmup 阶段学习率为什么是 <code>0.00012</code> 起步？cosine 衰减在日志里怎么体现？</li>
+<li>日志里为什么看不到 warmup 段？lr 从 <code>0.002947</code> 一路衰减到 <code>0.000300</code> 是怎么来的？</li>
 <li>temperature、top-k、top-p 三个参数是怎么配合采样的？</li>
-<li>为什么 loss 已经降到 0.34，模型输出的文本依然只是&quot;像样&quot;而不是&quot;正确&quot;？</li>
+<li>为什么 loss 已经降到 0.16，模型输出的文本依然只是&quot;像样&quot;而不是&quot;正确&quot;？</li>
 </ol>
 <h2>2. 训练全景：demo_gpt 做了什么</h2>
-<p><code>src/main.rs</code> 的演示 3（第 12-16、17-20 课）是本节的主角：</p>
+<p><code>src/main.rs</code> 的演示 3（第 12-21 课）是本节的主角：</p>
 <pre><code class="language-rust">fn demo_gpt() {
     println!(&quot;=== 演示 3：训练小 GPT 并生成文本 ===&quot;);
 
@@ -2274,7 +2429,16 @@ opt.zero_grad();
 
     // 训练（第 13、17、20 课：训练循环 + AdamW + warmup/cosine 调度）
     let loader = DataLoader::new(CORPUS, &amp;tokenizer, model.cfg.block_size, 8);
-    train::train_gpt(&amp;model, &amp;tokenizer, &amp;loader, 600, 8, 3e-3, 50, 100, &amp;mut rng);
+    let tcfg = config::TrainConfig {
+        seed: 42,
+        batch_size: 8,
+        steps: 600,
+        max_lr: 3e-3,
+        warmup_steps: 50,
+        eval_every: 100,
+        ..config::TrainConfig::default()
+    };
+    train::train_gpt(&amp;model, &amp;tokenizer, &amp;loader, &amp;tcfg, None, None, &amp;mut rng);
 
     // 生成（无 cache）
     println!(&quot;\n  —— 生成 1（temperature=0.8, top-k=10, top-p=0.9, 无 KV cache）——&quot;);
@@ -2315,8 +2479,8 @@ opt.zero_grad();
 </tr>
 <tr>
 <td>4. 训练</td>
-<td><code>train_gpt(..., 600, 8, 3e-3, 50, 100, ...)</code></td>
-<td>600 步，峰值学习率 3e-3，前 50 步 warmup，每 100 步打印一次</td>
+<td><code>train_gpt(&amp;model, &amp;tokenizer, &amp;loader, &amp;tcfg, None, None, ...)</code></td>
+<td>600 步，峰值学习率 3e-3，前 50 步 warmup，每 100 步打印一次（其余参数取 <code>TrainConfig::default()</code>）</td>
 </tr>
 <tr>
 <td>5. 生成</td>
@@ -2413,22 +2577,21 @@ Every morning, Red would wake up early and explore the forest. ...&quot;;
 </tr>
 </tbody>
 </table>
-<p>模型参数量：<code>train_gpt</code> 开头会打印真实数字：</p>
-<pre><code>训练参数数量：104611
+<p>模型参数量：<code>train_gpt</code> 开头会打印一行&quot;开始训练&quot;（真实数字就在其中）：</p>
+<pre><code>开始训练：char（vocab=35）模型参数 102336 | 语料 669 tokens（训练 669 / 验证 0）| batch=8 block=32
 </code></pre>
-<p>按第 12 课的方法验证一下：词表 V=35（不是 100）时，<code>tok_emb = 35×64 = 2240</code>，每层 Block ≈ 49984，两层 ≈ 99968，<code>ln_f = 128</code>，<code>lm_head = 64×35+35 = 2275</code>，总计 <strong>2240 + 99968 + 128 + 2275 = 104611</strong> ✓。约 10 万参数，CPU 上几秒就能跑完整个 demo。</p>
+<p>按第 12 课的方法验证一下：词表 V=35（不是 100）时，<code>tok_emb = 35×64 = 2240</code>，每层 Block ≈ 49984，两层 ≈ 99968，<code>ln_f = 128</code>，输出头是权重绑定（复用 <code>tok_emb</code> 转置，无独立 lm_head 参数），总计 <strong>2240 + 99968 + 128 = 102336</strong> ✓。约 10 万参数，CPU 上几秒就能跑完整个 demo。</p>
 <h2>5. 真实训练日志解读</h2>
 <p>运行 <code>cargo run --release</code>，演示 3 会打印（这是<strong>真实运行输出</strong>，不是编的）：</p>
 <pre><code>=== 演示 3：训练小 GPT 并生成文本 ===
   语料 669 字符，字符词表 35 个
-训练参数数量：104611
-step     0 | lr 0.00012 | loss 4.0569
-step   100 | lr 0.00294 | loss 2.2772
-step   200 | lr 0.00253 | loss 1.8047
-step   300 | lr 0.00183 | loss 0.9119
-step   400 | lr 0.00108 | loss 0.5509
-step   500 | lr 0.00051 | loss 0.3939
-step   599 | lr 0.00030 | loss 0.3351
+开始训练：char（vocab=35）模型参数 102336 | 语料 669 tokens（训练 669 / 验证 0）| batch=8 block=32
+step   100 | lr 0.002947 | train_loss 1.4597
+step   200 | lr 0.002540 | train_loss 0.5498
+step   300 | lr 0.001850 | train_loss 0.3338
+step   400 | lr 0.001096 | train_loss 0.2312
+step   500 | lr 0.000518 | train_loss 0.1557
+step   600 | lr 0.000300 | train_loss 0.1624
 </code></pre>
 <h3>5.1 三列日志分别是什么</h3>
 <table>
@@ -2442,16 +2605,16 @@ step   599 | lr 0.00030 | loss 0.3351
 <tbody>
 <tr>
 <td><code>step</code></td>
-<td>训练步数（从 0 到 599）</td>
-<td><code>train_gpt</code> 的循环变量</td>
+<td>训练步数（从 1 开始数，日志显示 100、200、…、600）</td>
+<td><code>train_gpt</code> 打印的是 <code>step + 1</code></td>
 </tr>
 <tr>
 <td><code>lr</code></td>
-<td>当前学习率（打印前一刻的值）</td>
-<td><code>scheduler.lr()</code></td>
+<td>本步实际用于更新的学习率</td>
+<td><code>cur_lr</code>（先取 <code>scheduler.lr()</code>，再 <code>scheduler.step()</code>）</td>
 </tr>
 <tr>
-<td><code>loss</code></td>
+<td><code>train_loss</code></td>
 <td>本步 batch 的平均交叉熵</td>
 <td><code>cross_entropy_loss(&amp;logits, &amp;y)</code></td>
 </tr>
@@ -2464,21 +2627,25 @@ step   599 | lr 0.00030 | loss 0.3351
     let loss = cross_entropy_loss(&amp;logits, &amp;y);     //    算损失
     loss.backward();                                // 3. 反向
     clip_grad_norm(&amp;params, 1.0);                   // 4. 梯度裁剪
-    opt.lr = scheduler.lr();                        // 5. 更新参数（设置当前 lr）
+    let cur_lr = scheduler.lr();                    // 5. 取当前步 lr 喂给优化器
+    opt.lr = cur_lr;
     opt.step();
     opt.zero_grad();                                // 6. 清零梯度
-    scheduler.step();
-    // 每 eval_every 步（或最后一步）打印
-    println!(&quot;step {:&gt;5} | lr {:.5} | loss {:.4}&quot;, step, scheduler.lr(), loss.data()[0]);
+    scheduler.step();                               //    步数 +1（为下一步准备 lr）
+    let last = step + 1 == steps;
+    if (step + 1) % cfg.eval_every == 0 || last {   // 每 eval_every 步（或最后一步）打印
+        // lr 打印的就是本步实际用的 cur_lr，没有错位；step 打印 step + 1
+        println!(&quot;step {:&gt;5} | lr {:.6} | train_loss {:.4}&quot;, step + 1, cur_lr, loss.item());
+    }
 }
 </code></pre>
-<h3>5.2 loss：4.06 → 0.34 说明了什么</h3>
+<h3>5.2 loss：1.46 → 0.16 说明了什么</h3>
 <ul>
-<li><strong>起步 4.06</strong>：随机初始化时，模型对 35 个字符基本&quot;一视同仁&quot;，理论下界是均匀分布的交叉熵 <code>ln(35) ≈ 3.56</code>。4.06 略高于它，是因为初始权重并不完全均匀、且首批样本有随机性。loss 在 4 附近徘徊，说明模型&quot;啥也没学会&quot;。</li>
-<li><strong>先快后慢</strong>：前 300 步 loss 从 4.06 掉到 0.91（降了 78%），后 300 步只从 0.91 掉到 0.34。这是训练曲线的典型形态——早期梯度大、方向明确，后期接近收敛、只能精雕细琢。</li>
-<li><strong>终点 0.34</strong>：交叉熵 0.34 意味着模型给&quot;正确下一个字符&quot;的平均概率约为 <code>exp(-0.34) ≈ 0.71</code>。对一篇 669 字符的&quot;课文&quot;来说，模型已经相当好地&quot;背&quot;下了其中的统计规律。</li>
+<li><strong>第一个打印点 1.46</strong>：日志只在 <code>step 100、200、…</code> 打印（<code>eval_every = 100</code>）。随机初始化时模型对 35 个字符基本&quot;一视同仁&quot;，理论下界是均匀分布的交叉熵 <code>ln(35) ≈ 3.56</code>；训练 100 步后降到 1.46，说明已经开始学习。</li>
+<li><strong>先快后慢</strong>：step 100→300 loss 从 1.46 掉到 0.33（降了 77%），step 300→600 只从 0.33 掉到 0.16。这是训练曲线的典型形态——早期梯度大、方向明确，后期接近收敛、只能精雕细琢。</li>
+<li><strong>终点 0.16</strong>：交叉熵 0.16 意味着模型给&quot;正确下一个字符&quot;的平均概率约为 <code>exp(-0.16) ≈ 0.85</code>。对一篇 669 字符的&quot;课文&quot;来说，模型已经相当好地&quot;背&quot;下了其中的统计规律。</li>
 </ul>
-<h3>5.3 warmup 阶段：lr 从 0.00012 爬升</h3>
+<h3>5.3 warmup 阶段：为什么日志里看不到</h3>
 <p><code>LRScheduler</code> 的规则（<code>src/train.rs</code>）：</p>
 <pre><code class="language-rust">pub fn lr(&amp;self) -&gt; f32 {
     if self.step &lt; self.warmup_steps {
@@ -2530,7 +2697,9 @@ step   599 | lr 0.00030 | loss 0.3351
 </tbody>
 </table>
 <blockquote>
-<p>日志里 <code>step 0 | lr 0.00012</code>：因为打印发生在 <code>scheduler.step()</code> 之后，所以显示的是&quot;下一步&quot;的学习率；第 1 步更新实际用的是 6e-5。这只是打印时机的 1 步错位，不影响理解——<strong>前 50 步 lr 从接近 0 线性爬到峰值 0.003</strong>。</p>
+<p>注意：demo 的 <code>eval_every = 100</code>，warmup 段（step 0-49）<strong>没有打印点</strong>，所以真实日志里看不到 0.00006 起步的爬升。
+把 <code>eval_every</code> 改成 10，就能看到 step 10/20/30/40 的 lr = <code>0.0006 → 0.0012 → 0.0018 → 0.0024</code>
+（每步增加 <code>0.003/50 = 0.00006</code>，10 步就是 0.0006）。</p>
 <p>为什么要 warmup？训练刚开始时参数是随机值，梯度方向噪声大、量级不可控。如果一上来就用 0.003 的大步长，很容易把参数&quot;推飞&quot;（loss 直接变成 NaN）。先用小步长稳住方向，再逐渐加力，是现代 LLM 训练的标准做法。</p>
 </blockquote>
 <h3>5.4 cosine 衰减：从峰值平滑降回 min_lr</h3>
@@ -2540,8 +2709,8 @@ progress = (step - 50) / (600 - 50)，超过 1 就截断到 1
 </code></pre>
 <p>验证日志里的两个数字：</p>
 <ul>
-<li><code>step 100</code>：<code>progress = (101-50)/550 ≈ 0.0927</code>，<code>cosine ≈ 0.9789</code>，<code>lr = 0.0003 + 0.0027×0.9789 ≈ 0.00294</code> ✓</li>
-<li><code>step 599</code>：<code>progress = (600-50)/550 = 1.0</code>，<code>cosine = 0.5×(1+cos π) = 0</code>，<code>lr = min_lr = 0.00030</code> ✓</li>
+<li><code>step 100</code>：scheduler 计数 = 99，<code>progress = (99-50)/550 ≈ 0.089</code>，<code>cosine ≈ 0.9805</code>，<code>lr = 0.0003 + 0.0027×0.9805 ≈ 0.002947</code> ✓</li>
+<li><code>step 600</code>：scheduler 计数 = 599，<code>progress = (599-50)/550 ≈ 0.998</code>，<code>cosine ≈ 0</code>，<code>lr ≈ min_lr = 0.000300</code> ✓</li>
 </ul>
 <p>学习率全程曲线：</p>
 <pre><code>lr
@@ -2604,13 +2773,13 @@ progress = (step - 50) / (600 - 50)，超过 1 就截断到 1
 </table>
 <p>真实生成结果（<code>cargo run --release</code> 原样输出）：</p>
 <pre><code>  —— 生成 1（temperature=0.8, top-k=10, top-p=0.9, 无 KV cache）——
-  Once upon a to his friend, the wise old owl. One day, Red found a wold of colors and turned
+  Once upon a time in a small village, there lived a curious little fox named Red. Every morn
 
   —— 生成 2（temperature=0.8, top-k=10, top-p=0.9, 带 KV cache）——
-  The fox the hidden garden, whe li
+  The fox named all is s fend the g
 </code></pre>
 <p>（生成 2 用的是另一个 prompt &quot;The fox&quot;，且因缓存模式上下文达到 block_size=32 提前停止，第 18 课会专门讲；生成 1 在无缓存模式下把 80 个新字符完整生成完了。）</p>
-<p>读这段输出：模型学会了故事的结构——&quot;Once upon a...&quot; 开头、&quot;his friend, the wise old owl&quot;、主谓宾、句号逗号，甚至复现了语料里的 &quot;hidden garden&quot; 词组。<strong>字面上&quot;像样&quot;，但仔细读全是毛病</strong>：<code>a to</code> 语法不通、<code>wold of colors</code> 应该是 <code>world of colors</code>、句子戛然而止。这就是下一节要回答的问题。</p>
+<p>读这段输出：模型学会了故事的结构——&quot;Once upon a time...&quot; 开头、&quot;in a small village, there lived a curious little fox named Red&quot; 几乎完整复现语料原文、主谓宾、句号逗号。<strong>字面上&quot;像样&quot;，但仔细读全是毛病</strong>：生成 2 的 &quot;named all is s fend the g&quot; 语法不通、句子戛然而止（block_size 截断）。这就是下一节要回答的问题。</p>
 <h2>7. 为什么小模型输出只是&quot;像样&quot;而非&quot;正确&quot;</h2>
 <p>四个层面叠加，缺一不可：</p>
 <table>
@@ -2631,7 +2800,7 @@ progress = (step - 50) / (600 - 50)，超过 1 就截断到 1
 </tr>
 <tr>
 <td><strong>训练不足</strong></td>
-<td>600 步后 loss 仍为 0.34（正确概率仅 71%），远未收敛到 0。模型对很多位置仍&quot;没把握&quot;</td>
+<td>600 步后 loss 仍为 0.16（正确概率约 85%），还没收敛到 0。模型对很多位置仍&quot;没把握&quot;</td>
 </tr>
 <tr>
 <td><strong>采样带随机性</strong></td>
@@ -2639,14 +2808,14 @@ progress = (step - 50) / (600 - 50)，超过 1 就截断到 1
 </tr>
 </tbody>
 </table>
-<p>用一句话总结：<strong>&quot;像样&quot;来自学到了语料的高频统计规律；&quot;不正确&quot;来自语料/模型/训练都不足以学到完整语法，再加上采样本身的随机性。</strong> 想要更&quot;正确&quot;，方向是加大语料、加大模型、多训几步（后面第 19、20 课还会继续优化），但永远不可能在 669 字符上学出真正的英语——这也侧面说明了为什么现代 LLM 需要 TB 级数据和千亿参数。</p>
+<p>用一句话总结：<strong>&quot;像样&quot;来自学到了语料的高频统计规律；&quot;不正确&quot;来自语料/模型/训练都不足以学到完整语法，再加上采样本身的随机性。</strong> 想要更&quot;正确&quot;，方向是加大语料、加大模型、多训几步（后面第 19、20、21 课还会继续优化），但永远不可能在 669 字符上学出真正的英语——这也侧面说明了为什么现代 LLM 需要 TB 级数据和千亿参数。</p>
 <h2>8. 动手练习</h2>
 <ol>
 <li><strong>改种子观察差异</strong>：把 <code>demo_gpt</code> 里 <code>Rng::new(1234)</code> 改成别的数字（如 42），重新 <code>cargo run --release</code>。loss 曲线和生成文本都会变——思考：为什么损失曲线也会变？（提示：采样 batch 的随机起点变了）</li>
 <li><strong>改 warmup</strong>：把 <code>train_gpt</code> 的 <code>warmup_steps</code> 从 50 改成 5 和 500，分别跑一次，对比前 100 步的 loss。体会&quot;warmup 太短容易起飞、太长浪费步数&quot;。</li>
 <li><strong>改生成参数</strong>：把 <code>generate</code> 的 <code>temperature</code> 改成 0.2 和 1.5 各跑一次。观察文本变得更&quot;死板/重复&quot;还是更&quot;发散/乱&quot;。</li>
-<li><strong>数 token</strong>：验证第 5.4 节——打印 <code>scheduler.lr()</code> 在 step 100、599 的计算过程，对照日志里的 <code>0.00294</code> 和 <code>0.00030</code>。</li>
-<li><strong>思考</strong>：loss 从 4.06 降到 0.34，但为什么不能说&quot;模型学会了英语&quot;？模型&quot;学会&quot;的到底是什么？</li>
+<li><strong>数 token</strong>：验证第 5.4 节——打印 <code>scheduler.lr()</code> 在 step 100、600 的计算过程，对照日志里的 <code>0.002947</code> 和 <code>0.000300</code>。</li>
+<li><strong>思考</strong>：loss 从 1.46 降到 0.16，但为什么不能说&quot;模型学会了英语&quot;？模型&quot;学会&quot;的到底是什么？</li>
 </ol>
 <h2>9. 本课总结</h2>
 <ul>
@@ -2657,7 +2826,7 @@ progress = (step - 50) / (600 - 50)，超过 1 就截断到 1
 <p>数据是自监督的：x 是 32 个 token，y 是 x 右移一位，预测&quot;下一个字符&quot;</p>
 </li>
 <li>
-<p>真实日志：loss <code>4.06 → 0.34</code>，前 300 步降得最快；lr 前 50 步从 <code>0.00012</code> 线性爬到峰值 <code>0.003</code>，之后 cosine 衰减到 <code>0.0003</code></p>
+<p>真实日志：loss <code>1.46 → 0.16</code>，前 300 步降得最快；lr 从 <code>0.002947</code> 一路 cosine 衰减到 <code>0.000300</code>（warmup 段因 <code>eval_every=100</code> 没有打印点）</p>
 </li>
 <li>
 <p>生成用 <code>temperature=0.8 + top-k=10 + top-p=0.9</code>：先缩放、再截断、再按概率随机抽样</p>
@@ -2675,7 +2844,7 @@ progress = (step - 50) / (600 - 50)，超过 1 就截断到 1
   <category term="GPT"/>
 </entry>
 <entry>
-  <title>第 15 课：推理与采样 —— 让模型创造性地生成</title>
+  <title>第 15 课：推理与采样 —— 让模型「创造性」地生成</title>
   <link href="https://ganto.me/post/rust-llm-guide-15"/>
   <id>https://ganto.me/post/rust-llm-guide-15</id>
   <updated>2026-09-16T00:00:00+08:00</updated>
@@ -2684,9 +2853,9 @@ progress = (step - 50) / (600 - 50)，超过 1 就截断到 1
   <summary><![CDATA[实现自回归推理与 temperature 采样，让模型逐 token 生成文本。]]></summary>
   <content type="html"><![CDATA[<h1>第 15 课：推理与采样 —— 让模型&quot;创造性&quot;地生成</h1>
 <blockquote>
-<p>代码位置：<a href="">src/sample.rs</a>
-模型接口：<a href="">src/model.rs</a>
-演示入口：<a href="">src/main.rs</a></p>
+<p>代码位置：<a href="src/sample.rs">src/sample.rs</a>
+模型接口：<a href="src/model.rs">src/model.rs</a>
+演示入口：<a href="src/main.rs">src/main.rs</a></p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
@@ -2764,7 +2933,7 @@ logits（每个 token 一个分数，未归一化）
 </tr>
 </tbody>
 </table>
-<p>代码（<a href="">src/sample.rs</a> <code>sample_token</code> 第 1 步）：</p>
+<p>代码（<a href="src/sample.rs">src/sample.rs</a> <code>sample_token</code> 第 1 步）：</p>
 <pre><code class="language-rust">let scaled: Vec&lt;f32&gt; = logits
     .iter()
     .map(|&amp;l| l / temperature.max(1e-5))   // 防止 T=0 除零
@@ -2837,7 +3006,7 @@ if top_k &gt; 0 &amp;&amp; items.len() &gt; top_k {
 <p>相比 top-k 的&quot;一刀切固定个数&quot;，top-p 更聪明：概率分布尖的时候只留 1-2 个候选，平的时候留一堆。实践中 top-k 和 top-p 经常<strong>一起开</strong>（本项目 main.rs 里就是 <code>top_k=10, top_p=0.9</code> 同时启用）。</p>
 </blockquote>
 <h2>7. 汇总：sample_token 的完整六步</h2>
-<p><a href="">src/sample.rs</a> 的 <code>sample_token</code> 把上面所有招数串起来：</p>
+<p><a href="src/sample.rs">src/sample.rs</a> 的 <code>sample_token</code> 把上面所有招数串起来：</p>
 <table>
 <thead>
 <tr>
@@ -2889,7 +3058,7 @@ items.last().map(|(i, _)| *i).unwrap_or(0)
 </code></pre>
 <p>数学上：选到 token i 的概率正好等于 pᵢ。这保证了——概率高的 token 被选中的机会大，但概率低的也有机会被选中，这就是&quot;随机性&quot;的来源。</p>
 <h2>8. generate：一步一步生成整句文本</h2>
-<p>全量模式（无 KV cache）的流程，<a href="">src/sample.rs</a>：</p>
+<p>全量模式（无 KV cache）的流程，<a href="src/sample.rs">src/sample.rs</a>：</p>
 <pre><code class="language-rust">let block_size = model.cfg.block_size;
 let mut ids = tokenizer.encode(prompt);        // 起始文本 → id 序列
 let mut cache = model.new_kv_cache();
@@ -3024,8 +3193,8 @@ if use_kv_cache &amp;&amp; cache[0].seq_len() &gt;= block_size {
   <summary><![CDATA[实现语料库与 DataLoader，把文本切分为输入-目标训练样本。]]></summary>
   <content type="html"><![CDATA[<h1>第 14 课：数据加载 —— 文本如何变成训练样本</h1>
 <blockquote>
-<p>代码位置：<a href="">src/data.rs</a>
-训练入口：<a href="">src/train.rs</a>（第 13 课）</p>
+<p>代码位置：<a href="src/data.rs">src/data.rs</a>
+训练入口：<a href="src/train.rs">src/train.rs</a>（第 13 课）</p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
@@ -3047,7 +3216,7 @@ token id 序列  [t₀, t₁, t₂, t₃, ...]
    ▼
 训练样本 (x, y)
 </code></pre>
-<p>本项目的语料是内置在 <a href="">src/data.rs</a> 里的一个英文小故事：</p>
+<p>本项目的语料是内置在 <a href="src/data.rs">src/data.rs</a> 里的一个英文小故事：</p>
 <pre><code class="language-rust">pub const CORPUS: &amp;str = &quot;\
 Once upon a time in a small village, there lived a curious little fox named Red. \
 ... every adventure begins with a single step.&quot;;
@@ -3074,7 +3243,7 @@ let tokens = tokenizer.encode(text);          // &quot;Once&quot; -&gt; [O, n, c
 </code></pre>
 <p>这为什么叫<strong>自监督</strong>？因为&quot;标准答案&quot;就藏在文本自己身上——预测&quot;下一个 token&quot;，标签就是原文里紧跟其后的那个 token，<strong>不需要任何人去标注</strong>。模型只要在海量文本上反复做这件事，就能学会语法、语义和世界知识。这也是 ChatGPT 这类大模型训练的第一阶段。</p>
 <h2>5. 第二步 + 第三步：x/y 配对（平移一位）</h2>
-<p><code>DataLoader::sample_batch</code> 的核心逻辑（<a href="">src/data.rs</a>）：</p>
+<p><code>DataLoader::sample_batch</code> 的核心逻辑（<a href="src/data.rs">src/data.rs</a>）：</p>
 <pre><code class="language-rust">pub fn sample_batch(&amp;self, rng: &amp;mut Rng) -&gt; (Vec&lt;usize&gt;, Vec&lt;usize&gt;) {
     let max_start = self.tokens.len() - self.block_size - 1;
     let mut x = Vec::with_capacity(self.batch_size * self.block_size);
@@ -3224,8 +3393,8 @@ x = [ t57 t58 t59 t60 ]  y = [ t58 t59 t60 t61 ]
   <summary><![CDATA[编写完整的训练循环：前向、损失计算、反向传播与参数更新。]]></summary>
   <content type="html"><![CDATA[<h1>第 13 课：训练循环 —— 让模型真正开始学习</h1>
 <blockquote>
-<p>代码位置：<a href="">src/train.rs</a>
-演示入口：<a href="">src/main.rs</a></p>
+<p>代码位置：<a href="src/train.rs">src/train.rs</a>
+演示入口：<a href="src/main.rs">src/main.rs</a></p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
@@ -3288,7 +3457,7 @@ x = [ t57 t58 t59 t60 ]  y = [ t58 t59 t60 t61 ]
 <blockquote>
 <p><strong>顺序不能乱</strong>：前向必须发生在反向之前（没有前向就没有计算图）；更新必须发生在反向之后（没有梯度就没东西可更新）；清零必须放在最后（否则下一步的梯度会叠加在旧梯度上）。</p>
 </blockquote>
-<p>对应代码（<a href="">src/train.rs</a> 中的 <code>train_gpt</code>，省略了日志打印）：</p>
+<p>对应代码（<a href="src/train.rs">src/train.rs</a> 中的 <code>train_gpt</code>，省略了日志打印）：</p>
 <pre><code class="language-rust">for step in 0..steps {
     // 1. 采样 batch
     let (x, y) = loader.sample_batch(rng);
@@ -3342,19 +3511,17 @@ let loss = cross_entropy_loss(&amp;logits, &amp;y);           // 标量
 </code></pre>
 <p>模型给正确 token 的概率越高，loss 越小；loss 为 0 意味着预测完全正确。训练的目标就是把这个数压到最低。</p>
 <h2>6. 第三步：反向 —— <code>loss.backward()</code> 做了什么</h2>
-<p>这是自动微分（第 2 课）的核心。看 <a href="">src/tensor.rs</a> 里的实现：</p>
+<p>这是自动微分（第 2 课）的核心。看 <a href="src/autograd.rs">src/autograd.rs</a> 里的实现：</p>
 <pre><code class="language-rust">pub fn backward(&amp;self) {
     assert_eq!(self.rank(), 0, &quot;backward() 只支持标量（0 维）输出&quot;);
     // 1. 先把输出自身的梯度设为 1（d loss / d loss = 1）
-    g[0] = 1.0;
+    self.grad.borrow_mut()[0] = 1.0;
 
-    // 2. DFS 遍历计算图，得到&quot;拓扑序&quot;（先子节点后父节点）
-    fn dfs(t: &amp;Tensor, order: &amp;mut Vec&lt;Tensor&gt;, visited: &amp;mut HashSet&lt;usize&gt;) {
-        let key = Rc::as_ptr(&amp;t.data) as usize;
-        if !visited.insert(key) { return; }
-        for p in t.parents.iter() { dfs(p, order, visited); }
-        order.push(t.clone());
-    }
+    // 2. 迭代式 DFS 拓扑排序（避免递归栈溢出，见第 4 课 6.2 节）
+    //    用显式栈模拟递归，得到&quot;先子节点后父节点&quot;的拓扑序
+    let mut stack: Vec&lt;(Tensor, usize)&gt; = Vec::new();
+    let mut visited: HashSet&lt;usize&gt; = HashSet::new();
+    // ... 三色标记法遍历 ...
 
     // 3. 把拓扑序反过来：从 loss 开始，一层一层往回传梯度
     for t in order.iter().rev() {
@@ -3378,7 +3545,7 @@ let loss = cross_entropy_loss(&amp;logits, &amp;y);           // 标量
 <h2>7. 第四步：梯度裁剪 <code>clip_grad_norm</code></h2>
 <p><strong>问题：梯度爆炸。</strong> 深层网络 + 长序列训练时，链式法则连乘会导致梯度呈指数级放大，一步更新就可能把参数&quot;推飞&quot;，loss 直接变成 NaN/无穷大。</p>
 <p><strong>对策：</strong> 在更新参数之前，先检查所有参数梯度的总范数；如果超过阈值 <code>max_norm</code>，就<strong>整体等比缩放</strong>，让方向不变、大小受控。</p>
-<p>代码（<a href="">src/train.rs</a>）：</p>
+<p>代码（<a href="src/train.rs">src/train.rs</a>）：</p>
 <pre><code class="language-rust">pub fn clip_grad_norm(params: &amp;[Tensor], max_norm: f32) {
     // 1. 算总范数：所有梯度元素的平方和，再开根号
     let mut total = 0.0f32;
@@ -3487,9 +3654,10 @@ step   599 | lr 0.00030 | loss 0.8142
   <summary><![CDATA[组合 Embedding、TransformerBlock、LayerNorm 等积木，拼出完整的 GPT 模型结构。]]></summary>
   <content type="html"><![CDATA[<h1>第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</h1>
 <blockquote>
-<p>代码位置：<a href="">src/model.rs</a>（<code>GPTConfig</code> / <code>GPT</code> / <code>TransformerBlock</code> / <code>MultiHeadAttention</code>）
-代码位置：<a href="">src/layers.rs</a>（<code>Embedding</code> / <code>Linear</code> / <code>LayerNorm</code> / <code>gelu</code>）
-演示入口：<a href="">src/main.rs</a>（演示 3：训练小 GPT 并生成文本）</p>
+<p>代码位置：<a href="src/model.rs">src/model.rs</a>（<code>GPTConfig</code> / <code>GPT</code> / <code>TransformerBlock</code>）
+代码位置：<a href="src/attention.rs">src/attention.rs</a>（<code>MultiHeadAttention</code> / <code>KVCache</code>）
+代码位置：<a href="src/layers.rs">src/layers.rs</a>（<code>Embedding</code> / <code>Linear</code> / <code>LayerNorm</code> / <code>gelu</code>）
+演示入口：<a href="src/main.rs">src/main.rs</a>（演示 3：训练小 GPT 并生成文本）</p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
@@ -3503,10 +3671,8 @@ step   599 | lr 0.00030 | loss 0.8142
 <pre><code>              ┌───────────────────────────────┐
  token id     │  tok_emb: Embedding [V, D]    │  ← 每个 token 查表成向量
               └───────────────────────────────┘
-              ┌───────────────────────────────┐
-              │  pos_emb: 正弦位置编码 [T, D]   │  ← 常数，告诉模型位置（第 11 课）
-              └───────────────────────────────┘
-              │        x = tok + pos_emb       │
+              │   x = tok（位置信息不再相加：由 RoPE 在   │
+              │   注意力内部旋转 Q/K 提供，见第 19 课）    │
               ┌───────────────────────────────┐
               │  blocks: N 层 Transformer      │  ← 注意力找相关性 + MLP 加工信息
               │  Block（本课第 3 节）           │
@@ -3515,7 +3681,7 @@ step   599 | lr 0.00030 | loss 0.8142
               │  ln_f: 最终 LayerNorm          │  ← 输出前再归一化一次
               └───────────────────────────────┘
               ┌───────────────────────────────┐
-              │  lm_head: Linear [D, V]        │  ← 映射成对每个词的打分
+              │  lm_head: tok_emb 表转置       │  ← 权重绑定，映射成对每个词的打分
               └───────────────────────────────┘
                       logits [B*T, V]（预测下一个 token）
 </code></pre>
@@ -3523,11 +3689,9 @@ step   599 | lr 0.00030 | loss 0.8142
 <pre><code class="language-rust">/// 完整的 GPT 模型
 pub struct GPT {
     pub cfg: GPTConfig,
-    tok_emb: Embedding,
-    pos_emb: Tensor, // 正弦位置编码 [block_size, D]（常数，不参与训练）
+    tok_emb: Embedding,          // 同时充当 lm_head（权重绑定）
     blocks: Vec&lt;TransformerBlock&gt;,
     ln_f: LayerNorm,
-    lm_head: Linear, // [D, vocab]
 }
 </code></pre>
 <table>
@@ -3549,14 +3713,8 @@ pub struct GPT {
 <tr>
 <td><code>tok_emb</code></td>
 <td><code>Embedding</code></td>
-<td>token id → 向量，查表 <code>[V, D]</code></td>
+<td>token id → 向量，查表 <code>[V, D]</code>；<strong>权重绑定</strong>：输出头直接复用它的转置，不再单独建 <code>lm_head</code></td>
 <td>第 12 课（<code>layers.rs</code>）</td>
-</tr>
-<tr>
-<td><code>pos_emb</code></td>
-<td><code>Tensor</code></td>
-<td>正弦位置编码，<code>[block_size, D]</code>，<strong>不参与训练</strong></td>
-<td>第 11 课</td>
 </tr>
 <tr>
 <td><code>blocks</code></td>
@@ -3570,30 +3728,21 @@ pub struct GPT {
 <td>输出前的最后归一化</td>
 <td>第 11 课</td>
 </tr>
-<tr>
-<td><code>lm_head</code></td>
-<td><code>Linear</code></td>
-<td><code>[D, V]</code>，把向量映射成对每个词的分数</td>
-<td>第 5 课</td>
-</tr>
 </tbody>
 </table>
+<p>位置信息哪里去了？—— 第 11 课的正弦位置编码（<code>pos_emb</code>）在第 19 课被 <strong>RoPE</strong> 取代：不再向输入加位置向量，而是在每个注意力层内部对 Q/K 做旋转（见第 19 课与 <code>MultiHeadAttention::forward</code>）。所以 <code>GPT</code> 结构体里已经没有 <code>pos_emb</code> 字段了。</p>
 <p>在 <code>GPT::new</code> 里把它们创建出来：</p>
 <pre><code class="language-rust">pub fn new(cfg: GPTConfig, rng: &amp;mut Rng) -&gt; Self {
     let n_embd = cfg.n_embd;
     let vocab_size = cfg.vocab_size;
-    let pos_emb = Tensor::from_vec(
-        sinusoidal_positions(cfg.block_size, cfg.n_embd),
-        vec![cfg.block_size, cfg.n_embd],
-    );
-    let blocks = (0..cfg.n_layer).map(|_| TransformerBlock::new(&amp;cfg, rng)).collect();
+    let blocks = (0..cfg.n_layer)
+        .map(|_| TransformerBlock::new(&amp;cfg, rng))
+        .collect();
     GPT {
         cfg,
         tok_emb: Embedding::new(vocab_size, n_embd, rng),
-        pos_emb,
         blocks,
         ln_f: LayerNorm::new(n_embd, 1e-5),
-        lm_head: Linear::new(n_embd, vocab_size, rng),
     }
 }
 </code></pre>
@@ -3729,14 +3878,9 @@ impl TransformerBlock {
 <td><code>[B*T] → [B*T, D] → [B, T, D]</code></td>
 </tr>
 <tr>
-<td>2. 位置编码</td>
-<td><code>self.pos_emb.gather_rows(&amp;positions).reshape(vec![b, t, d])</code></td>
-<td><code>[B, T, D]</code>（与 tok 同形状）</td>
-</tr>
-<tr>
-<td>—— 相加</td>
-<td><code>let x = tok.add(&amp;pos_emb);</code></td>
-<td><code>[B, T, D]</code>（第 11 课：语义+位置）</td>
+<td>2. 位置信息（RoPE）</td>
+<td>在注意力内部对 Q/K 旋转（第 19 课），输入不再加位置向量；这里只算 <code>base</code>（KV cache 模式下已缓存的位置数）</td>
+<td>——</td>
 </tr>
 <tr>
 <td>3. 构造因果掩码</td>
@@ -3745,12 +3889,12 @@ impl TransformerBlock {
 </tr>
 <tr>
 <td>4. 逐层 Transformer Block</td>
-<td><code>x = block.forward(&amp;x, &amp;mask, cache);</code></td>
+<td><code>x = block.forward(&amp;x, &amp;mask, cache, base);</code></td>
 <td><code>[B, T, D]</code> → <code>[B, T, D]</code>（层内拆头又合并，形状不变）</td>
 </tr>
 <tr>
 <td>5. 最终归一化 + 输出头</td>
-<td><code>ln_f.forward(&amp;x)</code> 然后 <code>reshape(vec![b * t, d])</code>，<code>lm_head.forward(&amp;x)</code></td>
+<td><code>ln_f.forward(&amp;x)</code> 然后 <code>reshape(vec![b * t, d])</code>，<code>x.matmul(&amp;tok_emb.table.transpose())</code></td>
 <td><code>[B, T, D] → [B*T, D] → [B*T, V]</code></td>
 </tr>
 </tbody>
@@ -3760,21 +3904,14 @@ impl TransformerBlock {
 assert_eq!(idx.len(), b * t, &quot;输入 id 数量必须等于 b*t&quot;);
 
 // 1. token embedding
-let tok = self.tok_emb.forward(idx).reshape(vec![b, t, d]);
+let x = self.tok_emb.forward(idx).reshape(vec![b, t, d]);
 
-// 2. 位置编码：KV cache 推理时，当前位置从缓存长度开始
+// 2. 位置信息由 RoPE 提供（在注意力内部旋转 Q/K，见 MultiHeadAttention::forward）。
+//    base = KV cache 模式下已缓存的位置数：新 token 的绝对位置 = base + 窗口内下标 j。
 let base = kv_cache
     .as_ref()
     .map(|c| c.first().map(|k| k.seq_len()).unwrap_or(0))
     .unwrap_or(0);
-let mut positions = Vec::with_capacity(b * t);
-for _ in 0..b {
-    for j in 0..t {
-        positions.push(base + j);
-    }
-}
-let pos_emb = self.pos_emb.gather_rows(&amp;positions).reshape(vec![b, t, d]);
-let x = tok.add(&amp;pos_emb);
 
 // 3. 因果掩码：scores 形状 [B*H, T, T_total]，广播 mask [T, T_total]
 let t_total = t + base;
@@ -3792,19 +3929,19 @@ let mask = Tensor::from_vec(mask_data, vec![t, t_total]);
 let mut x = x;
 for (i, block) in self.blocks.iter().enumerate() {
     let cache = kv_cache.as_mut().map(|c| &amp;mut c[i]);
-    x = block.forward(&amp;x, &amp;mask, cache);
+    x = block.forward(&amp;x, &amp;mask, cache, base);
 }
 
-// 5. 最终归一化 + 输出头
+// 5. 最终归一化 + 输出头（权重绑定：lm_head 复用 tok_emb.table 的转置）
 let x = self.ln_f.forward(&amp;x);
 let x = x.reshape(vec![b * t, d]);
-self.lm_head.forward(&amp;x)
+x.matmul(&amp;self.tok_emb.table.transpose())
 </code></pre>
 <p>几个容易忽略的细节：</p>
 <ol>
-<li><strong><code>gather_rows</code> 取位置行</strong>：<code>pos_emb</code> 是 <code>[block_size, D]</code>，<code>positions</code> 里存的是每个 token 的位置（<code>base + j</code>），<code>gather_rows</code> 按行取出对应的位置向量（第 1 课学的查表）。</li>
+<li><strong>位置信息来自 RoPE 而不是相加</strong>：第 11 课的做法是 <code>x = tok + pos_emb</code>（把正弦位置向量加进去）；第 19 课之后改为在注意力内部对 Q/K 做旋转（<code>rotary_pair</code>），<code>GPT::forward</code> 不再需要 <code>pos_emb</code> 表，只把 <code>base</code> 传给各层——KV cache 推理时，新 token 的绝对位置是 <code>base + j</code>（第 18 课）。</li>
 <li><strong>因果掩码的构造</strong>：<code>j &gt; i + base</code> 的位置设为 <code>-inf</code>。也就是说第 i 个 token 只能看到&quot;它自己和它前面的&quot;（含 KV cache 里的历史位置），未来位置在 softmax 后概率为 0——保证模型只能预测下一个词、不能偷看答案。</li>
-<li><strong>最终形状</strong>：<code>lm_head</code> 是 <code>Linear [D, V]</code>，把每个位置的 <code>[D]</code> 向量打分成 <code>[V]</code> 个词的分数，所以输出是 <code>[B*T, V]</code>。</li>
+<li><strong>权重绑定的输出头</strong>：<code>tok_emb.table</code> 是 <code>[V, D]</code>，它的转置 <code>[D, V]</code> 恰好可以把 <code>[D]</code> 向量打分成 <code>[V]</code> 个词的分数（&quot;第 i 行 = 第 i 个词的嵌入&quot;与当前向量做点积）。这与 GPT 的&quot;输入输出共享词嵌入&quot;做法一致，省掉了一份独立的 <code>lm_head</code> 参数（第 5.2 节参数量里会体现）。</li>
 </ol>
 <h3>4.3 一张形状变化总表</h3>
 <p>以 <code>b=1, t=4, n_embd=64, vocab=100</code> 为例：</p>
@@ -3828,14 +3965,9 @@ self.lm_head.forward(&amp;x)
 <td>每个 token 的语义向量</td>
 </tr>
 <tr>
-<td><code>pos_emb</code></td>
-<td><code>[1, 4, 64]</code></td>
-<td>每个 token 的位置向量</td>
-</tr>
-<tr>
-<td><code>x = tok + pos_emb</code></td>
-<td><code>[1, 4, 64]</code></td>
-<td>语义 + 位置</td>
+<td>（位置由 RoPE 提供）</td>
+<td>在注意力内部旋转 Q/K，形状不变</td>
+<td>相对位置信息（第 19 课）</td>
 </tr>
 <tr>
 <td>注意力内部</td>
@@ -3858,24 +3990,21 @@ self.lm_head.forward(&amp;x)
 <td>展平 B、T 两维</td>
 </tr>
 <tr>
-<td><code>lm_head</code></td>
+<td>权重绑定 lm_head</td>
 <td><code>[4, 100]</code></td>
-<td>每个位置对 100 个词的分数 = logits</td>
+<td><code>x @ tableᵀ</code>，每个位置对 100 个词的分数 = logits</td>
 </tr>
 </tbody>
 </table>
 <blockquote>
-<p>全程只有两处形状变化：<code>tok_emb</code> 之后从 <code>[B*T, D]</code> 变成 <code>[B, T, D]</code>（为了层内处理），<code>lm_head</code> 之前从 <code>[B, T, D]</code> 变回 <code>[B*T, D]</code>（因为 <code>Linear</code> 把 3D 输入自动展平，输出再还原）。中间的注意力拆头/合头都在 Block 内部完成，外部看到的一直是 <code>[B, T, D]</code>。</p>
+<p>全程只有两处形状变化：<code>tok_emb</code> 之后从 <code>[B*T, D]</code> 变成 <code>[B, T, D]</code>（为了层内处理），<code>ln_f</code> 之后从 <code>[B, T, D]</code> 变回 <code>[B*T, D]</code>（因为 <code>Linear</code> 把 3D 输入自动展平，输出再还原）。中间的注意力拆头/合头都在 Block 内部完成，外部看到的一直是 <code>[B, T, D]</code>。</p>
 </blockquote>
 <h2>5. GPTConfig::tiny 配置解读</h2>
-<pre><code class="language-rust">/// 一个小配置，适合学习演示
+<pre><code class="language-rust">/// 一个小配置，适合学习演示（其余字段与 Default 一致）
 pub fn tiny(vocab_size: usize) -&gt; Self {
     GPTConfig {
         vocab_size,
-        n_embd: 64,
-        n_head: 4,
-        n_layer: 2,
-        block_size: 32,
+        ..Default::default()
     }
 }
 </code></pre>
@@ -3893,7 +4022,7 @@ pub fn tiny(vocab_size: usize) -&gt; Self {
 <td><code>vocab_size</code></td>
 <td>由调用者传入</td>
 <td>词表大小（有多少种 token）</td>
-<td>决定 <code>tok_emb</code> 表行数和 <code>lm_head</code> 输出维度</td>
+<td>决定 <code>tok_emb</code> 表行数（兼输出头的宽度）</td>
 </tr>
 <tr>
 <td><code>n_embd</code></td>
@@ -3917,7 +4046,7 @@ pub fn tiny(vocab_size: usize) -&gt; Self {
 <td><code>block_size</code></td>
 <td>32</td>
 <td>最大上下文长度</td>
-<td>位置编码表 <code>[32, 64]</code> 的宽度；序列超过 32 个 token 就没位置编码可用</td>
+<td>训练/推理的最大 token 数；RoPE 的绝对位置 = <code>base + j</code> 不受此表限制</td>
 </tr>
 </tbody>
 </table>
@@ -3925,7 +4054,7 @@ pub fn tiny(vocab_size: usize) -&gt; Self {
 <ul>
 <li><strong>每个头处理多少维</strong>：<code>head_dim = n_embd / n_head = 64 / 4 = 16</code>（<code>MultiHeadAttention::forward</code> 里有断言 <code>head_dim * n_head == d</code>，配置必须能整除）。</li>
 <li><strong>每层的形状</strong>：注意力 4 个 Linear 都是 <code>[64, 64]</code>；MLP 是 <code>[64, 256]</code> 和 <code>[256, 64]</code>（4 倍升维）。</li>
-<li><strong>位置编码表</strong>：<code>[block_size=32, n_embd=64]</code>，一共 32×64 个常数。</li>
+<li><strong>位置信息</strong>：RoPE 的 cos/sin 表按&quot;位置 × 对偶下标&quot;预计算（第 19 课），维度 <code>block_size × (D/2)</code> 的常数，不参与训练。</li>
 </ul>
 <h3>5.2 粗略参数量估算</h3>
 <p>设词表大小 = V，参数量约：</p>
@@ -3939,7 +4068,7 @@ pub fn tiny(vocab_size: usize) -&gt; Self {
 </thead>
 <tbody>
 <tr>
-<td><code>tok_emb</code></td>
+<td><code>tok_emb</code>（兼 lm_head）</td>
 <td>V × 64</td>
 <td>6,400</td>
 </tr>
@@ -3975,13 +4104,13 @@ pub fn tiny(vocab_size: usize) -&gt; Self {
 </tr>
 <tr>
 <td><code>lm_head</code></td>
-<td>64×V + V</td>
-<td>6,500</td>
+<td><strong>0（权重绑定，复用 tok_emb 转置）</strong></td>
+<td><strong>0</strong></td>
 </tr>
 <tr>
 <td><strong>总计</strong></td>
 <td>——</td>
-<td><strong>≈ 113,000（约 11 万参数）</strong></td>
+<td><strong>≈ 106,500（约 10.6 万参数）</strong></td>
 </tr>
 </tbody>
 </table>
@@ -3994,12 +4123,12 @@ pub fn tiny(vocab_size: usize) -&gt; Self {
 <li><strong>改配置</strong>：自己加一个 <code>GPTConfig::small</code>，比如 <code>n_embd=128, n_head=8, n_layer=4, block_size=64</code>。注意 <code>head_dim = 128/8 = 16</code> 仍成立；再按 5.2 节的表估一下参数量。</li>
 <li><strong>验证 logits 形状</strong>：在 <code>main.rs</code> 演示 3 里，<code>model.forward(...)</code> 之后加一行打印 <code>logits.shape()</code>，确认是 <code>[B*T, V]</code>。</li>
 <li><strong>看 Block 内部分工</strong>：把 <code>mlp_linear1</code> 的维度改成 <code>2 * cfg.n_embd</code>（2 倍而不是 4 倍），训练看 loss 变化——体会 MLP 宽度对模型能力的影响。</li>
-<li><strong>思考</strong>：为什么 <code>lm_head</code> 和 <code>tok_emb</code> 可以&quot;共享权重&quot;（很多实现里是同一个矩阵的转置）？我们的代码里是两份独立参数，如果共享会省多少参数？（提示：<code>[V, D]</code> 和 <code>[D, V]</code> 恰好互为转置。）</li>
+<li><strong>思考</strong>：我们的输出头就是 <code>tok_emb.table</code> 的转置（权重绑定）。为什么可以这样做？相比&quot;独立的 lm_head&quot;省了多少参数？（提示：<code>[V, D]</code> 和 <code>[D, V]</code> 互为转置，<code>lm_head</code> 的参数量 <code>64×V+V</code> 恰好被省掉了。）</li>
 </ol>
 <h2>7. 本课总结</h2>
 <ul>
 <li>
-<p>GPT 由 <strong>token embedding + 正弦位置编码 + N 层 Transformer Block + 最终 LayerNorm + lm_head</strong> 五大部分组成</p>
+<p>GPT 由 <strong>token embedding + N 层 Transformer Block + 最终 LayerNorm + 权重绑定输出头</strong> 四大部分组成（位置信息由第 19 课的 RoPE 在注意力内部提供，不再有独立的 <code>pos_emb</code> 表）</p>
 </li>
 <li>
 <p>Transformer Block 是 <strong>pre-norm</strong> 结构：<code>LN → Attention → 残差</code>，再 <code>LN → MLP(GELU) → 残差</code>；MLP 做 <code>D → 4D → D</code> 的升维降维</p>
@@ -4008,10 +4137,13 @@ pub fn tiny(vocab_size: usize) -&gt; Self {
 <p><code>GPT::forward</code> 数据流：<code>idx [B*T] → [B, T, D] → ... → [B*T, V]</code>，只有进出输出头时形状变化，层内形状始终 <code>[B, T, D]</code></p>
 </li>
 <li>
-<p>因果掩码保证&quot;只能看过去&quot;，位置编码保证&quot;知道在哪&quot;</p>
+<p>因果掩码保证&quot;只能看过去&quot;，RoPE 保证&quot;知道相对位置&quot;</p>
 </li>
 <li>
-<p><code>tiny</code> 配置：<code>n_embd=64</code>、<code>n_head=4</code>（head_dim=16）、<code>n_layer=2</code>、<code>block_size=32</code>，约 11 万参数，CPU 上几分钟就能跑一轮训练</p>
+<p>输出头权重绑定：<code>x @ tok_emb.tableᵀ</code>，与 GPT 的&quot;输入输出共享词嵌入&quot;一致</p>
+</li>
+<li>
+<p><code>tiny</code> 配置：<code>n_embd=64</code>、<code>n_head=4</code>（head_dim=16）、<code>n_layer=2</code>、<code>block_size=32</code>，约 10.6 万参数，CPU 上几分钟就能跑一轮训练</p>
 </li>
 <li>
 <p>下一课：写训练循环（前向 → 算损失 → 反向传播 → 更新参数），让这个 GPT 真的学会生成文本！</p>
@@ -4023,7 +4155,7 @@ pub fn tiny(vocab_size: usize) -&gt; Self {
   <category term="GPT"/>
 </entry>
 <entry>
-  <title>第 11 课：位置编码与归一化 —— 让序列带上位置感</title>
+  <title>第 11 课：位置编码与归一化 —— 让序列带上「位置感」</title>
   <link href="https://ganto.me/post/rust-llm-guide-11"/>
   <id>https://ganto.me/post/rust-llm-guide-11</id>
   <updated>2026-09-12T00:00:00+08:00</updated>
@@ -4032,9 +4164,12 @@ pub fn tiny(vocab_size: usize) -&gt; Self {
   <summary><![CDATA[引入正弦位置编码与 LayerNorm 层归一化，配合残差连接稳定训练。]]></summary>
   <content type="html"><![CDATA[<h1>第 11 课：位置编码与归一化 —— 让序列带上&quot;位置感&quot;</h1>
 <blockquote>
-<p>代码位置：<a href="">src/model.rs</a>（正弦位置编码 <code>sinusoidal_positions</code>、<code>TransformerBlock</code> 里的残差连接）
-代码位置：<a href="">src/layers.rs</a>（<code>LayerNorm</code>）
-演示入口：<a href="">src/main.rs</a></p>
+<p>代码位置：<a href="src/model.rs">src/model.rs</a>（<code>TransformerBlock</code> 里的残差连接）
+代码位置：<a href="src/layers.rs">src/layers.rs</a>（<code>LayerNorm</code>）
+演示入口：<a href="src/main.rs">src/main.rs</a></p>
+<p>⚠️ <strong>历史说明</strong>：本课实现的正弦位置编码（<code>sinusoidal_positions</code> / <code>pos_emb</code>）已在<strong>第 19 课被 RoPE 取代</strong>——
+当前 <code>src/model.rs</code> 里不再有 <code>pos_emb</code> 字段，位置信息由注意力内部旋转 Q/K 提供。
+本节仍是必读的：LayerNorm 与残差连接至今原样在模型里，且&quot;位置编码要解决什么问题&quot;是理解 RoPE 的前提。</p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
@@ -4169,8 +4304,10 @@ PE(pos, 2i+1) = cos(pos / 10000^(2i/d))
 </tbody>
 </table>
 <h3>3.4 对应代码</h3>
-<p><code>src/model.rs</code> 里的实现：</p>
-<pre><code class="language-rust">/// 正弦位置编码（第 11 课）
+<blockquote>
+<p>⚠️ 以下函数已从代码库中删除（被 RoPE 取代），仅供理解原理。</p>
+</blockquote>
+<pre><code class="language-rust">/// 正弦位置编码（第 11 课，已删除）
 ///
 /// PE(pos, 2i)   = sin(pos / 10000^(2i/D))
 /// PE(pos, 2i+1) = cos(pos / 10000^(2i/D))
@@ -4512,6 +4649,9 @@ ln_f: LayerNorm::new(n_embd, 1e-5),
 <li>
 <p>下一课：把这些积木全部拼起来，组成完整的 GPT 模型！</p>
 </li>
+<li>
+<p>（本课的正弦位置编码在第 19 课被 RoPE 取代，见 <a href="docs/19-RoPE%E6%97%8B%E8%BD%AC%E4%BD%8D%E7%BD%AE%E7%BC%96%E7%A0%81.md">docs/19-RoPE旋转位置编码.md</a>；LayerNorm 与残差连接保留至今。）</p>
+</li>
 </ul>
 ]]></content>
   <category term="Rust"/>
@@ -4519,7 +4659,7 @@ ln_f: LayerNorm::new(n_embd, 1e-5),
   <category term="注意力"/>
 </entry>
 <entry>
-  <title>第 10 课：多头注意力 —— 让模型多角度看世界</title>
+  <title>第 10 课：多头注意力 —— 让模型「多角度」看世界</title>
   <link href="https://ganto.me/post/rust-llm-guide-10"/>
   <id>https://ganto.me/post/rust-llm-guide-10</id>
   <updated>2026-09-11T00:00:00+08:00</updated>
@@ -4528,8 +4668,8 @@ ln_f: LayerNorm::new(n_embd, 1e-5),
   <summary><![CDATA[将单头注意力扩展为多头注意力，让模型从多个表示子空间并行捕捉信息。]]></summary>
   <content type="html"><![CDATA[<h1>第 10 课：多头注意力 —— 让模型&quot;多角度&quot;看世界</h1>
 <blockquote>
-<p>代码位置：<a href="">src/model.rs</a>（<code>MultiHeadAttention</code> 结构 + <code>forward</code>）
-底层算子：<a href="">src/tensor.rs</a>（<code>reshape</code> / <code>permute</code> / <code>matmul</code> / <code>softmax_last_dim</code>）</p>
+<p>代码位置：<a href="src/attention.rs">src/attention.rs</a>（<code>MultiHeadAttention</code> 结构 + <code>forward</code>）
+底层算子：<a href="src/tensor.rs">src/tensor.rs</a>（<code>reshape</code> / <code>permute</code> / <code>matmul</code> / <code>softmax_last_dim</code>）</p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
@@ -4817,7 +4957,7 @@ cargo run    # 演示 3 训练小 GPT：4 头注意力参与每一轮前向/反�
   <category term="注意力"/>
 </entry>
 <entry>
-  <title>第 9 课：注意力机制 —— 让 token 互相看</title>
+  <title>第 9 课：注意力机制 —— 让 token 互相「看」</title>
   <link href="https://ganto.me/post/rust-llm-guide-09"/>
   <id>https://ganto.me/post/rust-llm-guide-09</id>
   <updated>2026-09-10T00:00:00+08:00</updated>
@@ -4826,9 +4966,9 @@ cargo run    # 演示 3 训练小 GPT：4 头注意力参与每一轮前向/反�
   <summary><![CDATA[实现注意力机制：Q/K/V 投影、打分、softmax 与因果掩码。]]></summary>
   <content type="html"><![CDATA[<h1>第 9 课：注意力机制 —— 让 token 互相&quot;看&quot;</h1>
 <blockquote>
-<p>代码位置：<a href="">src/model.rs</a>（<code>MultiHeadAttention::forward</code> 中的投影 / 打分 / softmax / 掩码部分）
-底层算子：<a href="">src/tensor.rs</a>（<code>softmax_last_dim</code> / <code>matmul</code> / <code>permute</code> / <code>mul_scalar</code>）
-掩码构造：<a href="">src/model.rs</a>（<code>GPT::forward</code>）</p>
+<p>代码位置：<a href="src/attention.rs">src/attention.rs</a>（<code>MultiHeadAttention::forward</code> 中的投影 / 打分 / softmax / 掩码部分）
+底层算子：<a href="src/tensor.rs">src/tensor.rs</a>（<code>softmax_last_dim</code> / <code>matmul</code> / <code>permute</code> / <code>mul_scalar</code>）
+掩码构造：<a href="src/model.rs">src/model.rs</a>（<code>GPT::forward</code>）</p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
@@ -5118,7 +5258,7 @@ cargo run    # 演示 3 训练小 GPT：每一步前向/反向都跑在本课的
   <category term="注意力"/>
 </entry>
 <entry>
-  <title>第 8 课：BPE 分词器 —— 让模型读懂文字</title>
+  <title>第 8 课：BPE 分词器 —— 让模型「读懂」文字</title>
   <link href="https://ganto.me/post/rust-llm-guide-08"/>
   <id>https://ganto.me/post/rust-llm-guide-08</id>
   <updated>2026-09-09T00:00:00+08:00</updated>
@@ -5127,9 +5267,9 @@ cargo run    # 演示 3 训练小 GPT：每一步前向/反向都跑在本课的
   <summary><![CDATA[实现 BPE（Byte Pair Encoding）分词器，将文本切分为模型可处理的 token。]]></summary>
   <content type="html"><![CDATA[<h1>第 8 课：BPE 分词器 —— 让模型&quot;读懂&quot;文字</h1>
 <blockquote>
-<p>代码位置：<a href="">src/tokenizer.rs</a>
-演示入口：<a href="">src/main.rs</a>（<code>demo_bpe</code>）
-语料：<a href="">src/data.rs</a>（<code>CORPUS</code>）</p>
+<p>代码位置：<a href="src/tokenizer.rs">src/tokenizer.rs</a>
+演示入口：<a href="src/main.rs">src/main.rs</a>（<code>demo_bpe</code>）
+语料：<a href="src/data.rs">src/data.rs</a>（<code>CORPUS</code>）</p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
@@ -5203,9 +5343,18 @@ pub fn encode(&amp;self, text: &amp;str) -&gt; Vec&lt;usize&gt; {
         .collect()
 }
 
-// id 序列 -&amp;gt; 文本（按 id 反查字符）
+// id 序列 -&amp;gt; 文本（按 id 反查字符，越界 id 带下标 panic 提示）
 pub fn decode(&amp;self, ids: &amp;[usize]) -&gt; String {
-    ids.iter().map(|&amp;i| self.chars[i]).collect()
+    ids.iter()
+        .map(|&amp;i| {
+            self.chars
+                .get(i)
+                .copied()
+                .unwrap_or_else(|| {
+                    panic!(&quot;decode 遇到越界 token id {i}（词表大小 {}）&quot;, self.chars.len())
+                })
+        })
+        .collect()
 }
 </code></pre>
 <p>编码和解码互为逆运算：<code>decode(encode(text)) == text</code>（单元测试 <code>test_char_tokenizer_roundtrip</code> 验证了这一点）。</p>
@@ -5342,51 +5491,53 @@ let mut ids: Vec&lt;u16&gt; = corpus.as_bytes().iter().map(|&amp;b| b as u16).co
 </ul>
 <p>词表大小 = 256 + 合并次数。演示里 <code>BPETokenizer::train(CORPUS, 400)</code> 得到 <strong>400 = 256 字节 + 144 次合并</strong>。</p>
 <h2>6. BPE 编码：encode()</h2>
-<p>编码 = 对新文本执行<strong>同样的贪心合并</strong>。但合并顺序必须和训练时一致：训练时越早合并的规则优先级越高（它对应的 token id 更小）。</p>
+<p>编码 = 对新文本执行<strong>同样的合并</strong>。但合并顺序必须和训练时一致：训练时越早合并的规则优先级越高（它对应的 token id 更小）。</p>
 <pre><code class="language-rust">pub fn encode(&amp;self, text: &amp;str) -&gt; Vec&lt;usize&gt; {
     let mut ids: Vec&lt;u16&gt; = text.as_bytes().iter().map(|&amp;b| b as u16).collect();
-    loop {
-        // 找到 ids 中优先级最高（merge 下标最小）的可合并 pair
-        let mut best_merge: Option&lt;usize&gt; = None;
-        let mut pos = 0;
-        for i in 0..ids.len().saturating_sub(1) {
-            let pair = (ids[i], ids[i + 1]);
-            if let Some(idx) = self.merges.iter().position(|&amp;m| m == pair) {
-                if best_merge.map_or(true, |b| idx &lt; b) {
-                    best_merge = Some(idx);
-                    pos = i;
-                }
+    for (idx, &amp;(a, b)) in self.merges.iter().enumerate() {
+        let new_id = (256 + idx) as u16;
+        let mut out: Vec&lt;u16&gt; = Vec::with_capacity(ids.len());
+        let mut i = 0;
+        while i &lt; ids.len() {
+            if i + 1 &lt; ids.len() &amp;&amp; ids[i] == a &amp;&amp; ids[i + 1] == b {
+                out.push(new_id);
+                i += 2;
+            } else {
+                out.push(ids[i]);
+                i += 1;
             }
         }
-        let Some(idx) = best_merge else { break; };
-        let new_id = (256 + idx) as u16;
-        ids[pos] = new_id;
-        ids.remove(pos + 1);
+        ids = out;
     }
     ids.into_iter().map(|x| x as usize).collect()
 }
 </code></pre>
 <p>要点：</p>
 <ul>
-<li>每次找<strong>当前序列里可合并且 merge 下标最小</strong>的 pair，替换后重新找，直到没有可合并的 pair</li>
+<li><strong>按规则优先级单趟扫描</strong>（GPT-2 的标准实现）：从 <code>merges[0]</code> 到 <code>merges[最后]</code>，每条规则在序列上扫一遍，能合并就替换成它对应的新 token。复杂度 O(len × 合并数)，大语料也能秒级完成（若&quot;每次只合并一个 pair 并全量重扫&quot;是 O(n²×m)，174KB 语料会卡死）</li>
 <li><code>new_id = 256 + idx</code>：merge 下标 idx 直接映射成 token id——因为训练时第 idx 次合并恰好产生 id <code>256 + idx</code></li>
 <li>字节 id（0~255）直接复用训练时的字节 → id 映射</li>
 <li>演示里 <code>&quot;the garden&quot;</code> 编码后只有 <strong>2 个 token</strong>（&quot;the&quot; 和 &quot; garden&quot; 都被压缩成了单个 token）</li>
 </ul>
-<p>以 <code>&quot;lowest&quot;</code> 为例走一遍：字节 <code>[l,o,w,e,s,t]</code> → 合并 <code>(l,o)</code> → <code>[256,w,e,s,t]</code> → 合并 <code>(256,w)</code> → <code>[257,e,s,t]</code> → 继续合并 <code>(e,s)</code>、<code>(s,t)</code>……最终 6 个字节被压成 3 个 token（单元测试要求 <code>&quot;low&quot;</code> 编码后不超过 3 个 token）。</p>
+<p>以 <code>&quot;lowest&quot;</code> 为例走一遍：字节 <code>[l,o,w,e,s,t]</code> → 应用规则 0（假设是 <code>(l,o)</code>）→ <code>[256,w,e,s,t]</code> → 应用规则 1（<code>(256,w)</code>）→ <code>[257,e,s,t]</code> → 继续应用 <code>(e,s)</code>、<code>(s,t)</code> 对应规则……最终 6 个字节被压成 3 个 token（单元测试要求 <code>&quot;low&quot;</code> 编码后不超过 3 个 token）。</p>
 <h2>7. BPE 解码：decode()</h2>
 <p>解码是查表 + 拼接：每个 id 查到它代表的字节序列，拼起来还原文本。</p>
 <pre><code class="language-rust">pub fn decode(&amp;self, ids: &amp;[usize]) -&gt; String {
     let mut bytes: Vec&lt;u8&gt; = Vec::new();
     for &amp;id in ids {
-        bytes.extend_from_slice(&amp;self.vocab[id]);
+        let tok = self
+            .vocab
+            .get(id)
+            .unwrap_or_else(|| panic!(&quot;decode 遇到越界 token id {id}（词表大小 {}）&quot;, self.vocab.len()));
+        bytes.extend_from_slice(tok);
     }
     String::from_utf8_lossy(&amp;bytes).to_string()
 }
 </code></pre>
 <ul>
 <li><code>vocab[id]</code>：id → 字节序列（0~255 是单字节，256+ 是合并出来的多字节序列）</li>
-<li><code>String::from_utf8_lossy</code>：万一拼出非法 UTF-8，用替换字符 <code>�</code> 顶替而不是 panic——<strong>decode 永不失败</strong></li>
+<li>越界 id 用 <code>vocab.get(id)</code> 拦截：带下标信息的 panic 提示（decode 也会因传入非法 id 报错，不再是&quot;永不失败&quot;）</li>
+<li><code>String::from_utf8_lossy</code>：万一拼出非法 UTF-8，用替换字符 <code>�</code> 顶替而不是 panic</li>
 </ul>
 <blockquote>
 <p>完整闭环：<code>decode(encode(&quot;lowest new&quot;)) == &quot;lowest new&quot;</code>（单元测试 <code>test_bpe_roundtrip</code> 验证）。</p>
@@ -5411,7 +5562,7 @@ let mut ids: Vec&lt;u16&gt; = corpus.as_bytes().iter().map(|&amp;b| b as u16).co
 <tr>
 <td>编码 encode</td>
 <td>对新文本按规则贪心合并</td>
-<td>反复找 merge 下标最小的可合并 pair 并替换</td>
+<td>按规则优先级（merges 顺序）单趟扫描替换</td>
 <td>一串 token id</td>
 </tr>
 <tr>
@@ -5424,7 +5575,7 @@ let mut ids: Vec&lt;u16&gt; = corpus.as_bytes().iter().map(|&amp;b| b as u16).co
 </table>
 <p>三者关系：<strong>编码必须复现训练时的合并顺序</strong>，解码只是查表，所以编码、解码天然互逆，<code>decode(encode(x)) == x</code>。</p>
 <h2>9. 运行与测试</h2>
-<pre><code class="language-bash">cargo test   # 15 个测试全部通过，其中 tokenizer 的 2 个验证了编解码互逆
+<pre><code class="language-bash">cargo test   # 全部测试通过
 cargo run    # 演示 2（BPE）：词表 400（256 + 144 次合并）；&quot;Red&quot; -&gt; [82, 101, 100]；&quot;the garden&quot; -&gt; 2 个 token
 </code></pre>
 <h2>10. 动手练习</h2>
@@ -5457,7 +5608,7 @@ cargo run    # 演示 2（BPE）：词表 400（256 + 144 次合并）；&quot;R
   <summary><![CDATA[用前面实现的层组合出第一个多层感知机，成功训练它学会 XOR 异或运算。]]></summary>
   <content type="html"><![CDATA[<h1>第 7 课：第一个 MLP —— 教会神经网络算 XOR</h1>
 <blockquote>
-<p>代码位置：<a href="">src/main.rs</a>（<code>demo_xor</code> 函数）
+<p>代码位置：<a href="src/main.rs">src/main.rs</a>（<code>demo_xor</code> 函数）
 前置知识：第 5 课 Linear / 激活函数、第 6 课 CrossEntropy / SGD</p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
@@ -5512,12 +5663,12 @@ cargo run    # 演示 2（BPE）：词表 400（256 + 144 次合并）；&quot;R
 <ul>
 <li>第 2 课的线性回归只有一层：<code>pred = xW + b</code>，它学出的边界本质是一条直线</li>
 <li>对 XOR，直线永远分不开 → 单层模型最多只能对 3 个样本正确（3/4），永远到不了 4/4</li>
-<li>解法：<strong>隐藏层 + 非线性激活</strong>（第 5 课的 ReLU）。非线性可以把输入空间&quot;折叠 / 扭曲&quot;，让原本线性不可分的点在高层变得线性可分</li>
+<li>解法：<strong>隐藏层 + 非线性激活</strong>（第 5 课学的 Tanh）。非线性可以把输入空间&quot;折叠 / 扭曲&quot;，让原本线性不可分的点在高层变得线性可分</li>
 </ul>
 <p>直觉（4 个样本为什么能学会）：</p>
 <ul>
 <li>隐藏层 4 个神经元 ≈ 学出 4 种&quot;特征组合&quot;</li>
-<li>ReLU 让每个特征可以&quot;开关&quot;（x &gt; 0 才激活）</li>
+<li>Tanh 把每个特征压缩到 (-1, 1)，给特征带来非线性</li>
 <li>第二层再线性组合这些特征，就能画出&quot;折线&quot;边界，把四个点完美分开</li>
 </ul>
 <h2>4. 数据集与网络结构：2 → 4 → 2</h2>
@@ -5538,7 +5689,7 @@ let y_targets = vec![0usize, 1, 1, 0]; // XOR 真值表
 let fc2 = Linear::new(4, 2, &amp;mut rng);   // 隐藏层 4 维 → 输出 2 维
 </code></pre>
 <p>结构图：</p>
-<pre><code>x [4,2] ─► fc1 (2→4) ─► ReLU ─► h [4,4] ─► fc2 (4→2) ─► logits [4,2]
+<pre><code>x [4,2] ─► fc1 (2→4) ─► Tanh ─► h [4,4] ─► fc2 (4→2) ─► logits [4,2]
 </code></pre>
 <ul>
 <li>输出层是 <strong>2 个神经元</strong>：第 0 个是&quot;类别 0 的分数&quot;，第 1 个是&quot;类别 1 的分数&quot;</li>
@@ -5559,8 +5710,8 @@ let opt = SGD::new(0.5, params);
 </ul>
 <h2>5. 训练循环：1000 步</h2>
 <pre><code class="language-rust">for step in 0..1000 {
-    // 前向：relu(x @ W1 + b1) @ W2 + b2
-    let h = relu(&amp;fc1.forward(&amp;x_data));
+    // 前向：tanh(x @ W1 + b1) @ W2 + b2
+    let h = tanh(&amp;fc1.forward(&amp;x_data));
     let logits = fc2.forward(&amp;h);
     let loss = cross_entropy_loss(&amp;logits, &amp;y_targets);
 
@@ -5585,7 +5736,7 @@ let opt = SGD::new(0.5, params);
 <tbody>
 <tr>
 <td>前向</td>
-<td><code>fc1.forward(&amp;x_data)</code> → <code>relu</code> → <code>fc2.forward(&amp;h)</code></td>
+<td><code>fc1.forward(&amp;x_data)</code> → <code>tanh</code> → <code>fc2.forward(&amp;h)</code></td>
 <td>4 个样本一次算完</td>
 </tr>
 <tr>
@@ -5614,7 +5765,7 @@ let opt = SGD::new(0.5, params);
 <h2>6. 验证：4/4 才算赢</h2>
 <p>训练完要&quot;考试&quot;：</p>
 <pre><code class="language-rust">// 验证正确率
-let h = relu(&amp;fc1.forward(&amp;x_data));
+let h = tanh(&amp;fc1.forward(&amp;x_data));
 let logits = fc2.forward(&amp;h);
 let data = logits.data();
 let mut correct = 0;
@@ -5635,7 +5786,7 @@ println!(&quot;  训练后正确率：{}/4（100% 说明反向传播正确）\n&
 <ol>
 <li><strong>参数是随机初始化的</strong>（种子 42），绝不是&quot;碰巧答对&quot;；</li>
 <li><strong>梯度完全来自自动微分</strong>：任何一个运算（matmul / add / relu / softmax / log / sum ...）的反向实现出错，梯度就会偏一点，参数越走越偏，1000 步后必然累积成大错；</li>
-<li><strong>XOR 没有捷径</strong>：它是&quot;必须两层非线性&quot;的问题，梯度要穿透 ReLU 的 mask、两层 matmul 的转置路径、softmax 的雅可比路径——整条反向传播链路被真实训练&quot;压测&quot;了一遍；</li>
+<li><strong>XOR 没有捷径</strong>：它是&quot;必须两层非线性&quot;的问题，梯度要穿透 Tanh 的导数（<code>1 - t²</code>）、两层 matmul 的转置路径、softmax 的雅可比路径——整条反向传播链路被真实训练&quot;压测&quot;了一遍；</li>
 <li>结果 100% 正确 + loss 单调下降，还同时验证了<strong>优化器</strong>（SGD 的 <code>set_data</code> 写回）和<strong>训练循环</strong>（backward → step → zero_grad 的顺序）都是对的。</li>
 </ol>
 <p>换句话说：<strong>XOR 训练收敛到 4/4，等于对&quot;张量库 + 网络层 + 损失 + 优化器&quot;整条链路做了一次端到端集成测试</strong>。</p>
@@ -5654,9 +5805,9 @@ println!(&quot;  训练后正确率：{}/4（100% 说明反向传播正确）\n&
 <h2>9. 动手练习</h2>
 <ol>
 <li>把隐藏层大小从 4 改成 2（<code>Linear::new(2, 2, ...)</code>），观察还能不能到 4/4（提示：2 个隐藏神经元很可能不够）。</li>
-<li>把 <code>relu</code> 换成 <code>tanh</code> 或 <code>gelu</code>，其他不变，观察收敛速度差异。</li>
+<li>把 <code>tanh</code> 换成 <code>relu</code> 或 <code>gelu</code>，其他不变，观察收敛速度差异。</li>
 <li>把学习率改成 0.05 和 5.0，对比 loss 下降曲线（太小慢、太大震荡）。</li>
-<li>去掉 <code>relu</code>（<code>h = fc1.forward(&amp;x_data)</code> 直接喂给 fc2），验证&quot;没有非线性就学不会 XOR&quot;，观察正确率卡在 3/4。</li>
+<li>去掉 <code>tanh</code>（<code>h = fc1.forward(&amp;x_data)</code> 直接喂给 fc2），验证&quot;没有非线性就学不会 XOR&quot;，观察正确率卡在 3/4。</li>
 <li>把训练步数改成 100（可能还没收敛）和 10000（数据只有 4 个样本，看会不会过拟合），观察 loss 与正确率。</li>
 </ol>
 <h2>10. 本课总结</h2>
@@ -5673,7 +5824,7 @@ println!(&quot;  训练后正确率：{}/4（100% 说明反向传播正确）\n&
   <category term="MLP"/>
 </entry>
 <entry>
-  <title>第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</title>
+  <title>第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</title>
   <link href="https://ganto.me/post/rust-llm-guide-06"/>
   <id>https://ganto.me/post/rust-llm-guide-06</id>
   <updated>2026-09-07T00:00:00+08:00</updated>
@@ -5684,10 +5835,10 @@ println!(&quot;  训练后正确率：{}/4（100% 说明反向传播正确）\n&
 <blockquote>
 <p>代码位置：</p>
 <ul>
-<li><a href="">src/loss.rs</a>（MSE / CrossEntropy）</li>
-<li><a href="">src/optim.rs</a>（SGD / AdamW）</li>
+<li><a href="src/loss.rs">src/loss.rs</a>（MSE / CrossEntropy）</li>
+<li><a href="src/optim.rs">src/optim.rs</a>（SGD / AdamW）</li>
 </ul>
-<p>演示入口：<a href="">src/main.rs</a>（demo_xor 使用 <code>cross_entropy_loss</code> + <code>SGD</code>）</p>
+<p>演示入口：<a href="src/main.rs">src/main.rs</a>（demo_xor 使用 <code>cross_entropy_loss</code> + <code>SGD</code>）</p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
@@ -5796,8 +5947,8 @@ pub fn mse_loss(pred: &amp;Tensor, target: &amp;Tensor) -&gt; Tensor {
     }
     let oh = Tensor::from_vec(onehot, vec![b, d]);
 
-    // —— 第 2 步：log_softmax ——
-    let log_probs = logits.softmax_last_dim().log();
+    // —— 第 2 步：log_softmax（数值稳定版，log-sum-exp 技巧）——
+    let log_probs = logits.log_softmax_last_dim();
 
     // —— 第 3 步：取出正确类别的 log 概率，取负，再取均值 ——
     log_probs
@@ -5974,7 +6125,7 @@ cargo run      # 演示 1 中 loss 从初始值一路下降、正确率 4/4
   <category term="优化器"/>
 </entry>
 <entry>
-  <title>第 5 课：线性层与激活函数 —— 神经网络的积木</title>
+  <title>第 5 课：线性层与激活函数 —— 神经网络的「积木」</title>
   <link href="https://ganto.me/post/rust-llm-guide-05"/>
   <id>https://ganto.me/post/rust-llm-guide-05</id>
   <updated>2026-09-06T00:00:00+08:00</updated>
@@ -5985,11 +6136,11 @@ cargo run      # 演示 1 中 loss 从初始值一路下降、正确率 4/4
 <blockquote>
 <p>代码位置：</p>
 <ul>
-<li><a href="">src/layers.rs</a>（Linear 层、ReLU / GELU / Tanh / Softmax）</li>
-<li><a href="">src/module.rs</a>（Module trait 参数管理）</li>
-<li><a href="">src/rng.rs</a>（xorshift64 随机数生成器，权重初始化用）</li>
+<li><a href="src/layers.rs">src/layers.rs</a>（Linear 层、ReLU / GELU / Tanh / Softmax）</li>
+<li><a href="src/module.rs">src/module.rs</a>（Module trait 参数管理）</li>
+<li><a href="src/rng.rs">src/rng.rs</a>（xorshift64 随机数生成器，权重初始化用）</li>
 </ul>
-<p>演示入口：<a href="">src/main.rs</a></p>
+<p>演示入口：<a href="src/main.rs">src/main.rs</a></p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
@@ -6066,18 +6217,17 @@ let y = x.matmul(&amp;self.weight).add(&amp;self.bias);
 <h2>4. 权重初始化：为什么是 ±1/√in</h2>
 <p><code>Linear::new</code> 创建时给权重赋随机初始值：</p>
 <pre><code class="language-rust">pub fn new(in_features: usize, out_features: usize, rng: &amp;mut Rng) -&gt; Self {
-    let bound = 1.0 / (in_features as f32).sqrt();
+    let std = (2.0 / (in_features + out_features) as f32).sqrt();
     let w: Vec&lt;f32&gt; = (0..in_features * out_features)
-        .map(|_| rng.uniform(-bound, bound))
+        .map(|_| rng.randn() * std)
         .collect();
-    let b: Vec&lt;f32&gt; = (0..out_features).map(|_| rng.uniform(-bound, bound)).collect();
     Linear {
         weight: Tensor::param(w, vec![in_features, out_features]),
-        bias: Tensor::param(b, vec![out_features]),
+        bias: Tensor::param(vec![0.0; out_features], vec![out_features]),
     }
 }
 </code></pre>
-<p>也就是从均匀分布 <code>U(-bound, bound)</code> 采样，<code>bound = 1/√in</code>（代码注释里称为 xavier/kaiming 风格的初始化）。</p>
+<p>也就是从正态分布 <code>N(0, std)</code> 采样，<code>std = √(2/(in+out))</code>（Xavier 正态初始化），bias 初始化为全零。</p>
 <p><strong>为什么不能随便初始化？</strong></p>
 <table>
 <thead>
@@ -6100,15 +6250,15 @@ let y = x.matmul(&amp;self.weight).add(&amp;self.bias);
 <td>梯度极小 → 收敛慢如蜗牛</td>
 </tr>
 <tr>
-<td>±1/√in</td>
-<td>激活值的<strong>量级随层数基本不放大</strong>，训练稳定</td>
+<td>√(2/(in+out))</td>
+<td>激活值的<strong>方差随层数基本不放大</strong>，训练稳定</td>
 </tr>
 </tbody>
 </table>
-<p><strong>直觉推导</strong>：假设输入 x 的方差为 1，输出是 in 个项 <code>wᵢxᵢ</code> 的和。若 <code>wᵢ ~ U(-b, b)</code>，则 <code>Var(wᵢ) = b²/3</code>，于是：</p>
-<pre><code>Var(Σ wᵢxᵢ) ≈ in · Var(wᵢ) · Var(x) = in · b²/3
+<p><strong>直觉推导</strong>：假设输入 x 的方差为 1，输出是 in 个项 <code>wᵢxᵢ</code> 的和。若 <code>wᵢ ~ N(0, σ²)</code>，则 <code>Var(wᵢ) = σ²</code>，于是：</p>
+<pre><code>Var(Σ wᵢxᵢ) ≈ in · Var(wᵢ) · Var(x) = in · σ²
 </code></pre>
-<p>想让方差保持不变，需要 <code>b = √(3/in)</code>；代码取 <code>b = 1/√in</code>（更保守），核心思想一致——<strong>让每一层的输出量级都保持在 1 附近</strong>。</p>
+<p>想让方差保持不变，需要 <code>σ = √(1/in)</code>；Xavier 正态取 <code>σ = √(2/(in+out))</code>（兼顾前向和反向），核心思想——<strong>让每一层的输出量级都保持在 1 附近</strong>。</p>
 <p>随机数从哪来？标准库没有 RNG，我们自己在 <code>rng.rs</code> 实现了一个 <strong>xorshift64</strong>（几十行位运算，零依赖、可复现）：</p>
 <pre><code class="language-rust">/// 生成 [lo, hi) 的均匀浮点数
 pub fn uniform(&amp;mut self, lo: f32, hi: f32) -&gt; f32 {
@@ -6298,7 +6448,7 @@ cargo run      # 演示 1：MLP 学习 XOR（第 7 课完整讲解）
 </code></pre>
 <h2>9. 动手练习</h2>
 <ol>
-<li>把 <code>Linear::new</code> 里的 <code>bound</code> 改成 0.01 或 5.0，跑第 7 课的 demo_xor，观察收敛速度变化，解释原因。</li>
+<li>把 <code>Linear::new</code> 里的 <code>std</code> 改成 0.01 或 5.0，跑第 7 课的 demo_xor，观察收敛速度变化，解释原因。</li>
 <li>给 Linear 加一个&quot;无 bias&quot;选项（bias 全 0 且不出现在 <code>parameters()</code> 里），想想 <code>parameters()</code> 该怎么改。</li>
 <li>手动推导：GELU 在 x=0 处的值（应为 0）和导数；tanh 在 x=0 处的导数（应为 1）。</li>
 <li>思考：代码里 ReLU 在 x=0 处的梯度定义为 0（<code>a &gt; 0</code> 才为 1）。如果定义为 1 会怎样？训练结果会有区别吗？</li>
@@ -6327,8 +6477,8 @@ cargo run      # 演示 1：MLP 学习 XOR（第 7 课完整讲解）
   <summary><![CDATA[对项目进行模块化重构，按职责分层文件，并引入 Rc<RefCell> 管理共享参数。]]></summary>
   <content type="html"><![CDATA[<h1>第 4 课：模块化重构 —— 项目结构分层与 Rc<!-- raw HTML omitted --> 架构</h1>
 <blockquote>
-<p>代码位置：<a href="">src/tensor.rs</a>（核心：Tensor 结构体与自动微分）、<a href="">src/module.rs</a>（Module trait）、<a href="">src/main.rs</a>（模块声明与演示编排）
-参考实现：<a href="">src/layers.rs</a>（Module 的第一个实现者）</p>
+<p>代码位置：<a href="src/tensor.rs">src/tensor.rs</a>（核心：Tensor 结构体与自动微分）、<a href="src/module.rs">src/module.rs</a>（Module trait）、<a href="src/main.rs">src/main.rs</a>（模块声明与演示编排）
+参考实现：<a href="src/layers.rs">src/layers.rs</a>（Module 的第一个实现者）</p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
@@ -6353,13 +6503,20 @@ cargo run      # 演示 1：MLP 学习 XOR（第 7 课完整讲解）
 <h2>3. src/ 各文件职责分工</h2>
 <p><code>main.rs</code> 顶部用 <code>mod</code> 声明了全部模块：</p>
 <pre><code class="language-rust">// src/main.rs
+mod attention;
+mod autograd;
+mod checkpoint;
+mod cli;
+mod config;
 mod data;
+mod gpu;
 mod layers;
 mod loss;
 mod model;
 mod module;
 mod optim;
 mod rng;
+mod rope;
 mod sample;
 mod tensor;
 mod tokenizer;
@@ -6377,8 +6534,28 @@ mod train;
 <tbody>
 <tr>
 <td><code>tensor.rs</code></td>
-<td>张量数据结构 + 全部运算 + 自动微分</td>
+<td>张量数据结构 + 运算（前向 + 反向闭包）</td>
 <td>第 1-4 课</td>
+</tr>
+<tr>
+<td><code>autograd.rs</code></td>
+<td>自动微分：<code>backward</code> 迭代式拓扑排序（从 tensor.rs 拆出）</td>
+<td>第 2 课</td>
+</tr>
+<tr>
+<td><code>rope.rs</code></td>
+<td>RoPE 旋转位置编码（从 tensor.rs 拆出）</td>
+<td>第 19 课</td>
+</tr>
+<tr>
+<td><code>attention.rs</code></td>
+<td>多头自注意力 + KV Cache（从 model.rs 拆出）</td>
+<td>第 9-10、18 课</td>
+</tr>
+<tr>
+<td><code>gpu.rs</code></td>
+<td>GPU 计算后端（<code>--features gpu</code>）：WGSL 计算着色器</td>
+<td>第 21 课</td>
 </tr>
 <tr>
 <td><code>module.rs</code></td>
@@ -6417,8 +6594,8 @@ mod train;
 </tr>
 <tr>
 <td><code>model.rs</code></td>
-<td><code>GPT</code> 模型 + <code>KVCache</code></td>
-<td>第 9-12、18 课</td>
+<td><code>GPT</code> 模型（Transformer Block 堆叠）</td>
+<td>第 11-12 课</td>
 </tr>
 <tr>
 <td><code>train.rs</code></td>
@@ -6429,6 +6606,21 @@ mod train;
 <td><code>sample.rs</code></td>
 <td>推理采样：temperature / top-k / top-p</td>
 <td>第 15 课</td>
+</tr>
+<tr>
+<td><code>config.rs</code></td>
+<td>配置加载（serde 序列化）</td>
+<td>配套</td>
+</tr>
+<tr>
+<td><code>checkpoint.rs</code></td>
+<td>checkpoint 保存/恢复</td>
+<td>配套</td>
+</tr>
+<tr>
+<td><code>cli.rs</code></td>
+<td>命令行定义（clap）</td>
+<td>配套</td>
 </tr>
 <tr>
 <td><code>main.rs</code></td>
@@ -6454,13 +6646,13 @@ mod train;
 </tr>
 <tr>
 <td>第 3 层（流程）</td>
-<td><code>train.rs</code> <code>model.rs</code> <code>sample.rs</code></td>
-<td>训练循环、GPT 组装、推理采样</td>
+<td><code>train.rs</code> <code>model.rs</code> <code>sample.rs</code> <code>checkpoint.rs</code> <code>cli.rs</code></td>
+<td>训练循环、GPT 组装、推理采样、checkpoint、命令行</td>
 </tr>
 <tr>
 <td>第 2 层（组件）</td>
-<td><code>layers.rs</code> <code>loss.rs</code> <code>optim.rs</code> <code>data.rs</code> <code>tokenizer.rs</code> <code>rng.rs</code></td>
-<td>层、损失、优化器、数据、分词、随机数</td>
+<td><code>layers.rs</code> <code>loss.rs</code> <code>optim.rs</code> <code>data.rs</code> <code>tokenizer.rs</code> <code>rng.rs</code> <code>config.rs</code></td>
+<td>层、损失、优化器、数据、分词、随机数、配置</td>
 </tr>
 <tr>
 <td>第 1 层（协议）</td>
@@ -6468,9 +6660,14 @@ mod train;
 <td>只定义一个 trait，不依赖上层任何模块</td>
 </tr>
 <tr>
+<td>第 0.5 层（拆分）</td>
+<td><code>autograd.rs</code> <code>rope.rs</code> <code>attention.rs</code></td>
+<td>从 tensor.rs / model.rs 拆出的独立模块</td>
+</tr>
+<tr>
 <td>第 0 层（地基）</td>
-<td><code>tensor.rs</code></td>
-<td>张量与自动微分，被所有模块依赖</td>
+<td><code>tensor.rs</code> <code>gpu.rs</code></td>
+<td>张量与自动微分、GPU 计算后端，被所有模块依赖</td>
 </tr>
 </tbody>
 </table>
@@ -6619,7 +6816,12 @@ pub struct Tensor {
 <h2>6. backward 的 DFS 拓扑排序</h2>
 <h3>6.1 为什么需要拓扑排序</h3>
 <p>反向传播要求梯度<strong>从输出端向输入端逐层传递</strong>：<code>z = (x·y) + w</code> 里，必须先执行 <code>z</code> 的 backward（把梯度分给 <code>t</code>、<code>w</code>），<code>t</code> 的梯度就绪后才能执行 <code>t</code> 的 backward（再分给 <code>x</code>、<code>y</code>）。执行顺序由计算图的依赖关系决定，而 DFS 后序 + 逆序执行恰好给出这个顺序。</p>
-<h3>6.2 代码：DFS + HashSet 去重</h3>
+<h3>6.2 代码：迭代式 DFS + HashSet 去重</h3>
+<blockquote>
+<p>注：早期版本使用递归 DFS，后改为<strong>迭代式栈 DFS</strong>（三色标记法），
+因为深层计算图（4 层 Transformer + batch=16）的递归深度会超过 Windows 默认 1MB 栈。
+见 <code>src/autograd.rs</code>。</p>
+</blockquote>
 <pre><code class="language-rust">pub fn backward(&amp;self) {
     assert_eq!(self.rank(), 0, &quot;backward() 只支持标量（0 维）输出，当前形状 {:?}&quot;, self.shape);
     {
@@ -6627,22 +6829,33 @@ pub struct Tensor {
         g[0] = 1.0;                     // ① loss 的梯度 = 1（∂loss/∂loss = 1）
     }
 
-    fn dfs(t: &amp;Tensor, order: &amp;mut Vec&lt;Tensor&gt;, visited: &amp;mut HashSet&lt;usize&gt;) {
-        let key = Rc::as_ptr(&amp;t.data) as usize;   // 用 data 的指针作节点唯一 ID
-        if !visited.insert(key) {                 // ② 已访问过就跳过（去重）
-            return;
-        }
-        for p in t.parents.iter() {
-            dfs(p, order, visited);               // ③ 先递归父节点
-        }
-        order.push(t.clone());                    // ④ 后序入队：子在前、父在后（叶在前、根最后）
+    // 迭代式 DFS 拓扑排序（避免递归栈溢出）
+    // 用显式栈模拟递归：每个元素 (node, child_index) 表示&quot;该节点的第 child_index 个子节点待访问&quot;
+    let mut order: Vec&lt;Tensor&gt; = Vec::new();
+    let mut visited: HashSet&lt;usize&gt; = HashSet::new();
+    let mut stack: Vec&lt;(Tensor, usize)&gt; = Vec::new();
+
+    let key = Rc::as_ptr(&amp;self.grad) as usize;   // 用 grad 的指针作节点唯一 ID
+    if visited.insert(key) {
+        stack.push((self.clone(), 0));
     }
 
-    let mut order = Vec::new();
-    let mut visited = HashSet::new();
-    dfs(self, &amp;mut order, &amp;mut visited);
+    // ② 迭代式后序 DFS：先展开所有子节点，再入队
+    while let Some((node, idx)) = stack.last_mut() {
+        if *idx &lt; node.parents.len() {
+            let child = node.parents[*idx].clone();
+            *idx += 1;
+            let child_key = Rc::as_ptr(&amp;child.grad) as usize;
+            if visited.insert(child_key) {
+                stack.push((child, 0));           // ③ 先递归父节点
+            }
+        } else {
+            let (node, _) = stack.pop().unwrap();
+            order.push(node);                     // ④ 后序入队：子在前、父在后
+        }
+    }
 
-    for t in order.iter().rev() {                 // ⑤ 逆序遍历：从根走向叶（输出端 → 输入端）
+    for t in order.iter().rev() {                 // ⑤ 逆序遍历：从根走向叶
         if let Some(b) = &amp;t.backward {
             b();                                  // 执行各节点的反向闭包
         }
@@ -6659,8 +6872,8 @@ pub struct Tensor {
 </thead>
 <tbody>
 <tr>
-<td><code>Rc::as_ptr(&amp;t.data)</code> 做节点 ID</td>
-<td><code>Tensor</code> 没有自增 id；用共享数据 <code>data</code> 的堆地址当身份证最省事，同一张量的所有句柄地址相同</td>
+<td><code>Rc::as_ptr(&amp;t.grad)</code> 做节点 ID</td>
+<td><code>Tensor</code> 没有自增 id；用梯度 <code>grad</code> 的堆地址当身份证最省事，同一张量的所有句柄地址相同</td>
 </tr>
 <tr>
 <td><code>HashSet</code> 去重</td>
@@ -6786,8 +6999,8 @@ impl Module for GPT {
 ├── tok_emb.parameters()        → [table]
 ├── block[0].parameters()       → ln1[γ,β] + attn[c_q,c_k,c_v,c_proj] + ln2[γ,β] + mlp[W1,b1,W2,b2]
 ├── block[1].parameters()       → …
-├── ln_f.parameters()           → [γ, β]
-└── lm_head.parameters()        → [W, b]
+└── ln_f.parameters()           → [γ, β]
+    （lm_head 通过权重绑定复用 tok_emb.table.T，不单独存储）
 </code></pre>
 <h3>7.4 与优化器的配合（main.rs 的 demo_xor）</h3>
 <p><code>main.rs</code> 里第 7 课的 XOR 演示展示了完整闭环：</p>
@@ -6879,8 +7092,8 @@ cargo run      # 依次演示：XOR MLP → BPE 分词 → 小 GPT 训练与生�
   <summary><![CDATA[扩展张量运算能力：广播规则、归约、softmax 与批量矩阵乘法。]]></summary>
   <content type="html"><![CDATA[<h1>第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</h1>
 <blockquote>
-<p>代码位置：<a href="">src/tensor.rs</a>（本章新增：broadcast_shapes / broadcast_map / binary / sum / sum_last_dim / softmax_last_dim / permute / gather_rows / 3D matmul）
-演示入口：<a href="">src/main.rs</a></p>
+<p>代码位置：<a href="src/tensor.rs">src/tensor.rs</a>（本章新增：broadcast_shapes / broadcast_map / binary / sum / sum_last_dim / softmax_last_dim / permute / gather_rows / 3D matmul）
+演示入口：<a href="src/main.rs">src/main.rs</a></p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
@@ -7644,7 +7857,7 @@ cargo run      # 运行演示
   <category term="张量"/>
 </entry>
 <entry>
-  <title>第 2 课：自动微分 Autograd —— 让模型学会自我修正</title>
+  <title>第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</title>
   <link href="https://ganto.me/post/rust-llm-guide-02"/>
   <id>https://ganto.me/post/rust-llm-guide-02</id>
   <updated>2026-09-03T00:00:00+08:00</updated>
@@ -7653,8 +7866,8 @@ cargo run      # 运行演示
   <summary><![CDATA[实现反向传播所需的梯度计算：grad、backward 与各运算的反向传播实现。]]></summary>
   <content type="html"><![CDATA[<h1>第 2 课：自动微分 Autograd —— 让模型学会&quot;自我修正&quot;</h1>
 <blockquote>
-<p>代码位置：<a href="">src/tensor.rs</a>（本章新增：grad / parents / backward / sum / 各运算的反向实现）
-演示入口：<a href="">src/main.rs</a></p>
+<p>代码位置：<a href="src/tensor.rs">src/tensor.rs</a>（grad / parents / 各运算的反向闭包）、<a href="src/autograd.rs">src/autograd.rs</a>（backward 拓扑排序）
+演示入口：<a href="src/main.rs">src/main.rs</a></p>
 </blockquote>
 <h2>1. 本课要搞懂的问题</h2>
 <ol>
@@ -7794,14 +8007,14 @@ cargo run      # 运行演示
 <p>图是有向无环图（DAG）。要保证&quot;子节点先算，父节点后算&quot;，需要<strong>拓扑排序</strong>：</p>
 <pre><code class="language-rust">pub fn backward(&amp;self) {
     // 1. loss 自己的梯度 = 1（d loss / d loss = 1）
-    self.grad[0] = 1.0;
-    // 2. DFS 收集拓扑序：父在前，子在后
-    dfs(self, &amp;mut order, &amp;mut visited);
+    self.grad.borrow_mut()[0] = 1.0;
+    // 2. 迭代式 DFS 收集拓扑序：子在前，父在后（避免递归栈溢出，见第 4 课 6.2 节）
+    //    用显式栈模拟递归，三色标记法保证每个节点只入队一次
     // 3. 逆序遍历，逐个调用 backward 闭包：梯度从子流向父
-    for t in order.iter().rev() { t.backward()? }
+    for t in order.iter().rev() { t.backward() }
 }
 </code></pre>
-<p>用 <code>Rc::as_ptr(&amp;t.data)</code> 作为节点的唯一编号做去重（一个节点被多个运算共享时不能重复入队）。</p>
+<p>用 <code>Rc::as_ptr(&amp;t.grad)</code> 作为节点的唯一编号做去重（一个节点被多个运算共享时不能重复入队）。</p>
 <h2>9. 训练循环：四步舞</h2>
 <p>一次&quot;学习&quot;包含四步（也是所有深度学习框架训练循环的骨架）：</p>
 <pre><code class="language-rust">// 1. 前向：算预测和损失
@@ -7841,184 +8054,5 @@ cargo run      # 演示：链式法则验证 + 线性回归训练
   <category term="Rust"/>
   <category term="LLM"/>
   <category term="自动微分"/>
-</entry>
-<entry>
-  <title>第 1 课：张量 Tensor —— 一切的基础</title>
-  <link href="https://ganto.me/post/rust-llm-guide-01"/>
-  <id>https://ganto.me/post/rust-llm-guide-01</id>
-  <updated>2026-09-02T00:00:00+08:00</updated>
-  <published>2026-09-02T00:00:00+08:00</published>
-  <author><name>干徒</name></author>
-  <summary><![CDATA[张量是深度学习里所有数据的统一容器，本课从零实现多维数组、内存布局与矩阵乘法。]]></summary>
-  <content type="html"><![CDATA[<h1>第 1 课：张量 Tensor —— 一切的基础</h1>
-<blockquote>
-<p>代码位置：<a href="">src/tensor.rs</a>
-演示入口：<a href="">src/main.rs</a></p>
-</blockquote>
-<h2>1. 本课要搞懂的问题</h2>
-<ol>
-<li>什么是张量？为什么深度学习离不开它？</li>
-<li>计算机内存是&quot;一维&quot;的，多维数据怎么存？</li>
-<li>矩阵乘法到底在算什么？代码怎么写？</li>
-</ol>
-<h2>2. 什么是张量</h2>
-<p><strong>张量（Tensor）就是多维数组</strong>，是深度学习里所有数据的统一容器：</p>
-<table>
-<thead>
-<tr>
-<th>维度</th>
-<th>名称</th>
-<th>例子</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>0</td>
-<td>标量 (scalar)</td>
-<td>损失值 0.37</td>
-</tr>
-<tr>
-<td>1</td>
-<td>向量 (vector)</td>
-<td>一个词被表示成 [0.1, -0.3, 0.8, ...]</td>
-</tr>
-<tr>
-<td>2</td>
-<td>矩阵 (matrix)</td>
-<td>一批词向量堆在一起</td>
-</tr>
-<tr>
-<td>3</td>
-<td>3 维张量</td>
-<td>一批文本（每条文本是一串词向量）</td>
-</tr>
-<tr>
-<td>4</td>
-<td>4 维张量</td>
-<td>一批图像（高×宽×通道）</td>
-</tr>
-</tbody>
-</table>
-<p>在我们的实现里，张量由两部分构成：</p>
-<pre><code class="language-rust">pub struct Tensor {
-    pub data: Vec&lt;f32&gt;,      // 所有数值，展平成一维数组
-    pub shape: Vec&lt;usize&gt;,   // 每个维度的大小
-}
-</code></pre>
-<p><strong>关键思想</strong>：内存只有一维，但我们可以通过 <code>shape</code> 决定&quot;怎么解释&quot;这些数。</p>
-<h2>3. 行优先存储（Row-Major）</h2>
-<p>假设我们要存一个 2×3 的矩阵：</p>
-<pre><code>[ 1 2 3 ]
-[ 4 5 6 ]
-</code></pre>
-<p><strong>行优先</strong>就是&quot;一行一行地平铺&quot;：<code>[1, 2, 3, 4, 5, 6]</code>。</p>
-<p>那么&quot;第 i 行第 j 列&quot;的元素在数组里的下标是：</p>
-<pre><code>下标 = i * 列数 + j
-</code></pre>
-<p>例如矩阵里的元素 5，它在视觉上是&quot;第 2 行第 2 列&quot;，但编程里的行号、列号都<strong>从 0 开始数</strong>，
-所以行下标 i=1、列下标 j=1，列数=3：
-<code>下标 = 1*3 + 1 = 4</code>，<code>data[4] = 5</code> ✓</p>
-<blockquote>
-<p>容易混淆的点：<strong>&quot;第 1 行&quot; 和 &quot;行下标 1&quot; 不是一回事</strong>。
-行下标 1 其实是指视觉上的第 2 行。Rust 数组下标（<code>vec[i]</code>）也都是从 0 开始的。</p>
-</blockquote>
-<p>我们把这段逻辑写成了通用函数 <code>flat_index</code>，支持任意维度：</p>
-<pre><code class="language-rust">fn flat_index(&amp;self, index: &amp;[usize]) -&gt; usize {
-    let mut flat = 0;
-    for (i, &amp;idx) in index.iter().enumerate() {
-        flat = flat * self.shape[i] + idx;
-    }
-    flat
-}
-</code></pre>
-<h2>4. 逐元素运算（Element-wise）</h2>
-<p>两个形状相同的张量，对应位置各自做运算：</p>
-<ul>
-<li>加法：<code>c[i] = a[i] + b[i]</code></li>
-<li>减法：<code>c[i] = a[i] - b[i]</code></li>
-<li>乘法（Hadamard 积）：<code>c[i] = a[i] * b[i]</code></li>
-</ul>
-<p>Rust 里用 <code>zip</code> 可以优雅地实现：</p>
-<pre><code class="language-rust">pub fn add(&amp;self, other: &amp;Tensor) -&gt; Tensor {
-    assert_eq!(self.shape, other.shape, &quot;加法要求形状相同&quot;);
-    Tensor {
-        data: self.data.iter().zip(&amp;other.data).map(|(a, b)| a + b).collect(),
-        shape: self.shape.clone(),
-    }
-}
-</code></pre>
-<blockquote>
-<p>注意：逐元素乘法 <code>*</code> 和矩阵乘法 <code>@</code> 是完全不同的两件事！很多人刚开始会混淆。</p>
-</blockquote>
-<h2>5. 矩阵乘法（Matrix Multiplication）</h2>
-<p>这是神经网络里<strong>最重要的运算</strong>。一个线性层 <code>y = xW + b</code> 本质就是矩阵乘法。</p>
-<p><strong>数学定义</strong>：设 A 是 m×k，B 是 k×n，则 C = A×B 是 m×n，其中：</p>
-<pre><code>C[i][j] = Σ(k) A[i][k] * B[k][j]
-</code></pre>
-<p><strong>几何直觉</strong>：C 的第 i 行第 j 列 = A 的第 i 行 与 B 的第 j 列 的<strong>点积</strong>（对应位置相乘再求和）。</p>
-<p><strong>朴素实现</strong>（三重循环）：</p>
-<pre><code class="language-rust">pub fn matmul(&amp;self, other: &amp;Tensor) -&gt; Tensor {
-    let (m, k1) = (self.shape[0], self.shape[1]);
-    let (k2, n) = (other.shape[0], other.shape[1]);
-    assert_eq!(k1, k2, &quot;矩阵乘法维度不匹配&quot;);
-
-    let mut result = vec![0.0; m * n];
-    for i in 0..m {
-        for j in 0..n {
-            let mut sum = 0.0;
-            for k in 0..k1 {
-                sum += self.data[i * k1 + k] * other.data[k * n + j];
-            }
-            result[i * n + j] = sum;
-        }
-    }
-    Tensor { data: result, shape: vec![m, n] }
-}
-</code></pre>
-<p>验证一下：</p>
-<pre><code>[1 2]   [5 6]   [1*5+2*7  1*6+2*8]   [19 22]
-[3 4] × [7 8] = [3*5+4*7  3*6+4*8] = [43 50]
-</code></pre>
-<p>程序输出正是 <code>[19, 22, 43, 50]</code> ✓</p>
-<blockquote>
-<p>提示：三重循环复杂度是 O(m·n·k)。真实框架会用各种优化（分块、SIMD、GPU），
-我们后面课程会逐步改进，但<strong>先保证正确，再谈效率</strong>。</p>
-</blockquote>
-<h2>6. 转置与 reshape</h2>
-<ul>
-<li><strong>转置 (transpose)</strong>：m×n → n×m，<code>C[j][i] = A[i][j]</code>。后续反向传播中很常用。</li>
-<li><strong>reshape</strong>：只改变形状、不改变数据。<code>[1,2,3,4,5,6]</code> 可以是 2×3，也可以是 3×2，数据顺序不变。</li>
-</ul>
-<pre><code class="language-rust">let a = Tensor::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], vec![2, 3]);
-let b = a.reshape(vec![3, 2]);   // 形状变了，数据还是 [1..6]
-</code></pre>
-<h2>7. 防御性编程习惯</h2>
-<p>好代码应该&quot;出错早、出错明显&quot;。我们做了两个校验：</p>
-<pre><code class="language-rust">assert_eq!(data.len(), numel, &quot;数据长度与形状要求不一致&quot;);
-assert!(idx &lt; self.shape[i], &quot;索引越界&quot;);
-</code></pre>
-<p>这样一旦传错参数，程序立刻 panic 并告诉我们哪里错了，而不是静默产生错误结果。</p>
-<h2>8. 运行与测试</h2>
-<pre><code class="language-bash">cargo run      # 运行演示
-cargo test     # 运行单元测试（5 个全部通过）
-</code></pre>
-<h2>9. 动手练习</h2>
-<ol>
-<li>写一个函数 <code>scalar_dot(a: &amp;Tensor, b: &amp;Tensor) -&gt; f32</code>，计算两个 1 维张量的点积。</li>
-<li>给 <code>Tensor</code> 加一个 <code>apply(f: impl Fn(f32) -&gt; f32)</code> 方法，对每个元素应用函数
-（这个能力下一课做激活函数时会用到）。</li>
-<li>思考：<code>matmul</code> 为什么要求&quot;A 的列数 == B 的行数&quot;？如果 A 是 3×2、B 是 2×4，结果形状是什么？</li>
-</ol>
-<h2>10. 本课总结</h2>
-<ul>
-<li>张量 = 数据 + 形状，内存用行优先存储</li>
-<li>学会了：创建、reshape、转置、逐元素运算、矩阵乘法</li>
-<li>验证了矩阵乘法结果的正确性</li>
-<li>下一课：给张量加上&quot;梯度&quot;和自动微分，让它能学习！</li>
-</ul>
-]]></content>
-  <category term="Rust"/>
-  <category term="LLM"/>
-  <category term="张量"/>
 </entry>
 </feed>

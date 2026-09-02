@@ -26,16 +26,16 @@
 {"@context":"https://schema.org","@type":"BlogPosting","headline":"第 7 课：第一个 MLP —— 教会神经网络算 XOR","description":"用前面实现的层组合出第一个多层感知机，成功训练它学会 XOR 异或运算。","url":"https://ganto.me/post/rust-llm-guide-07","datePublished":"2026-09-08","dateModified":"2026-09-08","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, MLP","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
     </script>
     <link rel="stylesheet" href="/styles-7c1d1949e9830de8.css">
-<link rel="modulepreload" href="/web-rs-b059a239d7f0d228.js" crossorigin="anonymous" integrity="sha384-Mb+chI/Plpkcs6uAI7AeZdRBRYKbMFSw/yrQ4JThnxnJPS+dPmlbB9NIN5QpgGXy">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
+<link rel="modulepreload" href="/web-rs-f203db110d36061e.js" crossorigin="anonymous" integrity="sha384-Mb+chI/Plpkcs6uAI7AeZdRBRYKbMFSw/yrQ4JThnxnJPS+dPmlbB9NIN5QpgGXy">
 <link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
 <link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous" integrity="sha384-pfz3GoOS0du3Se5f5C1lkvbvMo0g507e24Rcu0dm29CmSCqxguUw3chk5PS1brtF">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
 <link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous" integrity="sha384-2DHjVGrzcpbms06h5LAGWYB1zXEqfWTjATq1YsBBgX1CE2W+T4mRjoljwlXKhTcj">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
 <link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
-<link rel="preload" href="/web-rs-b059a239d7f0d228_bg.wasm" crossorigin="anonymous" integrity="sha384-UMJWfGNHBT0r1+9/Ez4Na62rda+OEKX9M8SYlHJXMu37du9w0yoSsePjUtXlamJR" as="fetch" type="application/wasm">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
+<link rel="preload" href="/web-rs-f203db110d36061e_bg.wasm" crossorigin="anonymous" integrity="sha384-QlGcV0FSwWrxhGA9Qjcx6O2IggWncSVpcxRw9+di79DjJrvwVpZfg1Op6fCkcPbk" as="fetch" type="application/wasm">
 
     <style>
 :root {
@@ -143,7 +143,7 @@
                 <div class="blog-content">
 <h1><a href="#第-7-课第一个-mlp--教会神经网络算-xor" aria-hidden="true" class="anchor" id="user-content-第-7-课第一个-mlp--教会神经网络算-xor"></a>第 7 课：第一个 MLP —— 教会神经网络算 XOR</h1>
 <blockquote>
-<p>代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/main.rs">src/main.rs</a>（<code>demo_xor</code> 函数）
+<p>代码位置：<a href="src/main.rs">src/main.rs</a>（<code>demo_xor</code> 函数）
 前置知识：第 5 课 Linear / 激活函数、第 6 课 CrossEntropy / SGD</p>
 </blockquote>
 <h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
@@ -198,12 +198,12 @@
 <ul>
 <li>第 2 课的线性回归只有一层：<code>pred = xW + b</code>，它学出的边界本质是一条直线</li>
 <li>对 XOR，直线永远分不开 → 单层模型最多只能对 3 个样本正确（3/4），永远到不了 4/4</li>
-<li>解法：<strong>隐藏层 + 非线性激活</strong>（第 5 课的 ReLU）。非线性可以把输入空间&quot;折叠 / 扭曲&quot;，让原本线性不可分的点在高层变得线性可分</li>
+<li>解法：<strong>隐藏层 + 非线性激活</strong>（第 5 课学的 Tanh）。非线性可以把输入空间&quot;折叠 / 扭曲&quot;，让原本线性不可分的点在高层变得线性可分</li>
 </ul>
 <p>直觉（4 个样本为什么能学会）：</p>
 <ul>
 <li>隐藏层 4 个神经元 ≈ 学出 4 种&quot;特征组合&quot;</li>
-<li>ReLU 让每个特征可以&quot;开关&quot;（x &gt; 0 才激活）</li>
+<li>Tanh 把每个特征压缩到 (-1, 1)，给特征带来非线性</li>
 <li>第二层再线性组合这些特征，就能画出&quot;折线&quot;边界，把四个点完美分开</li>
 </ul>
 <h2><a href="#4-数据集与网络结构2--4--2" aria-hidden="true" class="anchor" id="user-content-4-数据集与网络结构2--4--2"></a>4. 数据集与网络结构：2 → 4 → 2</h2>
@@ -224,7 +224,7 @@ let y_targets = vec![0usize, 1, 1, 0]; // XOR 真值表
 let fc2 = Linear::new(4, 2, &amp;mut rng);   // 隐藏层 4 维 → 输出 2 维
 </code></pre>
 <p>结构图：</p>
-<pre><code>x [4,2] ─► fc1 (2→4) ─► ReLU ─► h [4,4] ─► fc2 (4→2) ─► logits [4,2]
+<pre><code>x [4,2] ─► fc1 (2→4) ─► Tanh ─► h [4,4] ─► fc2 (4→2) ─► logits [4,2]
 </code></pre>
 <ul>
 <li>输出层是 <strong>2 个神经元</strong>：第 0 个是&quot;类别 0 的分数&quot;，第 1 个是&quot;类别 1 的分数&quot;</li>
@@ -245,8 +245,8 @@ let opt = SGD::new(0.5, params);
 </ul>
 <h2><a href="#5-训练循环1000-步" aria-hidden="true" class="anchor" id="user-content-5-训练循环1000-步"></a>5. 训练循环：1000 步</h2>
 <pre><code class="language-rust">for step in 0..1000 {
-    // 前向：relu(x @ W1 + b1) @ W2 + b2
-    let h = relu(&amp;fc1.forward(&amp;x_data));
+    // 前向：tanh(x @ W1 + b1) @ W2 + b2
+    let h = tanh(&amp;fc1.forward(&amp;x_data));
     let logits = fc2.forward(&amp;h);
     let loss = cross_entropy_loss(&amp;logits, &amp;y_targets);
 
@@ -271,7 +271,7 @@ let opt = SGD::new(0.5, params);
 <tbody>
 <tr>
 <td>前向</td>
-<td><code>fc1.forward(&amp;x_data)</code> → <code>relu</code> → <code>fc2.forward(&amp;h)</code></td>
+<td><code>fc1.forward(&amp;x_data)</code> → <code>tanh</code> → <code>fc2.forward(&amp;h)</code></td>
 <td>4 个样本一次算完</td>
 </tr>
 <tr>
@@ -300,7 +300,7 @@ let opt = SGD::new(0.5, params);
 <h2><a href="#6-验证44-才算赢" aria-hidden="true" class="anchor" id="user-content-6-验证44-才算赢"></a>6. 验证：4/4 才算赢</h2>
 <p>训练完要&quot;考试&quot;：</p>
 <pre><code class="language-rust">// 验证正确率
-let h = relu(&amp;fc1.forward(&amp;x_data));
+let h = tanh(&amp;fc1.forward(&amp;x_data));
 let logits = fc2.forward(&amp;h);
 let data = logits.data();
 let mut correct = 0;
@@ -321,7 +321,7 @@ println!(&quot;  训练后正确率：{}/4（100% 说明反向传播正确）\n&
 <ol>
 <li><strong>参数是随机初始化的</strong>（种子 42），绝不是&quot;碰巧答对&quot;；</li>
 <li><strong>梯度完全来自自动微分</strong>：任何一个运算（matmul / add / relu / softmax / log / sum ...）的反向实现出错，梯度就会偏一点，参数越走越偏，1000 步后必然累积成大错；</li>
-<li><strong>XOR 没有捷径</strong>：它是&quot;必须两层非线性&quot;的问题，梯度要穿透 ReLU 的 mask、两层 matmul 的转置路径、softmax 的雅可比路径——整条反向传播链路被真实训练&quot;压测&quot;了一遍；</li>
+<li><strong>XOR 没有捷径</strong>：它是&quot;必须两层非线性&quot;的问题，梯度要穿透 Tanh 的导数（<code>1 - t²</code>）、两层 matmul 的转置路径、softmax 的雅可比路径——整条反向传播链路被真实训练&quot;压测&quot;了一遍；</li>
 <li>结果 100% 正确 + loss 单调下降，还同时验证了<strong>优化器</strong>（SGD 的 <code>set_data</code> 写回）和<strong>训练循环</strong>（backward → step → zero_grad 的顺序）都是对的。</li>
 </ol>
 <p>换句话说：<strong>XOR 训练收敛到 4/4，等于对&quot;张量库 + 网络层 + 损失 + 优化器&quot;整条链路做了一次端到端集成测试</strong>。</p>
@@ -340,9 +340,9 @@ println!(&quot;  训练后正确率：{}/4（100% 说明反向传播正确）\n&
 <h2><a href="#9-动手练习" aria-hidden="true" class="anchor" id="user-content-9-动手练习"></a>9. 动手练习</h2>
 <ol>
 <li>把隐藏层大小从 4 改成 2（<code>Linear::new(2, 2, ...)</code>），观察还能不能到 4/4（提示：2 个隐藏神经元很可能不够）。</li>
-<li>把 <code>relu</code> 换成 <code>tanh</code> 或 <code>gelu</code>，其他不变，观察收敛速度差异。</li>
+<li>把 <code>tanh</code> 换成 <code>relu</code> 或 <code>gelu</code>，其他不变，观察收敛速度差异。</li>
 <li>把学习率改成 0.05 和 5.0，对比 loss 下降曲线（太小慢、太大震荡）。</li>
-<li>去掉 <code>relu</code>（<code>h = fc1.forward(&amp;x_data)</code> 直接喂给 fc2），验证&quot;没有非线性就学不会 XOR&quot;，观察正确率卡在 3/4。</li>
+<li>去掉 <code>tanh</code>（<code>h = fc1.forward(&amp;x_data)</code> 直接喂给 fc2），验证&quot;没有非线性就学不会 XOR&quot;，观察正确率卡在 3/4。</li>
 <li>把训练步数改成 100（可能还没收敛）和 10000（数据只有 4 个样本，看会不会过拟合），观察 loss 与正确率。</li>
 </ol>
 <h2><a href="#10-本课总结" aria-hidden="true" class="anchor" id="user-content-10-本课总结"></a>10. 本课总结</h2>
@@ -355,7 +355,7 @@ println!(&quot;  训练后正确率：{}/4（100% 说明反向传播正确）\n&
 </ul>
 
                 </div>
-                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-06/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-08/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span></a></div></div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 22 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 1.46 一路降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与全项目总结</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：GPU 加速训练与推理</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-06/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-08/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a></div></div>
             </article>
         </main>
 <footer class="footer-content">
@@ -370,8 +370,8 @@ println!(&quot;  训练后正确率：{}/4（100% 说明反向传播正确）\n&
 <script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
 try{document.getElementById('main').innerHTML='';}catch(e){}</script>
 <script type="module">
-import init, * as bindings from '/web-rs-b059a239d7f0d228.js';
-const wasm = await init({ module_or_path: '/web-rs-b059a239d7f0d228_bg.wasm' });
+import init, * as bindings from '/web-rs-f203db110d36061e.js';
+const wasm = await init({ module_or_path: '/web-rs-f203db110d36061e_bg.wasm' });
 
 
 window.wasmBindings = bindings;

@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>第 8 课：BPE 分词器 —— 让模型读懂文字 - 干徒</title>
+    <title>第 8 课：BPE 分词器 —— 让模型「读懂」文字 - 干徒</title>
     <meta name="description" content="实现 BPE（Byte Pair Encoding）分词器，将文本切分为模型可处理的 token。">
     <meta name="author" content="干徒">
     <meta name="keywords" content="Rust, LLM, 分词器">
     <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-08">
-    <meta property="og:title" content="第 8 课：BPE 分词器 —— 让模型读懂文字 - 干徒">
+    <meta property="og:title" content="第 8 课：BPE 分词器 —— 让模型「读懂」文字 - 干徒">
     <meta property="og:description" content="实现 BPE（Byte Pair Encoding）分词器，将文本切分为模型可处理的 token。">
     <meta property="og:type" content="article">
     <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-08">
@@ -17,25 +17,25 @@
     <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="第 8 课：BPE 分词器 —— 让模型读懂文字 - 干徒">
+    <meta property="og:image:alt" content="第 8 课：BPE 分词器 —— 让模型「读懂」文字 - 干徒">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="第 8 课：BPE 分词器 —— 让模型读懂文字 - 干徒">
+    <meta name="twitter:title" content="第 8 课：BPE 分词器 —— 让模型「读懂」文字 - 干徒">
     <meta name="twitter:description" content="实现 BPE（Byte Pair Encoding）分词器，将文本切分为模型可处理的 token。">
     <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
     <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 8 课：BPE 分词器 —— 让模型读懂文字","description":"实现 BPE（Byte Pair Encoding）分词器，将文本切分为模型可处理的 token。","url":"https://ganto.me/post/rust-llm-guide-08","datePublished":"2026-09-09","dateModified":"2026-09-09","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 分词器","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 8 课：BPE 分词器 —— 让模型「读懂」文字","description":"实现 BPE（Byte Pair Encoding）分词器，将文本切分为模型可处理的 token。","url":"https://ganto.me/post/rust-llm-guide-08","datePublished":"2026-09-09","dateModified":"2026-09-09","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 分词器","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
     </script>
     <link rel="stylesheet" href="/styles-7c1d1949e9830de8.css">
-<link rel="modulepreload" href="/web-rs-b059a239d7f0d228.js" crossorigin="anonymous" integrity="sha384-Mb+chI/Plpkcs6uAI7AeZdRBRYKbMFSw/yrQ4JThnxnJPS+dPmlbB9NIN5QpgGXy">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
+<link rel="modulepreload" href="/web-rs-f203db110d36061e.js" crossorigin="anonymous" integrity="sha384-Mb+chI/Plpkcs6uAI7AeZdRBRYKbMFSw/yrQ4JThnxnJPS+dPmlbB9NIN5QpgGXy">
 <link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
 <link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous" integrity="sha384-pfz3GoOS0du3Se5f5C1lkvbvMo0g507e24Rcu0dm29CmSCqxguUw3chk5PS1brtF">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
 <link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous" integrity="sha384-2DHjVGrzcpbms06h5LAGWYB1zXEqfWTjATq1YsBBgX1CE2W+T4mRjoljwlXKhTcj">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
 <link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
-<link rel="preload" href="/web-rs-b059a239d7f0d228_bg.wasm" crossorigin="anonymous" integrity="sha384-UMJWfGNHBT0r1+9/Ez4Na62rda+OEKX9M8SYlHJXMu37du9w0yoSsePjUtXlamJR" as="fetch" type="application/wasm">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
+<link rel="preload" href="/web-rs-f203db110d36061e_bg.wasm" crossorigin="anonymous" integrity="sha384-QlGcV0FSwWrxhGA9Qjcx6O2IggWncSVpcxRw9+di79DjJrvwVpZfg1Op6fCkcPbk" as="fetch" type="application/wasm">
 
     <style>
 :root {
@@ -134,7 +134,7 @@
 </div>
         <main class="main-content">
             <article class="blog-post prerender-article">
-                <h1>第 8 课：BPE 分词器 —— 让模型读懂文字</h1>
+                <h1>第 8 课：BPE 分词器 —— 让模型「读懂」文字</h1>
                 <div class="prerender-meta">
                     <span>2026-09-09</span>
                     <span>干徒</span>
@@ -143,9 +143,9 @@
                 <div class="blog-content">
 <h1><a href="#第-8-课bpe-分词器--让模型读懂文字" aria-hidden="true" class="anchor" id="user-content-第-8-课bpe-分词器--让模型读懂文字"></a>第 8 课：BPE 分词器 —— 让模型&quot;读懂&quot;文字</h1>
 <blockquote>
-<p>代码位置：<a href="file:///d:/Code/Rust/llm_from_scratch/src/tokenizer.rs">src/tokenizer.rs</a>
-演示入口：<a href="file:///d:/Code/Rust/llm_from_scratch/src/main.rs">src/main.rs</a>（<code>demo_bpe</code>）
-语料：<a href="file:///d:/Code/Rust/llm_from_scratch/src/data.rs">src/data.rs</a>（<code>CORPUS</code>）</p>
+<p>代码位置：<a href="src/tokenizer.rs">src/tokenizer.rs</a>
+演示入口：<a href="src/main.rs">src/main.rs</a>（<code>demo_bpe</code>）
+语料：<a href="src/data.rs">src/data.rs</a>（<code>CORPUS</code>）</p>
 </blockquote>
 <h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
 <ol>
@@ -219,9 +219,18 @@ pub fn encode(&amp;self, text: &amp;str) -&gt; Vec&lt;usize&gt; {
         .collect()
 }
 
-// id 序列 -&gt; 文本（按 id 反查字符）
+// id 序列 -&gt; 文本（按 id 反查字符，越界 id 带下标 panic 提示）
 pub fn decode(&amp;self, ids: &amp;[usize]) -&gt; String {
-    ids.iter().map(|&amp;i| self.chars[i]).collect()
+    ids.iter()
+        .map(|&amp;i| {
+            self.chars
+                .get(i)
+                .copied()
+                .unwrap_or_else(|| {
+                    panic!(&quot;decode 遇到越界 token id {i}（词表大小 {}）&quot;, self.chars.len())
+                })
+        })
+        .collect()
 }
 </code></pre>
 <p>编码和解码互为逆运算：<code>decode(encode(text)) == text</code>（单元测试 <code>test_char_tokenizer_roundtrip</code> 验证了这一点）。</p>
@@ -358,51 +367,53 @@ let mut ids: Vec&lt;u16&gt; = corpus.as_bytes().iter().map(|&amp;b| b as u16).co
 </ul>
 <p>词表大小 = 256 + 合并次数。演示里 <code>BPETokenizer::train(CORPUS, 400)</code> 得到 <strong>400 = 256 字节 + 144 次合并</strong>。</p>
 <h2><a href="#6-bpe-编码encode" aria-hidden="true" class="anchor" id="user-content-6-bpe-编码encode"></a>6. BPE 编码：encode()</h2>
-<p>编码 = 对新文本执行<strong>同样的贪心合并</strong>。但合并顺序必须和训练时一致：训练时越早合并的规则优先级越高（它对应的 token id 更小）。</p>
+<p>编码 = 对新文本执行<strong>同样的合并</strong>。但合并顺序必须和训练时一致：训练时越早合并的规则优先级越高（它对应的 token id 更小）。</p>
 <pre><code class="language-rust">pub fn encode(&amp;self, text: &amp;str) -&gt; Vec&lt;usize&gt; {
     let mut ids: Vec&lt;u16&gt; = text.as_bytes().iter().map(|&amp;b| b as u16).collect();
-    loop {
-        // 找到 ids 中优先级最高（merge 下标最小）的可合并 pair
-        let mut best_merge: Option&lt;usize&gt; = None;
-        let mut pos = 0;
-        for i in 0..ids.len().saturating_sub(1) {
-            let pair = (ids[i], ids[i + 1]);
-            if let Some(idx) = self.merges.iter().position(|&amp;m| m == pair) {
-                if best_merge.map_or(true, |b| idx &lt; b) {
-                    best_merge = Some(idx);
-                    pos = i;
-                }
+    for (idx, &amp;(a, b)) in self.merges.iter().enumerate() {
+        let new_id = (256 + idx) as u16;
+        let mut out: Vec&lt;u16&gt; = Vec::with_capacity(ids.len());
+        let mut i = 0;
+        while i &lt; ids.len() {
+            if i + 1 &lt; ids.len() &amp;&amp; ids[i] == a &amp;&amp; ids[i + 1] == b {
+                out.push(new_id);
+                i += 2;
+            } else {
+                out.push(ids[i]);
+                i += 1;
             }
         }
-        let Some(idx) = best_merge else { break; };
-        let new_id = (256 + idx) as u16;
-        ids[pos] = new_id;
-        ids.remove(pos + 1);
+        ids = out;
     }
     ids.into_iter().map(|x| x as usize).collect()
 }
 </code></pre>
 <p>要点：</p>
 <ul>
-<li>每次找<strong>当前序列里可合并且 merge 下标最小</strong>的 pair，替换后重新找，直到没有可合并的 pair</li>
+<li><strong>按规则优先级单趟扫描</strong>（GPT-2 的标准实现）：从 <code>merges[0]</code> 到 <code>merges[最后]</code>，每条规则在序列上扫一遍，能合并就替换成它对应的新 token。复杂度 O(len × 合并数)，大语料也能秒级完成（若&quot;每次只合并一个 pair 并全量重扫&quot;是 O(n²×m)，174KB 语料会卡死）</li>
 <li><code>new_id = 256 + idx</code>：merge 下标 idx 直接映射成 token id——因为训练时第 idx 次合并恰好产生 id <code>256 + idx</code></li>
 <li>字节 id（0~255）直接复用训练时的字节 → id 映射</li>
 <li>演示里 <code>&quot;the garden&quot;</code> 编码后只有 <strong>2 个 token</strong>（&quot;the&quot; 和 &quot; garden&quot; 都被压缩成了单个 token）</li>
 </ul>
-<p>以 <code>&quot;lowest&quot;</code> 为例走一遍：字节 <code>[l,o,w,e,s,t]</code> → 合并 <code>(l,o)</code> → <code>[256,w,e,s,t]</code> → 合并 <code>(256,w)</code> → <code>[257,e,s,t]</code> → 继续合并 <code>(e,s)</code>、<code>(s,t)</code>……最终 6 个字节被压成 3 个 token（单元测试要求 <code>&quot;low&quot;</code> 编码后不超过 3 个 token）。</p>
+<p>以 <code>&quot;lowest&quot;</code> 为例走一遍：字节 <code>[l,o,w,e,s,t]</code> → 应用规则 0（假设是 <code>(l,o)</code>）→ <code>[256,w,e,s,t]</code> → 应用规则 1（<code>(256,w)</code>）→ <code>[257,e,s,t]</code> → 继续应用 <code>(e,s)</code>、<code>(s,t)</code> 对应规则……最终 6 个字节被压成 3 个 token（单元测试要求 <code>&quot;low&quot;</code> 编码后不超过 3 个 token）。</p>
 <h2><a href="#7-bpe-解码decode" aria-hidden="true" class="anchor" id="user-content-7-bpe-解码decode"></a>7. BPE 解码：decode()</h2>
 <p>解码是查表 + 拼接：每个 id 查到它代表的字节序列，拼起来还原文本。</p>
 <pre><code class="language-rust">pub fn decode(&amp;self, ids: &amp;[usize]) -&gt; String {
     let mut bytes: Vec&lt;u8&gt; = Vec::new();
     for &amp;id in ids {
-        bytes.extend_from_slice(&amp;self.vocab[id]);
+        let tok = self
+            .vocab
+            .get(id)
+            .unwrap_or_else(|| panic!(&quot;decode 遇到越界 token id {id}（词表大小 {}）&quot;, self.vocab.len()));
+        bytes.extend_from_slice(tok);
     }
     String::from_utf8_lossy(&amp;bytes).to_string()
 }
 </code></pre>
 <ul>
 <li><code>vocab[id]</code>：id → 字节序列（0~255 是单字节，256+ 是合并出来的多字节序列）</li>
-<li><code>String::from_utf8_lossy</code>：万一拼出非法 UTF-8，用替换字符 <code>�</code> 顶替而不是 panic——<strong>decode 永不失败</strong></li>
+<li>越界 id 用 <code>vocab.get(id)</code> 拦截：带下标信息的 panic 提示（decode 也会因传入非法 id 报错，不再是&quot;永不失败&quot;）</li>
+<li><code>String::from_utf8_lossy</code>：万一拼出非法 UTF-8，用替换字符 <code>�</code> 顶替而不是 panic</li>
 </ul>
 <blockquote>
 <p>完整闭环：<code>decode(encode(&quot;lowest new&quot;)) == &quot;lowest new&quot;</code>（单元测试 <code>test_bpe_roundtrip</code> 验证）。</p>
@@ -427,7 +438,7 @@ let mut ids: Vec&lt;u16&gt; = corpus.as_bytes().iter().map(|&amp;b| b as u16).co
 <tr>
 <td>编码 encode</td>
 <td>对新文本按规则贪心合并</td>
-<td>反复找 merge 下标最小的可合并 pair 并替换</td>
+<td>按规则优先级（merges 顺序）单趟扫描替换</td>
 <td>一串 token id</td>
 </tr>
 <tr>
@@ -440,7 +451,7 @@ let mut ids: Vec&lt;u16&gt; = corpus.as_bytes().iter().map(|&amp;b| b as u16).co
 </table>
 <p>三者关系：<strong>编码必须复现训练时的合并顺序</strong>，解码只是查表，所以编码、解码天然互逆，<code>decode(encode(x)) == x</code>。</p>
 <h2><a href="#9-运行与测试" aria-hidden="true" class="anchor" id="user-content-9-运行与测试"></a>9. 运行与测试</h2>
-<pre><code class="language-bash">cargo test   # 15 个测试全部通过，其中 tokenizer 的 2 个验证了编解码互逆
+<pre><code class="language-bash">cargo test   # 全部测试通过
 cargo run    # 演示 2（BPE）：词表 400（256 + 144 次合并）；&quot;Red&quot; -&gt; [82, 101, 100]；&quot;the garden&quot; -&gt; 2 个 token
 </code></pre>
 <h2><a href="#10-动手练习" aria-hidden="true" class="anchor" id="user-content-10-动手练习"></a>10. 动手练习</h2>
@@ -460,7 +471,7 @@ cargo run    # 演示 2（BPE）：词表 400（256 + 144 次合并）；&quot;R
 </ul>
 
                 </div>
-                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 21 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会自我修正</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的积木</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道错在哪、怎么改</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型读懂文字</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相看</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型多角度看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上位置感</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型创造性地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 4.06 一路降到 0.34</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上惯性和自适应步长</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把相对位置揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与 20 课总结</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-07/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-09/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 9 课：注意力机制 —— 让 token 互相看</span></a></div></div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 22 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 1.46 一路降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与全项目总结</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：GPU 加速训练与推理</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-07/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-09/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a></div></div>
             </article>
         </main>
 <footer class="footer-content">
@@ -475,8 +486,8 @@ cargo run    # 演示 2（BPE）：词表 400（256 + 144 次合并）；&quot;R
 <script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
 try{document.getElementById('main').innerHTML='';}catch(e){}</script>
 <script type="module">
-import init, * as bindings from '/web-rs-b059a239d7f0d228.js';
-const wasm = await init({ module_or_path: '/web-rs-b059a239d7f0d228_bg.wasm' });
+import init, * as bindings from '/web-rs-f203db110d36061e.js';
+const wasm = await init({ module_or_path: '/web-rs-f203db110d36061e_bg.wasm' });
 
 
 window.wasmBindings = bindings;
