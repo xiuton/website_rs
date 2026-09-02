@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>函数柯里化 - 干徒</title>
-    <meta name="description" content="柯里化就是将多参函数变成单参函数 // 实现函数柯里化 function currying() { } // 测试柯里化函数 const sum = (a, b, c, d) =&amp;gt; a + b + c + d; console.log(currying(sum)(1)(2)(3)(4)); // 10 conso">
+    <title>使用class实现评分 - 干徒</title>
+    <meta name="description" content="创建Star类 class Star { constructor(will, score, dom) { this.will = will; this.score = score; this.dom = dom; } init() { const that = this; this.dom.forEach(elemen">
     <meta name="author" content="干徒">
     <meta name="keywords" content="">
     <link rel="canonical" href="https://ganto.me/post/20231117-3">
-    <meta property="og:title" content="函数柯里化 - 干徒">
-    <meta property="og:description" content="柯里化就是将多参函数变成单参函数 // 实现函数柯里化 function currying() { } // 测试柯里化函数 const sum = (a, b, c, d) =&amp;gt; a + b + c + d; console.log(currying(sum)(1)(2)(3)(4)); // 10 conso">
+    <meta property="og:title" content="使用class实现评分 - 干徒">
+    <meta property="og:description" content="创建Star类 class Star { constructor(will, score, dom) { this.will = will; this.score = score; this.dom = dom; } init() { const that = this; this.dom.forEach(elemen">
     <meta property="og:type" content="article">
     <meta property="og:url" content="https://ganto.me/post/20231117-3">
     <meta property="og:site_name" content="干徒的博客">
@@ -17,25 +17,25 @@
     <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="函数柯里化 - 干徒">
+    <meta property="og:image:alt" content="使用class实现评分 - 干徒">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="函数柯里化 - 干徒">
-    <meta name="twitter:description" content="柯里化就是将多参函数变成单参函数 // 实现函数柯里化 function currying() { } // 测试柯里化函数 const sum = (a, b, c, d) =&amp;gt; a + b + c + d; console.log(currying(sum)(1)(2)(3)(4)); // 10 conso">
+    <meta name="twitter:title" content="使用class实现评分 - 干徒">
+    <meta name="twitter:description" content="创建Star类 class Star { constructor(will, score, dom) { this.will = will; this.score = score; this.dom = dom; } init() { const that = this; this.dom.forEach(elemen">
     <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
     <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"BlogPosting","headline":"函数柯里化","description":"柯里化就是将多参函数变成单参函数 // 实现函数柯里化 function currying() { } // 测试柯里化函数 const sum = (a, b, c, d) =&gt; a + b + c + d; console.log(currying(sum)(1)(2)(3)(4)); // 10 conso","url":"https://ganto.me/post/20231117-3","datePublished":"2023-11-17","dateModified":"2023-11-17","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"使用class实现评分","description":"创建Star类 class Star { constructor(will, score, dom) { this.will = will; this.score = score; this.dom = dom; } init() { const that = this; this.dom.forEach(elemen","url":"https://ganto.me/post/20231117-3","datePublished":"2023-11-17","dateModified":"2023-11-17","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
     </script>
-    <link rel="stylesheet" href="/styles-7c1d1949e9830de8.css">
-<link rel="modulepreload" href="/web-rs-ee24dc4a1c0ac774.js" crossorigin="anonymous" integrity="sha384-Mb+chI/Plpkcs6uAI7AeZdRBRYKbMFSw/yrQ4JThnxnJPS+dPmlbB9NIN5QpgGXy">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous" integrity="sha384-pfz3GoOS0du3Se5f5C1lkvbvMo0g507e24Rcu0dm29CmSCqxguUw3chk5PS1brtF">
+    <link rel="stylesheet" href="/styles-84a0c1a16fd4b1bc.css">
+<link rel="modulepreload" href="/web-rs-97b45a2d46fc9067.js" crossorigin="anonymous" integrity="sha384-GCNmkcmAwDaliBgM2QHxbYy2O+tDERZ9dfvO5Z9+DVCOVpF9poWuBiA2w/VpqGh+">
 <link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
 <link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
-<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
 <link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
+<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous" integrity="sha384-pfz3GoOS0du3Se5f5C1lkvbvMo0g507e24Rcu0dm29CmSCqxguUw3chk5PS1brtF">
 <link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous" integrity="sha384-2DHjVGrzcpbms06h5LAGWYB1zXEqfWTjATq1YsBBgX1CE2W+T4mRjoljwlXKhTcj">
-<link rel="preload" href="/web-rs-ee24dc4a1c0ac774_bg.wasm" crossorigin="anonymous" integrity="sha384-glxIr5gECx/WmSZ3n28s0AJTA1uE75qkCKPbKBeqYinm/AnKOp2zyN0Et168APqj" as="fetch" type="application/wasm">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
+<link rel="preload" href="/web-rs-97b45a2d46fc9067_bg.wasm" crossorigin="anonymous" integrity="sha384-h9ElLoxYxp9pklofrSHm62BRCHBE8b2g9uK4LOXWCOXjbMuC/V+m64MKg5GBvHN2" as="fetch" type="application/wasm">
 
     <style>
 :root {
@@ -134,49 +134,193 @@
 </div>
         <main class="main-content">
             <article class="blog-post prerender-article">
-                <h1>函数柯里化</h1>
+                <h1>使用class实现评分</h1>
                 <div class="prerender-meta">
                     <span>2023-11-17</span>
                     <span>干徒</span>
                 </div>
                 <div class="blog-tags"></div>
                 <div class="blog-content">
-<p>柯里化就是将多参函数变成单参函数</p>
-<pre><code class="language-js">// 实现函数柯里化
-function currying() {
-  
-}
-
-// 测试柯里化函数
-const sum = (a, b, c, d) =&gt; a + b + c + d;
-
-console.log(currying(sum)(1)(2)(3)(4)); // 10
-console.log(currying(sum, 1)(2, 3)(4)); // 10
-console.log(currying(sum, 1, 2)(3)(4)); // 10
-console.log(currying(sum, 1, 2)(3, 4)); // 10
-
-</code></pre>
-<p>如上代码，实现柯里化函数<br />
-实现方式如下，自行理解代码</p>
-<pre><code class="language-js">// 实现函数柯里化
-function currying(fn, ...bindArgs) {
-  return (...args) =&gt; {
-    const allArgs = [...bindArgs, ...args];
-    if (allArgs.length &lt; fn.length) {
-      return currying(fn, ...allArgs);
-    } else {
-      return fn(...allArgs)
-    }
+<h1><a href="#创建star类" aria-hidden="true" class="anchor" id="user-content-创建star类"></a>创建Star类</h1>
+<pre><code class="language-js">class Star {
+  constructor(will, score, dom) {
+    this.will = will;
+    this.score = score;
+    this.dom = dom;
+  }
+  init() {
+    const that = this;
+    this.dom.forEach(element =&gt; {
+      element.onmouseover = e =&gt; {
+        that.point(Number(e.target.innerText));
+      }
+      element.onmouseout = () =&gt; {
+        that.point();
+      }
+      element.onclick = function() {
+        if (that.score === this.innerText) {
+          that.score = 0;
+        } else {
+          that.score = Number(this.innerText);
+        }
+      }
+    })
+  }
+  point(parm) {
+    this.will = parm || this.score;
+    this.dom.forEach((element, i) =&gt; {
+      element.className = i &lt; this.will ? &quot;on&quot; : &quot;&quot;;
+    });
   }
 }
 
-// 测试柯里化函数
-const sum = (a, b, c, d) =&gt; a + b + c + d;
+</code></pre>
+<h1><a href="#使用star类" aria-hidden="true" class="anchor" id="user-content-使用star类"></a>使用Star类</h1>
+<p>创建Star实例时需要输入成员变量<br />
+will 为 mouseover 的时候保存的星星数，用于鼠标经过星星时进行星星点亮的数据依据<br />
+score 为 click 的时候确定选择的星星数<br />
+dom 为 每组星星的 dom 数组</p>
+<pre><code class="language-js">const star_1 = new Star(0, 0, document.querySelectorAll(&quot;.star_1 ul li&quot;));
+star_1.init();
 
-console.log(currying(sum)(1)(2)(3)(4)); // 10
-console.log(currying(sum, 1)(2, 3)(4)); // 10
-console.log(currying(sum, 1, 2)(3)(4)); // 10
-console.log(currying(sum, 1, 2)(3, 4)); // 10
+</code></pre>
+<h1><a href="#完整代码" aria-hidden="true" class="anchor" id="user-content-完整代码"></a>完整代码</h1>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+  &lt;title&gt;Document&lt;/title&gt;
+  &lt;style&gt;
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      background-color: #000;
+      color: #fff;
+    }
+    body {
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    main {
+      .star {
+        width: 200px;
+        height: 40px;
+        &amp; ul {
+          display: flex;
+          &amp; li {
+            list-style: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: yellowgreen;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+          }
+          &amp; li.on {
+            background-color: red;
+          }
+        }
+      }
+      .btn {
+        text-align: center;
+        margin-top: 10px;
+        #submit {
+          display: inline-block;
+        }
+      }
+    }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;main&gt;
+    &lt;div class=&quot;star star_1&quot;&gt;
+      &lt;ul&gt;
+        &lt;li&gt;1&lt;/li&gt;
+        &lt;li&gt;2&lt;/li&gt;
+        &lt;li&gt;3&lt;/li&gt;
+        &lt;li&gt;4&lt;/li&gt;
+        &lt;li&gt;5&lt;/li&gt;
+      &lt;/ul&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;star star_2&quot;&gt;
+      &lt;ul&gt;
+        &lt;li&gt;1&lt;/li&gt;
+        &lt;li&gt;2&lt;/li&gt;
+        &lt;li&gt;3&lt;/li&gt;
+        &lt;li&gt;4&lt;/li&gt;
+        &lt;li&gt;5&lt;/li&gt;
+      &lt;/ul&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;star star_3&quot;&gt;
+      &lt;ul&gt;
+        &lt;li&gt;1&lt;/li&gt;
+        &lt;li&gt;2&lt;/li&gt;
+        &lt;li&gt;3&lt;/li&gt;
+        &lt;li&gt;4&lt;/li&gt;
+        &lt;li&gt;5&lt;/li&gt;
+      &lt;/ul&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;btn&quot;&gt;
+      &lt;button id=&quot;submit&quot;&gt;提交&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/main&gt;
+
+  &lt;script&gt;
+    window.onload = function() {
+      class Star {
+        constructor(will, score, dom) {
+          this.will = will;
+          this.score = score;
+          this.dom = dom;
+        }
+        init() {
+          const that = this;
+          this.dom.forEach(element =&gt; {
+            element.onmouseover = e =&gt; {
+              that.point(Number(e.target.innerText));
+            }
+            element.onmouseout = () =&gt; {
+              that.point();
+            }
+            element.onclick = function() {
+              if (that.score === this.innerText) {
+                that.score = 0;
+              } else {
+                that.score = Number(this.innerText);
+              }
+            }
+          })
+        }
+        point(parm) {
+          this.will = parm || this.score;
+          this.dom.forEach((element, i) =&gt; {
+            element.className = i &lt; this.will ? &quot;on&quot; : &quot;&quot;;
+          });
+        }
+      }
+      const star_1 = new Star(0, 0, document.querySelectorAll(&quot;.star_1 ul li&quot;));
+      const star_2 = new Star(0, 0, document.querySelectorAll(&quot;.star_2 ul li&quot;));
+      const star_3 = new Star(0, 0, document.querySelectorAll(&quot;.star_3 ul li&quot;));
+      console.log(star_1, star_2, star_3)
+      star_1.init();
+      star_2.init();
+      star_3.init();
+
+      document.querySelector(&quot;#submit&quot;).onclick = () =&gt; {
+        alert(`${star_1.score}, ${star_2.score}, ${star_3.score}`);
+      }
+    }
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
 
 </code></pre>
 
@@ -196,8 +340,8 @@ console.log(currying(sum, 1, 2)(3, 4)); // 10
 <script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
 try{document.getElementById('main').innerHTML='';}catch(e){}</script>
 <script type="module">
-import init, * as bindings from '/web-rs-ee24dc4a1c0ac774.js';
-const wasm = await init({ module_or_path: '/web-rs-ee24dc4a1c0ac774_bg.wasm' });
+import init, * as bindings from '/web-rs-97b45a2d46fc9067.js';
+const wasm = await init({ module_or_path: '/web-rs-97b45a2d46fc9067_bg.wasm' });
 
 
 window.wasmBindings = bindings;
