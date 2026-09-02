@@ -136,29 +136,41 @@
           .nav-item-with-sub {
             display: flex;
             align-items: center;
-            position: relative;
 
-            // 透明桥接层：填补父项与子菜单之间的 8px 空隙，
-            // 避免鼠标移入子菜单时 hover 丢失导致菜单消失
-            &::after {
-              content: "";
-              position: absolute;
-              top: 100%;
-              left: 0;
-              right: 0;
-              height: 8px;
-            }
+            .nav-sub-trigger {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              padding: 0.2rem;
+              margin-left: -0.3rem;
+              margin-right: 0.15rem;
+              border: none;
+              background: none;
+              color: var(--text-secondary);
+              cursor: pointer;
+              border-radius: var(--radius-sm);
+              transition: all 0.15s;
 
-            &:hover .nav-submenu {
-              display: block;
+              svg {
+                display: block;
+                stroke: currentColor;
+                stroke-width: 2;
+                fill: none;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+              }
+
+              &:hover {
+                color: var(--text-primary);
+                background: var(--bg-subtle);
+              }
             }
           }
 
-          .nav-submenu {
-            display: none;
+          .nav-submenu-popup {
             position: absolute;
-            top: calc(100% + 8px);
-            left: 0;
+            top: 100%;
+            margin-top: 4px;
             background: var(--bg-elevated);
             border: 1px solid var(--border-default);
             border-radius: var(--radius-md);
