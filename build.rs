@@ -42,6 +42,7 @@ use build_posts_json::generate_posts_json;
 use std::env;
 use std::fs;
 use std::path::Path;
+use std::collections::HashMap;
 
 fn main() {
     println!("cargo:rerun-if-changed=posts");
@@ -57,8 +58,9 @@ fn main() {
     }
 
     let mut posts: Vec<PostData> = Vec::new();
+    let mut date_count: HashMap<String, i32> = HashMap::new();
 
-    scan_dir(posts_dir, posts_dir, "", &mut posts);
+    scan_dir(posts_dir, posts_dir, "", &mut posts, &mut date_count);
 
     posts.sort_by(|a, b| b.date.cmp(&a.date));
 
