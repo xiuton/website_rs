@@ -14,5 +14,7 @@ pub struct BlogPost {
     pub order: i32,
     /// 系列目录页路径段（由文件夹名自动生成），空串表示根目录文章
     pub catalog: &'static str,
+    /// 原始文件名（不含扩展名），用于排序
+    pub filename: &'static str,
 }
 

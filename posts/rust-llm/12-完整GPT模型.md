@@ -1,11 +1,6 @@
 ---
 title: "第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型"
-date: "2026-09-13 09:00:00"
-author: "干徒"
-tags: ["Rust", "LLM", "GPT"]
-series: "Rust 大语言模型 学习指南"
-order: 12
-slug: "rust-llm-guide-12"
+tags: ["GPT"]
 summary: "组合 Embedding、TransformerBlock、LayerNorm 等积木，拼出完整的 GPT 模型结构。"
 ---
 

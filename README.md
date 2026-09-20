@@ -9,6 +9,7 @@
 - ⚡ **WebAssembly 驱动** — 基于 Rust 编译为 Wasm，接近原生的运行性能
 - 📝 **Markdown 博客** — Front Matter 元数据，comrak 渲染，highlight.js 代码高亮
 - 📚 **多章节文档支持** — 同一 `series` + 同一文件夹的文章自动聚合为文档，文章页显示章节目录与上下篇导航，首页列表合并显示为一条文档入口；子目录下无 `series` 字段的文章作为分类归总独立显示
+- ⚙️ **目录配置文件** — 系列文档支持 `_config.toml` 配置文件，统一管理重复元数据（author、series、tags、date、slug_prefix），文章 front matter 只需填写独有字段
 - 🏷️ **标签系统** — 文章标签展示
 - 🔖 **书签管理** — TOML 配置的书签页面，支持搜索筛选
 - 🎮 **操场 (Playground)** — 代码实验环境
@@ -144,15 +145,51 @@ tags: [rust, dioxus]
 正文内容...
 ```
 
-**多章节文档（系列）：** 一篇长文档拆成多个章节文件时，为每个章节添加 `series`（同一文档共用相同系列名）和 `order`（章节顺序）。将这些章节文件放在一个独立子目录中（如 `posts/rust-guide/`），目录名会自动作为系列目录页的路径标识：
+**多章节文档（系列）：** 一篇长文档拆成多个章节文件时，将这些章节文件放在一个独立子目录中（如 `posts/rust-guide/`），目录名会自动作为系列目录页的路径标识。
+
+**目录配置文件（推荐）：** 在系列目录下创建 `_config.toml` 文件，统一管理重复元数据：
+
+```toml
+# posts/rust-guide/_config.toml
+author = "干徒"
+series = "Rust 学习指南"
+tags = ["Rust"]
+date = "2026-09-01 12:00:00"
+slug_prefix = "rust-guide"
+```
+
+每篇文章只需填写独有字段，配置文件的值会自动填充：
+
+```yaml
+---
+title: "第三章 所有权"
+tags: ["所有权"]
+summary: "Rust 的所有权系统是其核心特性之一..."
+---
+```
+
+**合并规则：**
+- `author`、`series`、`date`：front matter 有值则用，否则用配置文件
+- `tags`：配置文件 + front matter 合并，去重
+- `slug`：自动生成 `{slug_prefix}-{order:02}`（如 `rust-guide-03`）
+- `order`：优先从 front matter 读取，否则从文件名数字提取（如 `03-xxx.md` → `3`）
+
+**排序规则：** 系列文档按以下优先级排序：
+1. `order` 字段（升序）
+2. 文件名字典序（升序）
+3. `date` 字段（降序）
+
+**文件过滤：** 以 `_` 开头的文件（如 `_README.md`、`_config.toml`）会被自动跳过，不会被识别为文章。
+
+**手动指定（不用配置文件时）：** 直接在 front matter 中添加 `series` 和 `order` 字段：
 
 ```yaml
 ---
 title: 第三章 所有权
 date: 2026-09-03 09:00:00
-series: "Rust 学习指南"   # 同一文档的所有章节共用相同 series 名
-order: 3                  # 章节顺序
-slug: "rust-guide-03"     # 可选，自定义 URL（否则使用文件名作为默认值）
+series: "Rust 学习指南"
+order: 3
+slug: "rust-guide-03"
 ---
 ```
 
@@ -191,7 +228,9 @@ slug: "rust-guide-03"     # 可选，自定义 URL（否则使用文件名作为
 │   ├── Rust所有权.md
 │   ├── ganto/               # 文章分类归总（无 series 字段，文章独立显示）
 │   │   └── ...
-│   ├── rust-llm-guide/      # 多章节文档（有 series 字段，自动聚合为系列）
+│   ├── rust-llm/            # 多章节文档（有 series 字段，自动聚合为系列）
+│   │   ├── _config.toml     # 系列配置文件（author、series、tags 等默认值）
+│   │   ├── _README.md       # 配置文件使用说明
 │   │   ├── 00-学习计划.md
 │   │   └── ...
 │   └── ...
@@ -285,6 +324,7 @@ gloo-timers = "0.3.0"     # 异步定时器
 [build-dependencies]
 walkdir = "2.4.0"         # 构建时遍历 posts 目录
 comrak = "0.20.0"
+toml = "0.8.8"            # 解析 _config.toml 配置文件
 ```
 
 ## 部署说明

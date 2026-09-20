@@ -68,7 +68,7 @@ fn main() {
 
     for post in &posts {
         output.push_str(&format!(
-            "    BlogPost {{\n        title: r#####\"{}\"#####,\n        date: r#####\"{}\"#####,\n        author: r#####\"{}\"#####,\n        tags: &[{}],\n        content: r#####\"{}\"#####,\n        slug: r#####\"{}\"#####,\n        category: r#####\"{}\"#####,\n        summary: r#####\"{}\"#####,\n        series: r#####\"{}\"#####,\n        order: {},\n        catalog: r#####\"{}\"#####,\n    }},\n",
+            "    BlogPost {{\n        title: r#####\"{}\"#####,\n        date: r#####\"{}\"#####,\n        author: r#####\"{}\"#####,\n        tags: &[{}],\n        content: r#####\"{}\"#####,\n        slug: r#####\"{}\"#####,\n        category: r#####\"{}\"#####,\n        summary: r#####\"{}\"#####,\n        series: r#####\"{}\"#####,\n        order: {},\n        catalog: r#####\"{}\"#####,\n        filename: r#####\"{}\"#####,\n    }},\n",
             post.title,
             post.date,
             post.author,
@@ -83,6 +83,7 @@ fn main() {
             post.series,
             post.order,
             post.catalog,
+            post.filename,
         ));
     }
 

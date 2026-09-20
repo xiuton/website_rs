@@ -1,11 +1,6 @@
 ---
 title: "第 8 课：BPE 分词器 —— 让模型「读懂」文字"
-date: "2026-09-09 09:00:00"
-author: "干徒"
-tags: ["Rust", "LLM", "分词器"]
-series: "Rust 大语言模型 学习指南"
-order: 8
-slug: "rust-llm-guide-08"
+tags: ["分词器"]
 summary: "实现 BPE（Byte Pair Encoding）分词器，将文本切分为模型可处理的 token。"
 ---
 

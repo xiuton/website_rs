@@ -1,0 +1,8 @@
+# rust-llm 系列文章配置
+# 此配置文件中的值会作为默认值，如果文章 front matter 中有相同字段，则以 front matter 为准
+
+series = "Rust 大语言模型 学习指南"
+author = "干徒"
+date = "2026-09-01 12:00:00"
+tags = ["Rust", "LLM"]
+slug_prefix = "rust-llm-guide"

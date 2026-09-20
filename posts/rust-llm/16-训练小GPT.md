@@ -1,11 +1,6 @@
 ---
 title: "第 16 课：训练小 GPT —— 看 loss 从 1.46 一路降到 0.16"
-date: "2026-09-17 09:00:00"
-author: "干徒"
-tags: ["Rust", "LLM", "GPT"]
-series: "Rust 大语言模型 学习指南"
-order: 16
-slug: "rust-llm-guide-16"
+tags: ["GPT"]
 summary: "完整训练一个小型 GPT 模型，观察 loss 从 1.46 一路下降到 0.16。"
 ---
 

@@ -1,11 +1,6 @@
 ---
 title: "第 19 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力"
-date: "2026-09-20 09:00:00"
-author: "干徒"
-tags: ["Rust", "LLM", "注意力"]
-series: "Rust 大语言模型 学习指南"
-order: 19
-slug: "rust-llm-guide-19"
+tags: ["注意力"]
 summary: "实现 RoPE 旋转位置编码，将相对位置信息直接编码进注意力分数。"
 ---
 

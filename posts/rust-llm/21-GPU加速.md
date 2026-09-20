@@ -1,11 +1,6 @@
 ---
 title: "第 21 课：GPU 加速训练与推理"
-date: "2026-09-22 09:00:00"
-author: "干徒"
-tags: ["Rust", "LLM", "GPU"]
-series: "Rust 大语言模型 学习指南"
-order: 21
-slug: "rust-llm-guide-21"
+tags: ["GPU"]
 summary: "用 wgpu 计算着色器（WGSL）把最耗时的算子搬到 GPU 上执行，支持 NVIDIA 与 Intel 核显，GPU 不可用时自动回退 CPU。"
 ---
 

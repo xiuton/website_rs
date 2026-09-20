@@ -181,6 +181,7 @@ pub fn generate_posts_json(posts: &[PostData]) {
         let escaped_category = escape_json_string(&post.category);
         let escaped_series = escape_json_string(&post.series);
         let escaped_catalog = escape_json_string(&post.catalog);
+        let escaped_filename = escape_json_string(&post.filename);
 
         let tags_json: Vec<String> = post
             .tags
@@ -200,6 +201,7 @@ pub fn generate_posts_json(posts: &[PostData]) {
     "series": "{}",
     "order": {},
     "catalog": "{}",
+    "filename": "{}",
     "content": "{}",
     "content_html": "{}",
     "content_mini": "{}"
@@ -214,6 +216,7 @@ pub fn generate_posts_json(posts: &[PostData]) {
             escaped_series,
             post.order,
             escaped_catalog,
+            escaped_filename,
             escaped_content,
             escaped_content_html,
             escaped_content_mini,

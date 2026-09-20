@@ -1,11 +1,6 @@
 ---
 title: "第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」"
-date: "2026-09-18 09:00:00"
-author: "干徒"
-tags: ["Rust", "LLM", "优化器"]
-series: "Rust 大语言模型 学习指南"
-order: 17
-slug: "rust-llm-guide-17"
+tags: ["优化器"]
 summary: "实现 AdamW 优化器，融合动量与自适应学习率，并与 SGD 对比。"
 ---
 

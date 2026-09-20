@@ -1,11 +1,6 @@
 ---
 title: "第 7 课：第一个 MLP —— 教会神经网络算 XOR"
-date: "2026-09-08 09:00:00"
-author: "干徒"
-tags: ["Rust", "LLM", "MLP"]
-series: "Rust 大语言模型 学习指南"
-order: 7
-slug: "rust-llm-guide-07"
+tags: ["MLP"]
 summary: "用前面实现的层组合出第一个多层感知机，成功训练它学会 XOR 异或运算。"
 ---
 

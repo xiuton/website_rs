@@ -2,6 +2,7 @@ use std::fs;
 use std::path::Path;
 use std::collections::HashMap;
 use comrak::ComrakOptions;
+use toml;
 
 pub struct PostData {
     pub title: String,
@@ -19,6 +20,71 @@ pub struct PostData {
     /// 系列目录页自定义路径段（由文件夹名自动生成），
     /// 空串表示文章在根目录下（非系列文档）
     pub catalog: String,
+    /// 原始文件名（不含扩展名），用于排序
+    pub filename: String,
+}
+
+/// 目录配置文件结构体
+/// 从 _config.toml 读取的默认值，文章 front matter 中的值会覆盖这些默认值
+#[derive(Debug, Default)]
+pub struct DirConfig {
+    pub author: Option<String>,
+    pub series: Option<String>,
+    pub tags: Vec<String>,
+    pub date: Option<String>,
+    pub slug_prefix: Option<String>,
+}
+
+/// 从目录下的 _config.toml 读取配置
+/// 如果文件不存在或解析失败，返回默认的空配置
+pub fn load_dir_config(dir: &Path) -> DirConfig {
+    let config_path = dir.join("_config.toml");
+    if !config_path.exists() {
+        return DirConfig::default();
+    }
+
+    match fs::read_to_string(&config_path) {
+        Ok(content) => {
+            match toml::from_str::<toml::Value>(&content) {
+                Ok(value) => {
+                    let mut config = DirConfig::default();
+                    
+                    if let Some(author) = value.get("author").and_then(|v| v.as_str()) {
+                        config.author = Some(author.to_string());
+                    }
+                    
+                    if let Some(series) = value.get("series").and_then(|v| v.as_str()) {
+                        config.series = Some(series.to_string());
+                    }
+                    
+                    if let Some(tags) = value.get("tags").and_then(|v| v.as_array()) {
+                        config.tags = tags
+                            .iter()
+                            .filter_map(|t| t.as_str().map(|s| s.to_string()))
+                            .collect();
+                    }
+                    
+                    if let Some(date) = value.get("date").and_then(|v| v.as_str()) {
+                        config.date = Some(date.to_string());
+                    }
+                    
+                    if let Some(slug_prefix) = value.get("slug_prefix").and_then(|v| v.as_str()) {
+                        config.slug_prefix = Some(slug_prefix.to_string());
+                    }
+                    
+                    config
+                }
+                Err(e) => {
+                    eprintln!("cargo:warning=Failed to parse {:?}: {}", config_path, e);
+                    DirConfig::default()
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("cargo:warning=Failed to read {:?}: {}", config_path, e);
+            DirConfig::default()
+        }
+    }
 }
 
 pub fn escape_rust_string(s: &str) -> String {
@@ -241,6 +307,9 @@ pub fn scan_dir(
     posts: &mut Vec<PostData>,
     date_count: &mut HashMap<String, i32>,
 ) {
+    // 读取当前目录的配置文件
+    let dir_config = load_dir_config(dir);
+    
     match fs::read_dir(dir) {
         Ok(entries) => {
             for entry in entries.flatten() {
@@ -259,6 +328,12 @@ pub fn scan_dir(
                                     .file_stem()
                                     .and_then(|n| n.to_str())
                                     .unwrap_or("");
+                                
+                                // 跳过以 _ 开头的文件（如 _README.md）
+                                if filename.starts_with('_') {
+                                    continue;
+                                }
+                                
                                 if let Ok(content) = fs::read_to_string(&path) {
                                     process_post(
                                         &content,
@@ -266,6 +341,7 @@ pub fn scan_dir(
                                         filename,
                                         posts,
                                         date_count,
+                                        &dir_config,
                                     );
                                 }
                             }
@@ -286,6 +362,7 @@ pub fn process_post(
     filename: &str,
     posts: &mut Vec<PostData>,
     date_count: &mut HashMap<String, i32>,
+    dir_config: &DirConfig,
 ) {
     let mut in_front_matter = false;
     let mut front_matter = String::new();
@@ -327,6 +404,13 @@ pub fn process_post(
             .map(|l| l.replace("date:", "").trim().to_string())
             .unwrap_or_default(),
     );
+    
+    // 如果 front matter 中没有 date，使用配置文件的默认值
+    let date = if date.is_empty() {
+        dir_config.date.clone().unwrap_or_default()
+    } else {
+        date
+    };
 
     let author = strip_yaml_quotes(
         &front_matter
@@ -335,6 +419,13 @@ pub fn process_post(
             .map(|l| l.replace("author:", "").trim().to_string())
             .unwrap_or_default(),
     );
+    
+    // 如果 front matter 中没有 author，使用配置文件的默认值
+    let author = if author.is_empty() {
+        dir_config.author.clone().unwrap_or_default()
+    } else {
+        author
+    };
 
     let tags = front_matter
         .lines()
@@ -345,9 +436,20 @@ pub fn process_post(
                 .trim_matches(|c| c == '[' || c == ']')
                 .split(',')
                 .map(|s| strip_yaml_quotes(s.trim()))
+                .filter(|s| !s.is_empty())
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
+    
+    // 合并配置文件的 tags 和 front matter 的 tags
+    // 配置文件的 tags 在前，front matter 的 tags 在后，去重
+    let mut merged_tags = dir_config.tags.clone();
+    for tag in tags {
+        if !merged_tags.contains(&tag) {
+            merged_tags.push(tag);
+        }
+    }
+    let tags = merged_tags;
 
     let summary = strip_yaml_quotes(
         &front_matter
@@ -365,13 +467,27 @@ pub fn process_post(
             .map(|l| l.replace("series:", "").trim().to_string())
             .unwrap_or_default(),
     );
+    
+    // 如果 front matter 中没有 series，使用配置文件的默认值
+    let series = if series.is_empty() {
+        dir_config.series.clone().unwrap_or_default()
+    } else {
+        series
+    };
 
-    // 章节顺序：缺失时默认 0（按日期排序兜底）
-    let order = front_matter
+    // 章节顺序：优先从 front matter 读取，否则从文件名提取数字
+    let order_from_front_matter = front_matter
         .lines()
         .find(|l| l.starts_with("order:"))
-        .and_then(|l| l.replace("order:", "").trim().parse::<i32>().ok())
+        .and_then(|l| l.replace("order:", "").trim().parse::<i32>().ok());
+    
+    let order_from_filename = filename
+        .split('-')
+        .next()
+        .and_then(|s| s.parse::<i32>().ok())
         .unwrap_or(0);
+    
+    let order = order_from_front_matter.unwrap_or(order_from_filename);
 
     // 目录页 slug：直接使用文档文件夹名称（category），不再从 front matter 读取
     // 对于无 series 字段的分类目录文章，catalog 仅作为分类标识，不触发系列聚合
@@ -388,8 +504,12 @@ pub fn process_post(
     let slug = if let Some(slug) = custom_slug {
         slug
     } else if !series.is_empty() {
-        // 系列文档：使用文件名作为默认 slug
-        filename.to_string()
+        // 系列文档：使用 slug_prefix + order 生成 slug，如果没有 prefix 则使用文件名
+        if let Some(prefix) = &dir_config.slug_prefix {
+            format!("{}-{:02}", prefix, order)
+        } else {
+            filename.to_string()
+        }
     } else {
         // 普通文章：使用日期生成 slug
         let date_parts: Vec<&str> = date.split(' ').collect();
@@ -419,6 +539,7 @@ pub fn process_post(
         series,
         order,
         catalog,
+        filename: filename.to_string(),
     });
 }
 

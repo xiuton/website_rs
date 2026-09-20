@@ -1,11 +1,6 @@
 ---
 title: "第 18 课：KV Cache —— 让逐 token 生成不再重复计算"
-date: "2026-09-19 09:00:00"
-author: "干徒"
-tags: ["Rust", "LLM", "推理"]
-series: "Rust 大语言模型 学习指南"
-order: 18
-slug: "rust-llm-guide-18"
+tags: ["推理"]
 summary: "实现 KV Cache 缓存历史键值，避免逐 token 生成时的重复计算。"
 ---
 

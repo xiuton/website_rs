@@ -34,7 +34,11 @@ pub fn SeriesView(slug: String) -> Element {
                     p_key == entry_key
                 })
                 .collect();
-            chapters.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| b.date.cmp(&a.date)));
+            chapters.sort_by(|a, b| {
+                a.order.cmp(&b.order)
+                    .then_with(|| a.filename.cmp(&b.filename))
+                    .then_with(|| b.date.cmp(&a.date))
+            });
             let intro = chapters.first().copied().unwrap_or(entry);
             (series, chapters, intro)
         });
