@@ -153,6 +153,7 @@ tags: [rust, dioxus]
 # posts/rust-guide/_config.toml
 author = "干徒"
 series = "Rust 学习指南"
+summary = "系列文档摘要"
 tags = ["Rust"]
 date = "2026-09-01 12:00:00"
 slug_prefix = "rust-guide"
@@ -169,10 +170,17 @@ summary: "Rust 的所有权系统是其核心特性之一..."
 ```
 
 **合并规则：**
-- `author`、`series`、`date`：front matter 有值则用，否则用配置文件
+- `author`、`series`、`date`、`summary`：front matter 有值则用，否则用配置文件
 - `tags`：配置文件 + front matter 合并，去重
 - `slug`：自动生成 `{slug_prefix}-{order:02}`（如 `rust-guide-03`）
 - `order`：优先从 front matter 读取，否则从文件名数字提取（如 `03-xxx.md` → `3`）
+
+**首页列表展示：** 系列文档在首页列表中合并展示，使用以下规则：
+- 标题：使用配置文件的 `series` 字段
+- 摘要：使用配置文件的 `summary` 字段（如果配置了）
+- 作者：使用配置文件的 `author` 字段
+- 日期：使用所有章节中最晚的日期
+- 标签：合并所有文章的标签（配置文件 + 所有章节），去重
 
 **排序规则：** 系列文档按以下优先级排序：
 1. `order` 字段（升序）

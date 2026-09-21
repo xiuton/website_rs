@@ -16,5 +16,7 @@ pub struct BlogPost {
     pub catalog: &'static str,
     /// 原始文件名（不含扩展名），用于排序
     pub filename: &'static str,
+    /// 系列级别的摘要（来自配置文件），用于首页列表展示
+    pub series_summary: &'static str,
 }
 

@@ -81,15 +81,16 @@ pub fn Home() -> Element {
     };
 
     // 合并系列文章：同一 series 的章节在列表中只显示文档入口（order 最小的一章），
-    // 并记录章节数，避免首页被同一文档的所有章节刷屏
+    // 并记录章节数、最后更新日期和合并后的标签，避免首页被同一文档的所有章节刷屏
     let display_posts = use_memo(move || {
         let all = posts.read();
         let mut seen: BTreeSet<&str> = BTreeSet::new();
-        let mut result: Vec<(&BlogPost, usize)> = Vec::new();
+        let mut result: Vec<(&BlogPost, usize, &str, Vec<&str>)> = Vec::new();
         for post in all.iter() {
             let series_key = if !post.series.is_empty() && !post.catalog.is_empty() { post.catalog } else { post.series };
             if series_key.is_empty() {
-                result.push((post, 0));
+                let tags: Vec<&str> = post.tags.iter().copied().collect();
+                result.push((post, 0, post.date, tags));
             } else if !seen.contains(series_key) {
                 seen.insert(series_key);
                 let chapters: Vec<&BlogPost> = all
@@ -104,11 +105,21 @@ pub fn Home() -> Element {
                     .iter()
                     .min_by(|a, b| a.order.cmp(&b.order).then_with(|| a.date.cmp(&b.date)))
                     .unwrap();
-                result.push((entry, chapters.len()));
+                let last_date = chapters.iter().map(|c| c.date).max().unwrap_or(entry.date);
+                // 合并所有文章的标签，去重
+                let mut merged_tags: Vec<&str> = Vec::new();
+                for chapter in &chapters {
+                    for tag in chapter.tags {
+                        if !merged_tags.contains(tag) {
+                            merged_tags.push(tag);
+                        }
+                    }
+                }
+                result.push((entry, chapters.len(), last_date, merged_tags));
             }
         }
-        // 按日期倒序排序（文档入口使用其发布时间）
-        result.sort_by(|a, b| b.0.date.cmp(&a.0.date));
+        // 按最后更新日期倒序排序
+        result.sort_by(|a, b| b.2.cmp(a.2));
         result
     });
 
@@ -118,8 +129,8 @@ pub fn Home() -> Element {
             display_posts.read().clone()
         } else {
             display_posts.read().iter()
-                .filter(|(p, _)| p.category == cat)
-                .copied()
+                .filter(|(p, _, _, _)| p.category == cat)
+                .cloned()
                 .collect::<Vec<_>>()
         }
     });
@@ -170,7 +181,7 @@ pub fn Home() -> Element {
                     div { class: "loading", "加载中..." }
                 } else {
                     div { class: "blog-posts",
-                        {current_page_posts().iter().map(|(post, chapter_count)| {
+                        {current_page_posts().iter().map(|(post, chapter_count, last_date, merged_tags)| {
                             let series_slug = if !post.catalog.is_empty() { post.catalog } else { post.slug };
                             rsx! {
                                 div { class: "blog-preview",
@@ -180,7 +191,13 @@ pub fn Home() -> Element {
                                         Route::BlogPostView { slug: post.slug.to_string() }
                                     },
                                         div { class: "preview-header",
-                                            h2 { class: "preview-title", {post.title} }
+                                            h2 { class: "preview-title",
+                                                {if *chapter_count > 0 {
+                                                    post.series.to_string()
+                                                } else {
+                                                    post.title.to_string()
+                                                }}
+                                            }
                                             if *chapter_count > 0 {
                                                 span { class: "preview-series-badge", "系列 · 共 {chapter_count} 章" }
                                             }
@@ -189,12 +206,18 @@ pub fn Home() -> Element {
                                             }
                                         }
                                         div { class: "preview-meta",
-                                            span { class: "preview-date", {post.date} }
+                                            span { class: "preview-date", {last_date} }
                                             span { class: "preview-author", {post.author} }
                                         }
                                         div { class: "preview-content",
                                             p { class: "preview-excerpt",
-                                                {if !post.summary.is_empty() {
+                                                {if *chapter_count > 0 {
+                                                    if !post.series_summary.is_empty() {
+                                                        post.series_summary.to_string()
+                                                    } else {
+                                                        post.summary.to_string()
+                                                    }
+                                                } else if !post.summary.is_empty() {
                                                     post.summary.to_string()
                                                 } else {
                                                     crate::utils::markdown::clean_markdown_excerpt(post.content, 150)
@@ -202,7 +225,7 @@ pub fn Home() -> Element {
                                             }
                                         }
                                         div { class: "preview-tags",
-                                            {post.tags.iter().map(|tag| {
+                                            {merged_tags.iter().map(|tag| {
                                                 rsx! {
                                                     span { class: "preview-tag",
                                                         TagIcon {}

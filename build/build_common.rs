@@ -22,6 +22,8 @@ pub struct PostData {
     pub catalog: String,
     /// 原始文件名（不含扩展名），用于排序
     pub filename: String,
+    /// 系列级别的摘要（来自配置文件），用于首页列表展示
+    pub series_summary: String,
 }
 
 /// 目录配置文件结构体
@@ -33,6 +35,7 @@ pub struct DirConfig {
     pub tags: Vec<String>,
     pub date: Option<String>,
     pub slug_prefix: Option<String>,
+    pub summary: Option<String>,
 }
 
 /// 从目录下的 _config.toml 读取配置
@@ -70,6 +73,10 @@ pub fn load_dir_config(dir: &Path) -> DirConfig {
                     
                     if let Some(slug_prefix) = value.get("slug_prefix").and_then(|v| v.as_str()) {
                         config.slug_prefix = Some(slug_prefix.to_string());
+                    }
+                    
+                    if let Some(summary) = value.get("summary").and_then(|v| v.as_str()) {
+                        config.summary = Some(summary.to_string());
                     }
                     
                     config
@@ -458,6 +465,13 @@ pub fn process_post(
             .map(|l| l.replace("summary:", "").trim().to_string())
             .unwrap_or_default(),
     );
+    
+    // 如果 front matter 中没有 summary，使用配置文件的默认值
+    let summary = if summary.is_empty() {
+        dir_config.summary.clone().unwrap_or_default()
+    } else {
+        summary
+    };
 
     // 系列字段：同一 series 名的文章属于同一个多章节文档
     let series = strip_yaml_quotes(
@@ -540,6 +554,7 @@ pub fn process_post(
         order,
         catalog,
         filename: filename.to_string(),
+        series_summary: dir_config.summary.clone().unwrap_or_default(),
     });
 }
 
