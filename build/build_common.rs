@@ -948,19 +948,26 @@ pub fn date_key(date: &str) -> String {
 /// 2. 编号顺序必须稳定（按 日期 → order → 文件名 排序后分配），
 ///    否则 `fs::read_dir` 的遍历顺序会让 `-2`/`-3` 在不同机器上落到不同章节。
 pub fn assign_slugs(posts: &mut [PostData]) {
-    // 收集所有待分配的文章，并按「日期 → order → 文件名」稳定排序：
-    // 同一个日期的多篇（典型是共用 date 的系列章节）会依次拿到
-    // `20240511`、`20240511-2`、`20240511-3`…
+    // 待分配的文章（普通文章 / slug_style = "date" 的系列章节），
+    // 排序键 = 「完整日期时间 → order → 文件名 → 原始下标」：
+    //   · 用**完整**的 `YYYY-MM-DD HH:MM:SS` 而不是只取日期，
+    //     这样同一天里更早的时间一定拿到基础 slug（如 22:14 → 20250220，
+    //     22:27 → 20250220-2），而不是随构建顺序漂移；
+    //   · order 用于系列章节（共享同一个 date 时按章节顺序编号）；
+    //   · 文件名 + 原始下标只作为最后的手段，保证结果完全确定。
     let mut pending: Vec<(String, i32, String, usize)> = posts
         .iter()
         .enumerate()
         .filter(|(_, p)| p.slug.is_empty())
-        .map(|(i, p)| (date_key(&p.date), p.order, p.filename.clone(), i))
+        .map(|(i, p)| (p.date.clone(), p.order, p.filename.clone(), i))
         .collect();
     pending.sort();
 
-    let mut used: HashMap<String, usize> = HashMap::new();
-    for (key, _, _, i) in pending {
+    // 每遇到一个新的「日期」就分配一个新的计数器：
+    // 必须先按上面的顺序推进，计数器才会落在正确的那一篇上
+    let mut used: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+    for (datetime, _, _, i) in pending {
+        let key = date_key(&datetime);
         let slug = used.entry(key.clone()).or_insert(0);
         *slug += 1;
         posts[i].slug = if *slug > 1 {
