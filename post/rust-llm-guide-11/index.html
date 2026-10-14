@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>第 11 课：位置编码与归一化 —— 让序列带上「位置感」 - 干徒</title>
-    <meta name="description" content="引入正弦位置编码与 LayerNorm 层归一化，配合残差连接稳定训练。">
+    <meta name="description" content="用正弦位置编码补上注意力看不见的位置信息，再用 LayerNorm 与残差连接稳住深层网络。">
     <meta name="author" content="干徒">
-    <meta name="keywords" content="Rust, LLM, 注意力">
+    <meta name="keywords" content="Rust, LLM, 归一化">
     <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-11">
     <meta property="og:title" content="第 11 课：位置编码与归一化 —— 让序列带上「位置感」 - 干徒">
-    <meta property="og:description" content="引入正弦位置编码与 LayerNorm 层归一化，配合残差连接稳定训练。">
+    <meta property="og:description" content="用正弦位置编码补上注意力看不见的位置信息，再用 LayerNorm 与残差连接稳住深层网络。">
     <meta property="og:type" content="article">
     <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-11">
     <meta property="og:site_name" content="干徒的博客">
@@ -20,22 +20,22 @@
     <meta property="og:image:alt" content="第 11 课：位置编码与归一化 —— 让序列带上「位置感」 - 干徒">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="第 11 课：位置编码与归一化 —— 让序列带上「位置感」 - 干徒">
-    <meta name="twitter:description" content="引入正弦位置编码与 LayerNorm 层归一化，配合残差连接稳定训练。">
+    <meta name="twitter:description" content="用正弦位置编码补上注意力看不见的位置信息，再用 LayerNorm 与残差连接稳住深层网络。">
     <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
     <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 11 课：位置编码与归一化 —— 让序列带上「位置感」","description":"引入正弦位置编码与 LayerNorm 层归一化，配合残差连接稳定训练。","url":"https://ganto.me/post/rust-llm-guide-11","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 注意力","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 11 课：位置编码与归一化 —— 让序列带上「位置感」","description":"用正弦位置编码补上注意力看不见的位置信息，再用 LayerNorm 与残差连接稳住深层网络。","url":"https://ganto.me/post/rust-llm-guide-11","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 归一化","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
     </script>
     <link rel="stylesheet" href="/styles-84a0c1a16fd4b1bc.css">
-<link rel="modulepreload" href="/web-rs-8ee8b4f1252fa02d.js" crossorigin="anonymous" integrity="sha384-TxRN3IL8AIHuolVnquiA+u9SEBvUFMfUuLNiJ2VvN/bIfTer3FqW7bnpy6qNoFfK">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
-<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
+<link rel="modulepreload" href="/web-rs-a99f5589204ec566.js" crossorigin="anonymous" integrity="sha384-umfTmuv9naxm3y94Bh3NWTfgXO2lsKZY7liOaEQ/zp9/YvxyqCZMSoTUOtOsXZQ6">
 <link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous" integrity="sha384-2DHjVGrzcpbms06h5LAGWYB1zXEqfWTjATq1YsBBgX1CE2W+T4mRjoljwlXKhTcj">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
 <link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous" integrity="sha384-pfz3GoOS0du3Se5f5C1lkvbvMo0g507e24Rcu0dm29CmSCqxguUw3chk5PS1brtF">
-<link rel="preload" href="/web-rs-8ee8b4f1252fa02d_bg.wasm" crossorigin="anonymous" integrity="sha384-3wWr8DgnH4e2YxAuX2WFELRGjZBBSBguUlj/8PJRmz0t18sv4VhXf9yf2WFiiadO" as="fetch" type="application/wasm">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
+<link rel="preload" href="/web-rs-a99f5589204ec566_bg.wasm" crossorigin="anonymous" integrity="sha384-RN+hPytGjHtzCa+dPXlgO6NZwHHIA2reMSnH/98AjTuP+/n7D+fZxS0wwqc/Ie6I" as="fetch" type="application/wasm">
 
     <style>
 :root {
@@ -139,17 +139,18 @@
                     <span>2026-09-01</span>
                     <span>干徒</span>
                 </div>
-                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">注意力</span></div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">归一化</span></div>
                 <div class="blog-content">
 <h1><a href="#第-11-课位置编码与归一化--让序列带上位置感" aria-hidden="true" class="anchor" id="user-content-第-11-课位置编码与归一化--让序列带上位置感"></a>第 11 课：位置编码与归一化 —— 让序列带上&quot;位置感&quot;</h1>
 <blockquote>
-<p>代码位置：<a href="src/model.rs">src/model.rs</a>（<code>TransformerBlock</code> 里的残差连接）
-代码位置：<a href="src/layers.rs">src/layers.rs</a>（<code>LayerNorm</code>）
-演示入口：<a href="src/main.rs">src/main.rs</a></p>
-<p>⚠️ <strong>历史说明</strong>：本课实现的正弦位置编码（<code>sinusoidal_positions</code> / <code>pos_emb</code>）已在<strong>第 19 课被 RoPE 取代</strong>——
+<p>代码位置：<a href="../src/model.rs">src/model.rs</a>（<code>TransformerBlock</code> 里的残差连接）
+代码位置：<a href="../src/layers.rs">src/layers.rs</a>（<code>LayerNorm</code>）
+演示入口：<a href="../src/main.rs">src/main.rs</a></p>
+<p>⚠️ <strong>历史说明</strong>：本课实现的正弦位置编码（<code>sinusoidal_positions</code> / <code>pos_emb</code>）已在<strong>第 20 课被 RoPE 取代</strong>——
 当前 <code>src/model.rs</code> 里不再有 <code>pos_emb</code> 字段，位置信息由注意力内部旋转 Q/K 提供。
 本节仍是必读的：LayerNorm 与残差连接至今原样在模型里，且&quot;位置编码要解决什么问题&quot;是理解 RoPE 的前提。</p>
 </blockquote>
+<hr />
 <h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
 <ol>
 <li>注意力机制天生&quot;看不见位置&quot;，为什么？怎么补救？</li>
@@ -157,6 +158,7 @@
 <li>LayerNorm 是怎么把数据&quot;拉回&quot;标准分布的？它和 BatchNorm 有什么区别？</li>
 <li>残差连接为什么能让我们放心地把网络加深？</li>
 </ol>
+<hr />
 <h2><a href="#2-为什么需要位置编码" aria-hidden="true" class="anchor" id="user-content-2-为什么需要位置编码"></a>2. 为什么需要位置编码</h2>
 <p>先回忆第 9-10 课的注意力公式：</p>
 <pre><code>scores = (Q · Kᵀ) / √d_k      # Q、K 由每个 token 的内容算出来
@@ -194,6 +196,7 @@ out    = attn · V
 <pre><code>x = token_embedding + position_embedding
 </code></pre>
 <p>位置向量就是&quot;第 0 个位置长什么样、第 1 个位置长什么样……&quot;的一组向量。加上之后，同一个词在不同位置就有了不同的表示。</p>
+<hr />
 <h2><a href="#3-正弦位置编码" aria-hidden="true" class="anchor" id="user-content-3-正弦位置编码"></a>3. 正弦位置编码</h2>
 <h3><a href="#31-公式" aria-hidden="true" class="anchor" id="user-content-31-公式"></a>3.1 公式</h3>
 <p>原版 Transformer 论文（Attention Is All You Need）提出用<strong>不同频率的正弦波</strong>来编码位置：</p>
@@ -329,20 +332,20 @@ fn sinusoidal_positions(max_len: usize, d: usize) -&gt; Vec&lt;f32&gt; {
 </tr>
 </tbody>
 </table>
-<p>在 <code>GPT::new</code> 里把它变成一个 <code>[block_size, n_embd]</code> 的张量存起来：</p>
+<p>在 <code>Transformer::new</code> 里把它变成一个 <code>[block_size, n_embd]</code> 的张量存起来：</p>
 <pre><code class="language-rust">let pos_emb = Tensor::from_vec(
     sinusoidal_positions(cfg.block_size, cfg.n_embd),
     vec![cfg.block_size, cfg.n_embd],
 );
 </code></pre>
-<p><code>GPT</code> 结构体里它的类型是普通 <code>Tensor</code> 而不是 <code>Tensor::param(...)</code>：</p>
+<p><code>Transformer</code> 结构体里它的类型是普通 <code>Tensor</code> 而不是 <code>Tensor::param(...)</code>：</p>
 <pre><code class="language-rust">pos_emb: Tensor, // 正弦位置编码 [block_size, D]（常数，不参与训练）
 </code></pre>
 <blockquote>
 <p>它不在 <code>parameters()</code> 里，反向传播时不会产生梯度——<strong>位置编码是常数</strong>，这正是正弦编码对比&quot;可学习位置编码&quot;的一大优点。</p>
 </blockquote>
 <h3><a href="#35-怎么用加到-token-embedding-上" aria-hidden="true" class="anchor" id="user-content-35-怎么用加到-token-embedding-上"></a>3.5 怎么用：加到 token embedding 上</h3>
-<p>在 <code>GPT::forward</code> 里，用 <code>gather_rows</code> 按位置取行，再和 token embedding 相加：</p>
+<p>在 <code>Transformer::forward</code> 里，用 <code>gather_rows</code> 按位置取行，再和 token embedding 相加：</p>
 <pre><code class="language-rust">// 1. token embedding
 let tok = self.tok_emb.forward(idx).reshape(vec![b, t, d]);
 // 2. 位置编码：KV cache 推理时，当前位置从缓存长度开始
@@ -350,6 +353,7 @@ let pos_emb = self.pos_emb.gather_rows(&amp;positions).reshape(vec![b, t, d]);
 let x = tok.add(&amp;pos_emb);
 </code></pre>
 <p><code>x</code> 的每个元素 = 词的语义（token embedding）+ 词的位置（pos embedding），后续所有层都在这个&quot;带位置信息&quot;的表示上工作。</p>
+<hr />
 <h2><a href="#4-layernorm层归一化" aria-hidden="true" class="anchor" id="user-content-4-layernorm层归一化"></a>4. LayerNorm：层归一化</h2>
 <h3><a href="#41-公式" aria-hidden="true" class="anchor" id="user-content-41-公式"></a>4.1 公式</h3>
 <p>LayerNorm 对<strong>最后一维</strong>（每个样本自己）做归一化，再缩放平移：</p>
@@ -363,7 +367,7 @@ let x = tok.add(&amp;pos_emb);
 </ul>
 <p>直觉：先把每个样本拉成&quot;均值 0、方差 1&quot;的标准分布（稳定数值范围），再让模型<strong>自己决定</strong>要不要缩放平移回去（恢复表达能力）。</p>
 <h3><a href="#42-对应代码逐行拆解" aria-hidden="true" class="anchor" id="user-content-42-对应代码逐行拆解"></a>4.2 对应代码逐行拆解</h3>
-<p><code>src/layers.rs</code> 里的实现：</p>
+<p><code>src/layers.rs</code> 里的结构体定义与构造：</p>
 <pre><code class="language-rust">pub struct LayerNorm {
     pub gamma: Tensor, // [d] 可学习缩放
     pub beta: Tensor,  // [d] 可学习平移
@@ -380,24 +384,31 @@ impl LayerNorm {
     }
 
     pub fn forward(&amp;self, x: &amp;Tensor) -&gt; Tensor {
-        let d = x.shape()[x.rank() - 1];
-        // 均值 μ：[..., 1]（保持维度，方便广播）
-        let mean = x.sum_last_dim().mul_scalar(1.0 / d as f32);
-        // 中心化
-        let centered = x.sub(&amp;mean);
-        // 方差 σ²：中心化后平方再取均值
-        let var = centered
-            .mul(&amp;centered)
-            .sum_last_dim()
-            .mul_scalar(1.0 / d as f32);
-        // 归一化
-        let norm = centered.div(&amp;var.add_scalar(self.eps).sqrt());
-        // 缩放平移（γ、β 是 [d]，广播到 [..., d]）
-        norm.mul(&amp;self.gamma).add(&amp;self.beta)
+        // 融合实现（一个算子完成 11 个基础算子的前向+反向），见 Tensor::layernorm
+        x.layernorm(&amp;self.gamma, &amp;self.beta, self.eps)
     }
 }
 </code></pre>
-<p>公式 ↔ 代码对照表：</p>
+<p><code>forward</code> 的实际实现只有一行：调用融合算子 <code>Tensor::layernorm</code>（<code>src/tensor.rs</code>），一次算完归一化的前向与反向。</p>
+<blockquote>
+<p><strong>原理示意（等价的分步展开，非源码）</strong>：融合算子内部做的正是下面这 5 步，展开写只是为了对照公式；当前源码里已经没有这段分步代码了。</p>
+</blockquote>
+<pre><code class="language-rust">let d = x.shape()[x.rank() - 1];
+// 均值 μ：[..., 1]（保持维度，方便广播）
+let mean = x.sum_last_dim().mul_scalar(1.0 / d as f32);
+// 中心化
+let centered = x.sub(&amp;mean);
+// 方差 σ²：中心化后平方再取均值
+let var = centered
+    .mul(&amp;centered)
+    .sum_last_dim()
+    .mul_scalar(1.0 / d as f32);
+// 归一化
+let norm = centered.div(&amp;var.add_scalar(self.eps).sqrt());
+// 缩放平移（γ、β 是 [d]，广播到 [..., d]）
+norm.mul(&amp;self.gamma).add(&amp;self.beta)
+</code></pre>
+<p>公式 ↔ 分步展开对照表（对应融合算子内部的等价实现）：</p>
 <table>
 <thead>
 <tr>
@@ -485,17 +496,18 @@ impl LayerNorm {
 </table>
 <blockquote>
 <p>记忆口诀：<strong>LayerNorm 归一化&quot;每一行&quot;，BatchNorm 归一化&quot;每一列&quot;。</strong>
-GPT 选 LayerNorm 还有一个重要原因：它不引入&quot;batch 内样本之间的相互依赖&quot;，行为可预测、实现简单（公式就 5 步）。</p>
+Transformer 选 LayerNorm 还有一个重要原因：它不引入&quot;batch 内样本之间的相互依赖&quot;，行为可预测、实现简单（公式就 5 步）。</p>
 </blockquote>
 <h3><a href="#44-在模型里用在哪" aria-hidden="true" class="anchor" id="user-content-44-在模型里用在哪"></a>4.4 在模型里用在哪</h3>
 <p><code>TransformerBlock</code> 里有两个（<code>ln1</code> 在注意力前、<code>ln2</code> 在 MLP 前），模型末尾还有一个 <code>ln_f</code>：</p>
-<pre><code class="language-rust">// TransformerBlock::new
-ln1: LayerNorm::new(cfg.n_embd, 1e-5),
-ln2: LayerNorm::new(cfg.n_embd, 1e-5),
-// GPT::new
-ln_f: LayerNorm::new(n_embd, 1e-5),
+<pre><code class="language-rust">// TransformerBlock::new（src/model.rs）
+ln1: NormLayer::new(cfg.n_embd, cfg.rms_eps, cfg.use_rmsnorm),
+ln2: NormLayer::new(cfg.n_embd, cfg.rms_eps, cfg.use_rmsnorm),
+// Transformer::new（src/model.rs）
+ln_f: NormLayer::new(n_embd, cfg.rms_eps, cfg.use_rmsnorm),
 </code></pre>
-<p>三个归一化层都在<strong>层的最前面</strong>（pre-norm 结构，下一课细讲），<code>eps</code> 统一用 <code>1e-5</code>。</p>
+<p>注意类型是 <code>NormLayer</code> 而不是 <code>LayerNorm</code>：它是&quot;<code>LayerNorm</code> / <code>RMSNorm</code> 二选一&quot;的枚举（<code>src/layers.rs</code>），由配置 <code>cfg.use_rmsnorm</code> 决定用哪一种（默认 <code>true</code> 即 RMSNorm；改回 <code>false</code> 才是本课讲的 LayerNorm，见第 21 课）。三个归一化层都在<strong>层的最前面</strong>（pre-norm 结构，下一课细讲），<code>eps</code> 取自配置 <code>model.rms_eps</code>（默认 <code>LN_EPS = 1e-5</code>，<code>src/model.rs</code>；HF 的 Qwen2 用 <code>1e-6</code>，所以它被开成了字段）。</p>
+<hr />
 <h2><a href="#5-残差连接residual-connection" aria-hidden="true" class="anchor" id="user-content-5-残差连接residual-connection"></a>5. 残差连接（Residual Connection）</h2>
 <h3><a href="#51-公式与直觉" aria-hidden="true" class="anchor" id="user-content-51-公式与直觉"></a>5.1 公式与直觉</h3>
 <p>残差连接就是在子层的输出上<strong>加上输入本身</strong>：</p>
@@ -527,17 +539,28 @@ ln_f: LayerNorm::new(n_embd, 1e-5),
 </blockquote>
 <h3><a href="#54-对应代码" aria-hidden="true" class="anchor" id="user-content-54-对应代码"></a>5.4 对应代码</h3>
 <p><code>TransformerBlock::forward</code> 里残差连接就两处 <code>add</code>：</p>
-<pre><code class="language-rust">fn forward(&amp;self, x: &amp;Tensor, mask: &amp;Tensor, kv_cache: Option&lt;&amp;mut KVCache&gt;) -&gt; Tensor {
+<pre><code class="language-rust">fn forward(
+    &amp;self,
+    x: &amp;Tensor,
+    mask: Option&lt;&amp;Tensor&gt;,
+    kv_cache: Option&lt;&amp;mut KVCache&gt;,
+    base: usize,     // KV cache 推理时的位置偏移（训练 = 0，第 25 课）
+    training: bool,  // 是否训练模式（影响 dropout）
+) -&gt; Tensor {
     // 注意力子层 + 残差连接
-    let h = self.attn.forward(&amp;self.ln1.forward(x), mask, kv_cache);
+    let h = self.attn.forward(&amp;self.ln1.forward(x), mask, kv_cache, base);
+    let h = if self.dropout &gt; 0.0 { h.dropout(self.dropout, training) } else { h };
     let x = x.add(&amp;h);   // ← 残差连接 ①：x + Attention(LN(x))
     // 前馈子层 + 残差连接
     let h = self.ln2.forward(&amp;x);
-    let h = gelu(&amp;self.mlp_linear1.forward(&amp;h));
-    let h = self.mlp_linear2.forward(&amp;h);
+    let h = self.ffn.forward(&amp;h);   // Ffn：稠密 MLP（GELU 或 SwiGLU）或 MoE
+    let h = if self.dropout &gt; 0.0 { h.dropout(self.dropout, training) } else { h };
     x.add(&amp;h)            // ← 残差连接 ②：x + MLP(LN(x))
 }
 </code></pre>
+<blockquote>
+<p>前馈子层的字段是 <code>ffn: Ffn</code>（内部再选&quot;稠密 MLP（GELU 或 SwiGLU）&quot;或第 32 课的 MoE），源码里<strong>没有</strong> <code>mlp_linear1</code> / <code>mlp_linear2</code> 这两个字段。</p>
+</blockquote>
 <table>
 <thead>
 <tr>
@@ -565,7 +588,7 @@ ln_f: LayerNorm::new(n_embd, 1e-5),
 <thead>
 <tr>
 <th></th>
-<th>pre-norm（GPT-2 风格，我们用这个）</th>
+<th>pre-norm（经典风格，我们用这个）</th>
 <th>post-norm（原版 Transformer）</th>
 </tr>
 </thead>
@@ -582,11 +605,12 @@ ln_f: LayerNorm::new(n_embd, 1e-5),
 </tr>
 <tr>
 <td>深层堆叠</td>
-<td>更容易训练（GPT 系列深度更大也能训）</td>
+<td>更容易训练（现代 LLM深度更大也能训）</td>
 <td>需要 warmup 等技巧</td>
 </tr>
 </tbody>
 </table>
+<hr />
 <h2><a href="#6-三者如何协作" aria-hidden="true" class="anchor" id="user-content-6-三者如何协作"></a>6. 三者如何协作</h2>
 <p>一个 Transformer Block 里，位置编码负责&quot;把位置信息喂进来&quot;，LayerNorm 负责&quot;稳住数值分布&quot;，残差连接负责&quot;让梯度和信息畅通无阻&quot;：</p>
 <pre><code>x (带位置编码的 embedding)
@@ -597,15 +621,9 @@ ln_f: LayerNorm::new(n_embd, 1e-5),
  │
  └─ 送到下一层
 </code></pre>
-<h2><a href="#7-动手练习" aria-hidden="true" class="anchor" id="user-content-7-动手练习"></a>7. 动手练习</h2>
-<ol>
-<li><strong>手算 LayerNorm</strong>：对向量 <code>x = [1.0, 2.0, 3.0, 4.0]</code>，手算 μ、σ²、（σ²+ε）开方后的归一化结果（ε=1e-5），再用 <code>src/layers.rs</code> 里的 <code>LayerNorm::new(4, 1e-5)</code>（γ=1、β=0 时）跑一遍对比，应该完全一致。</li>
-<li><strong>改频率基数</strong>：把 <code>sinusoidal_positions</code> 里的 <code>10000</code> 改成 <code>10</code> 或 <code>1000000</code>，想想会怎样？（提示：<code>10</code> 让所有频率都变高、位置区分更&quot;拥挤&quot;；<code>1000000</code> 让波形几乎不动。跑训练对比 loss 曲线。）</li>
-<li><strong>去掉残差</strong>：把 <code>TransformerBlock::forward</code> 里的 <code>x.add(&amp;h)</code> 改成直接 <code>h</code>（两个子层都改），跑训练观察 loss 是否下降明显变慢——亲身感受梯度消失。</li>
-<li><strong>思考</strong>：位置编码为什么是&quot;加&quot;而不是&quot;拼接&quot;（concat）？（提示：加法让每个维度只&quot;混入&quot;一个位置信号，且不改变维度数；拼接会让维度翻倍、参数爆炸。）</li>
-<li><strong>思考</strong>：LayerNorm 里为什么用 <code>sum_last_dim</code> 求均值而不是 <code>sum</code>？如果 <code>sum</code> 把所有元素加一起会怎样？</li>
-</ol>
-<h2><a href="#8-本课总结" aria-hidden="true" class="anchor" id="user-content-8-本课总结"></a>8. 本课总结</h2>
+<hr />
+<h2><a href="#7-小结与下一课" aria-hidden="true" class="anchor" id="user-content-7-小结与下一课"></a>7. 小结与下一课</h2>
+<h3><a href="#本课小结" aria-hidden="true" class="anchor" id="user-content-本课小结"></a>本课小结</h3>
 <ul>
 <li>
 <p>注意力是<strong>位置盲</strong>的，必须把位置信息加进输入 → 正弦位置编码 <code>PE(pos,2i)=sin(pos/10000^(2i/d))</code></p>
@@ -623,18 +641,29 @@ ln_f: LayerNorm::new(n_embd, 1e-5),
 <p>残差连接 <code>y = x + F(x)</code> 让梯度里永远保留一份 <code>∂loss/∂y</code>，解决梯度消失、支持深网络</p>
 </li>
 <li>
-<p>pre-norm（LN → 子层 → 残差）是 GPT 系列的标准结构</p>
+<p>pre-norm（LN → 子层 → 残差）是现代 LLM的标准结构</p>
 </li>
 <li>
-<p>下一课：把这些积木全部拼起来，组成完整的 GPT 模型！</p>
-</li>
-<li>
-<p>（本课的正弦位置编码在第 19 课被 RoPE 取代，见 <a href="docs/19-RoPE%E6%97%8B%E8%BD%AC%E4%BD%8D%E7%BD%AE%E7%BC%96%E7%A0%81.md">docs/19-RoPE旋转位置编码.md</a>；LayerNorm 与残差连接保留至今。）</p>
+<p>（本课的正弦位置编码在第 20 课被 RoPE 取代，见 <a href="20-RoPE%E6%97%8B%E8%BD%AC%E4%BD%8D%E7%BD%AE%E7%BC%96%E7%A0%81.md">20-RoPE旋转位置编码.md</a>；LayerNorm 与残差连接保留至今。）</p>
 </li>
 </ul>
+<h3><a href="#拓展方向" aria-hidden="true" class="anchor" id="user-content-拓展方向"></a>拓展方向</h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li><strong>手算 LayerNorm</strong>：对向量 <code>x = [1.0, 2.0, 3.0, 4.0]</code>，手算 μ、σ²、（σ²+ε）开方后的归一化结果（ε=1e-5），再用 <code>src/layers.rs</code> 里的 <code>LayerNorm::new(4, 1e-5)</code>（γ=1、β=0 时）跑一遍对比，应该完全一致。</li>
+<li><strong>改频率基数</strong>：把 <code>sinusoidal_positions</code> 里的 <code>10000</code> 改成 <code>10</code> 或 <code>1000000</code>，想想会怎样？（提示：<code>10</code> 让所有频率都变高、位置区分更&quot;拥挤&quot;；<code>1000000</code> 让波形几乎不动。跑训练对比 loss 曲线。）</li>
+<li><strong>去掉残差</strong>：把 <code>TransformerBlock::forward</code> 里的 <code>x.add(&amp;h)</code> 改成直接 <code>h</code>（两个子层都改），跑训练观察 loss 是否下降明显变慢——亲身感受梯度消失。</li>
+<li><strong>思考</strong>：位置编码为什么是&quot;加&quot;而不是&quot;拼接&quot;（concat）？（提示：加法让每个维度只&quot;混入&quot;一个位置信号，且不改变维度数；拼接会让维度翻倍、参数爆炸。）</li>
+<li><strong>思考</strong>：LayerNorm 里为什么用 <code>sum_last_dim</code> 求均值而不是 <code>sum</code>？如果 <code>sum</code> 把所有元素加一起会怎样？</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="12-%E5%AE%8C%E6%95%B4Transformer%E6%A8%A1%E5%9E%8B.md">第 12 课 完整 Transformer 模型</a> —— 把这些积木全部拼起来，组成完整的 Transformer 模型！</p>
+</blockquote>
 
                 </div>
-                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 22 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 1.46 一路降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与全项目总结</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：GPU 加速训练与推理</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-10/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-12/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a></div></div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 51 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：学习率调度 —— warmup + cosine decay</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：Dropout —— 训练时的「随机失忆」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：RMSNorm —— 现代 LLM 的归一化标配</span></a><a class="series-nav-item" href="/post/rust-llm-guide-22/"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">第 22 课：SwiGLU 激活函数 —— LLaMA 的「门控」MLP</span></a><a class="series-nav-item" href="/post/rust-llm-guide-23/"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-24/"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星</span></a><a class="series-nav-item" href="/post/rust-llm-guide-25/"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">第 25 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-26/"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">第 26 课：混合精度训练（AMP）—— 用半精度加速，用全精度保底</span></a><a class="series-nav-item" href="/post/rust-llm-guide-27/"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">第 27 课：GPU 加速 —— 手写 WGSL 计算着色器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-28/"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a><a class="series-nav-item" href="/post/rust-llm-guide-29/"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-30/"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">第 30 课：Beam Search —— 贪心搜索的升级版</span></a><a class="series-nav-item" href="/post/rust-llm-guide-31/"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">第 31 课：Scaling Laws（缩放定律）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-32/"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">第 32 课：MoE 混合专家模型（Mixture of Experts）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-33/"><span class="series-nav-item-index">34</span><span class="series-nav-item-title">第 33 课：量化技术（Quantization）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-34/"><span class="series-nav-item-index">35</span><span class="series-nav-item-title">第 34 课：推测解码（Speculative Decoding）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-35/"><span class="series-nav-item-index">36</span><span class="series-nav-item-title">第 35 课：多 Token 预测（Multi-Token Prediction）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-36/"><span class="series-nav-item-index">37</span><span class="series-nav-item-title">第 36 课：RLHF 与人类对齐（Alignment）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-37/"><span class="series-nav-item-index">38</span><span class="series-nav-item-title">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-38/"><span class="series-nav-item-index">39</span><span class="series-nav-item-title">第 38 课：分布式训练（Distributed Training）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-39/"><span class="series-nav-item-index">40</span><span class="series-nav-item-title">第 39 课：工程化完善 —— 从算法实现到可用框架</span></a><a class="series-nav-item" href="/post/rust-llm-guide-40/"><span class="series-nav-item-index">41</span><span class="series-nav-item-title">第 40 课：把模型部署成 API 服务 —— 从「自己跑」到「给别人调」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-41/"><span class="series-nav-item-index">42</span><span class="series-nav-item-title">第 41 课：多模态 —— 图片理解与图片生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-42/"><span class="series-nav-item-index">43</span><span class="series-nav-item-title">第 42 课：知识蒸馏（Knowledge Distillation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-43/"><span class="series-nav-item-index">44</span><span class="series-nav-item-title">第 43 课：FP8 低精度训练（模拟）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-44/"><span class="series-nav-item-index">45</span><span class="series-nav-item-title">第 44 课：WSD 学习率调度（warmup-stable-decay）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-45/"><span class="series-nav-item-index">46</span><span class="series-nav-item-title">第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死</span></a><a class="series-nav-item" href="/post/rust-llm-guide-46/"><span class="series-nav-item-index">47</span><span class="series-nav-item-title">第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化</span></a><a class="series-nav-item" href="/post/rust-llm-guide-47/"><span class="series-nav-item-index">48</span><span class="series-nav-item-title">第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道</span></a><a class="series-nav-item" href="/post/rust-llm-guide-48/"><span class="series-nav-item-index">49</span><span class="series-nav-item-title">第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重</span></a><a class="series-nav-item" href="/post/rust-llm-guide-49/"><span class="series-nav-item-index">50</span><span class="series-nav-item-title">第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</span></a><a class="series-nav-item" href="/post/rust-llm-guide-50/"><span class="series-nav-item-index">51</span><span class="series-nav-item-title">第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-10/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-12/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</span></a></div></div>
             </article>
         </main>
 <footer class="footer-content">
@@ -649,8 +678,8 @@ ln_f: LayerNorm::new(n_embd, 1e-5),
 <script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
 try{document.getElementById('main').innerHTML='';}catch(e){}</script>
 <script type="module">
-import init, * as bindings from '/web-rs-8ee8b4f1252fa02d.js';
-const wasm = await init({ module_or_path: '/web-rs-8ee8b4f1252fa02d_bg.wasm' });
+import init, * as bindings from '/web-rs-a99f5589204ec566.js';
+const wasm = await init({ module_or_path: '/web-rs-a99f5589204ec566_bg.wasm' });
 
 
 window.wasmBindings = bindings;

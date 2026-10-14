@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>第 13 课：训练循环 —— 让模型真正开始学习 - 干徒</title>
-    <meta name="description" content="编写完整的训练循环：前向、损失计算、反向传播与参数更新。">
+    <meta name="description" content="严格按六步训练循环执行 forward/backward/step，并用梯度裁剪镇住梯度爆炸。">
     <meta name="author" content="干徒">
     <meta name="keywords" content="Rust, LLM, 训练">
     <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-13">
     <meta property="og:title" content="第 13 课：训练循环 —— 让模型真正开始学习 - 干徒">
-    <meta property="og:description" content="编写完整的训练循环：前向、损失计算、反向传播与参数更新。">
+    <meta property="og:description" content="严格按六步训练循环执行 forward/backward/step，并用梯度裁剪镇住梯度爆炸。">
     <meta property="og:type" content="article">
     <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-13">
     <meta property="og:site_name" content="干徒的博客">
@@ -20,22 +20,22 @@
     <meta property="og:image:alt" content="第 13 课：训练循环 —— 让模型真正开始学习 - 干徒">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="第 13 课：训练循环 —— 让模型真正开始学习 - 干徒">
-    <meta name="twitter:description" content="编写完整的训练循环：前向、损失计算、反向传播与参数更新。">
+    <meta name="twitter:description" content="严格按六步训练循环执行 forward/backward/step，并用梯度裁剪镇住梯度爆炸。">
     <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
     <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 13 课：训练循环 —— 让模型真正开始学习","description":"编写完整的训练循环：前向、损失计算、反向传播与参数更新。","url":"https://ganto.me/post/rust-llm-guide-13","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 训练","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 13 课：训练循环 —— 让模型真正开始学习","description":"严格按六步训练循环执行 forward/backward/step，并用梯度裁剪镇住梯度爆炸。","url":"https://ganto.me/post/rust-llm-guide-13","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 训练","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
     </script>
     <link rel="stylesheet" href="/styles-84a0c1a16fd4b1bc.css">
-<link rel="modulepreload" href="/web-rs-8ee8b4f1252fa02d.js" crossorigin="anonymous" integrity="sha384-TxRN3IL8AIHuolVnquiA+u9SEBvUFMfUuLNiJ2VvN/bIfTer3FqW7bnpy6qNoFfK">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
-<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
+<link rel="modulepreload" href="/web-rs-a99f5589204ec566.js" crossorigin="anonymous" integrity="sha384-umfTmuv9naxm3y94Bh3NWTfgXO2lsKZY7liOaEQ/zp9/YvxyqCZMSoTUOtOsXZQ6">
 <link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous" integrity="sha384-2DHjVGrzcpbms06h5LAGWYB1zXEqfWTjATq1YsBBgX1CE2W+T4mRjoljwlXKhTcj">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
 <link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous" integrity="sha384-pfz3GoOS0du3Se5f5C1lkvbvMo0g507e24Rcu0dm29CmSCqxguUw3chk5PS1brtF">
-<link rel="preload" href="/web-rs-8ee8b4f1252fa02d_bg.wasm" crossorigin="anonymous" integrity="sha384-3wWr8DgnH4e2YxAuX2WFELRGjZBBSBguUlj/8PJRmz0t18sv4VhXf9yf2WFiiadO" as="fetch" type="application/wasm">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
+<link rel="preload" href="/web-rs-a99f5589204ec566_bg.wasm" crossorigin="anonymous" integrity="sha384-RN+hPytGjHtzCa+dPXlgO6NZwHHIA2reMSnH/98AjTuP+/n7D+fZxS0wwqc/Ie6I" as="fetch" type="application/wasm">
 
     <style>
 :root {
@@ -143,9 +143,10 @@
                 <div class="blog-content">
 <h1><a href="#第-13-课训练循环--让模型真正开始学习" aria-hidden="true" class="anchor" id="user-content-第-13-课训练循环--让模型真正开始学习"></a>第 13 课：训练循环 —— 让模型真正开始学习</h1>
 <blockquote>
-<p>代码位置：<a href="src/train.rs">src/train.rs</a>
-演示入口：<a href="src/main.rs">src/main.rs</a></p>
+<p>代码位置：<a href="../src/train.rs">src/train.rs</a>
+演示入口：<a href="../src/main.rs">src/main.rs</a></p>
 </blockquote>
+<hr />
 <h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
 <ol>
 <li>训练一个模型，代码上到底要做哪几步？顺序为什么不能乱？</li>
@@ -153,9 +154,10 @@
 <li>梯度爆炸是什么？<code>clip_grad_norm</code> 是怎么防止它的？</li>
 <li>为什么每步训练结束都要&quot;清零梯度&quot;？不清零会怎样？</li>
 </ol>
+<hr />
 <h2><a href="#2-训练循环总览六步走" aria-hidden="true" class="anchor" id="user-content-2-训练循环总览六步走"></a>2. 训练循环总览：六步走</h2>
 <p>训练 = 把&quot;前向 → 算损失 → 反向 → 更新&quot;这个动作反复执行成千上万次。
-<code>train_gpt</code> 里每一次循环（一个 step）严格按下面的顺序执行：</p>
+<code>train_transformer</code> 里每一次循环（一个 step）严格按下面的顺序执行：</p>
 <table>
 <thead>
 <tr>
@@ -169,7 +171,7 @@
 <tr>
 <td>1</td>
 <td>采样 batch</td>
-<td><code>loader.sample_batch(rng)</code></td>
+<td><code>loader.sample_batch(rng)</code>（预取线程提前备好）</td>
 <td>从语料里随机取一批 (x, y) 训练对</td>
 </tr>
 <tr>
@@ -207,15 +209,15 @@
 <blockquote>
 <p><strong>顺序不能乱</strong>：前向必须发生在反向之前（没有前向就没有计算图）；更新必须发生在反向之后（没有梯度就没东西可更新）；清零必须放在最后（否则下一步的梯度会叠加在旧梯度上）。</p>
 </blockquote>
-<p>对应代码（<a href="src/train.rs">src/train.rs</a> 中的 <code>train_gpt</code>，省略了日志打印）：</p>
+<p>对应代码（<a href="../src/train.rs">src/train.rs</a> 中的 <code>train_transformer</code>，省略了日志打印）：</p>
 <pre><code class="language-rust">for step in 0..steps {
-    // 1. 采样 batch
+    // 1. 采样 batch（实际实现由预取线程提前备好，见第 4 节）
     let (x, y) = loader.sample_batch(rng);
     let b = batch_size;
     let t = block_size;
 
     // 2. 前向 + 损失
-    let logits = model.forward(&amp;x, b, t, None);
+    let logits = model.forward(&amp;x, b, t, None, true);   // 5 个参数，最后一个是 training
     let loss = cross_entropy_loss(&amp;logits, &amp;y);
 
     // 3. 反向
@@ -233,12 +235,21 @@
     scheduler.step();
 }
 </code></pre>
+<blockquote>
+<p>上面是&quot;最小可跑&quot;的六步。项目当前的 <code>train_transformer</code> 在此基础上叠加了四项工程特性：</p>
+<ul>
+<li><strong>batch 预取</strong>：第 1 步的采样由独立线程提前备好（容量 2 的 <code>sync_channel</code>），采样与前向/反向重叠、CPU 不再空等；每批附带采样后的 rng 状态、主线程消费时回写，采样序列与串行逐位一致，训练可复现（见第 4 节）。</li>
+<li><strong>梯度累积</strong>（<code>TrainConfig.accum_steps</code>）：每 <code>accum_steps</code> 步小 batch 才做一次「裁剪 + <code>opt.step()</code> + <code>zero_grad()</code>」，前向损失由 <code>forward_loss(..., N)</code> 产生、反向梯度按 <code>1/N</code> 缩放（<code>N</code> 是本窗口<strong>实际</strong>微批数，由 <code>accum_window(step, accum, steps)</code> 给出——尾窗不足 <code>accum</code> 时按实际值，否则那一步的学习率会被悄悄调小），用小显存模拟大 batch（第 28 课详解）。</li>
+<li><strong>早停</strong>（<code>early_stop_patience</code>）：验证 loss 连续 N 次评估都不再改善，就提前终止训练。</li>
+<li><strong>CSV 指标日志</strong>（<code>log_file</code>）：每个评估点把 lr / loss / ppl / tokens_per_sec 写入 CSV（每次运行会用 <code>File::create</code> 覆盖旧文件并重写表头；第 39 课，见本课小结）。</li>
+</ul>
+</blockquote>
 <p>下面把这六步逐一拆开讲。</p>
 <h2><a href="#3-准备阶段参数优化器学习率调度器" aria-hidden="true" class="anchor" id="user-content-3-准备阶段参数优化器学习率调度器"></a>3. 准备阶段：参数、优化器、学习率调度器</h2>
-<p>进入循环前，<code>train_gpt</code> 先做了三件准备工作：</p>
+<p>进入循环前，<code>train_transformer</code> 先做了三件准备工作：</p>
 <pre><code class="language-rust">let params = model.parameters();                 // 收集模型所有参数
-let mut opt = AdamW::new(max_lr, params.clone(), 0.01);   // 优化器（第 17 课详述）
-let mut scheduler = LRScheduler::new(warmup_steps, steps, max_lr, max_lr * 0.1); // 学习率调度（第 20 课详述）
+let mut opt = AdamW::new(cfg.max_lr, params.clone(), cfg.weight_decay);   // 优化器（第 17 课详述）
+let mut scheduler = LRScheduler::new(cfg.warmup_steps, cfg.steps, cfg.max_lr, cfg.min_lr); // 学习率调度（第 18 课详述）
 </code></pre>
 <ul>
 <li><code>parameters()</code>：通过第 5 课实现的 <code>Module</code> trait，把模型里所有可训练张量（embedding、每层 Linear、LayerNorm 的权重与偏置）收进一个 <code>Vec&lt;Tensor&gt;</code>。优化器更新和梯度裁剪都靠这份清单。</li>
@@ -249,8 +260,11 @@ let mut scheduler = LRScheduler::new(warmup_steps, steps, max_lr, max_lr * 0.1);
 <pre><code class="language-rust">let (x, y) = loader.sample_batch(rng);
 </code></pre>
 <p><code>x</code> 是一批&quot;输入 token&quot;，<code>y</code> 是&quot;标准答案&quot;（下一个 token）。它们怎么来的、<code>batch_size</code> 和 <code>block_size</code> 是什么意思，是<strong>第 14 课</strong>的主题，本课先把它当黑盒：每次调用就得到一批新的 (x, y)。</p>
+<blockquote>
+<p><strong>实现细节：采样其实在另一个线程里</strong>。<code>train_transformer</code> 用 <code>std::thread::scope</code> 起了一个预取线程，通过容量为 2 的 <code>sync_channel</code> 超前备好后续 batch——采样与前向/反向重叠。第一批在进入 scope 前先采（否则 spawn 后立刻接收会白等一次采样）；每批附带采样后的 rng 状态，主线程消费时回写，所以采样序列与串行逐位一致，可复现训练不受影响；scope 结束（含早停 break）时通道关闭，预取线程 send 失败自然退出，scope 负责 join。</p>
+</blockquote>
 <h2><a href="#5-第二步前向--损失" aria-hidden="true" class="anchor" id="user-content-5-第二步前向--损失"></a>5. 第二步：前向 + 损失</h2>
-<pre><code class="language-rust">let logits = model.forward(&amp;x, b, t, None);          // [B*T, vocab_size]
+<pre><code class="language-rust">let logits = model.forward(&amp;x, b, t, None, true);    // [B*T, vocab_size]（training = true）
 let loss = cross_entropy_loss(&amp;logits, &amp;y);           // 标量
 </code></pre>
 <ul>
@@ -261,29 +275,30 @@ let loss = cross_entropy_loss(&amp;logits, &amp;y);           // 标量
 </code></pre>
 <p>模型给正确 token 的概率越高，loss 越小；loss 为 0 意味着预测完全正确。训练的目标就是把这个数压到最低。</p>
 <h2><a href="#6-第三步反向--lossbackward-做了什么" aria-hidden="true" class="anchor" id="user-content-6-第三步反向--lossbackward-做了什么"></a>6. 第三步：反向 —— <code>loss.backward()</code> 做了什么</h2>
-<p>这是自动微分（第 2 课）的核心。看 <a href="src/autograd.rs">src/autograd.rs</a> 里的实现：</p>
+<p>这是自动微分（第 2 课）的核心。看 <a href="../src/autograd.rs">src/autograd.rs</a> 里的实现：</p>
 <pre><code class="language-rust">pub fn backward(&amp;self) {
     assert_eq!(self.rank(), 0, &quot;backward() 只支持标量（0 维）输出&quot;);
     // 1. 先把输出自身的梯度设为 1（d loss / d loss = 1）
     self.grad.borrow_mut()[0] = 1.0;
 
-    // 2. 迭代式 DFS 拓扑排序（避免递归栈溢出，见第 4 课 6.2 节）
-    //    用显式栈模拟递归，得到&quot;先子节点后父节点&quot;的拓扑序
-    let mut stack: Vec&lt;(Tensor, usize)&gt; = Vec::new();
-    let mut visited: HashSet&lt;usize&gt; = HashSet::new();
-    // ... 三色标记法遍历 ...
-
-    // 3. 把拓扑序反过来：从 loss 开始，一层一层往回传梯度
-    for t in order.iter().rev() {
-        if let Some(b) = &amp;t.backward { b(); }
+    // 2. 借出线程局部线性 tape，从末尾逆序扫描（逆序 == 拓扑逆序）
+    let mut reachable = HashSet::new();
+    reachable.insert(身份键(self));
+    for i in (0..tape.len()).rev() {
+        if reachable.contains(&amp;tape[i].out) {
+            (tape[i].f)();                    // 3. 执行链式法则闭包
+            reachable.extend(&amp;tape[i].parents); // 沿父键继续回溯
+            tape[i].done = true;
+        }
     }
+    tape.retain(|e| !e.done);                // 4. 只移除本次执行的条目
 }
 </code></pre>
 <p>拆开看有三步：</p>
 <ol>
 <li><strong>初始化</strong>：把 loss 自己的梯度设为 1.0。因为我们要算的是 <code>∂loss/∂θ</code>，链式法则的起点就是 <code>∂loss/∂loss = 1</code>。</li>
-<li><strong>拓扑排序</strong>：前向时每个中间结果都记住了自己的 <code>parents</code>（谁算出了我）和 <code>backward</code>（如何把梯度传回给我的输入）。DFS 从 loss 出发往下走到所有叶子节点，得到&quot;先依赖、后被依赖&quot;的拓扑序。</li>
-<li><strong>逆序传播</strong>：按拓扑序的反向（从 loss 往参数方向）依次调用每个节点的 <code>backward</code> 闭包。每个节点把自己的梯度 <code>g</code> 按链式法则乘上局部导数，<strong>累加</strong>到它的输入（包括参数）的梯度上。</li>
+<li><strong>逆序扫描</strong>：前向时每个算子都把反向闭包 <code>record</code> 登记到线性 tape（输出/父张量以 grad 地址为身份键）。tape 按前向顺序追加，<strong>子节点总比父节点登记得晚</strong>，所以从末尾往前扫天然就是拓扑逆序——用可达集只挑能回溯到 loss 的条目执行。</li>
+<li><strong>链式传播</strong>：每个闭包把自己的梯度 <code>g</code> 乘上局部导数，<strong>累加</strong>到各输入（包括参数）的梯度上，并把父键并入可达集继续回溯。</li>
 </ol>
 <pre><code>loss ──► softmax ──► matmul ──► ... ──► Linear(W) ──► embedding
   g=1     累积到输入     累积到输入          累积到 W         累积到表
@@ -295,23 +310,23 @@ let loss = cross_entropy_loss(&amp;logits, &amp;y);           // 标量
 <h2><a href="#7-第四步梯度裁剪-clip_grad_norm" aria-hidden="true" class="anchor" id="user-content-7-第四步梯度裁剪-clip_grad_norm"></a>7. 第四步：梯度裁剪 <code>clip_grad_norm</code></h2>
 <p><strong>问题：梯度爆炸。</strong> 深层网络 + 长序列训练时，链式法则连乘会导致梯度呈指数级放大，一步更新就可能把参数&quot;推飞&quot;，loss 直接变成 NaN/无穷大。</p>
 <p><strong>对策：</strong> 在更新参数之前，先检查所有参数梯度的总范数；如果超过阈值 <code>max_norm</code>，就<strong>整体等比缩放</strong>，让方向不变、大小受控。</p>
-<p>代码（<a href="src/train.rs">src/train.rs</a>）：</p>
+<p>代码（<a href="../src/train.rs">src/train.rs</a>）：</p>
 <pre><code class="language-rust">pub fn clip_grad_norm(params: &amp;[Tensor], max_norm: f32) {
     // 1. 算总范数：所有梯度元素的平方和，再开根号
     let mut total = 0.0f32;
     for p in params {
-        let g = p.grad();
-        for &amp;v in &amp;g { total += v * v; }
+        let g = p.grad.borrow();
+        total += g.iter().map(|v| v * v).sum::&lt;f32&gt;();
     }
     let norm = total.sqrt();
 
-    // 2. 超过阈值才裁剪：整体乘 scale = max_norm / norm
+    // 2. 超过阈值才裁剪：整体乘 scale = max_norm / norm（原地改梯度）
     if norm &gt; max_norm {
         let scale = max_norm / norm;
         for p in params {
-            let g = p.grad();
-            let scaled: Vec&lt;f32&gt; = g.iter().map(|&amp;v| v * scale).collect();
-            p.grad_set(scaled);   // 覆盖写回（tensor.rs 里专为裁剪提供的 API）
+            for v in p.grad.borrow_mut().iter_mut() {
+                *v *= scale;
+            }
         }
     }
 }
@@ -339,7 +354,7 @@ gᵢ' = gᵢ · min(1, max_norm / norm)
 </tbody>
 </table>
 <blockquote>
-<p>注意 <code>max_norm</code> 这里取 1.0，训练 LLM 时这是很常见的取值。裁剪<strong>不改变梯度方向</strong>，只是限制步长上限——这比粗暴地调低学习率更精准。</p>
+<p>注意 <code>max_norm</code> 不是硬编码的，它来自 <code>TrainConfig.grad_clip</code>（<code>train_transformer</code> 里调用的是 <code>clip_grad_norm(&amp;params, cfg.grad_clip)</code>）：仓库 <code>config/config.json</code> 与 <code>TrainConfig::default()</code> 都是 1.0，训练 LLM 时这是很常见的取值。裁剪<strong>不改变梯度方向</strong>，只是限制步长上限——这比粗暴地调低学习率更精准。</p>
 </blockquote>
 <h2><a href="#8-第五步更新参数-optstep" aria-hidden="true" class="anchor" id="user-content-8-第五步更新参数-optstep"></a>8. 第五步：更新参数 <code>opt.step()</code></h2>
 <pre><code class="language-rust">opt.lr = scheduler.lr();   // 这一步用多大的学习率，由调度器决定
@@ -361,37 +376,48 @@ step 1:  梯度 = 0 → 前向 → 反向(累加) → 裁剪 → 更新 → 清�
 ...
 </code></pre>
 <h2><a href="#10-看训练日志loss-在下降" aria-hidden="true" class="anchor" id="user-content-10-看训练日志loss-在下降"></a>10. 看训练日志：loss 在下降</h2>
-<p><code>train_gpt</code> 末尾每隔 <code>eval_every</code> 步打印一行（main.rs 里每 100 步一次）：</p>
-<pre><code>step     0 | lr 0.00006 | loss 3.4658
-step   100 | lr 0.00138 | loss 1.8701
-step   200 | lr 0.00228 | loss 1.4210
+<p><code>train_transformer</code> 每隔 <code>eval_every</code> 步打印一行（演示 3 的 <code>demo_transformer</code> 里 <code>eval_every = 100</code>）：</p>
+<pre><code>step   100 | lr 0.002945 | loss 1.3001 | 1564 tok/s
+step   200 | lr 0.002534 | loss 0.3962 | 1747 tok/s
+step   300 | lr 0.001842 | loss 0.2236 | 1973 tok/s
 ...
-step   599 | lr 0.00030 | loss 0.8142
+step   600 | lr 0.000300 | loss 0.1586 | 2459 tok/s
 </code></pre>
+<p>（<code>cargo run --release -- demo</code> 的真实输出；有验证集时格式里还会多一列 <code>val {:.4} (ppl {:.1})</code>。）</p>
+<p>同样的行也决定 CSV 指标日志的写入节奏：<code>log_file</code> 只在<strong>评估点</strong>写（<code>(step + 1) % eval_every == 0</code> 或最后一步那个分支），不是每步都写，所以日志里的 <code>step</code> 间隔等于 <code>eval_every</code>、行数约等于 <code>steps / eval_every + 1</code>——把 <code>eval_every</code> 调小才有更密的曲线。</p>
 <p>判读方法：</p>
 <ul>
 <li><strong>loss 总体下降</strong> → 模型在学习，六步循环工作正常；</li>
 <li><strong>loss 出现 NaN/剧烈抖动</strong> → 大概率梯度爆炸，检查 <code>clip_grad_norm</code> 的阈值或调低 <code>max_lr</code>；</li>
 <li><strong>loss 降得很慢/不降</strong> → 学习率太小，或数据/模型配置有问题（下一课会讲数据怎么来）。</li>
 </ul>
-<h2><a href="#11-动手练习" aria-hidden="true" class="anchor" id="user-content-11-动手练习"></a>11. 动手练习</h2>
-<ol>
-<li>把 <code>clip_grad_norm(&amp;params, 1.0)</code> 这一行注释掉再跑 <code>cargo run</code>，观察 loss 是否更容易出现剧烈波动（体会它到底在防什么）。</li>
-<li>把 <code>max_norm</code> 从 1.0 改成 0.01 再训练，对比收敛速度（阈值太小会&quot;拖慢&quot;训练）。</li>
-<li>试着删掉 <code>opt.zero_grad()</code>，观察 loss 曲线会发生什么，并解释原因（提示：梯度在跨步累加）。</li>
-<li>在循环里打印第 5 步更新前后某个参数 <code>params[0].data()[0]</code> 的变化，验证&quot;更新确实发生在 step 之后&quot;。</li>
-</ol>
-<h2><a href="#12-本课总结" aria-hidden="true" class="anchor" id="user-content-12-本课总结"></a>12. 本课总结</h2>
+<h2><a href="#11-拓展与延伸阅读" aria-hidden="true" class="anchor" id="user-content-11-拓展与延伸阅读"></a>11. 拓展与延伸阅读</h2>
+<p>CSV 指标日志（<code>train.log_file</code> 字段、写盘时机、CSV 各列含义，以及 <code>File::create</code> 每次覆盖同名文件的注意事项）见<a href="39-%E5%B7%A5%E7%A8%8B%E5%8C%96%E5%AE%8C%E5%96%84.md">第 39 课 工程化完善</a>第 10 节；产物目录规范与 checkpoint 格式也在该课。</p>
+<h2><a href="#12-小结与下一课" aria-hidden="true" class="anchor" id="user-content-12-小结与下一课"></a>12. 小结与下一课</h2>
+<h3><a href="#本课小结" aria-hidden="true" class="anchor" id="user-content-本课小结"></a>本课小结</h3>
 <ul>
 <li>训练循环六步，顺序固定：<strong>采样 → 前向 → 损失 → 反向 → 裁剪 → 更新 → 清零</strong>（裁剪是防爆炸的保险，可视为第 3.5 步）</li>
-<li><code>loss.backward()</code>：置初值 → DFS 拓扑排序 → 逆序沿链式法则累加梯度，一次调用搞定所有参数</li>
+<li><code>loss.backward()</code>：置初值 → 逆序扫描线性 tape（可达集裁剪）→ 沿链式法则累加梯度，一次调用搞定所有参数</li>
 <li><code>clip_grad_norm</code>：总梯度范数超阈值就等比缩放，只限大小、不改方向</li>
 <li><code>opt.zero_grad()</code>：跨步清零，防止梯度污染</li>
-<li>下一步（第 14 课）：搞清楚循环第一步 <code>sample_batch</code> 返回的 x/y 到底是怎么从语料里构造出来的</li>
 </ul>
+<h3><a href="#拓展方向" aria-hidden="true" class="anchor" id="user-content-拓展方向"></a>拓展方向</h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li>把 <code>clip_grad_norm(&amp;params, cfg.grad_clip)</code> 这一行注释掉再跑 <code>cargo run --release -- demo</code>，观察 loss 是否更容易出现剧烈波动（体会它到底在防什么）。</li>
+<li>把 <code>grad_clip</code> 从 1.0 改成 0.1 再训练，对比收敛速度（阈值太小会&quot;拖慢&quot;训练）。</li>
+<li>试着删掉 <code>opt.zero_grad()</code>，观察 loss 曲线会发生什么，并解释原因（提示：梯度在跨步累加）。</li>
+<li>在循环里打印第 5 步更新前后某个参数 <code>params[0].data()[0]</code> 的变化，验证&quot;更新确实发生在 step 之后&quot;。</li>
+<li>训练日志的落盘格式与产物目录规范见<a href="39-%E5%B7%A5%E7%A8%8B%E5%8C%96%E5%AE%8C%E5%96%84.md">第 39 课 工程化完善</a>第 10 节。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="14-%E6%95%B0%E6%8D%AE%E5%8A%A0%E8%BD%BD.md">第 14 课 数据加载</a> —— 搞清楚循环第一步 <code>sample_batch</code> 返回的 x/y 到底是怎么从语料里构造出来的</p>
+</blockquote>
 
                 </div>
-                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 22 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 1.46 一路降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与全项目总结</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：GPU 加速训练与推理</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-12/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-14/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a></div></div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 51 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：学习率调度 —— warmup + cosine decay</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：Dropout —— 训练时的「随机失忆」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：RMSNorm —— 现代 LLM 的归一化标配</span></a><a class="series-nav-item" href="/post/rust-llm-guide-22/"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">第 22 课：SwiGLU 激活函数 —— LLaMA 的「门控」MLP</span></a><a class="series-nav-item" href="/post/rust-llm-guide-23/"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-24/"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星</span></a><a class="series-nav-item" href="/post/rust-llm-guide-25/"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">第 25 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-26/"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">第 26 课：混合精度训练（AMP）—— 用半精度加速，用全精度保底</span></a><a class="series-nav-item" href="/post/rust-llm-guide-27/"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">第 27 课：GPU 加速 —— 手写 WGSL 计算着色器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-28/"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a><a class="series-nav-item" href="/post/rust-llm-guide-29/"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-30/"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">第 30 课：Beam Search —— 贪心搜索的升级版</span></a><a class="series-nav-item" href="/post/rust-llm-guide-31/"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">第 31 课：Scaling Laws（缩放定律）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-32/"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">第 32 课：MoE 混合专家模型（Mixture of Experts）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-33/"><span class="series-nav-item-index">34</span><span class="series-nav-item-title">第 33 课：量化技术（Quantization）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-34/"><span class="series-nav-item-index">35</span><span class="series-nav-item-title">第 34 课：推测解码（Speculative Decoding）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-35/"><span class="series-nav-item-index">36</span><span class="series-nav-item-title">第 35 课：多 Token 预测（Multi-Token Prediction）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-36/"><span class="series-nav-item-index">37</span><span class="series-nav-item-title">第 36 课：RLHF 与人类对齐（Alignment）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-37/"><span class="series-nav-item-index">38</span><span class="series-nav-item-title">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-38/"><span class="series-nav-item-index">39</span><span class="series-nav-item-title">第 38 课：分布式训练（Distributed Training）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-39/"><span class="series-nav-item-index">40</span><span class="series-nav-item-title">第 39 课：工程化完善 —— 从算法实现到可用框架</span></a><a class="series-nav-item" href="/post/rust-llm-guide-40/"><span class="series-nav-item-index">41</span><span class="series-nav-item-title">第 40 课：把模型部署成 API 服务 —— 从「自己跑」到「给别人调」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-41/"><span class="series-nav-item-index">42</span><span class="series-nav-item-title">第 41 课：多模态 —— 图片理解与图片生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-42/"><span class="series-nav-item-index">43</span><span class="series-nav-item-title">第 42 课：知识蒸馏（Knowledge Distillation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-43/"><span class="series-nav-item-index">44</span><span class="series-nav-item-title">第 43 课：FP8 低精度训练（模拟）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-44/"><span class="series-nav-item-index">45</span><span class="series-nav-item-title">第 44 课：WSD 学习率调度（warmup-stable-decay）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-45/"><span class="series-nav-item-index">46</span><span class="series-nav-item-title">第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死</span></a><a class="series-nav-item" href="/post/rust-llm-guide-46/"><span class="series-nav-item-index">47</span><span class="series-nav-item-title">第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化</span></a><a class="series-nav-item" href="/post/rust-llm-guide-47/"><span class="series-nav-item-index">48</span><span class="series-nav-item-title">第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道</span></a><a class="series-nav-item" href="/post/rust-llm-guide-48/"><span class="series-nav-item-index">49</span><span class="series-nav-item-title">第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重</span></a><a class="series-nav-item" href="/post/rust-llm-guide-49/"><span class="series-nav-item-index">50</span><span class="series-nav-item-title">第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</span></a><a class="series-nav-item" href="/post/rust-llm-guide-50/"><span class="series-nav-item-index">51</span><span class="series-nav-item-title">第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-12/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-14/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a></div></div>
             </article>
         </main>
 <footer class="footer-content">
@@ -406,8 +432,8 @@ step   599 | lr 0.00030 | loss 0.8142
 <script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
 try{document.getElementById('main').innerHTML='';}catch(e){}</script>
 <script type="module">
-import init, * as bindings from '/web-rs-8ee8b4f1252fa02d.js';
-const wasm = await init({ module_or_path: '/web-rs-8ee8b4f1252fa02d_bg.wasm' });
+import init, * as bindings from '/web-rs-a99f5589204ec566.js';
+const wasm = await init({ module_or_path: '/web-rs-a99f5589204ec566_bg.wasm' });
 
 
 window.wasmBindings = bindings;

@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 43 课：FP8 低精度训练（模拟） - 干徒</title>
+    <meta name="description" content="E4M3/E5M2 编解码与分块缩放，量化 FP8 训练的数值误差，并说清纯模拟的边界。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 低精度">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-43">
+    <meta property="og:title" content="第 43 课：FP8 低精度训练（模拟） - 干徒">
+    <meta property="og:description" content="E4M3/E5M2 编解码与分块缩放，量化 FP8 训练的数值误差，并说清纯模拟的边界。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-43">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 43 课：FP8 低精度训练（模拟） - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 43 课：FP8 低精度训练（模拟） - 干徒">
+    <meta name="twitter:description" content="E4M3/E5M2 编解码与分块缩放，量化 FP8 训练的数值误差，并说清纯模拟的边界。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 43 课：FP8 低精度训练（模拟）","description":"E4M3/E5M2 编解码与分块缩放，量化 FP8 训练的数值误差，并说清纯模拟的边界。","url":"https://ganto.me/post/rust-llm-guide-43","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 低精度","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-84a0c1a16fd4b1bc.css">
+<link rel="modulepreload" href="/web-rs-a99f5589204ec566.js" crossorigin="anonymous" integrity="sha384-umfTmuv9naxm3y94Bh3NWTfgXO2lsKZY7liOaEQ/zp9/YvxyqCZMSoTUOtOsXZQ6">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous" integrity="sha384-2DHjVGrzcpbms06h5LAGWYB1zXEqfWTjATq1YsBBgX1CE2W+T4mRjoljwlXKhTcj">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous" integrity="sha384-pfz3GoOS0du3Se5f5C1lkvbvMo0g507e24Rcu0dm29CmSCqxguUw3chk5PS1brtF">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
+<link rel="preload" href="/web-rs-a99f5589204ec566_bg.wasm" crossorigin="anonymous" integrity="sha384-RN+hPytGjHtzCa+dPXlgO6NZwHHIA2reMSnH/98AjTuP+/n7D+fZxS0wwqc/Ie6I" as="fetch" type="application/wasm">
+
+    <style>
+:root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+.dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+
+    </style>
+    <style>
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .theme-toggle .icon-sun { display: none; }
+        .dark .theme-toggle .icon-sun { display: inline; }
+        .dark .theme-toggle .icon-moon { display: none; }
+    </style>
+    <script>
+(function() {
+    if (location.pathname.length > 1 && location.pathname.endsWith('/')) {
+        history.replaceState(null, '', location.pathname.replace(/\/+$/, '') + location.search + location.hash);
+    }
+    var theme = localStorage.getItem('theme');
+    if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+    }
+    var tbtn = document.getElementById('prerender-theme-toggle');
+    if (tbtn) {
+        tbtn.addEventListener('click', function() {
+            var d = document.documentElement;
+            var dark = d.classList.toggle('dark');
+            localStorage.setItem('theme', dark ? 'dark' : 'light');
+        });
+    }
+})();
+    </script>
+</head>
+<body>
+    <div id="main">
+        <div class="app">
+<div class="navbar-content">
+    <div class="navbar-ui">
+        <div class="navbar-title-wrapper">
+            <h1 class="navbar-title">干徒</h1>
+            <div class="navbar-glow"></div>
+        </div>
+        <div class="navbar-subtitle">这很酷</div>
+    </div>
+</div>
+<div class="navbar-sticky-wrap">
+    <div class="navbar-links">
+        <a class="nav-link nav-active" href="/">首页</a>
+        <a class="nav-link" href="/about">关于</a>
+        <a class="nav-link" href="/tags">书签</a>
+        <a class="nav-link" href="/search">搜索</a>
+        <a class="nav-link" href="/knowledge-graph">图谱</a>
+        <a class="nav-link" href="/ai-summary">AI摘要</a>
+        <div class="nav-item-with-sub">
+            <a class="nav-link" href="/dev">开发</a>
+            <div class="nav-submenu">
+                <a class="nav-sub-link" href="/circle-generator">圆形生成器</a>
+            </div>
+        </div>
+        <a class="nav-icon-btn rss-toggle" href="/rss" title="RSS 订阅" aria-label="RSS 订阅">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"/></svg>
+        </a>
+        <button class="nav-icon-btn theme-toggle" id="prerender-theme-toggle" aria-label="切换主题" title="切换主题">
+            <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
+            <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="16" height="16" fill="currentColor"><path d="M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"/></svg>
+        </button>
+    </div>
+</div>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 43 课：FP8 低精度训练（模拟）</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-01</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">低精度</span></div>
+                <div class="blog-content">
+<h1><a href="#第-43-课fp8-低精度训练模拟" aria-hidden="true" class="anchor" id="user-content-第-43-课fp8-低精度训练模拟"></a>第 43 课：FP8 低精度训练（模拟）</h1>
+<blockquote>
+<p><strong>本课已落地为可运行代码</strong>：<code>src/fp8.rs</code>（E4M3 / E5M2 编解码 + per-block scale +
+模拟 matmul 往返；单测跑 <code>cargo test fp8</code>，数量以实际输出为准）+ <code>fp8</code> 子命令 + 训练开关 <code>train.fp8</code>。</p>
+<p>⚠️ <strong>必须说清的边界</strong>：本模块是<strong>纯数值模拟</strong>——把张量编成 FP8 的比特再解码回来，
+量&quot;若按 FP8 存，数值会差多少、loss 会变差多少&quot;。它<strong>不带来任何速度或显存收益</strong>：
+本仓库的算子全部跑在 CPU 的 f32 上，编解码反而更慢。真实 FP8 训练的收益来自 GPU 的
+FP8 tensor core（一条 <code>mma</code> 吃 8 位操作数、吞吐是 bf16 的两倍），本仓库没有 FP8 kernel，
+<strong>这份收益一分也拿不到</strong>。请勿把本课的数字当成性能数据。</p>
+<p>与第 33 课的衔接：第 33 课的量化走&quot;整数码 + 缩放因子&quot;（int8/int4，用于<strong>推理</strong>）；
+本课走&quot;浮点码 + 分块缩放&quot;（FP8，用于<strong>训练</strong>）。</p>
+</blockquote>
+<hr />
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li>FP8 与 int8 有什么本质区别？为什么训练侧偏爱 FP8？</li>
+<li>E4M3 与 E5M2 各自适合存什么？为什么 E4M3 <strong>没有 Inf</strong>？</li>
+<li>整张矩阵共用一个 scale 会出什么问题？MXFP8 的&quot;每 32 元素一个 scale&quot;是怎么来的？</li>
+<li>权重掉到 8 位，loss 会差多少？</li>
+</ol>
+<hr />
+<h2><a href="#2-fp8-不是8-位整数是8-位浮点" aria-hidden="true" class="anchor" id="user-content-2-fp8-不是8-位整数是8-位浮点"></a>2. FP8 不是&quot;8 位整数&quot;，是&quot;8 位浮点&quot;</h2>
+<table>
+<thead>
+<tr>
+<th>精度</th>
+<th>每参数字节</th>
+<th>结构</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FP32</td>
+<td>4</td>
+<td>1 符号 + 8 指数 + 23 尾数</td>
+</tr>
+<tr>
+<td>BF16</td>
+<td>2</td>
+<td>1 符号 + 8 指数 + 7 尾数</td>
+</tr>
+<tr>
+<td>FP16</td>
+<td>2</td>
+<td>1 符号 + 5 指数 + 10 尾数</td>
+</tr>
+<tr>
+<td><strong>FP8 (E4M3)</strong></td>
+<td>1</td>
+<td>1 符号 + <strong>4 指数 + 3 尾数</strong></td>
+</tr>
+<tr>
+<td><strong>FP8 (E5M2)</strong></td>
+<td>1</td>
+<td>1 符号 + <strong>5 指数 + 2 尾数</strong></td>
+</tr>
+</tbody>
+</table>
+<p>FP8 沿用浮点的&quot;符号 + 指数 + 尾数&quot;结构，只是把总位宽砍到 8 位。这带来一个对训练
+至关重要的性质：<strong>它是指数定长的浮点，相对精度在很大范围内恒定</strong>（3 位尾数恒给约
+<code>2^-4</code> 的舍入上界），不像 int8 那样&quot;范围一大、精度就一律变粗&quot;。</p>
+<h3><a href="#21-两种格式的分工" aria-hidden="true" class="anchor" id="user-content-21-两种格式的分工"></a>2.1 两种格式的分工</h3>
+<table>
+<thead>
+<tr>
+<th>格式</th>
+<th>指数位</th>
+<th>尾数位</th>
+<th>最大值</th>
+<th>最小正规数</th>
+<th>最小非规格化</th>
+<th>Inf 码</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E4M3</td>
+<td>4</td>
+<td>3</td>
+<td>448</td>
+<td>2⁻⁶ ≈ 1.562e-2</td>
+<td>2⁻⁹ ≈ 1.953e-3</td>
+<td><strong>无</strong></td>
+</tr>
+<tr>
+<td>E5M2</td>
+<td>5</td>
+<td>2</td>
+<td>57344</td>
+<td>2⁻¹⁴ ≈ 6.104e-5</td>
+<td>2⁻¹⁶ ≈ 1.526e-5</td>
+<td>有（0x7C）</td>
+</tr>
+</tbody>
+</table>
+<p>分工原则：</p>
+<ul>
+<li><strong>权重 / 激活用 E4M3</strong>：数值集中在 1 附近，范围够用，优先要精度（多一位尾数）。</li>
+<li><strong>梯度用 E5M2</strong>：反向的梯度跨好几个数量级，优先要动态范围（多一位指数）。</li>
+</ul>
+<p><strong>E4M3 没有 Inf 码</strong>是最容易被忽略的特性：它把&quot;指数全 1 + 尾数全 1&quot;这个位置留给了
+NaN，所以<strong>溢出只能饱和到最大值 448</strong>（OCP 规范如此），而不是报 Inf。E5M2 才保留 Inf。</p>
+<h3><a href="#22-标准码值对照" aria-hidden="true" class="anchor" id="user-content-22-标准码值对照"></a>2.2 标准码值对照</h3>
+<p><code>cargo run --release -- fp8</code> 第一节打印的代表性数值（与 OCP / NVIDIA 文档一致）：</p>
+<table>
+<thead>
+<tr>
+<th>数值</th>
+<th>E4M3 码</th>
+<th>解码值</th>
+<th>E5M2 码</th>
+<th>解码值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1.0</td>
+<td>0x38</td>
+<td>1.000000</td>
+<td>0x3C</td>
+<td>1.000000</td>
+</tr>
+<tr>
+<td>1.5</td>
+<td>0x3C</td>
+<td>1.500000</td>
+<td>0x3E</td>
+<td>1.500000</td>
+</tr>
+<tr>
+<td>0.1</td>
+<td>0x1D</td>
+<td>0.101562（+1.56%）</td>
+<td>0x2E</td>
+<td>0.093750（−6.25%）</td>
+</tr>
+<tr>
+<td>2⁻⁹</td>
+<td>0x01</td>
+<td>0.001953</td>
+<td>0x18</td>
+<td>0.001953</td>
+</tr>
+<tr>
+<td>448</td>
+<td>0x7E</td>
+<td>448.000000</td>
+<td>0x5F</td>
+<td>448.000000</td>
+</tr>
+<tr>
+<td>57344</td>
+<td><strong>0x7E</strong></td>
+<td><strong>448.000000</strong>（饱和）</td>
+<td>0x7B</td>
+<td>57344.000000</td>
+</tr>
+<tr>
+<td>1e9</td>
+<td><strong>0x7E</strong></td>
+<td><strong>448.000000</strong>（饱和）</td>
+<td><strong>0x7C</strong></td>
+<td><strong>inf</strong></td>
+</tr>
+</tbody>
+</table>
+<p>读法：<code>0.1</code> 在 E4M3 里只能落到 0.1016（3 位尾数就这个精度）；<code>1e9</code> 在两种格式里都
+超范围——E4M3 饱和到 448，E5M2 报 Inf。<strong>同一个数在两种格式下的码完全不同</strong>，
+所以解码必须知道用的是哪种格式。</p>
+<p>实现上舍入用手写的 round-to-nearest-ties-to-even（硬件做浮点舍入用的就是这个规则）：</p>
+<pre><code class="language-rust">fn round_ties_even(v: f32) -&gt; f32 {
+    let f = v.floor();
+    let d = v - f;
+    if d &gt; 0.5 { f + 1.0 }
+    else if d &lt; 0.5 { f }
+    else if (f as i64) % 2 == 0 { f }   // 正好在中间：往偶数靠
+    else { f + 1.0 }
+}
+</code></pre>
+<hr />
+<h2><a href="#3-分块缩放让-8-位装下真实分布" aria-hidden="true" class="anchor" id="user-content-3-分块缩放让-8-位装下真实分布"></a>3. 分块缩放：让 8 位装下真实分布</h2>
+<h3><a href="#31-整张一个-scale-的问题" aria-hidden="true" class="anchor" id="user-content-31-整张一个-scale-的问题"></a>3.1 整张一个 scale 的问题</h3>
+<p>FP8 的指数是定长的，没有&quot;非规格化到任意小&quot;的余地。如果整张矩阵共用一个 scale：</p>
+<p>$$
+\text{scale} = \frac{\max|x|}{\text{fmt.max()}}, \quad q = \text{encode}(x / \text{scale}), \quad x' = \text{decode}(q) \cdot \text{scale}
+$$</p>
+<p>那么只要有几个离群大的元素，<code>scale</code> 就被撑大，其余小量级的元素全被压进非规格化区间、
+甚至压成 0。</p>
+<h3><a href="#32-per-block-scalemicro-scaling" aria-hidden="true" class="anchor" id="user-content-32-per-block-scalemicro-scaling"></a>3.2 per-block scale（micro-scaling）</h3>
+<p>解法是 <strong>per-block scale</strong>（也叫 micro-scaling，MXFP8 规定每 32 个元素一个 scale）：</p>
+<pre><code>块内：scale = max|x_block| / fmt.max()
+      q     = encode(x / scale)     // 每元素 1 字节
+      x'    = decode(q) * scale
+</code></pre>
+<p>存储开销：32 元素共享一个 f32 scale = 4 字节 / 32 元素 = <strong>1 bit/元素</strong>，
+总位宽 <strong>9 bit</strong>，相比 f32 仍是<strong>约 3.6 倍压缩</strong>。</p>
+<h3><a href="#33-实测块大小怎么选" aria-hidden="true" class="anchor" id="user-content-33-实测块大小怎么选"></a>3.3 实测：块大小怎么选</h3>
+<p><code>cargo run --release -- fp8</code> 第二节构造了一个&quot;第 1 行尺度 1.0、最后一行 1e-6&quot;的
+合成权重 <code>[256×256]</code>（真实权重不同通道的尺度差异就这么大）：</p>
+<table>
+<thead>
+<tr>
+<th>块大小</th>
+<th>SNR (dB)</th>
+<th>平均绝对误差</th>
+<th>最大绝对误差</th>
+<th>占用（f32 的 %）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>整张</td>
+<td>31.4</td>
+<td>1.344e-3</td>
+<td>1.332e-1</td>
+<td>25.0%</td>
+</tr>
+<tr>
+<td>128</td>
+<td>31.8</td>
+<td>1.292e-3</td>
+<td>1.036e-1</td>
+<td>25.8%</td>
+</tr>
+<tr>
+<td><strong>32</strong></td>
+<td><strong>32.5</strong></td>
+<td><strong>1.200e-3</strong></td>
+<td><strong>9.497e-2</strong></td>
+<td><strong>28.1%</strong></td>
+</tr>
+<tr>
+<td>1</td>
+<td>154.8</td>
+<td>3.082e-10</td>
+<td>1.192e-7</td>
+<td><strong>125.0%</strong></td>
+</tr>
+</tbody>
+</table>
+<p>两个必须一起看的点：</p>
+<ul>
+<li>块越小误差越小，但 scale 的存储开销越大（块 1 时每个元素配一个 f32 scale，
+5 字节/元素，<strong>比 f32 还大</strong>——那不是量化，只是把 f32 换了个地方存）。
+<strong>收益与开销必须一起看，这是量化最容易自欺的地方。</strong></li>
+<li>注意&quot;整张&quot;与&quot;块 32&quot;的 SNR 只差 1.1 dB。因为 FP8 是浮点、相对精度与 scale 基本
+无关；单 scale 的真正代价是把小量级的元素压进非规格化区间直至压成 0，而这在
+<strong>平均</strong>误差里不显眼。要看出差别，得单独统计小量级那半段的相对误差。</li>
+</ul>
+<h3><a href="#34-模拟矩阵乘" aria-hidden="true" class="anchor" id="user-content-34-模拟矩阵乘"></a>3.4 模拟矩阵乘</h3>
+<p>操作数先各自往返量化、再相乘（累加仍在 f32）：</p>
+<table>
+<thead>
+<tr>
+<th>格式</th>
+<th>相对 Frobenius 误差</th>
+<th>最大绝对误差</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E4M3</td>
+<td>3.38%</td>
+<td>2.740</td>
+</tr>
+<tr>
+<td>E5M2</td>
+<td>6.73%</td>
+<td>4.632</td>
+</tr>
+</tbody>
+</table>
+<p>E4M3 的误差明显更小（3 位尾数 vs 2 位），代价是动态范围小两个数量级。这正是
+&quot;前向 E4M3 / 反向 E5M2&quot;的由来。</p>
+<hr />
+<h2><a href="#4-权重落-fp8-之后loss-差多少" aria-hidden="true" class="anchor" id="user-content-4-权重落-fp8-之后loss-差多少"></a>4. 权重落 FP8 之后，loss 差多少</h2>
+<p><code>cargo run --release -- fp8</code> 第三节：训一个小模型（<code>n_embd = 32</code>、<code>n_layer = 2</code>，60064 参数；
+默认 300 步：交叉熵 3.6363 → 0.7696），备份全部参数，然后把同一份权重分别按
+E4M3 / E5M2（+ 分块 32）往返量化，在同一评测集上重算 loss：</p>
+<table>
+<thead>
+<tr>
+<th>权重要求</th>
+<th>验证 CE</th>
+<th>困惑度</th>
+<th>相对变化</th>
+<th>量化张量/元素</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E4M3（+ 分块 32）</td>
+<td>2.8546</td>
+<td>17.368</td>
+<td>+0.07%</td>
+<td>15 / 58560</td>
+</tr>
+<tr>
+<td>E5M2（+ 分块 32）</td>
+<td>2.8689</td>
+<td>17.617</td>
+<td>+0.57%</td>
+<td>15 / 58560</td>
+</tr>
+<tr>
+<td>f32（原始）</td>
+<td>2.8526</td>
+<td>17.333</td>
+<td>0.00%</td>
+<td>0 / 60064</td>
+</tr>
+</tbody>
+</table>
+<p>（步数不同数字会略变；关键是量级——<strong>权重掉到 8 位只让 loss 动了不到 1%</strong>，
+这正是 FP8 训练可行的前提。）</p>
+<p>注意口径：</p>
+<ul>
+<li>这里只量化了<strong>权重</strong>。真实 FP8 训练还要把激活也压到 8 位（前向 E4M3），那是一份额外误差。</li>
+<li>只量化 <code>rank == 2</code> 的矩阵权重：RMSNorm 增益、bias 是一维的，尺度与矩阵权重差几个
+数量级，真实 FP8 训练也把它们留在高精度（bf16/f32）。</li>
+<li>小的相对变化（甚至略微变好）是正常波动——评测集小、量化扰动小；单测里因此断言的是
+<code>|Δ| / before &lt; 5%</code>，而不是&quot;只能变差&quot;。</li>
+</ul>
+<hr />
+<h2><a href="#5-本仓库实现要点训练开关-trainfp8" aria-hidden="true" class="anchor" id="user-content-5-本仓库实现要点训练开关-trainfp8"></a>5. 本仓库实现要点：训练开关 <code>train.fp8</code></h2>
+<pre><code class="language-jsonc">{
+  &quot;train&quot;: {
+    &quot;fp8&quot;: true   // 默认 false
+  }
+}
+</code></pre>
+<p>打开后，训练循环在<strong>每步 <code>opt.step()</code> 之后、下次前向之前</strong>，把所有二维权重矩阵按
+E4M3 + 每 32 元素一个 scale 往返量化回写。语义等价于&quot;权重以 FP8 精度存放，梯度与
+优化器状态仍是 f32&quot;。</p>
+<p>格式与块大小固定为模块常量 <code>TRAIN_FORMAT</code> / <code>TRAIN_BLOCK</code>（不做成配置项，
+避免过度配置化）。<strong>再次强调：只做数值模拟，不带来任何加速。</strong></p>
+<h3><a href="#代码地图" aria-hidden="true" class="anchor" id="user-content-代码地图"></a>代码地图</h3>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../src/fp8.rs"><code>src/fp8.rs</code></a> <code>Fp8Format</code></td>
+<td>两种格式的位数 / bias / 极值 / 码值规则</td>
+</tr>
+<tr>
+<td><a href="../src/fp8.rs"><code>src/fp8.rs</code></a> <code>encode</code> / <code>decode</code></td>
+<td>单值编解码（含 ties-to-even 舍入、饱和 / Inf / NaN 处理）</td>
+</tr>
+<tr>
+<td><a href="../src/fp8.rs"><code>src/fp8.rs</code></a> <code>Fp8Tensor</code></td>
+<td><code>[n]</code> 码 + <code>[n/block]</code> scale；<code>quantize</code> / <code>dequantize</code> / <code>errors</code> / <code>bytes</code></td>
+</tr>
+<tr>
+<td><a href="../src/fp8.rs"><code>src/fp8.rs</code></a> <code>simulate_matmul</code></td>
+<td>操作数先往返量化再乘</td>
+</tr>
+<tr>
+<td><a href="../src/fp8.rs"><code>src/fp8.rs</code></a> <code>roundtrip_params_in_place</code></td>
+<td>训练侧：原地量化二维权重（一维 norm/bias 保持高精度）</td>
+</tr>
+<tr>
+<td><a href="../src/train.rs"><code>src/train.rs</code></a></td>
+<td><code>train.fp8</code> 开关：每步更新后量化回写</td>
+</tr>
+<tr>
+<td><a href="../src/config.rs"><code>src/config.rs</code></a> <code>TrainConfig::fp8</code></td>
+<td>配置字段（默认 false，<code>#[serde(default)]</code> 兼容旧配置）</td>
+</tr>
+<tr>
+<td><a href="../src/cmd/experiments.rs"><code>src/cmd/experiments.rs</code></a> <code>cmd_fp8</code></td>
+<td><code>fp8</code> 子命令三节实验</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2><a href="#6-运行与验证" aria-hidden="true" class="anchor" id="user-content-6-运行与验证"></a>6. 运行与验证</h2>
+<p>本课的实测数据在 <code>cargo run --release -- fp8</code> 的三节演示里（标准码值对照 → 分块大小 SNR → 权重落 FP8 后的验证 CE），单测跑 <code>cargo test fp8</code>。</p>
+<h3><a href="#常见坑实测踩出来的" aria-hidden="true" class="anchor" id="user-content-常见坑实测踩出来的"></a>常见坑（实测踩出来的）</h3>
+<h4><a href="#1-舍入误差让-amax-元素溢出成-inf" aria-hidden="true" class="anchor" id="user-content-1-舍入误差让-amax-元素溢出成-inf"></a>1. 舍入误差让 amax 元素溢出成 Inf</h4>
+<p>第一版实现先出现 E5M2 的模拟 matmul 输出 <code>NaN</code>、E5M2 权重量化后验证 CE 变成 NaN。
+根因：<code>scale = amax / max</code> 之后 <code>inv = 1.0 / scale</code> 的舍入误差，会让&quot;恰好等于 amax&quot;
+的那个元素算出来比 <code>max</code> <strong>大一丁点</strong>，E5M2 于是把它编成 Inf——<strong>一个元素溢出就把
+整张张量污染成 inf/NaN</strong>。</p>
+<p>修法是编码前先饱和（真实的 FP8 kernel 也是&quot;先按 amax 定 scale 再饱和&quot;）：</p>
+<pre><code class="language-rust">let lim = fmt.max();
+chunk[k] = encode((data[base + k] * inv).clamp(-lim, lim), fmt);
+</code></pre>
+<p>并补了回归测试 <code>test_block_scale_saturates_instead_of_overflowing_to_inf</code>
+（E4M3/32、E5M2/32、E5M2/7 × 64 轮随机数据，断言全部有限）。</p>
+<h4><a href="#2-逐元素相对误差会被近-0-元素放大" aria-hidden="true" class="anchor" id="user-content-2-逐元素相对误差会被近-0-元素放大"></a>2. 逐元素相对误差会被近 0 元素放大</h4>
+<p><code>test_simulate_matmul_error_is_in_fp8_range</code> 第一版报&quot;单元素相对误差 27295%&quot;。
+原因是输出里有接近 0 的元素，逐元素相对误差被除零放大。改用<strong>相对输出峰值的绝对误差</strong>
+（<code>max_abs &lt; 0.2 × peak</code>）后就是干净的。</p>
+<h4><a href="#3-整张-snr-会被大元素主导" aria-hidden="true" class="anchor" id="user-content-3-整张-snr-会被大元素主导"></a>3. 整张 SNR 会被大元素主导</h4>
+<p><code>test_per_block_beats_single_scale_on_wide_dynamic_range</code> 第一版失败：单 scale 与
+分块都是 31.8 dB。两个原因：动态范围不够大；以及整张 SNR 被大元素主导，看不出
+小量级被压平。修法是加大动态范围，<strong>并只统计小量级那半段的平均相对误差</strong>。</p>
+<blockquote>
+<p><strong>教训</strong>：量化实验里，&quot;用什么指标&quot;比&quot;跑什么数据&quot;更容易出错。同时用 SNR、
+相对 Frobenius 误差、相对峰值绝对误差三种口径互相印证，才不容易被单一指标骗过去。</p>
+</blockquote>
+<hr />
+<h2><a href="#7-小结与下一课" aria-hidden="true" class="anchor" id="user-content-7-小结与下一课"></a>7. 小结与下一课</h2>
+<h3><a href="#本课小结" aria-hidden="true" class="anchor" id="user-content-本课小结"></a>本课小结</h3>
+<p>本课给出的是一份&quot;若按 FP8 存，数值会差多少&quot;的数值基准：权重掉到 8 位只让验证 CE 动了 +0.07%（E4M3 + 分块 32）；但本仓库没有 FP8 kernel，这份收益一分也拿不到。</p>
+<h3><a href="#拓展方向" aria-hidden="true" class="anchor" id="user-content-拓展方向"></a>拓展方向</h3>
+<ul>
+<li><strong>接真 kernel</strong>：本课留下的是&quot;可对照的数值基准&quot;。要在 GPU 上拿到真收益，需要把
+<code>matmul</code> 换成吃 FP8 操作数的 tensor core kernel（CUDA / Triton 的 <code>float8_e4m3fn</code>），
+并做 per-block scale 的融合。</li>
+<li><strong>延迟缩放（delayed scaling）</strong>：用历史 amax 的滑动统计来定 scale，比&quot;本块现算&quot;更省。</li>
+<li><strong>梯度用 E5M2</strong>：本课只覆盖前向的舍入往返；真实 FP8 训练里反向梯度走 E5M2。</li>
+<li><strong>FP8 与 AMP 共存</strong>：本项目的 <code>train.amp</code>（动态损失缩放）与 <code>train.fp8</code> 相互独立，可同时开。</li>
+</ul>
+<blockquote>
+<p><strong>下一课</strong>：<a href="44-WSD%E5%AD%A6%E4%B9%A0%E7%8E%87%E8%B0%83%E5%BA%A6.md">第 44 课 WSD 学习率调度（warmup-stable-decay）</a> —— 换学习率曲线：WSD（warmup-stable-decay）在同一个 <code>LRScheduler</code> 上加三段式调度。</p>
+</blockquote>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 51 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：学习率调度 —— warmup + cosine decay</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：Dropout —— 训练时的「随机失忆」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：RMSNorm —— 现代 LLM 的归一化标配</span></a><a class="series-nav-item" href="/post/rust-llm-guide-22/"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">第 22 课：SwiGLU 激活函数 —— LLaMA 的「门控」MLP</span></a><a class="series-nav-item" href="/post/rust-llm-guide-23/"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-24/"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星</span></a><a class="series-nav-item" href="/post/rust-llm-guide-25/"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">第 25 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-26/"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">第 26 课：混合精度训练（AMP）—— 用半精度加速，用全精度保底</span></a><a class="series-nav-item" href="/post/rust-llm-guide-27/"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">第 27 课：GPU 加速 —— 手写 WGSL 计算着色器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-28/"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a><a class="series-nav-item" href="/post/rust-llm-guide-29/"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-30/"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">第 30 课：Beam Search —— 贪心搜索的升级版</span></a><a class="series-nav-item" href="/post/rust-llm-guide-31/"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">第 31 课：Scaling Laws（缩放定律）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-32/"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">第 32 课：MoE 混合专家模型（Mixture of Experts）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-33/"><span class="series-nav-item-index">34</span><span class="series-nav-item-title">第 33 课：量化技术（Quantization）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-34/"><span class="series-nav-item-index">35</span><span class="series-nav-item-title">第 34 课：推测解码（Speculative Decoding）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-35/"><span class="series-nav-item-index">36</span><span class="series-nav-item-title">第 35 课：多 Token 预测（Multi-Token Prediction）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-36/"><span class="series-nav-item-index">37</span><span class="series-nav-item-title">第 36 课：RLHF 与人类对齐（Alignment）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-37/"><span class="series-nav-item-index">38</span><span class="series-nav-item-title">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-38/"><span class="series-nav-item-index">39</span><span class="series-nav-item-title">第 38 课：分布式训练（Distributed Training）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-39/"><span class="series-nav-item-index">40</span><span class="series-nav-item-title">第 39 课：工程化完善 —— 从算法实现到可用框架</span></a><a class="series-nav-item" href="/post/rust-llm-guide-40/"><span class="series-nav-item-index">41</span><span class="series-nav-item-title">第 40 课：把模型部署成 API 服务 —— 从「自己跑」到「给别人调」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-41/"><span class="series-nav-item-index">42</span><span class="series-nav-item-title">第 41 课：多模态 —— 图片理解与图片生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-42/"><span class="series-nav-item-index">43</span><span class="series-nav-item-title">第 42 课：知识蒸馏（Knowledge Distillation）</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-43/"><span class="series-nav-item-index">44</span><span class="series-nav-item-title">第 43 课：FP8 低精度训练（模拟）</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-44/"><span class="series-nav-item-index">45</span><span class="series-nav-item-title">第 44 课：WSD 学习率调度（warmup-stable-decay）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-45/"><span class="series-nav-item-index">46</span><span class="series-nav-item-title">第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死</span></a><a class="series-nav-item" href="/post/rust-llm-guide-46/"><span class="series-nav-item-index">47</span><span class="series-nav-item-title">第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化</span></a><a class="series-nav-item" href="/post/rust-llm-guide-47/"><span class="series-nav-item-index">48</span><span class="series-nav-item-title">第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道</span></a><a class="series-nav-item" href="/post/rust-llm-guide-48/"><span class="series-nav-item-index">49</span><span class="series-nav-item-title">第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重</span></a><a class="series-nav-item" href="/post/rust-llm-guide-49/"><span class="series-nav-item-index">50</span><span class="series-nav-item-title">第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</span></a><a class="series-nav-item" href="/post/rust-llm-guide-50/"><span class="series-nav-item-index">51</span><span class="series-nav-item-title">第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-42/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 42 课：知识蒸馏（Knowledge Distillation）</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-44/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 44 课：WSD 学习率调度（warmup-stable-decay）</span></a></div></div>
+            </article>
+        </main>
+<footer class="footer-content">
+    <div class="copyright">
+        <span>2019-2026 </span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"/></svg>
+        <span> 干徒 / Ganto</span>
+    </div>
+</footer>
+        </div>
+    </div>
+<script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
+try{document.getElementById('main').innerHTML='';}catch(e){}</script>
+<script type="module">
+import init, * as bindings from '/web-rs-a99f5589204ec566.js';
+const wasm = await init({ module_or_path: '/web-rs-a99f5589204ec566_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script>
+</body>
+</html>

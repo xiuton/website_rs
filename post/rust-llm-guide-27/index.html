@@ -1,0 +1,1573 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 27 课：GPU 加速 —— 手写 WGSL 计算着色器 - 干徒</title>
+    <meta name="description" content="用 wgpu + WGSL 手写算子把耗时计算搬上 GPU，并保证不可用时自动回退 CPU、数值不出错。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, GPU">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-27">
+    <meta property="og:title" content="第 27 课：GPU 加速 —— 手写 WGSL 计算着色器 - 干徒">
+    <meta property="og:description" content="用 wgpu + WGSL 手写算子把耗时计算搬上 GPU，并保证不可用时自动回退 CPU、数值不出错。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-27">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 27 课：GPU 加速 —— 手写 WGSL 计算着色器 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 27 课：GPU 加速 —— 手写 WGSL 计算着色器 - 干徒">
+    <meta name="twitter:description" content="用 wgpu + WGSL 手写算子把耗时计算搬上 GPU，并保证不可用时自动回退 CPU、数值不出错。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 27 课：GPU 加速 —— 手写 WGSL 计算着色器","description":"用 wgpu + WGSL 手写算子把耗时计算搬上 GPU，并保证不可用时自动回退 CPU、数值不出错。","url":"https://ganto.me/post/rust-llm-guide-27","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, GPU","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-84a0c1a16fd4b1bc.css">
+<link rel="modulepreload" href="/web-rs-a99f5589204ec566.js" crossorigin="anonymous" integrity="sha384-umfTmuv9naxm3y94Bh3NWTfgXO2lsKZY7liOaEQ/zp9/YvxyqCZMSoTUOtOsXZQ6">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous" integrity="sha384-2DHjVGrzcpbms06h5LAGWYB1zXEqfWTjATq1YsBBgX1CE2W+T4mRjoljwlXKhTcj">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous" integrity="sha384-pfz3GoOS0du3Se5f5C1lkvbvMo0g507e24Rcu0dm29CmSCqxguUw3chk5PS1brtF">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
+<link rel="preload" href="/web-rs-a99f5589204ec566_bg.wasm" crossorigin="anonymous" integrity="sha384-RN+hPytGjHtzCa+dPXlgO6NZwHHIA2reMSnH/98AjTuP+/n7D+fZxS0wwqc/Ie6I" as="fetch" type="application/wasm">
+
+    <style>
+:root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+.dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+
+    </style>
+    <style>
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .theme-toggle .icon-sun { display: none; }
+        .dark .theme-toggle .icon-sun { display: inline; }
+        .dark .theme-toggle .icon-moon { display: none; }
+    </style>
+    <script>
+(function() {
+    if (location.pathname.length > 1 && location.pathname.endsWith('/')) {
+        history.replaceState(null, '', location.pathname.replace(/\/+$/, '') + location.search + location.hash);
+    }
+    var theme = localStorage.getItem('theme');
+    if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+    }
+    var tbtn = document.getElementById('prerender-theme-toggle');
+    if (tbtn) {
+        tbtn.addEventListener('click', function() {
+            var d = document.documentElement;
+            var dark = d.classList.toggle('dark');
+            localStorage.setItem('theme', dark ? 'dark' : 'light');
+        });
+    }
+})();
+    </script>
+</head>
+<body>
+    <div id="main">
+        <div class="app">
+<div class="navbar-content">
+    <div class="navbar-ui">
+        <div class="navbar-title-wrapper">
+            <h1 class="navbar-title">干徒</h1>
+            <div class="navbar-glow"></div>
+        </div>
+        <div class="navbar-subtitle">这很酷</div>
+    </div>
+</div>
+<div class="navbar-sticky-wrap">
+    <div class="navbar-links">
+        <a class="nav-link nav-active" href="/">首页</a>
+        <a class="nav-link" href="/about">关于</a>
+        <a class="nav-link" href="/tags">书签</a>
+        <a class="nav-link" href="/search">搜索</a>
+        <a class="nav-link" href="/knowledge-graph">图谱</a>
+        <a class="nav-link" href="/ai-summary">AI摘要</a>
+        <div class="nav-item-with-sub">
+            <a class="nav-link" href="/dev">开发</a>
+            <div class="nav-submenu">
+                <a class="nav-sub-link" href="/circle-generator">圆形生成器</a>
+            </div>
+        </div>
+        <a class="nav-icon-btn rss-toggle" href="/rss" title="RSS 订阅" aria-label="RSS 订阅">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"/></svg>
+        </a>
+        <button class="nav-icon-btn theme-toggle" id="prerender-theme-toggle" aria-label="切换主题" title="切换主题">
+            <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
+            <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="16" height="16" fill="currentColor"><path d="M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"/></svg>
+        </button>
+    </div>
+</div>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 27 课：GPU 加速 —— 手写 WGSL 计算着色器</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-01</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">GPU</span></div>
+                <div class="blog-content">
+<h1><a href="#第-27-课gpu-加速--手写-wgsl-计算着色器" aria-hidden="true" class="anchor" id="user-content-第-27-课gpu-加速--手写-wgsl-计算着色器"></a>第 27 课：GPU 加速 —— 手写 WGSL 计算着色器</h1>
+<blockquote>
+<p>代码位置：<a href="../src/gpu.rs">src/gpu.rs</a>、<a href="../src/tensor.rs">src/tensor.rs</a>（逐算子分流点）、
+<a href="../src/model.rs">src/model.rs</a>（常驻链路接线）、<a href="../src/train.rs">src/train.rs</a>（稳态诊断）</p>
+<p>目标：用 wgpu 计算着色器（WGSL）把最耗时的算子搬到 GPU 上跑，
+支持 NVIDIA 与 Intel 核显，同时保证「GPU 不可用时自动回退 CPU、数值不出错」。</p>
+</blockquote>
+<hr />
+<h2><a href="#1-为什么选-wgpu" aria-hidden="true" class="anchor" id="user-content-1-为什么选-wgpu"></a>1. 为什么选 wgpu</h2>
+<ul>
+<li><strong>跨平台</strong>：Windows 走 DX12 / Vulkan，NVIDIA 独显和 Intel 核显都能用；</li>
+<li><strong>纯 Rust</strong>：不依赖 CUDA，也不引入深度学习框架（<code>wgpu</code>/<code>pollster</code> 是<strong>可选</strong>依赖，默认不编译）；</li>
+<li><strong>计算着色器</strong>：WGSL 手写算子，和写 CPU 的 for 循环思路一致——每一行都能对着数学公式核对，改完还能拿 CPU 参考实现逐值比对。</li>
+</ul>
+<p>本机标定用的是一块 <strong>NVIDIA GeForce MX150</strong>（3 个 SM、2GB 显存，Dx12 后端）。
+它很小，所以本课所有实测数字都能一眼看出「什么值得上 GPU、什么不值得」。</p>
+<hr />
+<h2><a href="#2-架构总览" aria-hidden="true" class="anchor" id="user-content-2-架构总览"></a>2. 架构总览</h2>
+<pre><code>Cargo.toml      wgpu / pollster 为可选依赖（feature = &quot;gpu&quot;）
+src/gpu.rs      GPU 上下文 + 22 个 WGSL 计算入口 + 「逐算子」与「常驻录制」两条路径
+src/tensor.rs   matmul / scale / add / relu / softmax 的分流点；
+                accumulate_grad / external / external_scalar_loss —— 常驻路径回注梯度的入口
+src/model.rs    TransformerBlock::forward、Transformer::forward_core 里的常驻链路接线
+src/train.rs    第一步打印 dispatch 分解、结尾打印稳态与「matmul 分流：GPU x / CPU y」
+</code></pre>
+<ul>
+<li><code>--features gpu</code> 开启；<strong>默认零 GPU 依赖</strong>，构建轻量。</li>
+<li>初始化用 <code>OnceLock&lt;Option&lt;GpuContext&gt;&gt;</code>：失败静默置 <code>None</code>，之后全部走 CPU。</li>
+<li>适配器按 <code>DiscreteGpu</code> 优先挑选（本机枚举到 Intel UHD 620 / MX150 / Basic Render Driver，选中 MX150）。</li>
+</ul>
+<hr />
+<h2><a href="#3-22-个-wgsl-计算入口" aria-hidden="true" class="anchor" id="user-content-3-22-个-wgsl-计算入口"></a>3. 22 个 WGSL 计算入口</h2>
+<p>分成 <strong>3 个 ShaderModule</strong>（同一 module 内的 storage 绑定声明是全局的，见 <a href="#9-%E8%B8%A9%E5%9D%91%E8%AE%B0%E5%BD%95">§9</a>）；
+下面的分组与个数是写作时的快照，以 <code>src/gpu.rs</code> 里的 <code>const SHADER*</code> 实际内容为准：</p>
+<h3><a href="#31-shader8-个" aria-hidden="true" class="anchor" id="user-content-31-shader8-个"></a>3.1 <code>SHADER</code>（8 个）</h3>
+<table>
+<thead>
+<tr>
+<th>入口</th>
+<th>workgroup</th>
+<th>计算</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>matmul_main</code></td>
+<td>16×16 = 256</td>
+<td><code>out[B,M,N] = a[B,M,K] @ b[B,K,N]</code>，输出 tile 128×128</td>
+</tr>
+<tr>
+<td><code>matmul_small_main</code></td>
+<td>8×8 = 64</td>
+<td>同一数学，输出 tile 64×64（<strong>当前默认</strong>，见 <a href="#5-%E5%A4%A7%E5%B0%8F-tile%E4%BB%8E-128128-%E5%88%B0-6464">§5</a>）</td>
+</tr>
+<tr>
+<td><code>softmax_fwd_main</code></td>
+<td>256</td>
+<td>掩码 softmax（每行一个 workgroup）</td>
+</tr>
+<tr>
+<td><code>softmax_bwd_main</code></td>
+<td>256</td>
+<td><code>dS = P ⊙ (dP − Σ dP·P)</code></td>
+</tr>
+<tr>
+<td><code>scale_main</code></td>
+<td>256</td>
+<td><code>out[i] = a[i] * s</code></td>
+</tr>
+<tr>
+<td><code>add_main</code></td>
+<td>256</td>
+<td><code>out[i] = a[i] + b[i]</code></td>
+</tr>
+<tr>
+<td><code>relu_main</code></td>
+<td>256</td>
+<td><code>out[i] = max(a[i], 0)</code></td>
+</tr>
+<tr>
+<td><code>fma_main</code></td>
+<td>256</td>
+<td>纯 FMA 循环，只用来探测量卡的峰值算力（标定用）</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#32-shader_lm_ce1-个" aria-hidden="true" class="anchor" id="user-content-32-shader_lm_ce1-个"></a>3.2 <code>SHADER_LM_CE</code>（1 个）</h3>
+<table>
+<thead>
+<tr>
+<th>入口</th>
+<th>计算</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lm_ce_main</code></td>
+<td>输出头融合交叉熵：<code>logits → log_softmax → CE → dlogits</code> 一次算完</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#33-shader_elem13-个" aria-hidden="true" class="anchor" id="user-content-33-shader_elem13-个"></a>3.3 <code>SHADER_ELEM</code>（13 个）</h3>
+<table>
+<thead>
+<tr>
+<th>入口</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ln_fwd_main</code> / <code>ln_bwd_x_main</code> / <code>ln_bwd_gb_main</code></td>
+<td>LayerNorm 前向、对输入的梯度、对 γ/β 的梯度（RMSNorm 共用同一套内核，靠模式位切换）</td>
+</tr>
+<tr>
+<td><code>gelu_fwd_bias_main</code> / <code>gelu_bwd_main</code></td>
+<td>GELU（+bias）前向与反向</td>
+</tr>
+<tr>
+<td><code>swiglu_fwd_main</code> / <code>swiglu_bwd_main</code></td>
+<td>SwiGLU 门控前向与反向</td>
+</tr>
+<tr>
+<td><code>add_bias_main</code></td>
+<td>加偏置（<code>use_bias = false</code> 的层不调它）</td>
+</tr>
+<tr>
+<td><code>bias_dropout_residual_main</code></td>
+<td><code>out = c + mask·(x + b)</code> 三合一</td>
+</tr>
+<tr>
+<td><code>dropout_bwd_main</code></td>
+<td>dropout 反向（用同一 seed <strong>重算</strong>掩码，前向/反向逐位一致）</td>
+</tr>
+<tr>
+<td><code>col_sum_main</code></td>
+<td>按列求和（沿行归约），用于 bias 梯度与 softmax 分母</td>
+</tr>
+<tr>
+<td><code>heads_split_main</code> / <code>heads_join_main</code></td>
+<td><code>[B,T,H,D] ↔ [B·H,T,D]</code> 重排，<strong>顺带做 RoPE 正/逆旋转</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>为什么单独写 <code>col_sum</code></strong>：WGSL 没有 <code>atomicAdd&lt;f32&gt;</code>（只有整数原子），
+多 workgroup 直接往同一地址累加会写飞，所以改成「一个 workgroup 负责一列 + 共享内存树形归约」。</p>
+</blockquote>
+<blockquote>
+<p><strong>为什么把 heads_split 和 RoPE 合并</strong>：重排本身是纯搬数据（访存型，GPU 不擅长），
+但既然要把 Q/K 搬一遍，就顺手把旋转做掉，省一次 4.2MB 的往返。</p>
+</blockquote>
+<p>参数统一走 16 字节对齐的 uniform：WGSL 里 uniform 数组的 stride 必须是 16 字节，所以参数不用 <code>array&lt;u32, 6&gt;</code>（会被摊成 96 字节），而是写成 6 个独立 u32 字段（共 24 字节）：</p>
+<pre><code class="language-wgsl">struct Params {
+    p0: u32, // batch（scale/add/relu 时 = len）
+    p1: u32, // m
+    p2: u32, // k
+    p3: u32, // n
+    p4: u32, // a 转置标志（1 = 物理 a 是 [B,K,M]）
+    p5: u32, // b 转置标志（1 = 物理 b 是 [B,N,K]）
+}
+</code></pre>
+<p>（f32 标量用 <code>bitcast&lt;f32&gt;</code> 传位模式。不同着色器复用同一布局，个别字段暂时空着不用。）</p>
+<hr />
+<h2><a href="#4-两条执行路径" aria-hidden="true" class="anchor" id="user-content-4-两条执行路径"></a>4. 两条执行路径</h2>
+<p>这是本课最重要的一节：<strong>同一个 GPU 后端里，粒度不同的两套跑法共存</strong>。</p>
+<h3><a href="#41-逐算子路径per-op" aria-hidden="true" class="anchor" id="user-content-41-逐算子路径per-op"></a>4.1 逐算子路径（per-op）</h3>
+<p>一个算子 = 一次提交 + 一次 poll + 一次回读（<code>GpuContext::run</code>）。
+matmul / scale / add / relu / 掩码 softmax 都走它，<code>tensor.rs</code> 里按 FLOPs 阈值分流。</p>
+<p>代价是<strong>每个算子都要付一次固定开销</strong>。本机实测（<code>[gpu] dispatch 分解</code>，采样 50 次逐算子调用）：</p>
+<pre><code>操作数上传 0.0ms (0%) | 参数上传 0.0ms (0%) | 绑定+编码+提交 0.8ms (6%) | poll+回读 13.0ms (94%)
+平均 13.9ms/次
+回读细分：poll(Wait) 9.0ms (69%) | 拷回 Vec 4.0ms (31%) —— 回读带宽约 646 MB/s
+</code></pre>
+<p>也就是说：<strong>九成以上的时间在等回读，而不是在算</strong>。所以这条路只适合大形状——
+小矩阵自动回退 CPU（阈值默认 <code>5e7</code> FLOPs，见 <a href="#7-%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F">§7</a>）。</p>
+<h3><a href="#42-常驻--批量录制路径resident" aria-hidden="true" class="anchor" id="user-content-42-常驻--批量录制路径resident"></a>4.2 常驻 / 批量录制路径（resident）</h3>
+<p>换一个粒度：<strong>一个子层</strong>（甚至整个 Block 栈）的算子全部录进<strong>同一个 command encoder</strong>，
+中间张量全部留在显存，最后只提交一次、只回读边界张量。
+反向同理——在显存里连续算完，只把边界梯度回读出来，由
+<a href="../src/tensor.rs"><code>Tensor::accumulate_grad</code></a> / <a href="../src/tensor.rs"><code>Tensor::external</code></a> 注回计算图。</p>
+<p>四条链路：</p>
+<table>
+<thead>
+<tr>
+<th>链路</th>
+<th>入口</th>
+<th>覆盖范围</th>
+<th>回注的边界梯度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>输出头融合 CE</td>
+<td><code>gpu::lm_head_ce</code></td>
+<td>matmul → log_softmax → CE → dlogits</td>
+<td>2 项（d_hidden / d_weight）</td>
+</tr>
+<tr>
+<td>注意力子层</td>
+<td><code>gpu::attn_layer_forward</code></td>
+<td>ln1 → QKV → RoPE → attn → c_proj → dropout → 残差</td>
+<td>11 项</td>
+</tr>
+<tr>
+<td>前馈子层</td>
+<td><code>gpu::mlp_forward</code></td>
+<td>ln2 → linear1 → GELU/SwiGLU → linear2 → dropout → 残差</td>
+<td>GELU 7 项 / SwiGLU 9 项</td>
+</tr>
+<tr>
+<td>整叠 Block</td>
+<td><code>gpu::stack_forward</code></td>
+<td>上述两条链路 × n_layer，子层边界也留在显存</td>
+<td>每层 16 项（SwiGLU 18 项）</td>
+</tr>
+</tbody>
+</table>
+<p>效果最直观的是输出头：logits 有 4096×8192 = 3355 万个数，逐算子版一步来回 <strong>268MB（两次回读实测 355ms）</strong>，
+融合后只回读每行一个 f32 的 <code>row_loss</code>（约 16KB）。</p>
+<p><strong>关键点：<code>attn_layer_forward</code> / <code>mlp_forward</code> 只替换「子层」</strong>，调用方拿到结果后<strong>必须继续往下走</strong>
+（注意力子层的结果要作为前馈子层的输入）。这一点曾经写错过，代价很大，见 <a href="#9-%E8%B8%A9%E5%9D%91%E8%AE%B0%E5%BD%95">§9</a>。</p>
+<p><strong>适用条件</strong>（任一不满足就自动回退逐算子 → CPU）：无 KV cache、<code>base = 0</code>（<strong>训练与评估的
+no_grad 前向都走这里</strong>）、GELU 或 SwiGLU MLP、形状与规模够大。</p>
+<p><strong>评估也走常驻路径</strong>：<code>Tensor::external</code> / <code>Tensor::external_scalar_loss</code> 原先无条件 <code>record</code>，
+no_grad 下会把永不 backward 的条目登进 tape，所以 eval 只能走逐算子。给这两处的 record 加上
+<code>grad_enabled()</code> 守卫（与普通算子的 <code>req()</code> 同口径）后，评估的前向与融合 CE 也进常驻链路。
+同机短程 bench：<strong>0.42 → 0.31 s/步</strong>、总时长 21s → 15s、eval 的逐算子 matmul 分流 <strong>580 → 0</strong>、
+<code>val 8.5975 ≈ 8.5977</code>（逐算子版）；训练步 fwd/bwd 67/173ms 无回归。</p>
+<p>归一化用 LayerNorm 还是 RMSNorm、K/V 是不是 GQA 的头数，都<strong>不需要让路</strong>——两者在参数层面
+就被抹平了：</p>
+<ul>
+<li><strong>RMSNorm</strong>：和 LayerNorm 共用同一套归约内核，靠一个模式位切换。RMSNorm 是 LayerNorm
+在&quot;μ≡0、无 β&quot;下的特例，所以前向只需把第一趟归约从&quot;求和&quot;换成&quot;求平方和&quot;、第三趟的仿射项取 0，
+反向只需把 <code>m1</code> 置 0（<code>dγ</code> 的公式本来就一致，写出的 <code>dβ</code> 无人接收）。</li>
+<li><strong>GQA</strong>：不动内核，而是在<strong>权重</strong>上做一次等价变换——把 K/V 的参数按
+<a href="../src/attention.rs"><code>repeat_kv</code></a> 的同一套头顺序展开成 <code>n_head</code> 份
+（<a href="../src/attention.rs"><code>expand_kv_head</code></a>），反向再把梯度按组折回
+（<a href="../src/attention.rs"><code>fold_kv_head_grad</code></a>）。展开后与标准 MHA 同形，整条常驻路径一行不用改；
+代价只是每步每层多上传 <code>(n_rep-1)</code> 份 K/V 权重（默认配置下 64KB 量级）。</li>
+</ul>
+<p>整叠路径默认<strong>关闭</strong>，用 <code>LLM_GPU_STACK=1</code> 打开。它在数值上与逐子层路径完全一致
+（同 seed 下 loss / val 逐位相同），实测也<strong>更快</strong>：同一配置 ABBA 两轮，
+逐子层 <code>0.67 / 0.70 s/步</code>，整叠 <code>0.59 / 0.60 s/步</code>（详见 <a href="#8-%E5%AE%9E%E6%B5%8Bmx150--dx12">§8</a>）。
+原因是<strong>提交粒度</strong>：逐子层路径按子层粒度走，每层的注意力、前馈各算一次提交（前向、反向都要各来一遍），
+整叠把整叠的前向、反向各压成一次提交——省掉的是每次提交之后的 poll + 回读等待
+（本机实测：逐子层约 <code>20.7ms/次 × 多次/步</code>，整叠一次提交 66~96ms 覆盖所有层）。</p>
+<p>默认仍关闭，因为它的<strong>准入条件更严</strong>：整叠要求所有 Block 都满足常驻条件、整个模型走同一条
+链路（单流 + 无 KV cache，训练与 no_grad 评估都可走），而逐子层是&quot;哪个子层不满足就只回退那一个&quot;。
+GELU 与 SwiGLU 现在都已支持（每层分别回注 16/18 项参数梯度）——SwiGLU 配置同机对照实测
+整叠 <code>0.44 s/步</code> vs 逐子层 <code>0.53 s/步</code>，约快 17%。
+想复现对照实验或追求吞吐时设 <code>LLM_GPU_STACK=1</code>。</p>
+<p><strong>复测（2026 年，<code>n_embd=128 / 4 层 / block=512 / batch=8 / 30 步</code>，RX 560 / DX12）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>逐子层常驻（默认）</th>
+<th>整叠常驻（<code>LLM_GPU_STACK=1</code>）</th>
+<th>变化</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>吞吐</td>
+<td>9149 tok/s</td>
+<td><strong>11307 tok/s</strong></td>
+<td><strong>+24%</strong></td>
+</tr>
+<tr>
+<td>墙钟（同配置同 seed）</td>
+<td>207 s</td>
+<td><strong>125 s</strong></td>
+<td><strong>−40%</strong></td>
+</tr>
+<tr>
+<td>loss / val</td>
+<td>7.3880 / 7.4083</td>
+<td><strong>7.3880 / 7.4083</strong></td>
+<td><strong>逐位相同</strong></td>
+</tr>
+<tr>
+<td>常驻&quot;批&quot;数</td>
+<td>180 批 = 6 批/步</td>
+<td>56 批 ≈ 1.9 批/步</td>
+<td>子层边界消失</td>
+</tr>
+<tr>
+<td>每批 dispatch</td>
+<td>12 次</td>
+<td><strong>60 次</strong></td>
+<td>融合度提高 5 倍</td>
+</tr>
+<tr>
+<td>稳态每批</td>
+<td>16.60 ms（回读 15.24）</td>
+<td>65.17 ms（回读 57.80）</td>
+<td>批变大、单批更重</td>
+</tr>
+<tr>
+<td>每批 上传 / 回读</td>
+<td>2.47 / 2.31 MB</td>
+<td>3.16 / 2.90 MB</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>同步回读占比</strong></td>
+<td><strong>86–89%</strong></td>
+<td><strong>84–92%</strong></td>
+<td><strong>并未消除</strong></td>
+</tr>
+</tbody>
+</table>
+<p>两条结论：</p>
+<ol>
+<li><strong>整叠是&quot;免费&quot;的提升</strong>：只差一个环境变量，数值逐位一致，吞吐 +24%。它省的是<strong>提交粒度</strong>
+（每次提交之后的 poll + 回读等待）——批数从 6/步 降到 1.9/步，子层边界上的 <code>b×t×d×4B</code>
+（本配置 2.1 MB）来回搬运次数成比例减少。</li>
+<li><strong>它不解决回读</strong>：同一次运行里同步回读仍占 84–92%（稳态每批 57.8 ms 里 55.2 ms 是同回读）。
+要提高利用率，下一个目标是<strong>减少回读量/回读次数</strong>（例如把 CE+反向也留在同一提交里、只回读
+边界张量），而不是继续调算力或阈值——同一实测里 <code>matmul 分流：GPU 0 / CPU 0</code>，说明逐算子
+通道一次都没走，<code>LLM_GPU_MATMUL_MIN_FLOPS</code> 对本配置<strong>不是</strong>杠杆。</li>
+</ol>
+<p><strong>适用范围</strong>：整叠要求 <code>kv_cache.is_none() &amp;&amp; base == 0</code> ⇒ 训练与整段（no_grad）评估受益，
+<strong>逐 token 生成（带 KV cache 的解码段）不走这条路径</strong>，那里靠权重常驻显存（<a href="#12-%E6%9D%83%E9%87%8D%E5%B8%B8%E9%A9%BB%E6%98%BE%E5%AD%98--%E5%90%88%E5%B9%B6-submitpoll%E6%8A%8A-m--1-%E9%82%A3%E4%B8%80%E5%88%80%E6%8B%BF%E4%B8%8B%E6%9D%A5">§12</a>）提速。</p>
+<hr />
+<h2><a href="#5-大小-tile从-128128-到-6464" aria-hidden="true" class="anchor" id="user-content-5-大小-tile从-128128-到-6464"></a>5. 大小 tile：从 128×128 到 64×64</h2>
+<p><strong>根因</strong>：原内核每个 workgroup 是 16×16 = 256 线程、输出 tile 128×128，每线程约 100 个寄存器。
+一块 SM 只塞得下 2 个这样的工作组，于是每次 <code>workgroupBarrier</code> 和每次全局 load 的等待都<strong>无处躲藏</strong>。
+改成 8×8 = 64 线程、tile 64×64（每线程仍是 8×8 = 64 个命名标量累加器）后，同一张 SM 能并存多得多的工作组，
+用一个组的访存去盖另一个组的等待。内层循环逐字未改，只把共享内存 stride 从 32 降到 16。</p>
+<p><strong>方法</strong>：GPU 连续满载会降频，两次独立运行的结果能差 15%，所以标定必须<strong>同进程内交替测量</strong>
+（<code>mm_tile_ab_probe</code>），而不是跑两次二进制再比。</p>
+<p>训练真实形状上逐个体测（大 tile → 小 tile 交替，各 3 轮）：</p>
+<table>
+<thead>
+<tr>
+<th>形状</th>
+<th>大 tile</th>
+<th>小 tile</th>
+<th>小/大</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PV fwd 512×512×32 b=32</td>
+<td>20.91ms / 103 GF/s</td>
+<td><strong>11.78ms / 182 GF/s</strong></td>
+<td>0.56</td>
+</tr>
+<tr>
+<td>dV bwd 512×512×32 b=32</td>
+<td>15.79 / 136</td>
+<td><strong>9.05 / 237</strong></td>
+<td>0.57</td>
+</tr>
+<tr>
+<td>QKᵀ fwd 512×32×512 b=32</td>
+<td>20.35 / 106</td>
+<td><strong>12.16 / 177</strong></td>
+<td>0.60</td>
+</tr>
+<tr>
+<td>QKV/c_proj fwd 4096×128×128</td>
+<td>7.86 / 137</td>
+<td><strong>5.60 / 192</strong></td>
+<td>0.71</td>
+</tr>
+<tr>
+<td>dW proj bwd 128×4096×128</td>
+<td>6.77 / 159</td>
+<td>6.78 / 158</td>
+<td>1.00</td>
+</tr>
+<tr>
+<td>MLP w2 fwd 4096×512×128</td>
+<td>8.89 / 242</td>
+<td><strong>7.04 / 305</strong></td>
+<td>0.79</td>
+</tr>
+<tr>
+<td>dX proj bwd 4096×128×128</td>
+<td>8.40 / 128</td>
+<td><strong>6.24 / 172</strong></td>
+<td>0.74</td>
+</tr>
+<tr>
+<td>lm_head fwd 4096×128×8192</td>
+<td>30.78 / 279</td>
+<td><strong>26.17 / 328</strong></td>
+<td>0.85</td>
+</tr>
+</tbody>
+</table>
+<p><strong>结论</strong>：小 tile 在<strong>每一个</strong>形状上都不输、多数快一截——原本「大 tile 共享内存复用率更高，
+只该在 n 很小或 workgroup 数太少时才换小的」的假设被数据否掉了：连 n = 8192、完全没有 tile 浪费的形状也快 18%。</p>
+<p>大 tile 内核保留（<code>LLM_GPU_MM_SMALL=0</code> 可强制回去），因为它是这张对照表的另一半，删掉就没法复现结论了。</p>
+<hr />
+<h2><a href="#6-数值正确性哪些是逐位一致哪些只是近似" aria-hidden="true" class="anchor" id="user-content-6-数值正确性哪些是逐位一致哪些只是近似"></a>6. 数值正确性：哪些是逐位一致、哪些只是近似</h2>
+<p><strong>这一点比性能数字更重要</strong>，因为它决定了「GPU 训练出来的模型能不能和 CPU 版本对得上」。</p>
+<table>
+<thead>
+<tr>
+<th>路径</th>
+<th>与 CPU 的关系</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>逐算子（matmul / softmax / scale / add / relu）</td>
+<td><strong>逐位一致</strong></td>
+<td>matmul 每个输出元素的 k 求和顺序与 CPU 完全相同；softmax 融合内核也是逐元素决定</td>
+</tr>
+<tr>
+<td>大 tile vs 小 tile matmul</td>
+<td><strong>逐位一致</strong></td>
+<td>只换并行粒度，不改累加顺序（<code>gpu_matmul_small_tile_matches_big_tile_bits</code> 守住）</td>
+</tr>
+<tr>
+<td>MLP 常驻链路</td>
+<td>逐位一致（本机实测）</td>
+<td>归约结构与 CPU 参考同序</td>
+</tr>
+<tr>
+<td>注意力常驻链路</td>
+<td><strong>相对误差 &lt; 1e-3</strong></td>
+<td>用了 col_sum / 共享内存树形归约，求和结构与 CPU 不同</td>
+</tr>
+</tbody>
+</table>
+<p>端到端验证（同一 seed、dropout=0、block=512、batch=8、4 层、<code>data/alice.txt</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>配置</th>
+<th>step 1 loss（GPU）</th>
+<th>step 1 loss（CPU）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GQA 配置（<strong>该行是&quot;注意力常驻尚不支持 GQA&quot;时的历史记录</strong>，故当时该链路未生效）</td>
+<td>4.5354</td>
+<td>4.5354（<strong>逐位一致</strong>）</td>
+</tr>
+<tr>
+<td>MHA 配置（注意力常驻生效）</td>
+<td>4.5075</td>
+<td>4.5169（差 0.2%）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>注意上表第一行的前提已经变了：GQA 现在<strong>能</strong>走注意力常驻路径（K/V 的头复制由调用方
+把权重按头展开后喂进内核），所以&quot;GQA ⇒ 本轮常驻链路不生效 ⇒ 逐位一致&quot;不再成立——
+GQA 形态下会落进 1e-3 相对误差那一档。四种形态（LayerNorm / RMSNorm / GQA / RMSNorm+GQA）
+现在都由 <code>test_gpu_resident_path_matches_loop_path</code> 按同一门槛守着。</p>
+</blockquote>
+<p>也就是说：<strong>想让 GPU 结果与 CPU 逐位对上，就把常驻链路整体让路</strong>——把
+<code>LLM_GPU_MATMUL_MIN_FLOPS</code> 设得比实际形状的 FLOPs 都大即可（见 <a href="#7-%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F">§7</a>）。
+只要注意力常驻链路生效，差值就在 <code>1e-3</code> 相对误差量级，测试里的 <code>assert_close</code> 正是按这个门槛设的；
+<code>test_gpu_resident_path_matches_loop_path</code> 把 LayerNorm / RMSNorm / GQA / RMSNorm+GQA
+四种形态都纳入了同一条门槛的守护（同一份参数、同一批数据跑常驻与逐算子两遍，比 loss 与全部参数梯度）。</p>
+<hr />
+<h2><a href="#7-环境变量" aria-hidden="true" class="anchor" id="user-content-7-环境变量"></a>7. 环境变量</h2>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>作用</th>
+<th>默认</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LLM_GPU_MATMUL_MIN_FLOPS</code></td>
+<td>覆盖分流阈值（FLOPs 低于它走 CPU）</td>
+<td><code>50000000</code></td>
+</tr>
+<tr>
+<td><code>LLM_GPU_MM_SMALL</code></td>
+<td><code>0</code> = 强制 128×128 大 tile；其他值 = 64×64 小 tile</td>
+<td>小 tile</td>
+</tr>
+<tr>
+<td><code>LLM_GPU_STACK</code></td>
+<td><strong>存在即启用整叠 Block 常驻路径</strong>（设置即生效，值不参与判断）。实测 +24% 吞吐 / −40% 墙钟且数值逐位相同，但准入更严：单流 + 无 KV cache（<code>base = 0</code>）+ 所有层无 QK-Norm / MLA / LoRA / 量化，任一不满足自动回退逐子层（数值不变）。训练与整段评估受益；逐 token 解码不走它</td>
+<td>关</td>
+</tr>
+<tr>
+<td><code>LLM_GPU_PROBE</code></td>
+<td>录制第一步的全部 matmul 形状并逐形状回放，打印每形状吞吐 + 纯 FMA 峰值</td>
+<td>关</td>
+</tr>
+<tr>
+<td><code>LLM_GPU_ABLATE</code></td>
+<td>逗号分隔算子类别名（<code>heads_split,heads_join,col_sum</code>），命中的只计数不提交，用步时差反推耗时</td>
+<td>空</td>
+</tr>
+<tr>
+<td><code>LLM_GPU_ABLATE_MM</code></td>
+<td>逗号分隔形状谓词（<code>k&lt;=32</code>、<code>n&gt;=8192</code>、<code>m&lt;=128</code>），命中的 matmul 只计数不提交</td>
+<td>空</td>
+</tr>
+<tr>
+<td><code>LLM_GPU_RESIDENT_MB</code></td>
+<td>权重常驻显存的预算（MiB，<strong><code>0</code> = 关闭常驻</strong>；<strong>每个进程只在 GPU 初始化时读一次</strong>，启动后改 env 无效）。见 <a href="#123-%E9%A2%84%E7%AE%97%E4%B8%A4%E6%AC%A1%E6%9C%BA%E4%BC%9A%E4%B8%8D%E6%B7%98%E6%B1%B0%E4%B8%8D%E8%BF%9B%E6%B1%A0%E6%8C%81%E9%94%81%E4%B8%8E%E6%94%BE%E4%B8%8D%E4%B8%8B%E5%8D%B3%E9%80%80%E5%9B%9E">§12.3</a></td>
+<td><code>4 × max_buffer_size</code>，夹在 <code>[512, 2048]</code>（本机 256 MiB 上限 ⇒ <code>1024</code>）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2><a href="#8-实测mx150--dx12" aria-hidden="true" class="anchor" id="user-content-8-实测mx150--dx12"></a>8. 实测（MX150 / Dx12）</h2>
+<p>配置：<code>n_embd=128 n_head=4 n_layer=4 block_size=512 batch_size=8</code>，BPE 词表 8192，<code>dropout=0</code>，
+语料 <code>data/alice.txt</code>，25 步。</p>
+<p><strong>先分清两个口径</strong>，否则数字没法比：</p>
+<ul>
+<li><code>[gpu] 稳态（末尾 20 批）</code> 里的&quot;批&quot;是<strong>一次录制提交</strong>，不是一步训练。
+逐子层路径一次提交 = 一个子层；整叠路径一次提交 = 整叠的前向（或反向）。</li>
+<li><code>[train] step k/25</code> 那一行的 <code>st/s</code> 与 <code>tok/s</code> 是<strong>整步</strong>吞吐（含进程内的首步热身）。</li>
+</ul>
+<p>同一配置下 ABBA 两轮（同一二进制、同一 seed，A→C→C→A）：</p>
+<table>
+<thead>
+<tr>
+<th>路径</th>
+<th>总耗时 / 25 步</th>
+<th>s/步</th>
+<th>整步 tok/s（进度行）</th>
+<th>稳态 ms/次提交</th>
+<th>前向+反向</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>逐子层常驻 + 小 tile（默认）</td>
+<td>18s / 17s</td>
+<td><strong>0.70 / 0.67</strong></td>
+<td>6766~7440</td>
+<td>23.6~26.1（每子层）</td>
+<td>~490ms</td>
+</tr>
+<tr>
+<td>逐子层常驻 + 大 tile（<code>LLM_GPU_MM_SMALL=0</code>）</td>
+<td>—</td>
+<td>—</td>
+<td>6532~6814</td>
+<td>26.4~29.0（每子层）</td>
+<td>—</td>
+</tr>
+<tr>
+<td>整叠常驻（<code>LLM_GPU_STACK=1</code>）</td>
+<td>15s / 15s</td>
+<td><strong>0.60 / 0.59</strong></td>
+<td>8113~8767</td>
+<td>66.6~96.5（每整叠）</td>
+<td>~415ms</td>
+</tr>
+</tbody>
+</table>
+<p>四个运行的 <code>loss 8.9662 / val 9.0090</code> 完全一致，说明三条路径（含大小 tile）数值上等价。</p>
+<blockquote>
+<p>⚠️ <strong>别跨粒度比较 ms/批</strong>：逐子层 24ms/次 vs 整叠 67ms/次看起来是整叠慢 3 倍，
+但前者一步要提交多次、后者一步只提交 2 次。看<strong>整步</strong>才得到真实结论——整叠反而快约 12%（0.59 vs 0.67 s/步）。</p>
+</blockquote>
+<p>单看 tile 的取舍，则以 <a href="#5-%E5%A4%A7%E5%B0%8F-tile%E4%BB%8E-128128-%E5%88%B0-6464">§5</a> 的<strong>同进程交替</strong>标定为准（端到端的跨进程对比会被 GPU 降频盖过）。</p>
+<p>另外两点：</p>
+<ol>
+<li><strong>进程启动有一次性开销</strong>（首步的管线绑定、缓冲池分配等）。短跑（几步）时它会把总耗时淹没，
+所以判断快慢要看<strong>稳态</strong>那一行或进度行的 <code>st/s</code>，不能看「总耗时/步数」。</li>
+<li>MX150 每次 dispatch 的固定开销约 10ms。手写 CPU 矩阵乘（朴素三重循环、无 SIMD/BLAS）
+实际吞吐只有约 3.5 GFLOPS，所以即使是 <code>n_embd=256</code> 的小模型，GPU 依然比 CPU 快
+（<code>bench</code> 子命令里 GPU 1900 tok/s vs CPU 1540 tok/s）。
+这一档的提升空间不在&quot;把单个着色器写得更玄&quot;，而在<strong>减少 dispatch 次数</strong>：把相邻算子的形状凑齐、
+用常驻显存路径一次提交算完一整段（见 §4.2 的路径设计与 §8 的实测数字）。</li>
+</ol>
+<p><code>bench</code> 子命令是稳定的对照点（固定模型/语料/种子，step 30 的 loss 恒为 <code>2.6754</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>构建</th>
+<th>训练吞吐</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--release</code>（CPU）</td>
+<td>~1540 tok/s</td>
+<td>8 线程</td>
+</tr>
+<tr>
+<td><code>--release --features gpu</code></td>
+<td>~1900 tok/s</td>
+<td>该配置形状偏小，常驻路径大多不触发</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2><a href="#9-踩坑记录" aria-hidden="true" class="anchor" id="user-content-9-踩坑记录"></a>9. 踩坑记录</h2>
+<ol>
+<li><strong>WGSL 变量遮蔽</strong>：<code>let b = params.p0</code> 把全局 storage 数组 <code>b</code> 遮蔽成 u32，
+再写 <code>b[...]</code> 报 <code>Invalid access into expression</code>。局部变量改名即可。</li>
+<li><strong>uniform 数组对齐</strong>：uniform 地址空间数组 stride 必须 16 字节对齐，
+<code>array&lt;u32,4&gt;</code> 实际占 64 字节；改用 4 个独立 u32 字段（16 字节）最省事。</li>
+<li><strong>绑定编号</strong>：scale/relu 不用 binding 1，但声明仍是全局的；创建 bind group
+时必须显式指定 binding 编号（0/2/3），不能从 0 连续排。</li>
+<li><strong>wgpu 30 API</strong>：<code>PipelineLayoutDescriptor</code> 无 <code>push_constant_ranges</code>（用
+<code>immediate_size</code>）、<code>bind_group_layouts</code> 元素是 <code>Option&lt;_&gt;</code>、
+<code>PollType::Wait</code> 是带字段 struct、<code>get_mapped_range()</code> 返回 <code>Result</code>。</li>
+<li><strong>沙箱限制</strong>：Windows 上 GPU 驱动会写 <code>NVIDIA DXCache</code>、<code>D3DSCache</code> 等目录，
+受限环境需要放行，否则进程会被杀（程序自身会先打印完结果）。</li>
+<li><strong><code>workgroupBarrier</code> 之前不能 return</strong>：dispatch 向上取整后，同一 workgroup
+内的控制流分歧会让 barrier 变成未定义行为。正确做法是「越界读补 0、写回再保护」。</li>
+<li><strong>共享内存排布要按 <code>(lid.x, lid.y)</code></strong>：线程行对应输出行；按习惯写反了矩阵乘结果全错，
+表现为「loss 卡住不降」——这类错误不会 panic，只会让模型学不动。</li>
+<li><strong>常驻路径只替换子层，不能提前 <code>return</code></strong>（本课最贵的一个 bug）：
+<code>TransformerBlock::forward</code> 里注意力常驻链路命中后直接 <code>return</code>，
+导致<strong>每一层的 MLP 子层都被整段丢掉</strong>，模型退化成「只有注意力」。
+它不报错、不 panic，只是 loss 对不上（step 1 差 0.023，10 步后差 0.11 且持续放大），
+是靠「CPU/GPU 同 seed 对拍」才抓到的。教训：<strong>融合算子替换的是子层，不是整个 Block</strong>。</li>
+<li><strong>懒零填充会污染计时</strong>：新建的 buffer 首次被写入前是「懒零填充」的，
+第一次 dispatch 会额外付一笔清零开销。标定前必须先把两侧各跑一遍预热。</li>
+<li><strong>回读量本身会造成假象</strong>：单步回读 1.46GB 时，91% 的时间在 <code>poll(Wait)</code> 里等，
+看起来像是「GPU 算得慢」，实际是「数据搬得多」。要判断内核本身的快慢，
+必须用 <code>matmul_throughput_probe</code>（一次提交内连跑同一 matmul，排除回读）。</li>
+<li><strong>GPU 会降频</strong>：连续满载后同一内核能慢 15%，两次独立运行的对比会被温度差盖过，
+所以 tile 对照必须<strong>同进程交替</strong>测（<code>mm_tile_ab_probe</code>）。</li>
+<li><strong>按形状做消融实验有失效边界</strong>：<code>LLM_GPU_ABLATE_MM=&lt;形状谓词&gt;</code> 能摘掉某个形状的 matmul 看步时差，
+但只对「输出不进后续依赖链」的形状成立——消融掉 m = 128 的权重梯度 matmul 后参数永远得不到更新，
+loss 直接变 NaN，整轮实验作废。</li>
+<li><strong>跨粒度比较计时会得出相反的结论</strong>：<code>[gpu] 稳态（末尾 20 批）</code> 的&quot;批&quot;是<strong>一次录制提交</strong>，
+逐子层路径一次提交 = 一个子层（约 24ms），整叠路径一次提交 = 一叠的前向（约 67ms）。
+直接比这两个数会得到&quot;整叠慢 3 倍&quot;的错误结论；换成<strong>整步</strong>（s/步、<code>st/s</code>）再看，
+整叠其实快约 12%。教训：<strong>比性能之前先对齐口径</strong>——单位不一致的对比比不做对比更危险。</li>
+</ol>
+<hr />
+<h2><a href="#10-显存上限与申请护栏放不下就回退绝不-panic" aria-hidden="true" class="anchor" id="user-content-10-显存上限与申请护栏放不下就回退绝不-panic"></a>10. 显存上限与申请护栏：放不下就回退，绝不 panic</h2>
+<blockquote>
+<p>与全课其它小节不同，这一节讲的不是「怎么更快」，而是「<strong>怎么不崩</strong>」：
+GPU 后端在把申请递给 wgpu 之前先自己判一次尺寸，放不下就沿既有的 <code>Option</code> 约定回退 CPU。
+它来自一次真实崩溃（<a href="#102-%E8%B5%B7%E5%9B%A0%E4%B8%80%E6%AC%A1%E7%9C%9F%E5%AE%9E%E5%B4%A9%E6%BA%83">§10.2</a>），判据由三个 <code>mem_guard_*</code> 单测守着。</p>
+<p><strong>放不下现在有两条出路</strong>：大矩阵乘只要还能切出一块就<strong>分块留在 GPU 上算</strong>（第 11 章），
+连最小块都放不下才真的回退 CPU。本节讲的是护栏本身（也就是「真的放不下」那一条），
+分块是它的第二条出路——两条路的提示都只打一次，用户看输出就知道走的是哪条。</p>
+</blockquote>
+<h3><a href="#101-一次申请要过三类上限" aria-hidden="true" class="anchor" id="user-content-101-一次申请要过三类上限"></a>10.1 一次申请要过三类上限</h3>
+<p>池化 buffer 全部是<strong>整块绑定</strong>（<code>BufferBinding { size: None }</code>），所以除了 <code>create_buffer</code> 自己的
+硬上限，还要过对应 binding 类型的上限。<code>GpuContext::alloc_limit(kind)</code> 取的就是二者的小值：</p>
+<table>
+<thead>
+<tr>
+<th>上限（来自 <code>device.limits()</code>）</th>
+<th>什么时候卡你</th>
+<th>本机（Radeon RX 560 / DX12）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_buffer_size</code></td>
+<td><strong>任何</strong>用途的 <code>create_buffer</code> 都躲不开</td>
+<td><strong>256 MiB —— 实际卡住那张 519.4 MiB 大表的就是它</strong></td>
+</tr>
+<tr>
+<td><code>max_storage_buffer_binding_size</code></td>
+<td>buffer 作为 <strong>storage</strong> 绑定（<code>KIND_IN</code> / <code>KIND_OUT</code>）时的上限</td>
+<td>初始化时按 512 MiB 申请（<code>max(x, 512MiB)</code>），本机不是瓶颈</td>
+</tr>
+<tr>
+<td><code>max_uniform_buffer_binding_size</code></td>
+<td>buffer 作为 <strong>uniform</strong> 绑定（<code>KIND_UNIFORM</code>，参数块只有 24 B）时的上限</td>
+<td>不是瓶颈</td>
+</tr>
+</tbody>
+</table>
+<p>用途到上限的映射写在一处：</p>
+<ul>
+<li><code>KIND_READ</code>（只做拷贝目标与映射回读，<strong>从不</strong>作 storage / uniform 绑定）→ 只看 <code>max_buffer_size</code>；</li>
+<li><code>KIND_UNIFORM</code> → <code>min(max_uniform_buffer_binding_size, max_buffer_size)</code>；</li>
+<li><code>KIND_IN</code> / <code>KIND_OUT</code>（storage）→ <code>min(max_storage_buffer_binding_size, max_buffer_size)</code>。</li>
+</ul>
+<blockquote>
+<p>那三个上限在<strong>初始化时缓存一次</strong>（<code>GpuContext</code> 的三个字段）。原因是护栏在每个算子入口都要查，
+而 <code>device.limits()</code> 每次调用都要拷一份很大的 <code>Limits</code> 结构体出来——逐算子取会明显拖慢。</p>
+</blockquote>
+<h3><a href="#102-起因一次真实崩溃" aria-hidden="true" class="anchor" id="user-content-102-起因一次真实崩溃"></a>10.2 起因：一次真实崩溃</h3>
+<p>Qwen2.5-0.5B（vocab = 151936、n_embd = 896）的输出头 / 词嵌入整表是 <code>[vocab, n_embd]</code>，
+也就是 <code>151936 × 896 × 4 = 544538624 B ≈ 519.4 MiB</code>。生成时算 logits 的那次 matmul 会把这整张表
+当<strong>操作数</strong>上传（<code>GpuContext::matmul</code> 里的 <code>take_buf(b.len(), KIND_IN)</code>：物理布局 <code>[vocab, d]</code> 即
+<code>[N, K]</code>，内核按 <code>b_t = true</code> 读），而它的 FLOPs（<code>2·rows·d·vocab</code>，rows = 1 时也有 2.7 亿）
+远超分流阈值、必然尝试上 GPU —— 于是这次申请被原样递给 <code>create_buffer</code>，wgpu 的校验失败，
+默认的 uncaptured error handler 当场 panic：</p>
+<pre><code class="language-text">cargo run --release --features gpu -- generate --ckpt checkpoints\qwen05\model.ckpt \
+    --tokenizer checkpoints\qwen05\tokenizer.json --prompt &quot;你可以做什么&quot;
+
+wgpu error: Validation Error
+Caused by: In Device::create_buffer, label = 'pooled'
+    Buffer size 544538624 is greater than the maximum buffer size (268435456)
+</code></pre>
+<p><code>268435456</code> = 256 MiB，正是本机 <code>device.limits().max_buffer_size</code>；<code>544538624</code> 恰好是
+64 KiB 的整数倍（8309 × 64 KiB），所以池的 size class 上取整这次没有额外放大它。
+常驻显存版的输出头（<code>lm_head_ce</code>）也会整块 <code>upload</code> 同一张表，走的是同一条护栏 ——
+<strong>每个会把这表搬上显存的地方都从 <code>take_buf</code> 走</strong>，所以护栏只需在一处把住。</p>
+<h3><a href="#103-判据与-wgpu-的校验同源" aria-hidden="true" class="anchor" id="user-content-103-判据与-wgpu-的校验同源"></a>10.3 判据：与 wgpu 的校验<strong>同源</strong></h3>
+<pre><code class="language-rust">fn alloc_limit(&amp;self, kind: u8) -&gt; u64            // 按用途取上限，并 min(max_buffer_size)（见 §10.1）
+fn can_alloc(&amp;self, len: usize, kind: u8) -&gt; bool // fits(alloc_limit(kind), size_class(len * 4))
+fn fits(limit: u64, bytes: usize) -&gt; bool         // bytes &lt;= limit
+</code></pre>
+<p>三点都是刻意的：</p>
+<ol>
+<li><strong>按池里真正创建的字节数判</strong>（<code>size_class</code> 上取整之后），而不是只看 <code>len * 4</code>。
+池对 &gt;64 KiB 的申请按 64 KiB 对齐，只看元素字节数会漏掉最多 65535 B（近 64 KiB）—— 而边界上
+恰好是这点对齐量决定 <code>create_buffer</code> 会不会报校验错误（单测里的例子：<code>size_class(268435457) = 268435456 + 65536</code>）。</li>
+<li><strong>用 <code>&lt;=</code> 而不是 <code>&lt;</code></strong>：wgpu 的判据是 <code>size &gt; max_buffer_size</code> 才报错，<strong>恰好等于上限是合法的</strong>。</li>
+<li><strong>判据只来自 <code>device.limits()</code>，不写死常量</strong>：同一份代码在 1 GiB 上限的卡上照旧让这张表上 GPU
+（<code>mem_guard_fits_boundaries</code> 里有这条对照）——护栏只拦「放不下」，不放宽也不收紧其它行为。</li>
+</ol>
+<h3><a href="#104-回退路径与诊断提示" aria-hidden="true" class="anchor" id="user-content-104-回退路径与诊断提示"></a>10.4 回退路径与诊断提示</h3>
+<ul>
+<li><code>take_buf</code> 是 GPU 后端<strong>唯一</strong>的分配入口（池命中与新建都从它走）：超限直接返回 <code>None</code>，
+绝不把申请递到 wgpu——那边只会 panic，不会给调用方一个失败返回。</li>
+<li>逐算子提交点 <code>run()</code> 还<strong>单独</strong>对回读暂存区（<code>KIND_READ</code>）判一次：即使某个调用点漏判了自己的操作数，
+也不会有超限 buffer 走到 <code>create_buffer</code>。</li>
+<li><code>None</code> 一路沿既有约定回退 CPU（<code>gpu::matmul</code> → <code>tensor.rs</code> 的 CPU 实现），数值不变，只是慢。
+大矩阵乘在回退之前还会先试一次<strong>分块</strong>（第 11 章）：只有 <code>chunk_plan</code> 也返回 <code>None</code>
+（连最小块宽都放不下）时，才真的走到这条 CPU 回退。</li>
+<li>初始化另有一道<strong>下限检查</strong>：连 4 KiB（池的最小 size class）都放不下的设备直接判为不可用。
+没有它，参数 uniform、占位 buffer 这类「必然放得下」的小申请也会被护栏拦掉，
+护栏就从「优雅回退」退化成「什么都干不了」。</li>
+</ul>
+<p>同一条 generate 命令修复后 <strong>exit 0</strong>；而且输出头那一刀<strong>已经不再撞护栏</strong>了——它现在走第 11 章的
+分块路径，打印的是分块提示（本轮实测原文见 <a href="#115-%E5%AE%9E%E6%B5%8B%E6%A0%87%E5%AE%9A">§11.5</a>）。护栏提示本身只在<strong>真的回退</strong>
+（连分块都救不了）时出现，文本如下（其中的数字是护栏挡下那张 519.4 MiB 表的实测，提示只打一次）：</p>
+<pre><code class="language-text">[gpu] 显存护栏：申请 136134656 个 f32 = 519.4 MiB（size class 上取整后 519.4 MiB）超过设备上限 256.0 MiB → 该算子回退 CPU。（只提示一次；此刻 matmul 分流：GPU 0 / CPU 96）
+</code></pre>
+<ul>
+<li><strong>每个进程只提示一次</strong>（<code>MEM_GUARD_WARNED</code> 是个 <code>AtomicBool</code>，用 <code>swap(true)</code> 抢）：生成时同一张
+大表每个 token 都会撞上，逐次打印只会刷屏（分块提示由 <code>CHUNK_NOTE_WARNED</code> 同样只打一次）；</li>
+<li>顺带打印<strong>此刻的 matmul 分流计数</strong>（进程内累计，含「低于 FLOPs 阈值本来就走 CPU」的调用点，
+见 <code>matmul_may_use_gpu</code>），用来一眼看清这一刻 GPU / CPU 各接了多少次 matmul；</li>
+<li>打印完照常生成，输出的中文是正确的。</li>
+</ul>
+<h3><a href="#105-常驻录制路径的占位句柄" aria-hidden="true" class="anchor" id="user-content-105-常驻录制路径的占位句柄"></a>10.5 常驻录制路径的占位句柄</h3>
+<p>常驻路径（<a href="#42-%E5%B8%B8%E9%A9%BB--%E6%89%B9%E9%87%8F%E5%BD%95%E5%88%B6%E8%B7%AF%E5%BE%84resident">§4.2</a>）的 <code>GpuRecorder::*</code> 是<strong>录制</strong>接口，几十个调用点
+（<code>upload</code> / <code>matmul</code> / <code>softmax_mask</code> / <code>empty</code> / …）都返回 <code>GpuHandle</code> 而不是 <code>Option</code>。放不下时的做法是：</p>
+<ol>
+<li><code>oversize_handle(len)</code> 把<strong>整批</strong>标记为作废（<code>GpuBatch::oversize = true</code>），并返回一块 <strong>4 KiB 的
+占位 buffer</strong>（初始化时创建，尺寸由下限检查保证合法）；</li>
+<li>录制代码拿着这个句柄照常往下录——下游基于垃圾数据算出来的内容无所谓；</li>
+<li><code>submit_and_read</code> / <code>batch_finish</code> 见到 <code>oversize</code> 就<strong>直接不提交</strong>：encoder 连同里面那些读了垃圾
+数据的 dispatch 一起被丢弃，占位 buffer 从不写入、<strong>永远不会被提交</strong>；</li>
+<li>调用方拿到 <code>None</code>，回退 CPU 重算，数值不受影响。</li>
+</ol>
+<p>这样就不必把几十个调用点的签名都改成 <code>Option</code>（改一处就要跟着改整条录制链）。
+另一个必须<strong>在写入前</strong>早退的理由：往一块小 buffer 里 <code>write_buffer</code> 大块数据同样会 panic，
+所以 <code>upload</code> 在 <code>take_buf</code> 失败时立刻返回占位句柄，根本走不到写入。</p>
+<h3><a href="#106-边界这是不崩不是提速" aria-hidden="true" class="anchor" id="user-content-106-边界这是不崩不是提速"></a>10.6 边界：这是「不崩」，不是「提速」</h3>
+<ul>
+<li>护栏<strong>不改变能放下时的既有行为</strong>：放得下就照旧上 GPU；</li>
+<li>它兜的是「<strong>某次申请确实放不下</strong>」这种场景。放不下时先试<strong>分块</strong>（第 11 章）：只要还能切出
+≥ 256 列的一块，这张表参与的矩阵乘就留在 GPU 上算，<strong>不</strong>回退 CPU；连最小块都放不下才真的回退，
+那时才付「整单在 CPU 上算」的代价；</li>
+<li>所以它是<strong>最后兜底</strong>，不是性能方案；分块同样不是&quot;全面加速&quot;，只是把&quot;回退&quot;换成&quot;慢一点&quot;
+（边界见 <a href="#116-%E8%BE%B9%E7%95%8C%E5%88%86%E5%9D%97%E4%B8%8D%E6%98%AF%E5%85%A8%E9%9D%A2%E5%8A%A0%E9%80%9F">§11.6</a>）。</li>
+<li>⚠️ <strong>别把冷启动的墙钟当成每 token 成本</strong>：<code>generate --max-new 4</code> 那条命令的墙钟约 <strong>37 s</strong>，
+但其中约 <strong>27 s 是 GPU 初始化</strong>（<code>request_device</code> + 管线编译）、约 <strong>7.6 s 载入 ckpt</strong>，
+真正生成只有约 <strong>2 s</strong>（本轮实测：日志里的总耗时 <strong>36.9 s</strong>，另用一条&quot;加载 ckpt 前就失败&quot;的命令
+单独量到 GPU 初始化 <strong>27.2 s</strong>）。早先这里写过&quot;实测 Qwen2.5-0.5B 生成为 <strong>~47 s/token</strong>&quot;，
+那是把这条墙钟除以 4 的<strong>误读</strong>——它量的是冷启动，不是每 token 的成本；长生成的真实成本是
+<strong>0.41 s/token</strong>（<a href="#116-%E8%BE%B9%E7%95%8C%E5%88%86%E5%9D%97%E4%B8%8D%E6%98%AF%E5%85%A8%E9%9D%A2%E5%8A%A0%E9%80%9F">§11.6</a>）。</li>
+<li>三个单测把关：<code>mem_guard_fits_boundaries</code>（判据边界：<code>&lt;=</code>、size class 上取整、真实崩溃尺寸）、
+<code>mem_guard_take_buf_rejects_oversize</code>（分配入口真的返回 <code>None</code>，且拒绝之后池与上下文完好）、
+<code>mem_guard_limits_match_device</code>（判据来自 <code>device.limits()</code>、<code>alloc_limit</code> 按用途取 min、
+0 个元素与极小张量在任何设备上都放得下）。</li>
+</ul>
+<hr />
+<h2><a href="#11-整块放不下就分块沿-n-切结果逐位一致" aria-hidden="true" class="anchor" id="user-content-11-整块放不下就分块沿-n-切结果逐位一致"></a>11. 整块放不下就分块：沿 N 切，结果逐位一致</h2>
+<blockquote>
+<p>第 10 章的护栏回答了「放不下怎么才能不崩」。这一章讲它的<strong>第二条出路</strong>：大矩阵乘整块放不下时，
+不再整单回退 CPU，而是<strong>沿 N（输出列）切成几块、逐块在 GPU 上算、再按列拼回</strong>。
+护栏本身一条都没改 —— 连最小块宽都放不下时，仍然照旧回退 CPU。</p>
+</blockquote>
+<h3><a href="#111-为什么切-n不切-k" aria-hidden="true" class="anchor" id="user-content-111-为什么切-n不切-k"></a>11.1 为什么切 N，不切 K</h3>
+<p><code>out[M,N] = A[M,K]·B[K,N]</code> 三条轴都能切，实际只有 N 能用：</p>
+<ul>
+<li><strong>切 K 会改浮点累加顺序</strong>：每个输出元素都是 <code>Σ_k</code> 的 f32 累加，浮点不满足结合律，分段算完再相加
+与整段一次算<strong>不再逐位一致</strong>；跨块还得多一轮归约（多一份显存、多一次 dispatch）。</li>
+<li><strong>切 N 不动 K 循环</strong>：块边界只决定「这次算哪几列」，每个输出元素仍是<strong>同一个内核、同一份 K 循环</strong>、
+同一累加顺序 ⇒ 与整块一次算<strong>逐位相同</strong>。这条由 <code>gpu_matmul_chunked_matches_whole_bits</code> 守住：
+它用 <code>assert_eq!</code>（<strong>不放任何容差</strong>）比对「整块一次算」与「分块算」。</li>
+<li>切 M 与切 N 同理（行与行之间本来就独立），但 M 是左操作数的行，切它只对「A 块自己就超限」有用 ——
+实现里并不在 M 上切，需要时切的是 <strong>batch 维</strong>（<code>[B,M,K]</code> 的最外层）：切它等于同时缩小 A 块与输出块。</li>
+</ul>
+<h3><a href="#112-两种-b_t-布局的切片代价" aria-hidden="true" class="anchor" id="user-content-112-两种-b_t-布局的切片代价"></a>11.2 两种 <code>b_t</code> 布局的切片代价</h3>
+<p>块宽 <code>w</code> 一定时，B 块的元素数恒为 <code>bc·k·w</code>，但<strong>取这 w 列要付的代价取决于物理布局</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>情形</th>
+<th>物理布局</th>
+<th>这一块怎么取</th>
+<th>额外拷贝</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>整块就放得下（<code>plan.is_whole</code>）</td>
+<td>任意</td>
+<td><strong>直接借整个 <code>b</code></strong></td>
+<td><strong>零</strong> —— 同尺寸 buffer、同参数、同一次 dispatch，与加分块之前完全一致</td>
+</tr>
+<tr>
+<td><code>b_t = true</code>、<code>batch = 1</code></td>
+<td><code>[N,K]</code></td>
+<td>列切片就是连续的 <code>w·k</code> 个元素，直接借位</td>
+<td><strong>零</strong></td>
+</tr>
+<tr>
+<td><code>b_t = true</code>、<code>batch &gt; 1</code></td>
+<td><code>[B,N,K]</code></td>
+<td>每个 batch 一段连续行段 memcpy</td>
+<td><code>bc·k·w</code></td>
+</tr>
+<tr>
+<td><code>b_t = false</code></td>
+<td><code>[B,K,N]</code></td>
+<td>列切片跨步 <code>N</code>，只能按 K 行逐段取 <code>w</code> 个元素</td>
+<td><code>bc·k·w</code>（所有列块合起来 ≈ <strong>一遍全表扫描</strong>）</td>
+</tr>
+</tbody>
+</table>
+<p>最后一行要按 K 行一段段取，代价是「扫一遍表」；真实输出头走的其实是上面那行（<code>batch = 1</code> 的连续行段，
+零拷贝借位）。而<strong>两种布局共同的收获</strong>是：B 块每个列块只上传一份，合起来仍只是整表一遍 ——
+<strong>不再需要先在 CPU 上把整张转置表物化出来</strong>（那是改动前真正贵的一步，见 <a href="#114-%E9%85%8D%E5%A5%97%E6%94%B9%E5%8A%A8%E8%BD%AC%E7%BD%AE%E8%A7%86%E5%9B%BE%E5%85%8D%E7%89%A9%E5%8C%96%E5%88%A4%E6%8D%AE%E4%BB%8E%E4%B8%A5">§11.4</a>）。</p>
+<h3><a href="#113-块宽均分最小列宽块数上限失败仍然回退" aria-hidden="true" class="anchor" id="user-content-113-块宽均分最小列宽块数上限失败仍然回退"></a>11.3 块宽：均分、最小列宽、块数上限，失败仍然回退</h3>
+<p><code>chunk_plan(m, k, n, batch, limit, elem) -&gt; Option&lt;ChunkPlan { batch_chunk, cols }&gt;</code> 是个<strong>纯函数</strong>
+（单测 <code>chunk_plan_boundaries</code> 不需要 GPU），判据与分配入口 <code>take_buf</code> 的 <code>size_class</code> 上取整<strong>同源</strong>：</p>
+<pre><code class="language-rust">fn chunk_bufs_fit(bc, m, k, w, limit, elem)  // A[bc,m,k] + B[bc,k,w] + out[bc,m,w] 三块都要放得下
+fn chunk_max_cols(bc, m, k, n, limit, elem)  // 这一档 batch 下能放下的最大列宽
+</code></pre>
+<ul>
+<li><strong>按「池里真正创建的字节数」判</strong>：<code>size_class(元素数 × 4)</code> 之后才和上限比。只看 <code>元素数 × 4</code> 会漏掉
+最后那几十 KiB 的上取整（&gt; 64 KiB 按 64 KiB 对齐），于是「算得下、取不到」，分块白分一场。</li>
+<li><strong>先整批、后分档</strong>：B 那块大表与 batch 无关，所以 <code>bc</code> 从 <code>batch</code> 往下试，只在 <strong>A / 输出自己就超限</strong>
+时才切 batch（真实形状 <code>[151936, 896]</code>、<code>batch = 1</code>，于是 <code>batch_chunk</code> 恒为 1）。</li>
+<li><strong>最小列宽 <code>MM_CHUNK_MIN_COLS = 256</code></strong>：块比这更窄时，每次 dispatch 的固定开销（编码 / 提交 / poll / 回读）
+会盖过计算本身，64 列的 tile 也盖不满。没有这条下限，<code>limit</code> 极小时会一路细分到「每块一列」
+（几万次 dispatch，比 CPU 还慢）。</li>
+<li><strong>块数上限 <code>MM_CHUNK_MAX = 256</code></strong>：最小列宽取 <code>w_lo = max(256, ⌈n/256⌉).min(n)</code> —— 真实形状下是
+<strong>594 列</strong>（<code>⌈151936/256⌉</code>），块数上限定住了最坏情况的 dispatch 次数。</li>
+<li><strong>均分而不是「满块 + 小尾巴」</strong>：先算能放下的最大列宽 <code>w_max</code>（从 <code>limit/(k+m)/4</code> 估个起点，
+再用同源判据校正），再按 <code>cnt = ⌈n/w_max⌉</code> 反算 <code>base = n / cnt</code>、余数摊在前 <code>rem</code> 块上。
+因为 <code>n ≤ cnt·w_max ⇒ ⌈n/cnt⌉ ≤ w_max</code>，均分后每块必然仍放得下；好处是块宽只差 ≤ 1（池里只出现
+1~2 个 size class），也少一次零头 dispatch。真实形状的账（本机 256 MiB 上限）：
+<code>w_max = 74898</code>（此时 B 块的 <code>size_class</code> 恰好等于 256 MiB —— 判据是 <code>&lt;=</code>，再多一列就顶出去），
+<code>cnt = ⌈151936/74898⌉ = 3</code> ⇒ <strong><code>[50646, 50645, 50645]</code></strong>。</li>
+<li><strong>失败即回退</strong>：<code>chunk_plan</code> 返回 <code>None</code>（形状退化、上限为 0、连最小块宽都放不下）时，
+<code>GpuContext::matmul</code> 返回 <code>None</code> → 该算子按第 10 章的老约定回退 CPU。<strong>护栏语义一个字没改</strong>，
+只是多了一条出路。</li>
+</ul>
+<h3><a href="#114-配套改动转置视图免物化判据从严" aria-hidden="true" class="anchor" id="user-content-114-配套改动转置视图免物化判据从严"></a>11.4 配套改动：转置视图免物化（判据从严）</h3>
+<p>分块要真能救下输出头，还差一步：<code>hidden @ Wᵀ</code> 里的 <code>Wᵀ</code> 过去会在 <code>Tensor::matmul</code> 入口被
+<code>contiguous()</code> 物化成一张 <code>[d, vocab]</code> 整表（519.4 MiB，按 strides 把整表 walk 一遍）—— 物化发生在
+内核之前，分块再优雅也碰不到它。现在入口先判一次：</p>
+<ul>
+<li><a href="../src/tensor.rs"><code>Tensor::is_transposed_2d_view</code></a>：<strong>2 维</strong>且 <code>strides == [1, shape[0]]</code>，
+也就是 <code>permute([1, 0])</code> 的产物。判据<strong>从严</strong>：连续张量唯一能满足它的是 1×1（那时转置是恒等，
+走哪条路结果都一样）；三维的 <code>permute([0, 2, 1])</code> 不在其列。</li>
+<li><a href="../src/tensor.rs"><code>gpu_would_use_matmul</code></a>：<code>gpu::matmul_would_use_gpu</code> 的<strong>不计数</strong>版（判据与内核入口
+同源：GPU 可用 + FLOPs 阈值），只用来决定「要不要为内核省掉这次物化」；紧接着那次
+<code>matmul_may_use_gpu</code> 照旧记分流计数，不会把一次调用算成两次。</li>
+</ul>
+<p>两条同时命中才把转置视图<strong>原样</strong>交给内核（内核本来就按 <code>b_t = true</code> 读物理 <code>[N,K]</code>）；<strong>无 GPU /
+低于 FLOPs 阈值时行为与改动前逐位一致</strong>（照旧 <code>contiguous()</code> 并行 gather）。</p>
+<blockquote>
+<p>⚠️ <strong>踩坑：免物化之后，反向的 <code>b_t</code> 必须按前向取反</strong>。<code>matmul_backward</code> 里 <code>∂a = g·bᵀ</code> 的内核标志
+原先<strong>写死 <code>b_t = true</code></strong>，那只在「右操作数已经被物化成 <code>[K,N]</code> 行主序」时成立。免物化后 b 的物理是
+<code>[N,K]</code>，<code>bᵀ</code> 正好是 <code>[K,N]</code> 行主序，内核必须按<strong>非</strong>转置读。写死 <code>true</code> 会把两种布局算串 ——
+训练里 <code>hidden.matmul(&amp;head.transpose())</code> 的反向梯度会错，而<strong>前向完全正常</strong>，只看 loss 曲线发现不了。
+现在按前向 <code>b_t</code> 取反，<code>tensor::tests::test_matmul_transposed_rhs_view</code> 用「两种布局 × 前向 / 反向」
+逐位对照把这条钉死。</p>
+</blockquote>
+<h3><a href="#115-实测标定" aria-hidden="true" class="anchor" id="user-content-115-实测标定"></a>11.5 实测标定</h3>
+<p>输出头那一刀到底该走 CPU 兜底还是分块 GPU：同一份权重、同一个 <code>Tensor::matmul</code> 入口，<strong>只切换分派</strong>
+（CPU 兜底 = 把分流阈值抬到 <code>usize::MAX</code>；分块 GPU = 阈值归 0），逐 m 采样。形状就是真实模型
+（<code>[vocab = 151936, d = 896]</code>，整表 519.4 MiB &gt; 本机 256 MiB 上限）：</p>
+<table>
+<thead>
+<tr>
+<th>m</th>
+<th>CPU 兜底（物化转置表 + 20 线程三重循环）</th>
+<th>分块 GPU（3 块）</th>
+<th>比值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>326.5 ms</td>
+<td>333.5 ms</td>
+<td>打平（CPU 略快 2%）</td>
+</tr>
+<tr>
+<td>8</td>
+<td>366.9 ms</td>
+<td>300.2 ms</td>
+<td>GPU 快 1.22×</td>
+</tr>
+<tr>
+<td>64</td>
+<td>813.3 ms</td>
+<td>349.5 ms</td>
+<td><strong>GPU 快 2.3×</strong></td>
+</tr>
+<tr>
+<td>512</td>
+<td>953.9 ms</td>
+<td>690.0 ms</td>
+<td>GPU 快 1.38×</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>口径</strong>：同一台机（Radeon RX 560 / DX12、20 逻辑核）、逐 m 采样；两条路的输出<strong>最大差 0.00e0</strong>
+（分块结果与 CPU 兜底逐位相同）。探针是 <code>gpu::tests::chunked_head_matmul_vs_cpu_probe</code>（<code>#[ignore]</code>）：
+<code>cargo test --release --features gpu chunked_head_matmul_vs_cpu_probe -- --ignored --nocapture</code>。</li>
+<li><strong>可复现性</strong>：写这一章时复跑同一探针得到 m = 1：301.4 / 331.3 ms、m = 8：357.4 / 274.7 ms、
+m = 64：736.1 / 371.3 ms（1.98×）、m = 512：965.1 / 706.3 ms —— 绝对值随 GPU 降频与后台负载浮动
+（同一张卡连续满载可差 15%，见第 5 章），<strong>结论不变</strong>：m = 1 与 CPU 打平、m ≥ 8 分块占优、
+m = 64 差距最大、两条路逐位一致。</li>
+<li><strong>提示原文</strong>（本轮实跑 <code>generate --max-new 4</code> 的输出，与「回退 CPU」那条一样只打一次）：</li>
+</ul>
+<pre><code class="language-text">[gpu] 分块 matmul：out[3,151936]（k=896, batch=1）放不下设备上限 256.0 MiB，沿 N 切成 3 块（最宽 50646 列）× 1 档 batch，逐块在 GPU 上算后按列拼回—— 本算子留在 GPU，没有整单回退 CPU。（只提示一次；此刻 matmul 分流：GPU 0 / CPU 96）
+</code></pre>
+<ul>
+<li><strong>守着的单测</strong>：<code>chunk_plan_boundaries</code>（纯函数边界：真实形状必须切成 3 块 <code>[50646, 50645, 50645]</code>、
+恰好放得下 ⇒ 单块且 <code>is_whole</code>、n = 501 时余数落在前块、A 自己超限 ⇒ 改切 batch、上限极窄 ⇒ 由
+「最小列宽 + 块数上限」挡下返回 <code>None</code>）、<code>gpu_matmul_chunked_matches_whole_bits</code>（分块 vs 整块
+<strong>逐位相同</strong>，覆盖两种 <code>b_t</code> 布局、<code>a_t</code>、batch 分档、块宽不落在 tile 整数倍上）。</li>
+</ul>
+<h3><a href="#116-边界分块不是全面加速" aria-hidden="true" class="anchor" id="user-content-116-边界分块不是全面加速"></a>11.6 边界：分块不是「全面加速」</h3>
+<ul>
+<li><strong>m = 1 与 CPU 打平</strong>：增量解码每个 token 都要把 519 MiB 权重<strong>重传一遍 PCIe</strong>，而 CPU 那边是
+20 线程直接吃内存带宽 —— 两条路都在搬同一张表，谁也快不了。分块的价值在 m ≥ 8 之后（预填充、评估、
+训练），m = 64 时是 2.3×。</li>
+<li><strong>长生成实测</strong>（<code>--max-new 100</code>，上一轮同机实测）：约 <strong>0.41 s/token</strong>，分块前后一致 —— 瓶颈就是上面那次重传，
+不是这次矩阵乘本身。</li>
+<li>⚠️ <strong>别被 generate 的墙钟误导</strong>：<code>generate --max-new 4</code> 的墙钟约 <strong>37 s</strong>，但其中约 27 s 是
+<strong>GPU 初始化</strong>（<code>request_device</code> + 管线编译）、约 7.6 s 载入 ckpt，真正生成只有约 2 s；
+同一命令不带 <code>--features gpu</code> 只要 <strong>9.8 s</strong>（走到「生成」8.14 s）。把 37 s 除以 4 得到的
+「9 s/token」是<strong>误读</strong>（第 10 章里早先写错的 <code>~47 s/token</code> 也是同一处误读）。</li>
+<li><strong>本章只解决「放不下」，不解决「搬得太多」</strong>：m = 1 打平的根因（每个 token 重传 519.4 MiB 权重）
+是下一章的事 —— <strong>权重常驻显存</strong>（别再每个 token 重传）+ 把多次 dispatch <strong>合并 submit / poll</strong>
+（第 <a href="#12-%E6%9D%83%E9%87%8D%E5%B8%B8%E9%A9%BB%E6%98%BE%E5%AD%98--%E5%90%88%E5%B9%B6-submitpoll%E6%8A%8A-m--1-%E9%82%A3%E4%B8%80%E5%88%80%E6%8B%BF%E4%B8%8B%E6%9D%A5">12 章</a>）。范式在第
+<a href="#42-%E5%B8%B8%E9%A9%BB--%E6%89%B9%E9%87%8F%E5%BD%95%E5%88%B6%E8%B7%AF%E5%BE%84resident">4.2</a> 节已经有了（常驻链路就是「一个子层只提交一次」），
+把它接到大矩阵乘的权重上，才能把 m = 1 那一刀也拿下来。</li>
+</ul>
+<hr />
+<h2><a href="#12-权重常驻显存--合并-submitpoll把-m--1-那一刀拿下来" aria-hidden="true" class="anchor" id="user-content-12-权重常驻显存--合并-submitpoll把-m--1-那一刀拿下来"></a>12. 权重常驻显存 + 合并 submit/poll：把 m = 1 那一刀拿下来</h2>
+<blockquote>
+<p>第 11 章只解决了「放不下」，没解决「搬得太多」。这一章补两件事：
+<strong>① 权重常驻显存（P2）</strong> —— 右操作数（权重表）留在显存里跨调用复用，不再每个 token 重传一遍；
+<strong>② 合并 submit / poll（P1）</strong> —— 一次分块的全部列块 dispatch 与<strong>全部</strong>回读拷贝录进同一个
+command encoder，只提交一次、只同步一次。
+两条都<strong>不改变任何数值</strong>（逐位一致，由 <code>assert_eq!</code> 守着）：P2 省的是 PCIe 上传，
+P1 只是把「等它们跑完」从 N 次收敛成 1 次。</p>
+</blockquote>
+<h3><a href="#121-为什么必须常驻" aria-hidden="true" class="anchor" id="user-content-121-为什么必须常驻"></a>12.1 为什么必须常驻</h3>
+<p>增量解码每个 token 只有 1 行输入（m = 1），输出头那一刀是 <code>hidden[1,896] @ Wᵀ[896,151936]</code>：</p>
+<table>
+<thead>
+<tr>
+<th>这一刀要付的</th>
+<th>量</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>真正的浮点计算</td>
+<td>2 × 1 × 896 × 151936 ≈ <strong>0.27 GFLOP</strong></td>
+</tr>
+<tr>
+<td>B 侧上传（分块后合起来仍是整表一遍）</td>
+<td>151936 × 896 × 4 = <strong>519.4 MiB</strong>（本机 256 MiB 上限 ⇒ 3 块）</td>
+</tr>
+<tr>
+<td>CPU 兜底那边</td>
+<td>20 线程直接吃内存带宽，<strong>同一张表也要从头读一遍</strong></td>
+</tr>
+</tbody>
+</table>
+<p>于是 <a href="#115-%E5%AE%9E%E6%B5%8B%E6%A0%87%E5%AE%9A">§11.5</a> 的结论是 m = 1 与 CPU 兜底打平：<strong>瓶颈不是矩阵乘，是那张表被搬了两遍</strong>
+（GPU：CPU→显存一遍；CPU 兜底：内存里过一遍）。而权重表在整段生成/训练里<strong>内容不变、反复使用</strong>，
+把它留在显存里，这笔重传就整段消失 —— 这就是常驻。</p>
+<p>为什么<strong>只</strong>缓存右操作数（B）：左操作数（激活）每个 token / 每一步都是新内容，缓存它等于
+「每次照样重传 + 白占一份显存」；真正反复重传的是 B 侧的权重表（QKV / MLP 权重、输出头 <code>[vocab, d]</code>）。</p>
+<h3><a href="#122-键与失效契约" aria-hidden="true" class="anchor" id="user-content-122-键与失效契约"></a>12.2 键与失效契约</h3>
+<p>常驻键 = <code>(id, version, bf16, ResLayout{elems, b_t, batch, k, whole, batch_chunk, cols})</code>：</p>
+<ul>
+<li><strong><code>id</code></strong>：底层 <code>Shared&lt;Buffer&gt;</code> 数据单元的唯一 id，由全局计数器分配、<strong>单调递增、绝不复用</strong>。
+拿裸指针当键有 ABA 漏洞（张量释放后新张量恰好落在同一地址 ⇒ 假命中），不复用的 id 从结构上排除它。</li>
+<li><strong><code>version</code></strong>：该单元的<strong>写入代数</strong>，每次可变借用 +1。内容一变代数就变，键随之失配 ——
+这是「改了权重之后绝不会静默用旧权重」的<strong>唯一</strong>依据。</li>
+<li><strong><code>bf16</code></strong>：底层存储类型。bf16 的内核输入是解码后的 f32、内容同样由 <code>(id, version)</code> 唯一确定，
+这一项是冗余保险（<code>to_bf16</code> 本身也会推高 <code>version</code>）。</li>
+<li><strong><code>ResLayout</code></strong>：决定「常驻副本切成哪几块、每块放什么」的一切 —— B 的物理元素数、<code>b_t</code>、<code>batch</code>、<code>k</code>、
+是否 <code>whole</code>（唯一一块就覆盖全部列与 batch）、<code>batch_chunk</code>、每块列宽 <code>cols</code>。
+<strong><code>m</code> 故意不在键里</strong>：列块怎么切与 m 无关（m 只决定输出块大小与 grid），所以 m = 1 / 8 / 64
+只要 <code>chunk_plan</code> 给出的列宽一致，就<strong>共用同一份常驻副本</strong> —— 这正是「生成（m = 1）与训练/评估
+（m 大）复用同一份权重常驻」能成立的前提。</li>
+</ul>
+<p>失效<strong>挂在唯一写入入口</strong> <a href="../src/tensor.rs"><code>Shared::borrow_mut</code></a> 上，而不是在几十个写入调用点手工调失效函数：</p>
+<ul>
+<li><code>set_data</code> / <code>decode_mut</code> / <code>to_bf16</code> / 优化器就地更新 / 量化回写 / checkpoint 载入 / HF 导入 /
+<code>merge_lora</code> / 分布式分片写回 —— <strong>全部</strong>经 <code>borrow_mut</code>，所以「漏失效」在<strong>结构上不可能</strong>
+（不管以后再加多少写入路径，只要它写的是 <code>Shared</code>，就自动失效）。</li>
+<li>反过来，手工失效只要漏一处，就是「训练之后仍然用旧权重算」的<strong>静默错误</strong>：形状全对、loss 照降，
+只看曲线发现不了。把失效收敛到一个入口，是<strong>用一点点固定开销换&quot;不可能漏&quot;</strong>。</li>
+<li>代价：每个 <code>Shared</code> 多 <strong>16 字节</strong>（<code>version: AtomicU64</code> + <code>id: u64</code>），每次可变借用多一次
+<code>fetch_add(Relaxed)</code>（与随后的整块写入相比可忽略）。</li>
+<li>⚠️ <strong>版本自增必须在拿到锁之后</strong>。自增与随后的写入落在同一把锁内，读者读到的 <code>(version, 内容)</code>
+才是自洽的一对：要么 <code>(v, 旧内容)</code>、要么 <code>(v+1, 新内容)</code>。先自增再等锁就会出现
+「版本已经是 v+1、内容还是旧的」这个窗口，读者完全可能把<strong>旧内容</strong>当成 v+1 代常驻下来，
+之后真正写完 v+1 的读者就会命中这份旧内容 —— 与漏失效同一个后果，但只在并发时序恰好命中时出现，
+比漏失效更难查。</li>
+</ul>
+<p>契约五条：</p>
+<ol>
+<li><strong>命中 = 键全等</strong>（<code>id</code> + <code>version</code> + <code>bf16</code> + <code>layout</code> 四处都等）才能复用；任何一处不等都不得直接拿去算。</li>
+<li><strong><code>version</code> 变（内容变）</strong>：布局一致时<strong>原地重传全部块</strong>，并把条目的 version 更新到新值
+（<code>write_buffer</code> 的写入在本次 submit 开头生效，所以这一次 dispatch 读到的就是新内容）。
+训练里权重<strong>每步都变</strong>，走的就是这条：成本 = 一次上传（与不常驻时相同），但<strong>不新建显存对象、
+绝不用旧内容</strong>。</li>
+<li><strong>布局变</strong>（列宽 / <code>b_t</code> / <code>batch</code> 换了切法）⇒ 重建条目（旧块还池）；重建后总量超预算就
+<strong>放弃并保留旧条目</strong>（另一个布局可能还在用，而且不淘汰才有硬上界）。</li>
+<li><strong>两次机会（two-strike）</strong>：同一个 <code>(id, version, layout)</code> 必须被<strong>看到两次</strong>才会常驻
+（观察窗上限 <strong>4096</strong> 条，超了整体清空）。理由：训练里绝大多数 B 是<strong>一次性的激活</strong>
+（每步都是新张量、新 version），首次即缓存会把预算（可达 1 GiB）填满垃圾，反而挤掉真正反复用到的
+权重；而权重表在生成/训练中反复出现，<code>(id, version, layout)</code> 第二次一定再现，<strong>只晚一次调用</strong>
+就进常驻。代价是<strong>收益要第三次调用才拿满</strong>：第一次只登记、第二次建表（那一遍仍然要上传），
+从第三次起才是纯命中 —— 标定探针必须先预热两次再计时。</li>
+<li><strong>预算只填不淘汰</strong>：工作集一旦超过预算，LRU 会让每次调用都「淘汰刚常驻的、重建上一批」，
+等于每次调用都付一次上传 + 重建，<strong>比不缓存更差</strong>；不淘汰则显存有硬上界，命中集一旦建立就稳定。</li>
+</ol>
+<h3><a href="#123-预算两次机会不淘汰不进池持锁与放不下即退回" aria-hidden="true" class="anchor" id="user-content-123-预算两次机会不淘汰不进池持锁与放不下即退回"></a>12.3 预算、两次机会、不淘汰、不进池、持锁与放不下即退回</h3>
+<p>预算由 <code>resident_budget</code> 决定：默认 <strong><code>4 × max_buffer_size</code></strong>，夹在 <strong>[512 MiB, 2 GiB]</strong>；
+环境变量 <strong><code>LLM_GPU_RESIDENT_MB</code></strong> 可按 MiB 覆盖（<strong><code>0</code> = 完全关闭常驻</strong>）。
+本机（RX 560 / DX12，<code>max_buffer_size</code> = 256 MiB）取到 <strong>1 GiB</strong>，正好放得下 519.4 MiB 的输出头整表（3 块）。
+⚠️ 这个变量<strong>每个进程只在 GPU 初始化时读一次</strong>：<code>resident_budget()</code> 的唯一调用点在 <code>GpuContext</code>
+构造里（<a href="../src/gpu.rs"><code>src/gpu.rs</code></a>），构造只在 <code>create()</code> 里发生一次，结果经 <code>GPU.set(ctx)</code>
+存进 <code>static GPU: OnceLock&lt;Option&lt;GpuContext&gt;&gt;</code> ⇒ <strong>启动之后改 env 无效，同进程内切换 A/B 是不成立的实验</strong>
+（A/B 必须两个独立进程，见 <a href="#1210-%E6%B5%8B%E9%87%8F%E7%BA%AA%E5%BE%8B%E4%BA%94%E6%9D%A1">§12.10</a> 第 1 条）。
+另有两条准入：B 小于 <strong>64 KiB</strong>（<code>RESIDENT_MIN_BYTES</code>）不常驻（上传它本来只要几十微秒，
+不值得占着一份显存不放）、布局与数据长度不自洽（<code>ResLayout::consistent</code>，例如 <code>b.len()</code> 不够 <code>batch·k·n</code>）
+不常驻。</p>
+<p><strong>两次机会</strong>：第一次见到某个 <code>(id, version, layout)</code> 只登记进 <code>pending</code>（观察窗上限 <strong>4096</strong> 条，
+超了整体清空），第二次才真的建表；<strong>不淘汰</strong>：预算只填不减，满了就不再新增条目 ——
+留在表里的权重一直是热的，显存占用有硬上界（这两条的动机见 <a href="#122-%E9%94%AE%E4%B8%8E%E5%A4%B1%E6%95%88%E5%A5%91%E7%BA%A6">§12.2</a> 的第 4、5 条）。</p>
+<p>另外三条实现约束：</p>
+<ul>
+<li><strong>常驻块不进池</strong>：它们只属于缓存，<code>matmul_planned</code> 不会把它们放进 <code>taken</code>（那批用完就还池的临时 buffer）；
+只有淘汰 / 重建 / <a href="../src/gpu.rs"><code>reset_resident_cache</code></a> 才 <code>put_buf</code> 归还。于是常驻占的是一份
+<strong>独占的死内存</strong>（不给别的算子复用），预算就是它的硬上界 —— 这也是预算不该设成「越大越好」的原因。</li>
+<li><strong>常驻路径整个使用窗口持 <code>resident</code> 锁</strong>：常驻块是<strong>共享可写</strong>的（内容变了要原地重传），
+只有把「查表 → 录制 → submit → poll」整段串行化，才能排除「另一个线程正把新内容写进同一块 buffer、
+而本线程已录好的 dispatch 仍以为读的是旧内容」这类竞态。锁序固定为 <code>resident → pool</code>
+（<code>take_buf</code> / <code>put_buf</code> / <code>drain_pending</code> 都不会反向加锁）。注意 <code>resident_stats()</code> 自己也要拿这把锁，
+测试里必须先放开手里的锁再查计数（std 的 <code>Mutex</code> 不可重入）。</li>
+<li><strong>任一块放不下 ⇒ 整条常驻放弃</strong>：常驻的每一块都过 <code>take_buf</code> 的显存护栏，任何一块取不到就把
+<strong>已经取出的全部还池</strong>，<code>resident_ensure</code> 返回 <code>None</code>，调用方退回「逐次上传 + 分块」那条路 ——
+<strong>绝不 panic</strong>，也不改变任何数值。这条与第 10、11 章的护栏语义一致：常驻只是&quot;更快的一条路&quot;。</li>
+</ul>
+<p><code>resident_stats()</code>（命中 / 未命中 / 新建 / 原地重传 / 放弃 / 当前占用字节 / 条目数）与
+<code>reset_resident_cache()</code>（清空并还池、计数归零）是这块的公共 API；正常路径<strong>不需要</strong>手动重置 ——
+失效是自动的（见 <a href="#122-%E9%94%AE%E4%B8%8E%E5%A4%B1%E6%95%88%E5%A5%91%E7%BA%A6">§12.2</a>）。</p>
+<h3><a href="#124-实测标定" aria-hidden="true" class="anchor" id="user-content-124-实测标定"></a>12.4 实测标定</h3>
+<p>探针 <code>gpu::tests::chunked_head_matmul_vs_cpu_probe</code>（<code>#[ignore]</code>），形状是真实模型
+（<code>[vocab = 151936, d = 896]</code>），每个 m <strong>先把常驻表建起来再计时、取 3 次最小值</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>m</th>
+<th>CPU 兜底</th>
+<th>分块 GPU 冷启动（每次都重传 B）</th>
+<th>常驻稳态（P2 命中）</th>
+<th>CPU/稳态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>301.0 ms</td>
+<td>357.0 ms</td>
+<td><strong>18.2 ms</strong></td>
+<td><strong>16.53×</strong></td>
+</tr>
+<tr>
+<td>8</td>
+<td>349.8 ms</td>
+<td>300.0 ms</td>
+<td><strong>21.7 ms</strong></td>
+<td><strong>16.15×</strong></td>
+</tr>
+<tr>
+<td>64</td>
+<td>731.1 ms</td>
+<td>298.5 ms</td>
+<td><strong>60.3 ms</strong></td>
+<td><strong>12.13×</strong></td>
+</tr>
+<tr>
+<td>512</td>
+<td>928.9 ms</td>
+<td>768.8 ms</td>
+<td><strong>443.9 ms</strong></td>
+<td><strong>2.09×</strong></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>口径</strong>：<code>cargo test --release --features gpu chunked_head_matmul_vs_cpu_probe -- --ignored --nocapture</code>，
+同一台机（Radeon RX 560 / DX12、20 逻辑核）、逐 m 采样；<strong>所有档「最大差 0.00e0」</strong>
+（冷启动与常驻稳态都逐位等于 CPU 兜底），常驻占用 519.4 MiB / 1 条
+（命中 4 / 新建 1 / 原地重传 0 / 放弃 0；探针把 MiB 打印成 <code>MB</code>）。因为「两次机会」的缘故，
+<strong>探针必须先预热两次</strong>再计时。</li>
+<li><strong>可复现性（这一节的数字必须连口径一起读）</strong>：同一探针在本机另一次（机器明显更忙）的采样：
+m = 1：312.9 / 324.6 → 17.3 ms（18.12×）、m = 8：352.1 / 305.2 → 60.9 ms（5.79×）、
+m = 64：2227.4 / 552.5 → 228.6 ms（9.75×）、m = 512：3485.4 / 3608.9 → 3018.1 ms（1.15×；
+单独进程只跑 m = 512 时 3503.5 / 968.3 / 720.8 ms = 4.86×）。
+绝对值能差 3~7 倍（m = 512 的稳态在 443.9 ~ 3018.1 ms 之间跳），<strong>结论不变</strong>：
+常驻稳态远快于 CPU 兜底与冷启动、m = 1 的收益最大、两种口径下最大差恒为 0.00e0。</li>
+<li>⚠️ <strong>这里的 16.53× 是「输出头单算子」的微观口径，不是端到端收益</strong>（端到端见 §12.7 的 ≈2.2×）。
+此前用 <code>generate</code> 的<strong>墙钟</strong>做端到端 A/B 确实不可信：本机墙钟被一次性开销淹没
+（GPU 初始化（DX12 着色器编译）在 <strong>27~60 s</strong> 之间跳、ckpt 载入 <strong>7.6~13.6 s</strong>，两项合计占墙钟
+<strong>95% 以上</strong>），<code>--max-new 40</code> 的 A/B 甚至给出「省 27.4 s / 省 1.7 s」这种自相矛盾的结果
+（省得多的那次其实是初始化更快，与本节改动无关）。改用 <code>serve</code> 的<strong>纯解码段</strong>指标后，
+端到端已经测得 <strong>≈2.2×</strong>（方法与结果表见 §12.7）——因此
+<strong>「解码段约 0.41 → 约 0.1 s/token」这句由 m = 1 微观实测推算出来的值不再作为对外口径</strong>，
+它只说明「输出头这一刀自己值多少」。要看真实收益要么用上面的探针（微观），
+要么用 §12.7 的 <code>serve</code> 纯解码段（端到端），<strong>两者不可混用</strong>。</li>
+<li><strong>P1（合并 submit / poll）的绝对收益小，但它是 P2 的前提</strong>：把形状挑成「同步开销占绝对多数」
+（8 块、每块约 4.2 MFLOP）时，<code>chunked_matmul_one_submit_matches_per_chunk_submit</code> 的实测是
+<strong>逐块 submit + poll 9.18 ms → 一次 submit + poll 7.19 ms（1.28×）</strong>；同一探针另一次采样是
+8.51 → 8.12 ms（1.05×）—— 本机一次空的 submit + poll 只有约 <strong>50 µs</strong>，8 块省下的同步本来就只有
+几百微秒量级。它的价值在另外两处：<strong>① 不改变数值的简化</strong>（逐块路径与合并路径用 <code>assert_eq!</code>
+逐位对拍）；<strong>② 作为常驻的前提</strong> —— 输出头的 3 个常驻块现在只对应 <strong>1 次提交 dispatch</strong>，
+常驻命中时一次调用只剩「录制 + 1 次 submit + 1 次 poll + 按列拼回」。</li>
+<li><strong>守着的单测</strong>：<code>chunked_matmul_one_submit_matches_per_chunk_submit</code>（合并 vs 逐块逐位相同）、
+<code>resident_cache_hit_is_bit_identical</code>（连续调用逐位一致 + 计数断言：<code>builds == 1</code> / <code>misses == 1</code> /
+<code>updates == 0</code>）、<code>resident_cache_invalidates_after_weight_change</code>（<code>set_data</code> 与 <code>decode_mut</code>
+改权重后<strong>必须</strong>换新结果，且与「全新上传的同内容张量」逐位一致）、
+<code>resident_chunked_table_matches_whole_bits</code>（分块常驻 vs 整块一次算逐位相同）。</li>
+</ul>
+<h3><a href="#125-未做项p3常驻录制路径沿-n-分块" aria-hidden="true" class="anchor" id="user-content-125-未做项p3常驻录制路径沿-n-分块"></a>12.5 未做项：P3（常驻录制路径沿 N 分块）</h3>
+<p>常驻<strong>录制</strong>路径（<code>lm_ce</code> / <code>softmax</code> 那条，<a href="#42-%E5%B8%B8%E9%A9%BB--%E6%89%B9%E9%87%8F%E5%BD%95%E5%88%B6%E8%B7%AF%E5%BE%84resident">§4.2</a>）现在还<strong>不能</strong>
+沿 N 分块 —— 它的 matmul 输出句柄是「一整块连续 buffer」。把分块接进录制层要新增
+「输出行距 / 输出列偏移」参数，牵动的东西远超一次小改：</p>
+<ol>
+<li><strong>参数 uniform 是共用的</strong>：<code>Params</code> 只有 24 字节（6 × u32），被 matmul / scale / add / relu / softmax
+<strong>共用同一套布局</strong>。要加两个字段，就得动 <strong>30+ 个派发点</strong>以及 <code>params_buf</code> / <code>take_buf(6, …)</code> 的约定；
+另一条路是给 matmul 单开一套 binding，但 <code>matmul_layout</code> <strong>还被 softmax 的前向 / 反向复用</strong>。</li>
+<li><strong>下游要求句柄是单块连续 buffer</strong>：<code>lm_ce</code> / <code>softmax</code> 直接按 <code>[rows, vocab]</code> 连续内存解释句柄，
+而 <code>copy_buffer_to_buffer</code> <strong>没有跨列 stride</strong> —— 回读侧无法把「列块」拼回一个连续的 <code>[rows, vocab]</code>。</li>
+<li><strong>录制器的三条不变式要在新语义下重新论证</strong>：每个 dispatch 用<strong>独立</strong>的参数 uniform、
+句柄必须保活到 <code>submit</code>、以及 <code>batch_finish</code> 见到 <code>oversize</code> <strong>不提交</strong> / <code>submit_and_read</code> 见到
+<code>oversize</code> 直接返回 <code>None</code>；连同 <code>oversize_handle</code> 这条「唯一绝不 panic 的路径」
+（放不下就返回占位句柄、整批作废，让录制代码照常走完）—— 一旦输出可以被<strong>分块写入</strong>，
+「哪一块放不下」就不再等价于「整批作废」，这些论证都得重做。</li>
+<li><strong>收益很窄</strong>：它只覆盖「训练 / 评估里大 vocab 输出头整批作废」这一种场景；
+真要省下 logits 的回读，还得把 <code>lm_ce</code> 的<strong>按行归约</strong>也做成分块 + 跨块归约。</li>
+</ol>
+<p>→ 结论：<strong>按「不交半成品」保持现状</strong>。P1（合并同步）已经把「多块 = 多次同步」这笔账消掉了；
+P3 要动的是录制层的公共约定，而收益只在窄场景，留到确实需要时再做。</p>
+<h3><a href="#126-已知待观察" aria-hidden="true" class="anchor" id="user-content-126-已知待观察"></a>12.6 已知待观察</h3>
+<ul>
+<li><strong>显存池没有回收策略</strong>（只增不减）。常驻表又额外占一份「独占死内存」（本机 519.4 MiB、预算 1 GiB），
+两者叠加时驱动的实际显存占用会明显高于「参数 + 常驻」的账面值。</li>
+<li>有一次机器很忙的采样里，m = 512 的常驻稳态从 <strong>443.9 ms 涨到 3018.1 ms</strong>（同一进程内四档连跑的口径）。
+<strong>怀疑</strong>与「显存池只增不减 + 常驻表」造成的 WDDM 显存超额有关（超额部分落到系统内存、再被 PCIe 拖一遍），
+<strong>但没有坐实</strong>：也可能是单纯的 CPU/GPU 争抢与 GPU 降频。要下这个结论得先有 WDDM 显存占用的独立观测，
+这里只作为<strong>待观察</strong>记录，不当作结论。</li>
+<li><code>resident_budget</code> 的默认值（<code>4 × max_buffer_size</code>，夹在 <code>[512 MiB, 2 GiB]</code>）<strong>只在 RX 560 / DX12 上验证过</strong>。
+<strong>核显（与系统内存共享）建议把 <code>LLM_GPU_RESIDENT_MB</code> 调小或直接设 <code>0</code> 关掉常驻</strong> ——
+常驻是「独占死内存」，挤占的可能是整机可用的系统内存。</li>
+</ul>
+<h3><a href="#127-端到端实测serve-纯解码段约-22" aria-hidden="true" class="anchor" id="user-content-127-端到端实测serve-纯解码段约-22"></a>12.7 端到端实测：serve 纯解码段约 2.2×</h3>
+<p>§12.4 的数字是<strong>单算子微观口径</strong>，回答的是「输出头这一刀值多少」。端到端到底值多少，此前用 <code>generate</code>
+的墙钟测不出来（刚启动的几十秒一次性开销比被优化的那一段还长，见 §12.4 的 ⚠️）。
+这一节换一个<strong>不受启动噪声污染</strong>的口径，把它测出来。</p>
+<p><strong>为什么 <code>serve</code> 能绕开启动噪声</strong>：HTTP 返回的 <code>usage.tokens_per_second</code> 由服务端的 <code>DecodeTimer</code> 给出 ——
+<code>Generator::step</code> 的<strong>第一步是 prefill</strong>，计时从第二步（真正的逐 token 解码）才开始，所以这个数是
+<strong>纯解码段</strong>速率，不含 GPU 初始化、ckpt 载入、prefill 与网络耗时；非流式与流式走的是<strong>同一个</strong>
+<code>DecodeTimer</code>（见 <a href="../src/serve.rs"><code>src/serve.rs</code></a> 的 <code>DecodeTimer</code>、<code>rate</code> 与 <code>usage</code> 组装）。</p>
+<p><strong>方法</strong>（每个进程都先预热一次，满足 §12.2「两次机会」规则）：</p>
+<pre><code class="language-text">serve --ckpt checkpoints\qwen05\model.ckpt --tokenizer checkpoints\qwen05\tokenizer.json ^
+      --host 127.0.0.1 --port 18080 --api-key … --no-web
+</code></pre>
+<ul>
+<li>请求：<strong>非流式</strong> <code>POST /v1/chat/completions</code>，<code>max_tokens = 300</code>、<code>temperature = 0.8</code>、<code>top_p = 0.9</code>；</li>
+<li>每个进程先跑一次预热（<code>max_tokens = 24, temperature = 0</code>），再做正式请求；</li>
+<li>A 组 <code>LLM_GPU_RESIDENT_MB=0</code>（关常驻）、B 组 <code>=1024</code>（开常驻），<strong>两组是两个独立进程</strong>（原因见 §12.3）；</li>
+<li>机器 / 模型：Radeon RX 560 Series（DX12）/ Windows，Qwen2.5-0.5B-Instruct（vocab 151936 / n_embd 896 /
+24 层 / 窗口 32768），release 二进制 <code>target\release\llm_from_scratch.exe</code>。</li>
+</ul>
+<p><strong>逐次结果</strong>（300-token 长解码，读数就是 <code>usage.tokens_per_second</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>A 关常驻（tok/s）</th>
+<th>B 开常驻（tok/s）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>2.7785</td>
+<td>6.4709</td>
+</tr>
+<tr>
+<td>2</td>
+<td>2.7459</td>
+<td>5.7828</td>
+</tr>
+<tr>
+<td>3</td>
+<td>2.7872</td>
+<td>5.5591</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2.7681</td>
+<td>6.4760</td>
+</tr>
+<tr>
+<td>5</td>
+<td>2.7148</td>
+<td>5.9876</td>
+</tr>
+<tr>
+<td>6</td>
+<td>—</td>
+<td>6.6381</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>组</th>
+<th>常驻</th>
+<th>n</th>
+<th>均值</th>
+<th>中位数</th>
+<th>范围</th>
+<th>每 token</th>
+<th>加速比</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A</td>
+<td><code>LLM_GPU_RESIDENT_MB=0</code></td>
+<td>5</td>
+<td><strong>2.7589</strong></td>
+<td>2.7681</td>
+<td>2.7148–2.7872（±1.3%）</td>
+<td><strong>362.5 ms</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>B</td>
+<td><code>LLM_GPU_RESIDENT_MB=1024</code></td>
+<td>6</td>
+<td><strong>6.1524</strong></td>
+<td>6.2318</td>
+<td>5.5591–6.6381（±9%）</td>
+<td><strong>162.5 ms</strong></td>
+<td><strong>2.23×</strong></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>加速比</strong>：均值 6.1524 / 2.7589 = <strong>2.23×</strong>、中位数 6.2318 / 2.7681 = <strong>2.25×</strong>、
+最坏（min B / max A）5.5591 / 2.7872 = <strong>1.99×</strong>、最好（max B / min A）6.6381 / 2.7148 = <strong>2.45×</strong>。</li>
+<li><strong>纯请求墙钟</strong>（只含这一次 HTTP 请求的往返）：A 均值 109.46 s vs B 均值 49.77 s = <strong>2.20×</strong>。</li>
+<li><strong>含启动的完整墙钟</strong>：A ≈144.9 s vs B ≈85.2 s = <strong>1.70×</strong> —— 因为两组「进程启动 → ready」
+都在 ≈35 s 量级且<strong>无差别</strong>（A 35.3–35.6 s / B 34.7–35.4 s）。这正是此前 <code>generate</code> 墙钟 A/B
+自相矛盾（「省 27.4 s / 省 1.7 s」）的根因：<strong>启动耗时不是常数，它的波动比被优化的那一段还大</strong>。
+所以「快了多少」必须<strong>同时说清是哪个口径</strong>。</li>
+<li><strong>污染样本已剔除</strong>：A 组第 3 个进程从第 5 个请求起退化（2.8 → 1.3 tok/s，该请求墙钟 225.9 s；
+同进程复测 1.7 tok/s / 178.4 s），<strong>重开进程立刻恢复</strong>，判为进程内退化，不计入 A 组；
+原始行仍然留档（剔除不等于删数据，见 §12.10 第 4 条）。</li>
+</ul>
+<h3><a href="#128-为什么端到端是-22而不是微观的-165" aria-hidden="true" class="anchor" id="user-content-128-为什么端到端是-22而不是微观的-165"></a>12.8 为什么端到端是 2.2×，而不是微观的 16.5×</h3>
+<p>两组数据都不假，差的是<strong>口径</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>口径</th>
+<th>每 token 省下</th>
+<th>加速比</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>输出头单算子（§12.4 探针，m = 1）</td>
+<td>301.0 → 18.2 ms（另一轮采样约 330 → 18 ms，省下约 312 ms）</td>
+<td>16.53×（另一轮 18.12×）</td>
+</tr>
+<tr>
+<td>端到端纯解码段（§12.7）</td>
+<td>362.5 → 162.5 ms = <strong>约 200 ms</strong></td>
+<td><strong>2.23×</strong></td>
+</tr>
+</tbody>
+</table>
+<p>差额的原因不是探针测错了，而是<strong>预算装不下整个模型</strong>：本机预算 <strong>1 GiB</strong>，输出头整表 519.4 MiB
+常驻之后只剩约 <strong>505 MiB</strong>，而 Qwen2.5-0.5B 的总权重约 <strong>1.9 GB</strong>。24 层 attn / MLP 的权重
+<strong>根本放不进去</strong>，于是每个 token 仍要把它们从 CPU 重传一遍：</p>
+<ul>
+<li>端到端每步只省下约 <strong>200 ms</strong>，而输出头这一刀的微观账是约 0.28~0.31 s/token —— 这说明
+<strong>光把输出头常驻还不够</strong>：还有一大笔搬运没被免掉，也就是下面这部分权重。</li>
+<li>B 组每 token 仍有 <strong>162.5 ms</strong>：输出头常驻后那一刀只要 18 ms 量级，<strong>剩下的约 160 ms/token
+来自没被常驻覆盖的权重</strong>（24 层 attn / MLP 每个 token 仍要从 CPU 上传一遍）。</li>
+<li>常驻<strong>只免掉它装得下的那部分</strong>；预算不够时它不报错、不淘汰、也不会比不缓存更差，
+只是退回逐次上传（§12.3）。这也解释了为什么 B 组只有 2.2×：<strong>常驻的收益被预算锁死了</strong>。</li>
+</ul>
+<blockquote>
+<p>⚠️ <strong>不要把 16.53× 当端到端收益</strong>。它回答的是「输出头这一刀值多少」，不是「用户能快多少」；
+后者是 §12.7 的 ≈2.2×。</p>
+</blockquote>
+<h3><a href="#129-引用纪律口径不可混用单数字不可引用" aria-hidden="true" class="anchor" id="user-content-129-引用纪律口径不可混用单数字不可引用"></a>12.9 引用纪律：口径不可混用，单数字不可引用</h3>
+<p>这一节的数字（§12.7）是全课<strong>唯一</strong>可以直接对外引用的 GPU 性能结论，引用时必须<strong>连口径一起写</strong>：</p>
+<ol>
+<li><strong>对外口径（原样引用）</strong>：
+<blockquote>
+<p>RX 560 单机、Qwen2.5-0.5B、<code>serve</code> 非流式、预热一次后 300-token 长解码段 ≈2.2×（2.0–2.4×）。</p>
+</blockquote>
+</li>
+<li><strong>不要引用单一数字</strong>：A 组 ±1.3%、B 组 ±9%，单次采样（例如 B 的 6.64 或 5.56）都不是结论；
+要写就写区间（2.0–2.4×）并带上样本量。</li>
+<li><strong>必须区分「纯解码 tok/s」与「含初始化 / 载入的墙钟」</strong>：前者 2.23×、后者 <strong>1.70×</strong>，两个数都对，
+混用就是错的。说「快了 2.2 倍」时指的是 300-token 长解码那一段请求，不是整个进程。</li>
+<li><strong>不要拿微观的 16.53× 当端到端收益</strong>（§12.8），也不要把 §12.4 里 0.41 → 0.1 s/token 的<strong>推算值</strong>
+当实测报——它已被 §12.7 的口径取代。</li>
+</ol>
+<h3><a href="#1210-测量纪律五条" aria-hidden="true" class="anchor" id="user-content-1210-测量纪律五条"></a>12.10 测量纪律五条</h3>
+<p>这组测量没改一行代码，价值在<strong>方法</strong>；下面五条都是踩过之后才写下来的：</p>
+<ol>
+<li><strong>环境变量按进程读一次 ⇒ A / B 必须两个独立进程</strong>。<code>LLM_GPU_RESIDENT_MB</code> 只在 GPU 初始化时被读：
+<code>resident_budget()</code> 的唯一调用点在 <code>GpuContext</code> 构造里，构造只在 <code>create()</code> 里发生一次，
+结果经 <code>GPU.set(ctx)</code> 存进 <code>static GPU: OnceLock&lt;Option&lt;GpuContext&gt;&gt;</code>（<a href="../src/gpu.rs"><code>src/gpu.rs</code></a>）。
+启动之后改 env 无效，<strong>同进程内切换 A/B 是根本不成立的实验</strong>。测量时另外核对了 Machine / User 级
+都没有设过相关环境变量，确保两组差异<strong>只</strong>来自这一个变量。</li>
+<li><strong>必须预热</strong>。常驻走「两次机会」规则（§12.2 第 4 条）：第一次只登记、第二次建表、那一遍仍在
+上传，<strong>收益从第三次调用起才拿满</strong>。所以每个进程先发一次 <code>max_tokens = 24, temperature = 0</code>
+的预热请求，再发正式请求，否则量到的是「建表那一遍」。</li>
+<li><strong>报告必须区分「纯解码 tok/s」与「含初始化 / 载入的墙钟」</strong>。这不是措辞讲究：本机启动
+（GPU 初始化 + ckpt 载入）≈35 s，而 300-token 解码段 A 组约 109 s、B 组约 50 s ——
+启动一混进来，2.23× 立刻被稀释成 1.70×。</li>
+<li><strong>污染样本要剔除，并且保留原始记录</strong>。A 组第 3 个进程从第 5 个请求起退化（2.8 → 1.3 tok/s，
+重开进程立刻恢复），这是一次<strong>进程内退化</strong>、与常驻开关无关；剔除它，但原始行照样留档
+（能追溯才叫剔除，悄悄删掉叫改数据）。</li>
+<li><strong>下滑要先判「环境噪声」还是「缓存抖动」</strong>。B 组第一个进程内 6.5 → 5.6 的下滑在第二个进程
+<strong>未复现</strong>（6.5 / 6.0 / 6.6），因此判为环境噪声；从机制上这也说得通 —— 常驻缓存<strong>不淘汰</strong>
+（§12.2 第 5 条），预算满了就 skip 新条目，结构上不会出现「淘汰刚常驻的、重建上一批」的 thrash。</li>
+</ol>
+<h3><a href="#1211-后续方向把预算调大" aria-hidden="true" class="anchor" id="user-content-1211-后续方向把预算调大"></a>12.11 后续方向：把预算调大</h3>
+<p>§12.8 已经把结论指出来了：<strong>现在唯一还能明显抬升 tok/s 的方向，就是把 <code>LLM_GPU_RESIDENT_MB</code> 调大</strong>
+（例如 <code>2048</code> / <code>4096</code>，取决于显卡实际显存），让 24 层 attn / MLP 权重也常驻显存 ——
+常驻的收益上限由预算决定，而当前 1 GiB 只装得下输出头。预期越接近「全部权重常驻」，
+端到端越接近微观口径的上限；但在当前预算下，端到端就是 §12.7 的 ≈2.2×。</p>
+<p>超预算<strong>不会崩</strong>：任一块放不下 ⇒ 整条常驻放弃、退回「逐次上传 + 分块」（§12.3），只是退化成不缓存
+（也不会比不缓存更差）。要验证调大预算的效果，建议直接沿用 §12.7 的口径
+（两个独立进程 + 每进程预热一次 + 300-token 长解码段），不要再去量 <code>generate</code> 的墙钟。</p>
+<hr />
+<h2><a href="#13-小结与下一课" aria-hidden="true" class="anchor" id="user-content-13-小结与下一课"></a>13. 小结与下一课</h2>
+<h3><a href="#本课小结" aria-hidden="true" class="anchor" id="user-content-本课小结"></a>本课小结</h3>
+<p>本课的结论分三层：<strong>怎么选</strong>（§1–§2：wgpu 覆盖面最广，两条执行路径 per-op / resident 各管一段）、
+<strong>怎么算对</strong>（§3–§6：22 个 WGSL 入口、大小 tile、哪些逐位一致哪些只是近似）、
+<strong>怎么不崩和不白跑</strong>（§10–§12：三类上限先自查、整块放不下就沿 N 分块、权重常驻 + 合并 submit/poll）。
+实测口径与踩坑写在 §8 / §9，引用性能数字前请先读 §12.9 的引用纪律。</p>
+<h3><a href="#拓展方向" aria-hidden="true" class="anchor" id="user-content-拓展方向"></a>拓展方向</h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li>把 <code>matmul_small_main</code> 的 tile 从 64×64 改成 32×32 或 128×64，用 <code>mm_tile_ab_probe</code> 同进程交替标定，
+看趋势是否还成立（小 tile 赢在<strong>占用率</strong>，再小就可能输在访存<strong>复用率</strong>上）；</li>
+<li>给 <code>MLPEnum</code> 再加一条常驻链路（把 SwiGLU 的三次投影也做成融合内核），并补一个 <code>assert_close</code> 数值测试；</li>
+<li>把注意力常驻链路的归约结构改成与 CPU 同序，验证能否把它从「1e-3 近似」拉回<strong>逐位一致</strong>；</li>
+<li>用 <code>LLM_GPU_STACK=1</code> 与默认配置各跑一次同 seed 训练，
+验证两条路径的 loss 逐位相同，并用 <code>s/步</code> 解释&quot;整叠为什么反而略快&quot;（提示：数一数每步各提交了几次）；</li>
+<li>用小 tile 内核算一下这张卡的实测峰值（<code>LLM_GPU_PROBE</code> 会打印纯 FMA 峰值），
+对比 MX150 的理论 FP32 算力，看看利用率还差多少、差在哪。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="28-%E6%A2%AF%E5%BA%A6%E7%B4%AF%E7%A7%AF.md">第 28 课 梯度累积</a> —— GPU 把单步算快了，但显存仍然有限——下一课用&quot;多个小 batch 攒梯度&quot;在有限显存里跑出大 batch 的效果。</p>
+</blockquote>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 51 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：学习率调度 —— warmup + cosine decay</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：Dropout —— 训练时的「随机失忆」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：RMSNorm —— 现代 LLM 的归一化标配</span></a><a class="series-nav-item" href="/post/rust-llm-guide-22/"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">第 22 课：SwiGLU 激活函数 —— LLaMA 的「门控」MLP</span></a><a class="series-nav-item" href="/post/rust-llm-guide-23/"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-24/"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星</span></a><a class="series-nav-item" href="/post/rust-llm-guide-25/"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">第 25 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-26/"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">第 26 课：混合精度训练（AMP）—— 用半精度加速，用全精度保底</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-27/"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">第 27 课：GPU 加速 —— 手写 WGSL 计算着色器</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-28/"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a><a class="series-nav-item" href="/post/rust-llm-guide-29/"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-30/"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">第 30 课：Beam Search —— 贪心搜索的升级版</span></a><a class="series-nav-item" href="/post/rust-llm-guide-31/"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">第 31 课：Scaling Laws（缩放定律）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-32/"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">第 32 课：MoE 混合专家模型（Mixture of Experts）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-33/"><span class="series-nav-item-index">34</span><span class="series-nav-item-title">第 33 课：量化技术（Quantization）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-34/"><span class="series-nav-item-index">35</span><span class="series-nav-item-title">第 34 课：推测解码（Speculative Decoding）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-35/"><span class="series-nav-item-index">36</span><span class="series-nav-item-title">第 35 课：多 Token 预测（Multi-Token Prediction）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-36/"><span class="series-nav-item-index">37</span><span class="series-nav-item-title">第 36 课：RLHF 与人类对齐（Alignment）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-37/"><span class="series-nav-item-index">38</span><span class="series-nav-item-title">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-38/"><span class="series-nav-item-index">39</span><span class="series-nav-item-title">第 38 课：分布式训练（Distributed Training）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-39/"><span class="series-nav-item-index">40</span><span class="series-nav-item-title">第 39 课：工程化完善 —— 从算法实现到可用框架</span></a><a class="series-nav-item" href="/post/rust-llm-guide-40/"><span class="series-nav-item-index">41</span><span class="series-nav-item-title">第 40 课：把模型部署成 API 服务 —— 从「自己跑」到「给别人调」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-41/"><span class="series-nav-item-index">42</span><span class="series-nav-item-title">第 41 课：多模态 —— 图片理解与图片生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-42/"><span class="series-nav-item-index">43</span><span class="series-nav-item-title">第 42 课：知识蒸馏（Knowledge Distillation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-43/"><span class="series-nav-item-index">44</span><span class="series-nav-item-title">第 43 课：FP8 低精度训练（模拟）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-44/"><span class="series-nav-item-index">45</span><span class="series-nav-item-title">第 44 课：WSD 学习率调度（warmup-stable-decay）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-45/"><span class="series-nav-item-index">46</span><span class="series-nav-item-title">第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死</span></a><a class="series-nav-item" href="/post/rust-llm-guide-46/"><span class="series-nav-item-index">47</span><span class="series-nav-item-title">第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化</span></a><a class="series-nav-item" href="/post/rust-llm-guide-47/"><span class="series-nav-item-index">48</span><span class="series-nav-item-title">第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道</span></a><a class="series-nav-item" href="/post/rust-llm-guide-48/"><span class="series-nav-item-index">49</span><span class="series-nav-item-title">第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重</span></a><a class="series-nav-item" href="/post/rust-llm-guide-49/"><span class="series-nav-item-index">50</span><span class="series-nav-item-title">第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</span></a><a class="series-nav-item" href="/post/rust-llm-guide-50/"><span class="series-nav-item-index">51</span><span class="series-nav-item-title">第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-26/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 26 课：混合精度训练（AMP）—— 用半精度加速，用全精度保底</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-28/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a></div></div>
+            </article>
+        </main>
+<footer class="footer-content">
+    <div class="copyright">
+        <span>2019-2026 </span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"/></svg>
+        <span> 干徒 / Ganto</span>
+    </div>
+</footer>
+        </div>
+    </div>
+<script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
+try{document.getElementById('main').innerHTML='';}catch(e){}</script>
+<script type="module">
+import init, * as bindings from '/web-rs-a99f5589204ec566.js';
+const wasm = await init({ module_or_path: '/web-rs-a99f5589204ec566_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script>
+</body>
+</html>

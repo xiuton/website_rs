@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent - 干徒</title>
+    <meta name="description" content="补齐 MLA 的解耦 RoPE，并借权重吸收让解码时 K/V 全程不物化，进一步压缩 KV Cache。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 注意力">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-50">
+    <meta property="og:title" content="第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent - 干徒">
+    <meta property="og:description" content="补齐 MLA 的解耦 RoPE，并借权重吸收让解码时 K/V 全程不物化，进一步压缩 KV Cache。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-50">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent - 干徒">
+    <meta name="twitter:description" content="补齐 MLA 的解耦 RoPE，并借权重吸收让解码时 K/V 全程不物化，进一步压缩 KV Cache。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent","description":"补齐 MLA 的解耦 RoPE，并借权重吸收让解码时 K/V 全程不物化，进一步压缩 KV Cache。","url":"https://ganto.me/post/rust-llm-guide-50","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 注意力","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-84a0c1a16fd4b1bc.css">
+<link rel="modulepreload" href="/web-rs-a99f5589204ec566.js" crossorigin="anonymous" integrity="sha384-umfTmuv9naxm3y94Bh3NWTfgXO2lsKZY7liOaEQ/zp9/YvxyqCZMSoTUOtOsXZQ6">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous" integrity="sha384-2DHjVGrzcpbms06h5LAGWYB1zXEqfWTjATq1YsBBgX1CE2W+T4mRjoljwlXKhTcj">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous" integrity="sha384-pfz3GoOS0du3Se5f5C1lkvbvMo0g507e24Rcu0dm29CmSCqxguUw3chk5PS1brtF">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
+<link rel="preload" href="/web-rs-a99f5589204ec566_bg.wasm" crossorigin="anonymous" integrity="sha384-RN+hPytGjHtzCa+dPXlgO6NZwHHIA2reMSnH/98AjTuP+/n7D+fZxS0wwqc/Ie6I" as="fetch" type="application/wasm">
+
+    <style>
+:root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+.dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+
+    </style>
+    <style>
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .theme-toggle .icon-sun { display: none; }
+        .dark .theme-toggle .icon-sun { display: inline; }
+        .dark .theme-toggle .icon-moon { display: none; }
+    </style>
+    <script>
+(function() {
+    if (location.pathname.length > 1 && location.pathname.endsWith('/')) {
+        history.replaceState(null, '', location.pathname.replace(/\/+$/, '') + location.search + location.hash);
+    }
+    var theme = localStorage.getItem('theme');
+    if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+    }
+    var tbtn = document.getElementById('prerender-theme-toggle');
+    if (tbtn) {
+        tbtn.addEventListener('click', function() {
+            var d = document.documentElement;
+            var dark = d.classList.toggle('dark');
+            localStorage.setItem('theme', dark ? 'dark' : 'light');
+        });
+    }
+})();
+    </script>
+</head>
+<body>
+    <div id="main">
+        <div class="app">
+<div class="navbar-content">
+    <div class="navbar-ui">
+        <div class="navbar-title-wrapper">
+            <h1 class="navbar-title">干徒</h1>
+            <div class="navbar-glow"></div>
+        </div>
+        <div class="navbar-subtitle">这很酷</div>
+    </div>
+</div>
+<div class="navbar-sticky-wrap">
+    <div class="navbar-links">
+        <a class="nav-link nav-active" href="/">首页</a>
+        <a class="nav-link" href="/about">关于</a>
+        <a class="nav-link" href="/tags">书签</a>
+        <a class="nav-link" href="/search">搜索</a>
+        <a class="nav-link" href="/knowledge-graph">图谱</a>
+        <a class="nav-link" href="/ai-summary">AI摘要</a>
+        <div class="nav-item-with-sub">
+            <a class="nav-link" href="/dev">开发</a>
+            <div class="nav-submenu">
+                <a class="nav-sub-link" href="/circle-generator">圆形生成器</a>
+            </div>
+        </div>
+        <a class="nav-icon-btn rss-toggle" href="/rss" title="RSS 订阅" aria-label="RSS 订阅">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"/></svg>
+        </a>
+        <button class="nav-icon-btn theme-toggle" id="prerender-theme-toggle" aria-label="切换主题" title="切换主题">
+            <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
+            <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="16" height="16" fill="currentColor"><path d="M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"/></svg>
+        </button>
+    </div>
+</div>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-01</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">注意力</span></div>
+                <div class="blog-content">
+<h1><a href="#第-50-课mla-解耦-rope--权重吸收--让-kv-缓存只存一份-latent" aria-hidden="true" class="anchor" id="user-content-第-50-课mla-解耦-rope--权重吸收--让-kv-缓存只存一份-latent"></a>第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</h1>
+<blockquote>
+<p><strong>本课已落地为可运行代码</strong>：<a href="../src/attention.rs"><code>src/attention.rs</code></a> 的
+<code>forward_mla_decoupled</code> / <code>absorb_attention</code>（解耦 RoPE 与 W_UK/W_UV 吸收），
+接入 <a href="../src/model.rs"><code>src/model.rs</code></a> 的 <code>TransformerConfig</code> 与 <a href="../src/config.rs"><code>src/config.rs</code></a> 的校验，
+演示命令 <a href="../src/cmd/experiments.rs"><code>src/cmd/experiments.rs</code></a> 的 <code>cmd_mla</code>。
+配置开关：<code>model.mla_rope_dim</code> / <code>model.mla_absorb</code>（默认 <code>0</code> / <code>false</code> = 关闭）/ 命令 <code>cargo run -- mla</code>。</p>
+<p>与第 23 课（MLA 低秩压缩 KV cache）的关系：第 23 课的 MLA <strong>只做了低秩压缩</strong>——
+把 K/V 先压到 <code>r</code> 维 latent、再从 latent 升维，缓存只存一份 latent。但它留了一个教学取舍：
+<strong>RoPE 作用在完整 <code>head_dim</code> 上</strong>。本课补上 DeepSeek-V2/V3 真正的做法——<strong>解耦 RoPE</strong>，
+并顺带解锁它带来的重量级优化：<strong>W_UK/W_UV 权重吸收</strong>（解码时 K/V 全程不物化）。</p>
+</blockquote>
+<hr />
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li>第 23 课的 MLA 为什么&quot;不完整&quot;？把 RoPE 作用在完整 <code>head_dim</code> 上有什么问题？</li>
+<li>什么是 <strong>decoupled RoPE（解耦 RoPE）</strong>？为什么它要额外投影一份 <code>q_rope</code> / <code>k_rope</code>？</li>
+<li>解耦之后，<strong>权重吸收</strong>（absorption）为什么才成立？它省下的到底是什么？</li>
+<li>吸收路径里，<code>c_k</code> / <code>c_v</code> 的 bias 各去哪了？为什么一个能忽略、一个必须补回？</li>
+<li>解耦 RoPE 给缓存加了什么？这份代价值与不值？（本课账本：缓存字节 + 吸收算力）</li>
+</ol>
+<hr />
+<h2><a href="#2-第-23-课遗留的问题rope-与低秩压缩的冲突" aria-hidden="true" class="anchor" id="user-content-2-第-23-课遗留的问题rope-与低秩压缩的冲突"></a>2. 第 23 课遗留的问题：RoPE 与低秩压缩的冲突</h2>
+<p>第 23 课的 MLA 结构是：</p>
+<pre><code class="language-text">  c_kv = x · W_DKV                       // [b, t, r]   一份低秩 latent
+  K    = c_kv · W_UK                     // [b, t, n_head·head_dim]   从 latent 升维
+  V    = c_kv · W_UV                     // [b, t, n_head·head_dim]
+  K    = RoPE(K)                         // ⚠️ 旋转在升维之后、作用在整个 head_dim
+</code></pre>
+<p>问题出在最后一步：<strong>RoPE 是位置相关的旋转，而 K 是从 latent 升维来的</strong>。
+一旦旋转作用在&quot;升维之后&quot;的 K 上，K 就<strong>不再是 latent 的纯线性函数</strong>了
+（旋转矩阵依赖位置）。这直接堵死了权重吸收——第 3 节的恒等式要求 <code>K</code> 对 <code>latent</code> 是线性的。</p>
+<p>DeepSeek 的解法是：<strong>把 RoPE 从 K 里摘出来，单独走一条低维通路</strong>。</p>
+<hr />
+<h2><a href="#3-解耦-rope把内容和位置分开走" aria-hidden="true" class="anchor" id="user-content-3-解耦-rope把内容和位置分开走"></a>3. 解耦 RoPE：把&quot;内容&quot;和&quot;位置&quot;分开走</h2>
+<p>把每个头的维度切成两段：<code>head_dim = hd_nope + hd_rope</code>。</p>
+<pre><code class="language-text">  ── 内容通路（不带位置）──────────────
+  c_kv   = x · W_DKV                     // [b, t, r]       共享 latent
+  k_nope = c_kv · W_UK                   // [b, t, n_head·hd_nope]
+  v      = c_kv · W_UV                   // [b, t, n_head·hd_nope]
+
+  ── 位置通路（直接由输入投影，不经过 latent）──
+  q_rope = x · W_QR  →  RoPE             // [b, t, n_head·hd_rope]
+  k_rope = x · W_KR  →  RoPE             // [b, t, n_head·hd_rope]
+
+  ── 拼接 ──
+  q = [ q_nope ‖ q_rope ]                // q_nope = x · W_Q
+  k = [ k_nope ‖ k_rope ]
+</code></pre>
+<p>关键点：<strong><code>k_rope</code> 完全绕开了 latent</strong>，由输入 <code>x</code> 直接投影得到。于是</p>
+<ul>
+<li><code>k_nope</code> 仍是 <code>latent</code> 的<strong>纯线性</strong>函数（<code>W_UK</code>）⇒ 可以吸收；</li>
+<li><code>k_rope</code> 带着位置信息，但它本来就只有一个很窄的 <code>hd_rope</code> 维（V3 里 64），
+直接<strong>按位置旋转后缓存起来</strong>即可，历史 token 不需要重算。</li>
+</ul>
+<p>注意力打分变成两段之和：</p>
+<pre><code class="language-text">  q·k = q_nope·k_nope  +  q_rope·k_rope
+</code></pre>
+<p>第一段走 latent（可吸收），第二段是普通小 RoPE 点积。</p>
+<h3><a href="#31-缓存里存什么" aria-hidden="true" class="anchor" id="user-content-31-缓存里存什么"></a>3.1 缓存里存什么</h3>
+<p>解耦后，每个位置需要缓存的&quot;键侧&quot;信息是：</p>
+<pre><code class="language-text">  缓存一行 = [ latent(r)  ‖  rotated_k_rope(n_head · hd_rope) ]
+</code></pre>
+<p><code>latent</code> 各头共享（一份），<code>k_rope</code> 逐头（<code>n_head</code> 份）。本仓库把两者<strong>拼成一条流</strong>
+存进既有的 latent 缓存（<a href="../src/attention.rs"><code>KVCache::append_latent</code></a>），
+读取时用 <code>split_last_cols</code> 无损切分——所以滑动窗口 / Attention Sink / rollback 全部原样复用，
+<strong>不用改任何缓存逻辑</strong>。</p>
+<hr />
+<h2><a href="#4-权重吸收解码时-kv-全程不物化" aria-hidden="true" class="anchor" id="user-content-4-权重吸收解码时-kv-全程不物化"></a>4. 权重吸收：解码时 K/V 全程不物化</h2>
+<p>有了&quot;<code>k_nope</code> 是 latent 的线性函数&quot;这个前提，就能把 <code>W_UK</code> 从 K 侧<strong>搬到 Q 侧</strong>：</p>
+<pre><code class="language-text">  q_nope[h] · k_nope[h]
+    = q_nope[h] · (c · W_UK[h])              // k_nope[h] = c · W_UK[h]
+    = (q_nope[h] · W_UK[h]ᵀ) · c             // 结合律：把 W_UK 折进 q
+    = qa[h] · c                              // qa[h] ≜ q_nope[h] · W_UK[h]ᵀ  （一次预计算）
+</code></pre>
+<p>于是打分不再需要&quot;把 <code>c</code> 升维成 <code>k_nope</code>&quot;，而是<strong>在 <code>r</code> 维 latent 空间直接点积</strong>。
+V 侧同理，利用&quot;加权求和是线性&quot;：</p>
+<pre><code class="language-text">  Σ_j p[h,j] · v_j
+    = Σ_j p[h,j] · (c_j · W_UV[h])           // v_j = c_j · W_UV[h]
+    = (Σ_j p[h,j] · c_j) · W_UV[h]           // 先对 latent 加权，再一次性升维
+</code></pre>
+<p>结论：<strong>K 与 V 全程不物化</strong>——注意力完全在 <code>r + hd_rope</code> 维空间里完成。</p>
+<h3><a href="#41-两处-bias-的不同命运" aria-hidden="true" class="anchor" id="user-content-41-两处-bias-的不同命运"></a>4.1 两处 bias 的不同命运</h3>
+<p><code>c_k</code> / <code>c_v</code> 都带 bias，它们在吸收里的处置<strong>不一样</strong>：</p>
+<ul>
+<li><code>b_k</code>（<code>c_k.bias</code>）加到 <code>k_nope</code> 上，对每个 query 都是一个<strong>逐 head 的常数</strong>。
+常数加在 softmax 的输入上，分子分母同乘 <code>e^{const}</code>，<strong>自动抵消</strong> ⇒ 可以忽略。</li>
+<li><code>b_v</code>（<code>c_v.bias</code>）加到 <code>v</code> 上。因为 <code>Σ_j p[h,j] = 1</code>，输出会整体平移 <code>b_v</code> ⇒
+<strong>必须补回</strong>（<a href="../src/attention.rs"><code>absorbed_v_bias</code></a>）。</li>
+</ul>
+<p>这条差异由单测 <code>test_mla_absorb_matches_naive_same_weights</code> 钉死：它特意给 <code>c_k</code>/<code>c_v</code>
+设了<strong>非零偏置</strong>，再核对吸收输出 == 朴素输出。</p>
+<h3><a href="#42-吸收的复用边界" aria-hidden="true" class="anchor" id="user-content-42-吸收的复用边界"></a>4.2 吸收的复用边界</h3>
+<p>吸收用到的恒等式只对<strong>线性</strong>的 K/V 通路成立，所以：</p>
+<ul>
+<li>吸收前向<strong>只在无梯度推理</strong>（<code>!grad_enabled()</code>）时启用——训练仍走朴素路径（可求导、正确）；</li>
+<li>吸收与 <strong>QK-Norm 不兼容</strong>：RMSNorm 是逐头非线性缩放，无法被线性吸收进 <code>W_UK</code>；</li>
+<li>解耦要求 <code>n_kv_head == 0 || n_kv_head == n_head</code>（不允许真正的 GQA 头分组），
+这样&quot;每个 Q 头对应一个 K 头&quot;，吸收的 <code>W_UK[h]</code> 分块才一一对应。</li>
+</ul>
+<hr />
+<h2><a href="#5-朴素路径怎么实现可求导" aria-hidden="true" class="anchor" id="user-content-5-朴素路径怎么实现可求导"></a>5. 朴素路径怎么实现（可求导）</h2>
+<p>训练 / 需要梯度时，走朴素解耦路径 <a href="../src/attention.rs"><code>forward_mla_decoupled</code></a>：</p>
+<ol>
+<li><code>q_nope</code>（可 QK-Norm）、<code>q_rope</code>（RoPE）分别投影；</li>
+<li><code>k_rope</code> 投影 + RoPE，与 <code>latent</code> 拼成一条流进缓存；</li>
+<li>从缓存切出 <code>latent</code> / <code>k_rope</code>，<code>k_nope = c_k(latent)</code>、<code>v = c_v(latent)</code>；</li>
+<li><strong>拼接</strong>：<code>q = [q_nope ‖ q_rope]</code>、<code>k = [k_nope ‖ k_rope]</code>（用可求导的
+<a href="../src/csa.rs"><code>concat_last</code></a>）；</li>
+<li><code>v</code> 的<strong>后 <code>hd_rope</code> 维补 0</strong>，凑齐 <code>flash_attention</code> 要求的同维 K/V；</li>
+<li><code>flash_attention</code> → reshape → <code>c_proj</code>。</li>
+</ol>
+<blockquote>
+<p>⚠️ 第 5 步的&quot;补零&quot;是本实现的一个简化：真实 MLA 的 V 只有 <code>hd_nope</code> 维（没有 RoPE 段），
+而本仓库的 <code>flash_attention</code> 要求 K/V 同 <code>head_dim</code>，所以把 V 的 rope 段填 0，
+由 <code>c_proj</code> 对应的那几列&quot;吸收&quot;掉（那几列会一直是初始值，且拿不到梯度——无害）。</p>
+</blockquote>
+<hr />
+<h2><a href="#6-本仓库实现要点" aria-hidden="true" class="anchor" id="user-content-6-本仓库实现要点"></a>6. 本仓库实现要点</h2>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../src/attention.rs"><code>src/attention.rs</code></a> <code>MultiHeadAttention</code></td>
+<td>新增字段 <code>mla_rope_dim</code> / <code>mla_absorb</code> / <code>c_qr: Option&lt;Linear&gt;</code> / <code>c_kr: Option&lt;Linear&gt;</code>；<code>mla_rope_dim = 0</code> 时不构造 <code>c_qr</code>/<code>c_kr</code>、<strong>不消耗随机数</strong></td>
+</tr>
+<tr>
+<td><a href="../src/attention.rs"><code>src/attention.rs</code></a> <code>forward_mla</code></td>
+<td>顶部按 <code>mla_rope_dim &gt; 0</code> 分派到 <code>forward_mla_decoupled</code>；否则走原路径，<strong>逐位不变</strong></td>
+</tr>
+<tr>
+<td><a href="../src/attention.rs"><code>src/attention.rs</code></a> <code>forward_mla_decoupled</code></td>
+<td>解耦前向：Q/K 两段拼接 → 缓存 <code>[latent‖k_rope]</code> → 朴素 <code>flash_attention</code> 或吸收分支</td>
+</tr>
+<tr>
+<td><a href="../src/attention.rs"><code>src/attention.rs</code></a> <code>absorb_attention</code></td>
+<td>吸收前向：<code>qa = q_nope·W_UKᵀ</code>，在 <code>r + hd_rope</code> 维做 <code>matmul + masked_softmax</code>，最后补 <code>b_v</code></td>
+</tr>
+<tr>
+<td><a href="../src/attention.rs"><code>src/attention.rs</code></a> 辅助函数</td>
+<td><code>join_head_parts</code> / <code>split_last_cols</code> / <code>repeat_batch_heads</code> / <code>absorbed_k_weight</code> / <code>absorbed_v_weight</code> / <code>absorbed_v_bias</code></td>
+</tr>
+<tr>
+<td><a href="../src/attention.rs"><code>src/attention.rs</code></a> 账本函数</td>
+<td><code>full_kv_cache_bytes_per_token</code> / <code>mla_cache_bytes_per_token</code> / <code>naive_mla_macs</code> / <code>absorbed_mla_macs</code></td>
+</tr>
+<tr>
+<td><a href="../src/model.rs"><code>src/model.rs</code></a></td>
+<td><code>TransformerConfig</code> 新增 <code>mla_rope_dim</code> / <code>mla_absorb</code></td>
+</tr>
+<tr>
+<td><a href="../src/config.rs"><code>src/config.rs</code></a></td>
+<td>校验：<code>r &gt; 0</code>、<code>n_kv_head ∈ {0, n_head}</code>、<code>hd_rope &lt; head_dim</code> 且为偶数、<code>mla_absorb ⇒ !qk_norm</code></td>
+</tr>
+<tr>
+<td><a href="../src/cmd/experiments.rs"><code>src/cmd/experiments.rs</code></a> <code>cmd_mla</code></td>
+<td><code>mla</code> 子命令：缓存字节账本 → 吸收算力账本 → 约束自检</td>
+</tr>
+</tbody>
+</table>
+<p><strong>两个实现细节</strong>：</p>
+<ul>
+<li>解耦模式下 <code>c_q</code>/<code>c_k</code>/<code>c_v</code> 的输出维变成 <code>n_head·hd_nope</code>，<code>q_norm</code>/<code>k_norm</code> 的
+<code>gamma</code> 长度也变成 <code>hd_nope</code>（QK-Norm 只作用在<strong>不旋转</strong>的那一段上）。</li>
+<li><code>c_qr</code> / <code>c_kr</code> <strong>最后构造</strong>：<code>mla_rope_dim = 0</code> 时根本不创建它们，
+保证默认配置下的随机数消耗顺序与加本课之前<strong>逐位一致</strong>。</li>
+</ul>
+<h3><a href="#默认路径逐位不变" aria-hidden="true" class="anchor" id="user-content-默认路径逐位不变"></a>默认路径逐位不变</h3>
+<ul>
+<li>默认 <code>mla_rope_dim = 0</code>：<code>forward_mla</code> 走原 MLA 路径，<code>c_qr</code>/<code>c_kr</code> 为 <code>None</code>、
+不消耗任何随机数 ⇒ 同种子下参数名与参数值逐位相同
+（单测 <code>test_mla_decoupled_off_is_bitwise_identical</code>）；</li>
+<li><code>mla_rope_dim = 0</code> 时 <code>mla_absorb</code> 必须为 <code>false</code>（<code>config.rs</code> 校验），
+所以&quot;关&quot;的语义是干净的；</li>
+<li>解耦开启后，<code>mla_rope_dim</code> 仍然只在 <strong>MLA 模式</strong>（<code>kv_lora_rank &gt; 0</code>）下有意义。</li>
+</ul>
+<h3><a href="#代码地图" aria-hidden="true" class="anchor" id="user-content-代码地图"></a>代码地图</h3>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../src/attention.rs"><code>src/attention.rs</code></a></td>
+<td><code>forward_mla_decoupled</code>（朴素可求导）/ <code>absorb_attention</code>（无梯度吸收）/ 6 个辅助函数 / 4 个账本函数</td>
+</tr>
+<tr>
+<td><a href="../src/model.rs"><code>src/model.rs</code></a></td>
+<td><code>TransformerConfig</code> 的 <code>mla_rope_dim</code> / <code>mla_absorb</code></td>
+</tr>
+<tr>
+<td><a href="../src/config.rs"><code>src/config.rs</code></a></td>
+<td>解耦与吸收的约束校验</td>
+</tr>
+<tr>
+<td><a href="../src/cmd/experiments.rs"><code>src/cmd/experiments.rs</code></a></td>
+<td><code>cmd_mla</code> 三节账本</td>
+</tr>
+<tr>
+<td><a href="23-GQA%E5%88%86%E7%BB%84%E6%9F%A5%E8%AF%A2%E6%B3%A8%E6%84%8F%E5%8A%9B.md"><code>docs/23-GQA分组查询注意力.md</code></a></td>
+<td>MLA 低秩压缩 KV Cache 的基础（第 23 课「6. 延伸：MLA 低秩压缩 KV Cache（DeepSeek-V2/V3）」一节；本课补上它留的取舍——解耦 RoPE 与权重吸收）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2><a href="#7-运行与验证" aria-hidden="true" class="anchor" id="user-content-7-运行与验证"></a>7. 运行与验证</h2>
+<pre><code class="language-bash"># 解耦 + 吸收的单测（逐位不变 / 吸收等价 / 缓存一致 / 字节账本）
+cargo test mla_decoupled
+cargo test mla_absorb
+
+# 端到端账本：三节演示（缓存字节 → 吸收算力 → 约束自检）
+cargo run --release -- mla
+</code></pre>
+<p>配置示例：</p>
+<pre><code class="language-jsonc">{
+  &quot;model&quot;: {
+    &quot;kv_lora_rank&quot;: 512,   // 先开 MLA 低秩压缩（第 23 课）
+    &quot;mla_rope_dim&quot;: 64,    // 解耦 RoPE 的旋转维 hd_rope（&gt; 0 开启；必须为偶数、&lt; head_dim）
+    &quot;mla_absorb&quot;: true     // 权重吸收（仅无梯度解码时生效；与 qk_norm 互斥）
+  }
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>测试</th>
+<th>验证内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_mla_decoupled_off_is_bitwise_identical</code></td>
+<td><code>mla_rope_dim = 0</code> 时不构造 <code>c_qr/c_kr</code>、不消耗随机数，与同种子普通 MLA 逐位一致；开启后 <code>head_dim</code> 才拆成 <code>hd_nope + hd_rope</code></td>
+</tr>
+<tr>
+<td><code>test_mla_absorb_matches_naive_same_weights</code></td>
+<td>同权重、非零 <code>c_k</code>/<code>c_v</code> bias 下，无梯度吸收输出 == 朴素输出（<code>b_k</code> 抵消、<code>b_v</code> 补回）</td>
+</tr>
+<tr>
+<td><code>test_mla_decoupled_cache_matches_full_recompute</code></td>
+<td>带 latent 缓存的逐 token 增量 == 全量重算（拼接/切分无损）</td>
+</tr>
+<tr>
+<td><code>test_mla_decoupled_cache_bytes</code></td>
+<td>缓存字节 <code>== T·(r + n_head·hd_rope)·4</code>，且与解析账本同口径</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#71-实测账本cargo-run---release----mla默认-n_head128head_dim19212864r512t4096l60" aria-hidden="true" class="anchor" id="user-content-71-实测账本cargo-run---release----mla默认-n_head128head_dim19212864r512t4096l60"></a>7.1 实测账本（<code>cargo run --release -- mla</code>，默认 <code>n_head=128</code>、<code>head_dim=192=128+64</code>、<code>r=512</code>、<code>T=4096</code>、<code>L=60</code>）</h3>
+<p><strong>第一节：增量缓存字节</strong>（每层每 token，f32，K + V 两份）</p>
+<table>
+<thead>
+<tr>
+<th>latent r</th>
+<th>MLA 字节</th>
+<th>全量字节</th>
+<th>压缩比</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>64</td>
+<td>33,024</td>
+<td>196,608</td>
+<td>5.95x</td>
+</tr>
+<tr>
+<td>128</td>
+<td>33,280</td>
+<td>196,608</td>
+<td>5.91x</td>
+</tr>
+<tr>
+<td>256</td>
+<td>33,792</td>
+<td>196,608</td>
+<td>5.82x</td>
+</tr>
+<tr>
+<td>512</td>
+<td>34,816</td>
+<td>196,608</td>
+<td><strong>5.65x</strong></td>
+</tr>
+<tr>
+<td>1024</td>
+<td>36,864</td>
+<td>196,608</td>
+<td>5.33x</td>
+</tr>
+<tr>
+<td>2048</td>
+<td>40,960</td>
+<td>196,608</td>
+<td>4.80x</td>
+</tr>
+</tbody>
+</table>
+<p>放大到 <code>T = 4096 × 60</code> 层：MLA ≈ <strong>7.97 GB</strong> vs 全量 ≈ <strong>45.00 GB</strong>。
+注意压缩比随 <code>r</code> 变化<strong>不大</strong>——因为这里 <code>hd_rope</code> 让 <code>k_rope</code> 占了 <code>128×64 = 8192</code> 维，
+已经是瓶颈；<code>r</code> 只在分母里占一小块。这正是解耦的代价（见 §7 常见坑第 3 条）。</p>
+<p><strong>第二节：权重吸收的解码算力</strong>（每层、全历史 <code>T</code> 的乘加次数）</p>
+<table>
+<thead>
+<tr>
+<th>T</th>
+<th>朴素 MACs</th>
+<th>吸收 MACs</th>
+<th>算力比</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>128</td>
+<td>2,151,677,952</td>
+<td>33,554,432</td>
+<td>64.12x</td>
+</tr>
+<tr>
+<td>512</td>
+<td>8,606,711,808</td>
+<td>83,886,080</td>
+<td>102.60x</td>
+</tr>
+<tr>
+<td>2048</td>
+<td>34,426,847,232</td>
+<td>285,212,672</td>
+<td>120.71x</td>
+</tr>
+<tr>
+<td>8192</td>
+<td>137,707,388,928</td>
+<td>1,090,519,040</td>
+<td>126.28x</td>
+</tr>
+</tbody>
+</table>
+<p>比值随 <code>T</code> 增长趋近 <strong><code>hd_nope = 128</code></strong>——T 越长越接近（短序列时 <code>qa</code> 预计算与投回 <code>W_UV</code>
+的常数项还占一定比例，所以 <code>T = 128</code> 时只有 64x）。</p>
+<h3><a href="#常见坑实测踩出来的" aria-hidden="true" class="anchor" id="user-content-常见坑实测踩出来的"></a>常见坑（实测踩出来的）</h3>
+<h4><a href="#1-解耦的前提是k-对-latent-线性" aria-hidden="true" class="anchor" id="user-content-1-解耦的前提是k-对-latent-线性"></a>1. 解耦的前提是&quot;K 对 latent 线性&quot;</h4>
+<p>吸收恒等式 <code>q_nope·(c·W_UK) = (q_nope·W_UKᵀ)·c</code> 要求 <code>k_nope</code> 是 <code>latent</code> 的<strong>线性</strong>函数。
+任何加在 K 上的<strong>非线性</strong>（比如 QK-Norm 的 RMSNorm）都会破坏它。所以
+<code>mla_absorb</code> 与 <code>qk_norm</code> 在 <code>config.rs</code> 里被显式判为互斥。</p>
+<h4><a href="#2-flash_attention-要求-kv-同维而-mla-的-v-少一段" aria-hidden="true" class="anchor" id="user-content-2-flash_attention-要求-kv-同维而-mla-的-v-少一段"></a>2. <code>flash_attention</code> 要求 K/V 同维，而 MLA 的 V 少一段</h4>
+<p>真实 MLA 里 <code>v</code> 只有 <code>hd_nope</code> 维，<code>k</code> 有 <code>head_dim = hd_nope + hd_rope</code> 维。
+本仓库的 <code>flash_attention</code> 要求两者同 <code>head_dim</code>，所以朴素路径给 <code>v</code> 的 rope 段<strong>补 0</strong>，
+吸收路径则在输出后补 0（两者口径一致，由 <code>test_mla_absorb_matches_naive_same_weights</code> 保证）。</p>
+<h4><a href="#3-解耦-rope-不是免费的" aria-hidden="true" class="anchor" id="user-content-3-解耦-rope-不是免费的"></a>3. 解耦 RoPE <strong>不是免费的</strong></h4>
+<p><code>k_rope</code> 由输入直接投影、逐头缓存，所以缓存里多出 <code>n_head · hd_rope</code> 一整段。
+在 V3 超参下它是 <code>128 × 64 = 8192</code> 维，<strong>比 latent 的 512 维还大一个量级</strong>——
+这就是 §7.1 里&quot;压缩比对 <code>r</code> 不敏感&quot;的原因。解耦换来的是<strong>权重吸收的能力</strong>
+（以及更标准的 MLA 语义），代价是缓存里多一份逐头的位置分量。选 <code>hd_rope</code> 时要在
+&quot;位置分辨率&quot;与&quot;缓存体积&quot;之间权衡，DeepSeek-V3 取的是 <code>head_dim</code> 的三分之一。</p>
+<hr />
+<h2><a href="#8-小结与下一课" aria-hidden="true" class="anchor" id="user-content-8-小结与下一课"></a>8. 小结与下一课</h2>
+<h3><a href="#本课小结" aria-hidden="true" class="anchor" id="user-content-本课小结"></a>本课小结</h3>
+<p>解耦 RoPE 让 <code>k_nope</code> 对 latent 保持线性，从而解锁权重吸收（解码时 K/V 全程不物化，算力比随 <code>T</code> 趋近 <code>hd_nope = 128</code>）；代价是缓存里多一份逐头的 <code>k_rope</code>。</p>
+<h3><a href="#拓展方向" aria-hidden="true" class="anchor" id="user-content-拓展方向"></a>拓展方向</h3>
+<ul>
+<li><strong>吸收 + 量化</strong>：吸收后注意力在 latent 空间完成，而 latent 正是 KV 量化（第 33 课）最该量化的对象；
+两者可叠加做&quot;低秩 + 低比特&quot;的 KV 缓存。</li>
+<li><strong>融合 kernel</strong>：把 <code>qa = q_nope·W_UKᵀ</code> 与 <code>s1 = qa·cᵀ</code> 写成一个内核，才能真正兑现账本里的算力收益。</li>
+<li><strong>解耦 RoPE 的变体</strong>：<code>hd_rope</code> 可以按层变化（浅层大、深层小），或让 <code>q_rope</code>/<code>k_rope</code>
+共享一个更小的投影。这是 V3 之后不少工作继续调的方向。</li>
+<li><strong>与 CSA 组合</strong>：MLA 压 KV 的<strong>维度</strong>、CSA（第 49 课）压 KV 的<strong>个数</strong>，两者正交，可叠加。</li>
+</ul>
+<blockquote>
+<p><strong>下一课</strong>：本课是当前路线的最后一课（十二阶段共 50 课，路线图见 <a href="00-%E5%AD%A6%E4%B9%A0%E8%AE%A1%E5%88%92.md"><code>00-学习计划.md</code></a>）；再往前的方向见上面的拓展方向。</p>
+</blockquote>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 51 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：学习率调度 —— warmup + cosine decay</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：Dropout —— 训练时的「随机失忆」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：RMSNorm —— 现代 LLM 的归一化标配</span></a><a class="series-nav-item" href="/post/rust-llm-guide-22/"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">第 22 课：SwiGLU 激活函数 —— LLaMA 的「门控」MLP</span></a><a class="series-nav-item" href="/post/rust-llm-guide-23/"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-24/"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星</span></a><a class="series-nav-item" href="/post/rust-llm-guide-25/"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">第 25 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-26/"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">第 26 课：混合精度训练（AMP）—— 用半精度加速，用全精度保底</span></a><a class="series-nav-item" href="/post/rust-llm-guide-27/"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">第 27 课：GPU 加速 —— 手写 WGSL 计算着色器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-28/"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a><a class="series-nav-item" href="/post/rust-llm-guide-29/"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-30/"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">第 30 课：Beam Search —— 贪心搜索的升级版</span></a><a class="series-nav-item" href="/post/rust-llm-guide-31/"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">第 31 课：Scaling Laws（缩放定律）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-32/"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">第 32 课：MoE 混合专家模型（Mixture of Experts）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-33/"><span class="series-nav-item-index">34</span><span class="series-nav-item-title">第 33 课：量化技术（Quantization）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-34/"><span class="series-nav-item-index">35</span><span class="series-nav-item-title">第 34 课：推测解码（Speculative Decoding）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-35/"><span class="series-nav-item-index">36</span><span class="series-nav-item-title">第 35 课：多 Token 预测（Multi-Token Prediction）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-36/"><span class="series-nav-item-index">37</span><span class="series-nav-item-title">第 36 课：RLHF 与人类对齐（Alignment）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-37/"><span class="series-nav-item-index">38</span><span class="series-nav-item-title">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-38/"><span class="series-nav-item-index">39</span><span class="series-nav-item-title">第 38 课：分布式训练（Distributed Training）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-39/"><span class="series-nav-item-index">40</span><span class="series-nav-item-title">第 39 课：工程化完善 —— 从算法实现到可用框架</span></a><a class="series-nav-item" href="/post/rust-llm-guide-40/"><span class="series-nav-item-index">41</span><span class="series-nav-item-title">第 40 课：把模型部署成 API 服务 —— 从「自己跑」到「给别人调」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-41/"><span class="series-nav-item-index">42</span><span class="series-nav-item-title">第 41 课：多模态 —— 图片理解与图片生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-42/"><span class="series-nav-item-index">43</span><span class="series-nav-item-title">第 42 课：知识蒸馏（Knowledge Distillation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-43/"><span class="series-nav-item-index">44</span><span class="series-nav-item-title">第 43 课：FP8 低精度训练（模拟）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-44/"><span class="series-nav-item-index">45</span><span class="series-nav-item-title">第 44 课：WSD 学习率调度（warmup-stable-decay）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-45/"><span class="series-nav-item-index">46</span><span class="series-nav-item-title">第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死</span></a><a class="series-nav-item" href="/post/rust-llm-guide-46/"><span class="series-nav-item-index">47</span><span class="series-nav-item-title">第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化</span></a><a class="series-nav-item" href="/post/rust-llm-guide-47/"><span class="series-nav-item-index">48</span><span class="series-nav-item-title">第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道</span></a><a class="series-nav-item" href="/post/rust-llm-guide-48/"><span class="series-nav-item-index">49</span><span class="series-nav-item-title">第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重</span></a><a class="series-nav-item" href="/post/rust-llm-guide-49/"><span class="series-nav-item-index">50</span><span class="series-nav-item-title">第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-50/"><span class="series-nav-item-index">51</span><span class="series-nav-item-title">第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</span><span class="series-nav-item-now">本篇</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-49/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</span></a><span class="series-nav-page disabled">已经是最后一章</span></div></div>
+            </article>
+        </main>
+<footer class="footer-content">
+    <div class="copyright">
+        <span>2019-2026 </span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"/></svg>
+        <span> 干徒 / Ganto</span>
+    </div>
+</footer>
+        </div>
+    </div>
+<script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
+try{document.getElementById('main').innerHTML='';}catch(e){}</script>
+<script type="module">
+import init, * as bindings from '/web-rs-a99f5589204ec566.js';
+const wasm = await init({ module_or_path: '/web-rs-a99f5589204ec566_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script>
+</body>
+</html>

@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>第 9 课：注意力机制 —— 让 token 互相「看」 - 干徒</title>
-    <meta name="description" content="实现注意力机制：Q/K/V 投影、打分、softmax 与因果掩码。">
+    <meta name="description" content="从 Q/K/V 投影讲到缩放点积注意力，用 -inf 掩码保证模型只能看过去。">
     <meta name="author" content="干徒">
     <meta name="keywords" content="Rust, LLM, 注意力">
     <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-09">
     <meta property="og:title" content="第 9 课：注意力机制 —— 让 token 互相「看」 - 干徒">
-    <meta property="og:description" content="实现注意力机制：Q/K/V 投影、打分、softmax 与因果掩码。">
+    <meta property="og:description" content="从 Q/K/V 投影讲到缩放点积注意力，用 -inf 掩码保证模型只能看过去。">
     <meta property="og:type" content="article">
     <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-09">
     <meta property="og:site_name" content="干徒的博客">
@@ -20,22 +20,22 @@
     <meta property="og:image:alt" content="第 9 课：注意力机制 —— 让 token 互相「看」 - 干徒">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="第 9 课：注意力机制 —— 让 token 互相「看」 - 干徒">
-    <meta name="twitter:description" content="实现注意力机制：Q/K/V 投影、打分、softmax 与因果掩码。">
+    <meta name="twitter:description" content="从 Q/K/V 投影讲到缩放点积注意力，用 -inf 掩码保证模型只能看过去。">
     <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
     <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 9 课：注意力机制 —— 让 token 互相「看」","description":"实现注意力机制：Q/K/V 投影、打分、softmax 与因果掩码。","url":"https://ganto.me/post/rust-llm-guide-09","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 注意力","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 9 课：注意力机制 —— 让 token 互相「看」","description":"从 Q/K/V 投影讲到缩放点积注意力，用 -inf 掩码保证模型只能看过去。","url":"https://ganto.me/post/rust-llm-guide-09","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 注意力","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
     </script>
     <link rel="stylesheet" href="/styles-84a0c1a16fd4b1bc.css">
-<link rel="modulepreload" href="/web-rs-8ee8b4f1252fa02d.js" crossorigin="anonymous" integrity="sha384-TxRN3IL8AIHuolVnquiA+u9SEBvUFMfUuLNiJ2VvN/bIfTer3FqW7bnpy6qNoFfK">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
-<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
+<link rel="modulepreload" href="/web-rs-a99f5589204ec566.js" crossorigin="anonymous" integrity="sha384-umfTmuv9naxm3y94Bh3NWTfgXO2lsKZY7liOaEQ/zp9/YvxyqCZMSoTUOtOsXZQ6">
 <link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous" integrity="sha384-2DHjVGrzcpbms06h5LAGWYB1zXEqfWTjATq1YsBBgX1CE2W+T4mRjoljwlXKhTcj">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
 <link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous" integrity="sha384-pfz3GoOS0du3Se5f5C1lkvbvMo0g507e24Rcu0dm29CmSCqxguUw3chk5PS1brtF">
-<link rel="preload" href="/web-rs-8ee8b4f1252fa02d_bg.wasm" crossorigin="anonymous" integrity="sha384-3wWr8DgnH4e2YxAuX2WFELRGjZBBSBguUlj/8PJRmz0t18sv4VhXf9yf2WFiiadO" as="fetch" type="application/wasm">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
+<link rel="preload" href="/web-rs-a99f5589204ec566_bg.wasm" crossorigin="anonymous" integrity="sha384-RN+hPytGjHtzCa+dPXlgO6NZwHHIA2reMSnH/98AjTuP+/n7D+fZxS0wwqc/Ie6I" as="fetch" type="application/wasm">
 
     <style>
 :root {
@@ -143,20 +143,23 @@
                 <div class="blog-content">
 <h1><a href="#第-9-课注意力机制--让-token-互相看" aria-hidden="true" class="anchor" id="user-content-第-9-课注意力机制--让-token-互相看"></a>第 9 课：注意力机制 —— 让 token 互相&quot;看&quot;</h1>
 <blockquote>
-<p>代码位置：<a href="src/attention.rs">src/attention.rs</a>（<code>MultiHeadAttention::forward</code> 中的投影 / 打分 / softmax / 掩码部分）
-底层算子：<a href="src/tensor.rs">src/tensor.rs</a>（<code>softmax_last_dim</code> / <code>matmul</code> / <code>permute</code> / <code>mul_scalar</code>）
-掩码构造：<a href="src/model.rs">src/model.rs</a>（<code>GPT::forward</code>）</p>
+<p>代码位置：<a href="../src/attention.rs">src/attention.rs</a>（<code>MultiHeadAttention::forward</code> 中的投影与注意力算子调用）
+底层算子：<a href="../src/tensor.rs">src/tensor.rs</a>（<code>flash_attention</code> / <code>permute</code> / <code>matmul</code>）
+掩码构造：<a href="../src/model.rs">src/model.rs</a>（<code>Transformer::forward_core</code>）</p>
 </blockquote>
+<hr />
 <h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
 <ol>
 <li>为什么一个 token 需要&quot;看&quot;别的 token？注意力到底在算什么？</li>
 <li>Query / Key / Value 是什么？为什么不能直接用 x 打分？</li>
 <li>为什么要除以 √d_k？softmax 在干什么？</li>
-<li>为什么 GPT 只能看过去？<code>-inf</code> 掩码怎么实现？</li>
+<li>为什么 Transformer 只能看过去？<code>-inf</code> 掩码怎么实现？</li>
 </ol>
+<hr />
 <h2><a href="#2-从词向量到上下文向量" aria-hidden="true" class="anchor" id="user-content-2-从词向量到上下文向量"></a>2. 从词向量到&quot;上下文向量&quot;</h2>
 <p>第 12 课会把每个 token 嵌入成一个向量，但 Embedding 查表得到的向量<strong>只代表这个 token 自己</strong>：它不知道周围发生了什么。&quot;bank&quot; 到底是&quot;河岸&quot;还是&quot;银行&quot;，单看它自己无法判断，必须结合上下文。</p>
 <p>注意力要做的事：<strong>让每个位置根据内容，从其他位置&quot;收集&quot;信息</strong>。输出不再是&quot;我自己的向量&quot;，而是&quot;我 + 我关注的别人的向量的加权混合&quot;。</p>
+<hr />
 <h2><a href="#3-检索的视角query--key--value" aria-hidden="true" class="anchor" id="user-content-3-检索的视角query--key--value"></a>3. 检索的视角：Query / Key / Value</h2>
 <p>注意力最直观的类比是图书馆检索：</p>
 <table>
@@ -187,6 +190,7 @@
 </table>
 <p>流程：拿 query 去和所有 key 比对相似度 → 得到权重 → 按权重把 value 加权求和。</p>
 <p>我们的模型里 Q、K、V 都来自同一个输入 x（每个位置既当&quot;提问者&quot;又当&quot;被看者&quot;），这叫<strong>自注意力（Self-Attention）</strong>。</p>
+<hr />
 <h2><a href="#4-q--k--v-投影三个角色各学各的表示" aria-hidden="true" class="anchor" id="user-content-4-q--k--v-投影三个角色各学各的表示"></a>4. Q / K / V 投影：三个角色各学各的表示</h2>
 <p>直接用 x 当 Q、K、V 行不行？可以，但不好——三个角色应该学<strong>不同的表示</strong>。所以每个角色先过一层可学习的线性投影（<code>Linear: y = xW + b</code>）：</p>
 <pre><code class="language-rust">// 1. 投影得到 Q、K、V
@@ -197,8 +201,9 @@ let v = self.c_v.forward(x).reshape(vec![b, t, d]);
 <ul>
 <li><code>c_q</code> / <code>c_k</code> / <code>c_v</code> 是三个独立的 <code>Linear::new(D, D)</code>（<code>MultiHeadAttention</code> 结构体里的字段），各有自己的权重和偏置，在训练中学习</li>
 <li><code>Linear::forward</code> 对 3D 输入会自动展平成 <code>[B*T, D]</code> 计算再还原 3D；这里的 <code>reshape(vec![b, t, d])</code> 保证形状明确是 <code>[B, T, D]</code></li>
-<li>D = n_embd。模型配置 <code>GPTConfig::tiny</code>：n_embd = 64，n_head = 4 → head_dim = 16（第 10 课讲怎么拆头；<strong>本课先假设只有一个头</strong>，公式层面 H = 1）</li>
+<li>D = n_embd。模型配置 <code>TransformerConfig::tiny</code>：n_embd = 64，n_head = 4 → head_dim = 16（第 10 课讲怎么拆头；<strong>本课先假设只有一个头</strong>，公式层面 H = 1）</li>
 </ul>
+<hr />
 <h2><a href="#5-打分scores--qkᵀ--d_k" aria-hidden="true" class="anchor" id="user-content-5-打分scores--qkᵀ--d_k"></a>5. 打分：scores = Q·Kᵀ / √d_k</h2>
 <p>query 和 key 的相似度用<strong>点积</strong>衡量：q_i · k_j 越大越相似。一次性算所有两两相似度，就是矩阵乘法：</p>
 <pre><code>S = Q · Kᵀ / √d_k
@@ -208,15 +213,13 @@ let v = self.c_v.forward(x).reshape(vec![b, t, d]);
 <li>S[i][j] = (q_i · k_j) / √d_k：第 i 个查询对第 j 个键的&quot;原始分数&quot;</li>
 </ul>
 <p>对应代码：</p>
-<pre><code class="language-rust">// 4. 注意力分数：scores = Q·Kᵀ / √d_k
-let scale = 1.0 / (head_dim as f32).sqrt();
-let kt = k.permute(&amp;[0, 2, 1]);                     // K 转置：[B*H, head_dim, T_total]
-let scores = q.matmul(&amp;kt).mul_scalar(scale);       // [B*H, T, T_total]
+<pre><code class="language-rust">// 实际实现：打分 → 加掩码 → softmax → 加权求和 被融合成一个算子
+//   （调用点 src/attention.rs，算子定义 src/tensor.rs 的 Tensor::flash_attention）
+let out = Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32);
 </code></pre>
 <ul>
-<li><code>permute(&amp;[0, 2, 1])</code>：把 K 的 <code>[T, head_dim]</code> 两维交换，得到数学上的 Kᵀ</li>
-<li><code>q.matmul(&amp;kt)</code>：3D 批量矩阵乘法（第 1 课学的 matmul，这里按&quot;批&quot;逐矩阵相乘）</li>
-<li><code>mul_scalar(scale)</code>：每个元素乘以 1/√d_k</li>
+<li>算子内部依次做：<code>Q' = Q/√d_k</code> → <code>S = Q'·Kᵀ</code>（3D 批量矩阵乘）→ <code>P = softmax(S + M)</code> → <code>O = P·V</code>，与上面的公式逐项等价</li>
+<li>原先分散写的 <code>permute</code>（得到 Kᵀ）/ <code>matmul</code>（Q·Kᵀ）/ <code>mul_scalar</code>（缩放）这一步已经被上面这个融合算子取代；这些基础算子本身仍在 <code>src/tensor.rs</code> 中，只是不再出现在注意力路径上</li>
 </ul>
 <h3><a href="#51-手算例子d_k--2两个-token" aria-hidden="true" class="anchor" id="user-content-51-手算例子d_k--2两个-token"></a>5.1 手算例子（d_k = 2，两个 token）</h3>
 <pre><code>Q = [ [1, 0],          K = [ [1, 0],          V = [ [1, 0],
@@ -229,6 +232,7 @@ Q·Kᵀ = [ [1, 0],
                  [0,     0.707] ]
 </code></pre>
 <p>softmax 按行归一化（见第 7 节）后，第 1 行 ≈ [0.670, 0.330]，第 2 行 ≈ [0.330, 0.670]——即&quot;每个位置主要关注自己&quot;（对角线），很符合直觉。</p>
+<hr />
 <h2><a href="#6-为什么要除以-d_k" aria-hidden="true" class="anchor" id="user-content-6-为什么要除以-d_k"></a>6. 为什么要除以 √d_k</h2>
 <p>假设 q、k 每个维度独立、均值 0、方差 1。两个 d_k 维向量的点积：</p>
 <pre><code>Var(q·k) = Var(Σ q_i·k_i) = d_k          →  标准差 = √d_k
@@ -258,12 +262,13 @@ Q·Kᵀ = [ [1, 0],
 <li>除以 √d_k 把方差拉回 1，softmax 保持&quot;温和&quot;的分布</li>
 <li>所以这个公式叫 <strong>Scaled</strong> Dot-Product Attention——<strong>缩放</strong>点积注意力</li>
 </ul>
+<hr />
 <h2><a href="#7-softmax-归一化把分数变成权重" aria-hidden="true" class="anchor" id="user-content-7-softmax-归一化把分数变成权重"></a>7. softmax 归一化：把分数变成权重</h2>
 <p>原始分数可正可负、量纲不定，不能直接当权重。softmax 把每一行变成<strong>非负且和为 1</strong> 的概率分布：</p>
 <pre><code>a_ij = exp(S_ij) / Σ_j' exp(S_ij')
 </code></pre>
 <p>含义：第 i 个查询给第 j 个键的&quot;注意力权重&quot;，<strong>一行加起来等于 1</strong>。</p>
-<h3><a href="#数值稳定技巧" aria-hidden="true" class="anchor" id="user-content-数值稳定技巧"></a>数值稳定技巧</h3>
+<h3><a href="#71-数值稳定技巧" aria-hidden="true" class="anchor" id="user-content-71-数值稳定技巧"></a>7.1 数值稳定技巧</h3>
 <p><code>exp</code> 对大的正数会爆炸（如 exp(1000) = 无穷大），所以先减去每行最大值——数学上不改变结果（分子分母同除 exp(max)）：</p>
 <pre><code class="language-rust">// softmax_last_dim：沿最后一维逐行独立归一化
 for r in 0..rows {
@@ -287,26 +292,27 @@ for r in 0..rows {
 <blockquote>
 <p>反向传播公式（<code>softmax_last_dim</code> 的 backward 里已实现）：∂x_i = s_i·(g_i − Σ_j g_j·s_j)，其中 s 是 softmax 输出、g 是上游梯度。这正是第 2 课自动微分的用武之地。</p>
 </blockquote>
+<hr />
 <h2><a href="#8-加权求和out--av" aria-hidden="true" class="anchor" id="user-content-8-加权求和out--av"></a>8. 加权求和：out = A·V</h2>
 <p>把权重矩阵 A 作用到 V 上：</p>
 <pre><code>out_i = Σ_j a_ij · v_j
 </code></pre>
-<p>即&quot;每个输出 = 所有位置 V 的<strong>凸组合</strong>&quot;（权重非负、和为 1）。代码只有两行：</p>
-<pre><code class="language-rust">// 6. softmax 得到注意力权重，加权求和
-let attn = scores.softmax_last_dim();  // [B*H, T, T_total]   注意力权重
-let out = attn.matmul(&amp;v);             // [B*H, T, head_dim]  加权求和
+<p>即&quot;每个输出 = 所有位置 V 的<strong>凸组合</strong>&quot;（权重非负、和为 1）。这一步与前面的打分、掩码一起都在同一个融合算子里完成：</p>
+<pre><code class="language-rust">// softmax + 加权求和：融合在 flash_attention 内部（src/tensor.rs 的 Tensor::flash_attention）
+let out = Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32); // [B*H, T, head_dim]
 </code></pre>
 <p>至此，注意力 = <strong>内容相关的可学习加权平均</strong>：每个位置根据 query 与各 key 的相似度，从所有 value 里&quot;取&quot;信息。</p>
-<h2><a href="#9-因果掩码为什么-gpt-只能看过去" aria-hidden="true" class="anchor" id="user-content-9-因果掩码为什么-gpt-只能看过去"></a>9. 因果掩码：为什么 GPT 只能看过去</h2>
-<p>GPT 是<strong>自回归语言模型</strong>：预测第 t 个 token 时，条件只能是它之前的 token：</p>
+<hr />
+<h2><a href="#9-因果掩码为什么-transformer-只能看过去" aria-hidden="true" class="anchor" id="user-content-9-因果掩码为什么-transformer-只能看过去"></a>9. 因果掩码：为什么 Transformer 只能看过去</h2>
+<p>Transformer 是<strong>自回归语言模型</strong>：预测第 t 个 token 时，条件只能是它之前的 token：</p>
 <pre><code>P(token_t | token_1, ..., token_{t-1})
 </code></pre>
 <ul>
 <li>训练时我们把<strong>整段文本并行</strong>喂入（这样才快！）。如果不加限制，位置 t 会&quot;偷看&quot;位置 t+1 的答案——信息泄漏，模型退化成&quot;抄答案&quot;</li>
 <li>解决办法：让位置 i 的查询<strong>看不到 j &gt; i 的键</strong>——这就是因果掩码（causal mask）</li>
 </ul>
-<h3><a href="#掩码长什么样" aria-hidden="true" class="anchor" id="user-content-掩码长什么样"></a>掩码长什么样</h3>
-<p><code>GPT::forward</code> 里构造（<code>t_total = t + base</code>，训练时 base = 0）：</p>
+<h3><a href="#91-掩码长什么样" aria-hidden="true" class="anchor" id="user-content-91-掩码长什么样"></a>9.1 掩码长什么样</h3>
+<p><code>Transformer::forward_core</code> 里构造（<code>t_total = t + base</code>，训练时 base = 0）：</p>
 <pre><code class="language-rust">let mut mask_data = vec![0.0f32; t * t_total];
 for i in 0..t {
     for j in 0..t_total {
@@ -360,15 +366,19 @@ let mask = Tensor::from_vec(mask_data, vec![t, t_total]);
 </tbody>
 </table>
 <p>对角线及以下（j ≤ i）是 0，未来位置（j &gt; i）是 <code>-inf</code>。</p>
-<h3><a href="#为什么是--inf-而不是把列删掉" aria-hidden="true" class="anchor" id="user-content-为什么是--inf-而不是把列删掉"></a>为什么是 -inf 而不是把列删掉</h3>
+<h3><a href="#92-为什么是--inf-而不是把列删掉" aria-hidden="true" class="anchor" id="user-content-92-为什么是--inf-而不是把列删掉"></a>9.2 为什么是 -inf 而不是把列删掉</h3>
 <p>softmax 里 <code>exp(-inf) = 0</code>，被掩码位置的注意力权重<strong>精确为 0</strong>——&quot;看不见&quot;等价于&quot;权重为 0&quot;。同时张量形状保持不变，可以继续走统一的批量矩阵运算。</p>
-<pre><code class="language-rust">let scores = scores.add(mask);              // [B*H, T, T_total] + 广播 [T, T_total]
-let attn = scores.softmax_last_dim();       // -inf -&gt; exp(-inf) = 0 -&gt; 权重为 0
+<pre><code class="language-rust">// mask 是 Option&lt;&amp;Tensor&gt;：**两条路径都真的消费它**——
+// CPU 分块核在核内把掩码行加到打分上（有掩码时可见性完全由掩码决定，不再另按因果截断）；
+// GPU 常驻 / probe 录制路径按真实掩码 buffer 消费（没传掩码时由算子自己物化一张因果掩码）。
+let out = Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32); // src/attention.rs
 </code></pre>
 <blockquote>
-<p><code>scores.add(mask)</code> 用到了第 3 课的广播：mask 形状 [T, T_total] 自动广播到 [B*H, T, T_total] 的每一个&quot;批&quot;（每个头共享同一张掩码）。
-（代码里的 <code>base</code> 是 KV cache 引入的偏移，第 18 课讲解；训练时 base = 0。）</p>
+<p>掩码被消费时同样用到第 3 课的广播：mask 形状 [T, T_total] 自动广播到 [B*H, T, T_total] 的每一个&quot;批&quot;（每个头共享同一张掩码）；<code>-inf</code> 位置 <code>exp(-inf) = 0</code>，注意力权重精确为 0。
+传 <code>None</code> 时 CPU 分块核才退回<strong>核内后缀因果</strong>快路（query i 只看 <code>j &lt;= i + visible_before</code>）——这也是视觉塔必须显式传一张<strong>全 0 掩码</strong>才能拿到真正双向注意力的原因（见 <a href="41-%E5%A4%9A%E6%A8%A1%E6%80%81.md">第 41 课</a>）。
+（代码里的 <code>base</code> 是 KV cache 引入的偏移，第 25 课讲解；训练时 base = 0。）</p>
 </blockquote>
+<hr />
 <h2><a href="#10-公式--代码-总对照" aria-hidden="true" class="anchor" id="user-content-10-公式--代码-总对照"></a>10. 公式 ↔ 代码 总对照</h2>
 <pre><code>Attention(Q, K, V) = softmax( (Q·Kᵀ / √d_k) + M ) · V
 </code></pre>
@@ -390,48 +400,65 @@ let attn = scores.softmax_last_dim();       // -inf -&gt; exp(-inf) = 0 -&gt; �
 </tr>
 <tr>
 <td>Kᵀ</td>
-<td><code>k.permute(&amp;[0, 2, 1])</code></td>
+<td>融合算子内部完成</td>
 </tr>
 <tr>
 <td>Q·Kᵀ / √d_k</td>
-<td><code>q.matmul(&amp;kt).mul_scalar(scale)</code>，<code>scale = 1.0 / (head_dim as f32).sqrt()</code></td>
+<td>融合算子内部完成（先把 Q 乘 <code>1/√d_k</code>，再做批量矩阵乘）</td>
 </tr>
 <tr>
 <td>+ M（因果掩码）</td>
-<td><code>scores.add(mask)</code></td>
+<td><code>mask</code> 作为参数传入融合算子</td>
 </tr>
 <tr>
 <td>softmax</td>
-<td><code>scores.softmax_last_dim()</code></td>
+<td>融合算子内部完成</td>
 </tr>
 <tr>
 <td>·V</td>
-<td><code>attn.matmul(&amp;v)</code></td>
+<td>融合算子内部完成</td>
+</tr>
+<tr>
+<td>后 5 行整体</td>
+<td><code>Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32)</code>（调用点 <code>src/attention.rs</code>，算子定义 <code>src/tensor.rs</code>）</td>
 </tr>
 </tbody>
 </table>
-<h2><a href="#11-运行与测试" aria-hidden="true" class="anchor" id="user-content-11-运行与测试"></a>11. 运行与测试</h2>
+<hr />
+<h2><a href="#11-运行与验证" aria-hidden="true" class="anchor" id="user-content-11-运行与验证"></a>11. 运行与验证</h2>
 <pre><code class="language-bash">cargo test   # tensor 的 test_softmax / test_matmul_2d / test_matmul_3d 验证本课用到的底层算子
-cargo run    # 演示 3 训练小 GPT：每一步前向/反向都跑在本课的注意力计算上
+cargo run --release -- demo    # 演示 3 训练小 Transformer：每一步前向/反向都跑在本课的注意力计算上
 </code></pre>
-<h2><a href="#12-动手练习" aria-hidden="true" class="anchor" id="user-content-12-动手练习"></a>12. 动手练习</h2>
-<ol>
-<li>手算：取第 5.1 节的 2×2 例子，写出 softmax 后每一行的权重，再算出最终的加权求和结果，对照公式逐项核对。</li>
-<li>修改 <code>GPT::forward</code> 里的掩码条件 <code>j &gt; i + base</code> 为 <code>j &gt;= i + base</code>（禁止&quot;看自己&quot;），思考对训练会有什么影响（提示：每个位置的预测将只能依赖更早的 token）。</li>
-<li>临时改 <code>softmax_last_dim</code>：去掉&quot;减最大值&quot;那一步，用大数（如 1000）做输入，观察溢出/精度问题，验证数值稳定技巧的必要性。</li>
-<li>阅读 <code>softmax_last_dim</code> 的反向代码，对照公式 ∂x_i = s_i·(g_i − Σ_j g_j·s_j) 逐行核对。</li>
-</ol>
-<h2><a href="#13-本课总结" aria-hidden="true" class="anchor" id="user-content-13-本课总结"></a>13. 本课总结</h2>
+<h2><a href="#12-小结与下一课" aria-hidden="true" class="anchor" id="user-content-12-小结与下一课"></a>12. 小结与下一课</h2>
+<h3><a href="#融合算子flash_attention" aria-hidden="true" class="anchor" id="user-content-融合算子flash_attention"></a>融合算子：<code>flash_attention</code></h3>
+<p>训练中每步的注意力计算调用的是 <code>Tensor::flash_attention</code>（定义在 <code>src/tensor.rs</code>，调用点 <code>src/attention.rs</code>），
+它把&quot;打分 → 加掩码 → softmax → 加权求和 V&quot;四步融合成一个算子：内部先算 <code>Q' = Q/√d_k</code>，
+再做 <code>S = Q'·Kᵀ</code> → <code>P = softmax(S + M)</code> → <code>O = P·V</code>，全程走矩阵乘内核，反向同样全用矩阵乘。
+（另有融合算子 <code>Tensor::masked_softmax</code>（<code>src/tensor.rs</code>），它把&quot;加掩码 + softmax&quot;合成一个算子，
+用在 MLA 吸收路径与 CSA 稀疏注意力上；整行都被 <code>-inf</code> 淹没时它输出全 0 而不是 <code>NaN</code>。）</p>
+<h3><a href="#本课小结" aria-hidden="true" class="anchor" id="user-content-本课小结"></a>本课小结</h3>
 <ul>
 <li>注意力 = 内容相关的加权平均：Q 问、K 答、V 给内容</li>
 <li>scores = Q·Kᵀ/√d_k：点积打分，缩放防止 d_k 大时 softmax 饱和</li>
 <li>softmax：分数 → 权重（非负、和为 1）；先减 max 保证数值稳定</li>
 <li>因果掩码：未来位置填 <code>-inf</code> → softmax 后权重为 0 → 模型只能看过去</li>
-<li>下一课：把注意力&quot;切成多份&quot;并行计算——多头注意力！</li>
 </ul>
+<h3><a href="#拓展方向" aria-hidden="true" class="anchor" id="user-content-拓展方向"></a>拓展方向</h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li>手算：取第 5.1 节的 2×2 例子，写出 softmax 后每一行的权重，再算出最终的加权求和结果，对照公式逐项核对。</li>
+<li>修改 <code>forward_core</code> 里的掩码条件 <code>j &gt; i + base</code> 为 <code>j &gt;= i + base</code>（禁止&quot;看自己&quot;），思考对训练会有什么影响（提示：每个位置的预测将只能依赖更早的 token）。</li>
+<li>临时改 <code>softmax_last_dim</code>：去掉&quot;减最大值&quot;那一步，用大数（如 1000）做输入，观察溢出/精度问题，验证数值稳定技巧的必要性。</li>
+<li>阅读 <code>softmax_last_dim</code> 的反向代码，对照公式 ∂x_i = s_i·(g_i − Σ_j g_j·s_j) 逐行核对。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="10-%E5%A4%9A%E5%A4%B4%E6%B3%A8%E6%84%8F%E5%8A%9B.md">第 10 课 多头注意力</a> —— 把注意力&quot;切成多份&quot;并行计算——多头注意力！</p>
+</blockquote>
 
                 </div>
-                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 22 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 1.46 一路降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与全项目总结</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：GPU 加速训练与推理</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-08/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-10/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a></div></div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 51 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：学习率调度 —— warmup + cosine decay</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：Dropout —— 训练时的「随机失忆」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：RMSNorm —— 现代 LLM 的归一化标配</span></a><a class="series-nav-item" href="/post/rust-llm-guide-22/"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">第 22 课：SwiGLU 激活函数 —— LLaMA 的「门控」MLP</span></a><a class="series-nav-item" href="/post/rust-llm-guide-23/"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-24/"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星</span></a><a class="series-nav-item" href="/post/rust-llm-guide-25/"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">第 25 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-26/"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">第 26 课：混合精度训练（AMP）—— 用半精度加速，用全精度保底</span></a><a class="series-nav-item" href="/post/rust-llm-guide-27/"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">第 27 课：GPU 加速 —— 手写 WGSL 计算着色器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-28/"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a><a class="series-nav-item" href="/post/rust-llm-guide-29/"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-30/"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">第 30 课：Beam Search —— 贪心搜索的升级版</span></a><a class="series-nav-item" href="/post/rust-llm-guide-31/"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">第 31 课：Scaling Laws（缩放定律）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-32/"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">第 32 课：MoE 混合专家模型（Mixture of Experts）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-33/"><span class="series-nav-item-index">34</span><span class="series-nav-item-title">第 33 课：量化技术（Quantization）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-34/"><span class="series-nav-item-index">35</span><span class="series-nav-item-title">第 34 课：推测解码（Speculative Decoding）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-35/"><span class="series-nav-item-index">36</span><span class="series-nav-item-title">第 35 课：多 Token 预测（Multi-Token Prediction）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-36/"><span class="series-nav-item-index">37</span><span class="series-nav-item-title">第 36 课：RLHF 与人类对齐（Alignment）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-37/"><span class="series-nav-item-index">38</span><span class="series-nav-item-title">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-38/"><span class="series-nav-item-index">39</span><span class="series-nav-item-title">第 38 课：分布式训练（Distributed Training）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-39/"><span class="series-nav-item-index">40</span><span class="series-nav-item-title">第 39 课：工程化完善 —— 从算法实现到可用框架</span></a><a class="series-nav-item" href="/post/rust-llm-guide-40/"><span class="series-nav-item-index">41</span><span class="series-nav-item-title">第 40 课：把模型部署成 API 服务 —— 从「自己跑」到「给别人调」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-41/"><span class="series-nav-item-index">42</span><span class="series-nav-item-title">第 41 课：多模态 —— 图片理解与图片生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-42/"><span class="series-nav-item-index">43</span><span class="series-nav-item-title">第 42 课：知识蒸馏（Knowledge Distillation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-43/"><span class="series-nav-item-index">44</span><span class="series-nav-item-title">第 43 课：FP8 低精度训练（模拟）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-44/"><span class="series-nav-item-index">45</span><span class="series-nav-item-title">第 44 课：WSD 学习率调度（warmup-stable-decay）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-45/"><span class="series-nav-item-index">46</span><span class="series-nav-item-title">第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死</span></a><a class="series-nav-item" href="/post/rust-llm-guide-46/"><span class="series-nav-item-index">47</span><span class="series-nav-item-title">第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化</span></a><a class="series-nav-item" href="/post/rust-llm-guide-47/"><span class="series-nav-item-index">48</span><span class="series-nav-item-title">第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道</span></a><a class="series-nav-item" href="/post/rust-llm-guide-48/"><span class="series-nav-item-index">49</span><span class="series-nav-item-title">第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重</span></a><a class="series-nav-item" href="/post/rust-llm-guide-49/"><span class="series-nav-item-index">50</span><span class="series-nav-item-title">第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</span></a><a class="series-nav-item" href="/post/rust-llm-guide-50/"><span class="series-nav-item-index">51</span><span class="series-nav-item-title">第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-08/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-10/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a></div></div>
             </article>
         </main>
 <footer class="footer-content">
@@ -446,8 +473,8 @@ cargo run    # 演示 3 训练小 GPT：每一步前向/反向都跑在本课的
 <script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
 try{document.getElementById('main').innerHTML='';}catch(e){}</script>
 <script type="module">
-import init, * as bindings from '/web-rs-8ee8b4f1252fa02d.js';
-const wasm = await init({ module_or_path: '/web-rs-8ee8b4f1252fa02d_bg.wasm' });
+import init, * as bindings from '/web-rs-a99f5589204ec566.js';
+const wasm = await init({ module_or_path: '/web-rs-a99f5589204ec566_bg.wasm' });
 
 
 window.wasmBindings = bindings;

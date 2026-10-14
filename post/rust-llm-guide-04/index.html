@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构 - 干徒</title>
-    <meta name="description" content="对项目进行模块化重构，按职责分层文件，并引入 Rc&lt;RefCell&gt; 管理共享参数。">
+    <title>第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构 - 干徒</title>
+    <meta name="description" content="把张量库拆成独立模块，引入 Shared 共享可变数据、线程局部 tape 与 Module trait。">
     <meta name="author" content="干徒">
     <meta name="keywords" content="Rust, LLM, 架构">
     <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-04">
-    <meta property="og:title" content="第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构 - 干徒">
-    <meta property="og:description" content="对项目进行模块化重构，按职责分层文件，并引入 Rc&lt;RefCell&gt; 管理共享参数。">
+    <meta property="og:title" content="第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构 - 干徒">
+    <meta property="og:description" content="把张量库拆成独立模块，引入 Shared 共享可变数据、线程局部 tape 与 Module trait。">
     <meta property="og:type" content="article">
     <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-04">
     <meta property="og:site_name" content="干徒的博客">
@@ -17,25 +17,25 @@
     <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构 - 干徒">
+    <meta property="og:image:alt" content="第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构 - 干徒">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构 - 干徒">
-    <meta name="twitter:description" content="对项目进行模块化重构，按职责分层文件，并引入 Rc&lt;RefCell&gt; 管理共享参数。">
+    <meta name="twitter:title" content="第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构 - 干徒">
+    <meta name="twitter:description" content="把张量库拆成独立模块，引入 Shared 共享可变数据、线程局部 tape 与 Module trait。">
     <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
     <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 4 课：模块化重构 —— 项目结构分层与 Rc<RefCell> 架构","description":"对项目进行模块化重构，按职责分层文件，并引入 Rc<RefCell> 管理共享参数。","url":"https://ganto.me/post/rust-llm-guide-04","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 架构","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 4 课：模块化重构 —— 项目结构分层与 Arc<Mutex>/Shared 架构","description":"把张量库拆成独立模块，引入 Shared 共享可变数据、线程局部 tape 与 Module trait。","url":"https://ganto.me/post/rust-llm-guide-04","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 架构","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
     </script>
     <link rel="stylesheet" href="/styles-84a0c1a16fd4b1bc.css">
-<link rel="modulepreload" href="/web-rs-8ee8b4f1252fa02d.js" crossorigin="anonymous" integrity="sha384-TxRN3IL8AIHuolVnquiA+u9SEBvUFMfUuLNiJ2VvN/bIfTer3FqW7bnpy6qNoFfK">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
-<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
+<link rel="modulepreload" href="/web-rs-a99f5589204ec566.js" crossorigin="anonymous" integrity="sha384-umfTmuv9naxm3y94Bh3NWTfgXO2lsKZY7liOaEQ/zp9/YvxyqCZMSoTUOtOsXZQ6">
 <link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous" integrity="sha384-2DHjVGrzcpbms06h5LAGWYB1zXEqfWTjATq1YsBBgX1CE2W+T4mRjoljwlXKhTcj">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
 <link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous" integrity="sha384-pfz3GoOS0du3Se5f5C1lkvbvMo0g507e24Rcu0dm29CmSCqxguUw3chk5PS1brtF">
-<link rel="preload" href="/web-rs-8ee8b4f1252fa02d_bg.wasm" crossorigin="anonymous" integrity="sha384-3wWr8DgnH4e2YxAuX2WFELRGjZBBSBguUlj/8PJRmz0t18sv4VhXf9yf2WFiiadO" as="fetch" type="application/wasm">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
+<link rel="preload" href="/web-rs-a99f5589204ec566_bg.wasm" crossorigin="anonymous" integrity="sha384-RN+hPytGjHtzCa+dPXlgO6NZwHHIA2reMSnH/98AjTuP+/n7D+fZxS0wwqc/Ie6I" as="fetch" type="application/wasm">
 
     <style>
 :root {
@@ -134,37 +134,39 @@
 </div>
         <main class="main-content">
             <article class="blog-post prerender-article">
-                <h1>第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</h1>
+                <h1>第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构</h1>
                 <div class="prerender-meta">
                     <span>2026-09-01</span>
                     <span>干徒</span>
                 </div>
                 <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">架构</span></div>
                 <div class="blog-content">
-<h1><a href="#第-4-课模块化重构--项目结构分层与-rc-架构" aria-hidden="true" class="anchor" id="user-content-第-4-课模块化重构--项目结构分层与-rc-架构"></a>第 4 课：模块化重构 —— 项目结构分层与 Rc<RefCell> 架构</h1>
+<h1><a href="#第-4-课模块化重构--项目结构分层与-arcshared-架构" aria-hidden="true" class="anchor" id="user-content-第-4-课模块化重构--项目结构分层与-arcshared-架构"></a>第 4 课：模块化重构 —— 项目结构分层与 Arc<Mutex>/Shared 架构</h1>
 <blockquote>
-<p>代码位置：<a href="src/tensor.rs">src/tensor.rs</a>（核心：Tensor 结构体与自动微分）、<a href="src/module.rs">src/module.rs</a>（Module trait）、<a href="src/main.rs">src/main.rs</a>（模块声明与演示编排）
-参考实现：<a href="src/layers.rs">src/layers.rs</a>（Module 的第一个实现者）</p>
+<p>代码位置：<a href="../src/tensor.rs">src/tensor.rs</a>（核心：Tensor 结构体与自动微分）、<a href="../src/module.rs">src/module.rs</a>（Module trait）、<a href="../src/main.rs">src/main.rs</a>（模块声明与演示编排）
+参考实现：<a href="../src/layers.rs">src/layers.rs</a>（Module 的第一个实现者）</p>
 </blockquote>
+<hr />
 <h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
 <ol>
 <li>一个从零写的项目，文件该怎么切？每个文件各管什么？</li>
-<li><code>Tensor</code> 里的 <code>Rc&lt;RefCell&lt;Vec&lt;f32&gt;&gt;&gt;</code> 是什么？为什么张量需要&quot;共享可变数据&quot;？</li>
-<li>为什么 <code>parents</code> 要用 <code>Rc&lt;Vec&lt;Tensor&gt;&gt;</code> 而不是直接 <code>Vec&lt;Tensor&gt;</code>？直接存会有什么灾难？</li>
-<li><code>backward()</code> 里的 DFS 拓扑排序是怎么保证&quot;梯度从 loss 流回叶子&quot;的？</li>
+<li><code>Tensor</code> 里的 <code>Shared&lt;Buffer&gt;</code> / <code>Shared&lt;Vec&lt;f32&gt;&gt;</code>（<code>Arc&lt;Mutex&gt;</code> 的薄封装）是什么？为什么张量需要&quot;共享可变数据&quot;？</li>
+<li>计算图为什么不住在 <code>Tensor</code> 的字段里，而要放进线程局部线性 tape？</li>
+<li><code>backward()</code> 是怎么保证&quot;梯度从 loss 流回叶子&quot;的？</li>
 <li><code>Module</code> trait 是干什么的？它和优化器、训练循环怎么配合？</li>
 </ol>
+<hr />
 <h2><a href="#2-为什么要重构" aria-hidden="true" class="anchor" id="user-content-2-为什么要重构"></a>2. 为什么要&quot;重构&quot;</h2>
 <p>经过前三课，<code>tensor.rs</code> 已经长成了一个功能完整的张量库：构造、形状、逐元素运算、广播、归约、softmax、matmul、自动微分……如果所有代码继续堆在一个文件里，很快就会失控：</p>
 <ul>
 <li><strong>职责不分</strong>：张量运算、自动微分、模型层、训练逻辑混在一起，改一处可能碰坏另一处</li>
-<li><strong>无法复用</strong>：后续每节课都要加新东西（层、损失、优化器、GPT 模型），没有清晰的模块边界就没法增量开发</li>
+<li><strong>无法复用</strong>：后续每节课都要加新东西（层、损失、优化器、Transformer 模型），没有清晰的模块边界就没法增量开发</li>
 <li><strong>依赖混乱</strong>：谁依赖谁说不清，改个接口要满项目搜索</li>
 </ul>
 <p>所以这一课做两件事：</p>
 <ol>
 <li><strong>横向</strong>：把项目按职责拆成多个 <code>.rs</code> 文件，形成清晰的依赖金字塔</li>
-<li><strong>纵向</strong>：深入理解 <code>Tensor</code> 的 <code>Rc&lt;RefCell&gt;</code> 架构——它是一切上层建筑的地基，前三课里所有算子都建立在这套设计之上</li>
+<li><strong>纵向</strong>：深入理解 <code>Tensor</code> 的 <code>Arc&lt;Mutex&gt;</code>/Shared 架构——它是一切上层建筑的地基，前三课里所有算子都建立在这套设计之上</li>
 </ol>
 <h2><a href="#3-src-各文件职责分工" aria-hidden="true" class="anchor" id="user-content-3-src-各文件职责分工"></a>3. src/ 各文件职责分工</h2>
 <p><code>main.rs</code> 顶部用 <code>mod</code> 声明了全部模块：</p>
@@ -175,6 +177,7 @@ mod checkpoint;
 mod cli;
 mod config;
 mod data;
+#[cfg(feature = &quot;gpu&quot;)]
 mod gpu;
 mod layers;
 mod loss;
@@ -200,28 +203,28 @@ mod train;
 <tbody>
 <tr>
 <td><code>tensor.rs</code></td>
-<td>张量数据结构 + 运算（前向 + 反向闭包）</td>
+<td>张量数据结构 + 运算（前向 + 反向闭包登记）</td>
 <td>第 1-4 课</td>
 </tr>
 <tr>
 <td><code>autograd.rs</code></td>
-<td>自动微分：<code>backward</code> 迭代式拓扑排序（从 tensor.rs 拆出）</td>
+<td>自动微分：线性 tape 与 <code>backward</code> 逆序扫描（从 tensor.rs 拆出）</td>
 <td>第 2 课</td>
 </tr>
 <tr>
 <td><code>rope.rs</code></td>
 <td>RoPE 旋转位置编码（从 tensor.rs 拆出）</td>
-<td>第 19 课</td>
+<td>第 20 课</td>
 </tr>
 <tr>
 <td><code>attention.rs</code></td>
 <td>多头自注意力 + KV Cache（从 model.rs 拆出）</td>
-<td>第 9-10、18 课</td>
+<td>第 9-10、20、23、25 课</td>
 </tr>
 <tr>
 <td><code>gpu.rs</code></td>
 <td>GPU 计算后端（<code>--features gpu</code>）：WGSL 计算着色器</td>
-<td>第 21 课</td>
+<td>第 27 课</td>
 </tr>
 <tr>
 <td><code>module.rs</code></td>
@@ -260,17 +263,17 @@ mod train;
 </tr>
 <tr>
 <td><code>model.rs</code></td>
-<td><code>GPT</code> 模型（Transformer Block 堆叠）</td>
+<td><code>Transformer</code> 模型（Transformer Block 堆叠）</td>
 <td>第 11-12 课</td>
 </tr>
 <tr>
 <td><code>train.rs</code></td>
 <td>训练循环 + 学习率调度 <code>LRScheduler</code></td>
-<td>第 13、20 课</td>
+<td>第 13、18 课</td>
 </tr>
 <tr>
 <td><code>sample.rs</code></td>
-<td>推理采样：temperature / top-k / top-p</td>
+<td>推理采样：temperature / top-k / top-p / 重复惩罚</td>
 <td>第 15 课</td>
 </tr>
 <tr>
@@ -280,7 +283,7 @@ mod train;
 </tr>
 <tr>
 <td><code>checkpoint.rs</code></td>
-<td>checkpoint 保存/恢复</td>
+<td>checkpoint 保存/恢复（<code>LLMCP2</code> 二进制格式，详见第 39 课 §11）</td>
 <td>配套</td>
 </tr>
 <tr>
@@ -313,7 +316,7 @@ mod train;
 <tr>
 <td>第 3 层（流程）</td>
 <td><code>train.rs</code> <code>model.rs</code> <code>sample.rs</code> <code>checkpoint.rs</code> <code>cli.rs</code></td>
-<td>训练循环、GPT 组装、推理采样、checkpoint、命令行</td>
+<td>训练循环、Transformer 组装、推理采样、checkpoint、命令行</td>
 </tr>
 <tr>
 <td>第 2 层（组件）</td>
@@ -343,30 +346,30 @@ mod train;
 <li><strong><code>module.rs</code> 只依赖 <code>tensor.rs</code></strong>：它只定义一个 trait，是个&quot;协议层&quot;，供 <code>layers.rs</code> / <code>model.rs</code> 实现。</li>
 <li><strong>上层模块互相独立</strong>：<code>loss.rs</code> 不知道 <code>optim.rs</code> 的存在，改动一个不影响另一个；<code>data.rs</code>、<code>tokenizer.rs</code>、<code>rng.rs</code> 与神经网络计算完全解耦。</li>
 </ul>
-<h2><a href="#4-核心架构rcrefcellvec-共享可变数据" aria-hidden="true" class="anchor" id="user-content-4-核心架构rcrefcellvec-共享可变数据"></a>4. 核心架构：Rc&lt;RefCell&lt;Vec<f32>&gt;&gt; 共享可变数据</h2>
+<h2><a href="#4-核心架构sharedarc跨线程共享可变数据" aria-hidden="true" class="anchor" id="user-content-4-核心架构sharedarc跨线程共享可变数据"></a>4. 核心架构：Shared（Arc<Mutex>）跨线程共享可变数据</h2>
 <p>先看 <code>Tensor</code> 的结构体（<code>src/tensor.rs</code>）：</p>
 <pre><code class="language-rust">#[derive(Clone)]
 pub struct Tensor {
-    data: Rc&lt;RefCell&lt;Vec&lt;f32&gt;&gt;&gt;,   // 数值（前向结果）
-    shape: Vec&lt;usize&gt;,             // 形状
-    grad: Rc&lt;RefCell&lt;Vec&lt;f32&gt;&gt;&gt;,   // 梯度（反向累加）
-    requires_grad: bool,           // 是否需要梯度（参数=true，数据=false）
-    parents: Rc&lt;Vec&lt;Tensor&gt;&gt;,      // 父节点列表（我是由谁算出来的）
-    backward: Option&lt;BackwardFn&gt;,  // 反向函数：把梯度传给父节点
+    data: Shared&lt;Buffer&gt;,        // 数值（前向结果）
+    shape: Vec&lt;usize&gt;,           // 形状
+    strides: Vec&lt;usize&gt;,         // 视图步长（第 5 课）
+    grad: Shared&lt;Vec&lt;f32&gt;&gt;,      // 梯度（反向累加）
+    requires_grad: Arc&lt;AtomicBool&gt;, // 是否需要梯度（参数=true，数据=false；Relaxed 原子读写）
+    // 计算图结构不在张量上：反向闭包统一登记到 autograd 的线性 tape
 }
 </code></pre>
 <p>两个问题：<strong>为什么数值和梯度要共享？共享之后怎么才能&quot;可变&quot;？</strong></p>
-<h3><a href="#41-rc多个句柄指向同一份数据" aria-hidden="true" class="anchor" id="user-content-41-rc多个句柄指向同一份数据"></a>4.1 Rc：多个句柄指向同一份数据</h3>
+<h3><a href="#41-arc多个句柄指向同一份数据" aria-hidden="true" class="anchor" id="user-content-41-arc多个句柄指向同一份数据"></a>4.1 Arc：多个句柄指向同一份数据</h3>
 <p>计算图里一个节点经常被<strong>多个运算同时引用</strong>。比如 <code>z = x·y + w</code> 里 <code>y</code> 只被用一次，但看下面这种图：</p>
 <pre><code>          x ──┐
                mul ──► t ──┐
           x ──┘            add ──► z      （x 被用了两次！）
           w ───────────────┘
 </code></pre>
-<p><code>x</code> 同时是两次运算的输入。如果 <code>Tensor</code> 直接 <code>pub data: Vec&lt;f32&gt;</code>，克隆一个 <code>Tensor</code> 就要<strong>复制整份数据</strong>；而 <code>Rc&lt;T&gt;</code>（引用计数）允许无数个 <code>Tensor</code> 句柄共享同一个底层数据，克隆只把引用计数 +1，是 <strong>O(1)</strong> 的操作。这也是 <code>#[derive(Clone)]</code> 能放心用的前提。</p>
-<h3><a href="#42-refcell共享的同时允许修改" aria-hidden="true" class="anchor" id="user-content-42-refcell共享的同时允许修改"></a>4.2 RefCell：共享的同时允许修改</h3>
-<p><code>Rc</code> 只解决&quot;共享&quot;，不解决&quot;可变&quot;——<code>Rc&lt;T&gt;</code> 的内容默认不可变。但我们的张量既被多处引用、又需要更新（前向写 <code>data</code>、反向写 <code>grad</code>）。Rust 的常规借用规则（一个值同时只能有一个可变借用）会拒绝这种写法。</p>
-<p><code>RefCell&lt;T&gt;</code>（内部可变性）把&quot;借用检查&quot;从<strong>编译期</strong>推迟到<strong>运行期</strong>：<code>borrow()</code> 只读借用、<code>borrow_mut()</code> 可变借用，同一时刻只能有一个 <code>borrow_mut</code>，违反就 panic。这就是&quot;共享可变数据&quot;的标准解法：</p>
+<p><code>x</code> 同时是两次运算的输入。如果 <code>Tensor</code> 直接 <code>pub data: Vec&lt;f32&gt;</code>，克隆一个 <code>Tensor</code> 就要<strong>复制整份数据</strong>；而 <code>Arc&lt;T&gt;</code>（原子引用计数）允许无数个 <code>Tensor</code> 句柄共享同一个底层数据，克隆只把引用计数 +1（原子操作），是 <strong>O(1)</strong> 的操作。这也是 <code>#[derive(Clone)]</code> 能放心用的前提。</p>
+<h3><a href="#42-sharedarc跨线程的共享可变数据" aria-hidden="true" class="anchor" id="user-content-42-sharedarc跨线程的共享可变数据"></a>4.2 Shared（Arc<Mutex>）：跨线程的共享可变数据</h3>
+<p><code>Arc</code> 只解决&quot;共享&quot;，不解决&quot;可变&quot;——<code>Arc&lt;T&gt;</code> 的内容默认不可变。但我们的张量既被多处引用、又需要更新（前向写 <code>data</code>、反向写 <code>grad</code>）。Rust 的常规借用规则（一个值同时只能有一个可变借用）会拒绝这种写法。</p>
+<p><code>Mutex&lt;T&gt;</code>（互斥锁）把借用检查从<strong>编译期</strong>推迟到<strong>运行期</strong>：<code>borrow()</code> 只读借用、<code>borrow_mut()</code> 可变借用，内部都是加锁拿到 <code>MutexGuard</code>，同一时刻只能有一把锁，锁被持有时再借会阻塞等待。<code>tensor.rs</code> 顶部用薄封装 <code>Shared&lt;T&gt;(Arc&lt;Mutex&lt;T&gt;&gt;)</code> 暴露它（内部用 <code>PoisonError::into_inner</code> 忽略锁毒化），调用写法与旧方案完全一致。这就是&quot;跨线程共享可变数据&quot;的标准解法：</p>
 <table>
 <thead>
 <tr>
@@ -377,54 +380,48 @@ pub struct Tensor {
 </thead>
 <tbody>
 <tr>
-<td><code>Rc&lt;T&gt;</code></td>
-<td>多个句柄共享一份数据</td>
+<td><code>Arc&lt;T&gt;</code></td>
+<td>多个句柄跨线程共享一份数据</td>
 <td>只读共享</td>
 </tr>
 <tr>
-<td><code>RefCell&lt;T&gt;</code></td>
+<td><code>Mutex&lt;T&gt;</code></td>
 <td>共享的数据还能改</td>
-<td>借用检查推迟到运行时</td>
+<td>加锁开销、锁未释放时阻塞</td>
 </tr>
 <tr>
-<td><code>Rc&lt;RefCell&lt;T&gt;&gt;</code></td>
-<td><strong>共享 + 可变</strong></td>
-<td>运行时 panic 风险、无线程安全</td>
+<td><code>Arc&lt;Mutex&lt;T&gt;&gt;</code>（即 <code>Shared&lt;T&gt;</code>）</td>
+<td><strong>跨线程共享 + 可变</strong></td>
+<td>Mutex 不可重入，需要锁纪律</td>
 </tr>
 </tbody>
 </table>
 <p>对应到代码里的经典模式：</p>
 <pre><code class="language-rust">let sd = self.data.borrow();          // 读：前向计算
-// …… 用完立刻释放，避免借用重叠
+// …… 用完立刻释放，避免同一把锁重叠
 drop(sd);
 let mut g = self.grad.borrow_mut();   // 写：反向累加梯度
 </code></pre>
-<p><strong>注意代码里几乎每个算子的前向都有 <code>drop(sd); drop(od);</code></strong>——因为之后构造结果节点要 <code>borrow_mut</code> 自己的东西，如果 <code>data</code> 的只读借用还挂着，同一 <code>RefCell</code> 上&quot;只读借用未释放就再取可变借用&quot;会在运行时 panic。这是 <code>RefCell</code> 使用者的纪律。</p>
-<h3><a href="#43-为什么-data-和-grad-分开两个-rc" aria-hidden="true" class="anchor" id="user-content-43-为什么-data-和-grad-分开两个-rc"></a>4.3 为什么 data 和 grad 分开两个 Rc</h3>
-<p>细看：<code>data</code> 和 <code>grad</code> 是<strong>两个独立</strong>的 <code>Rc&lt;RefCell&lt;Vec&lt;f32&gt;&gt;&gt;</code>。除了&quot;语义上一个是数值、一个是梯度&quot;之外，还有两个实际好处：</p>
+<p><strong>注意代码里几乎每个算子的前向都有 <code>drop(sd); drop(od);</code></strong>——因为之后构造结果节点要 <code>borrow_mut</code> 自己的东西。<code>Mutex</code> 不可重入：同一把锁还没释放就再借一次会<strong>死锁挂起</strong>。这是加锁使用者的纪律。另外，同一底层缓冲可能被借两次的位点（<code>x*x</code> 自乘、matmul 传入同一个张量）必须先 <code>Shared::ptr_eq</code> 判同一、只借一把锁，第二个视图用 <code>Option&lt;MutexGuard&gt;</code> 接住。</p>
+<h3><a href="#43-为什么-data-和-grad-分开两个-shared" aria-hidden="true" class="anchor" id="user-content-43-为什么-data-和-grad-分开两个-shared"></a>4.3 为什么 data 和 grad 分开两个 Shared</h3>
+<p>细看：<code>data</code> 和 <code>grad</code> 是<strong>两个独立</strong>的 <code>Shared</code>——<code>data</code> 是 <code>Shared&lt;Buffer&gt;</code>（存储层可切 f32 / bf16，见第 26 课），<code>grad</code> 是 <code>Shared&lt;Vec&lt;f32&gt;&gt;</code>（梯度恒 f32）。除了&quot;语义上一个是数值、一个是梯度&quot;之外，还有两个实际好处：</p>
 <ol>
-<li><strong>可以同时读 data、写 grad</strong>：反向闭包里常见 <code>let sd_b = sd.borrow(); let mut sgm = sg.borrow_mut();</code>——两者不是同一个 <code>RefCell</code>，互不冲突。</li>
-<li><strong>data 的指针充当计算图节点 ID</strong>：<code>backward</code> 里用 <code>Rc::as_ptr(&amp;t.data) as usize</code> 唯一标识一个节点（见第 6 节），而 <code>grad</code> 的指针用来判断&quot;两个父节点是不是同一个张量&quot;（<code>Rc::ptr_eq(&amp;sg, &amp;og)</code>，处理 <code>x*x</code> 自乘的梯度合并）。</li>
+<li><strong>可以同时读 data、写 grad</strong>：反向闭包里常见 <code>let sd_b = sd.borrow(); let mut sgm = sg.borrow_mut();</code>——两者是两把不同的锁，互不冲突。</li>
+<li><strong>grad 的指针充当计算图节点 ID</strong>：<code>backward</code> 里用 <code>Shared::as_ptr(&amp;t.grad) as usize</code> 唯一标识一个节点（见第 6 节）。注意不能用 <code>data</code> 指针判重——<code>reshape</code> 等视图运算与输入共享 <code>data</code>，会误把父节点跳过导致梯度截断。<code>grad</code> 的指针还用来判断&quot;两个父节点是不是同一个张量&quot;（<code>Shared::ptr_eq(&amp;sg, &amp;og)</code>，处理 <code>x*x</code> 自乘的梯度合并）。</li>
 </ol>
-<h3><a href="#44-为什么不是-arc" aria-hidden="true" class="anchor" id="user-content-44-为什么不是-arc"></a>4.4 为什么不是 Arc<Mutex></h3>
-<p><code>Rc</code> 是单线程引用计数（快，无锁），<code>Arc&lt;Mutex&gt;</code> 是多线程方案。我们的训练是单线程的，用 <code>Rc</code> + <code>RefCell</code> 更轻、更符合&quot;从零实现&quot;的教学目标。等将来要并行训练，再换成 <code>Arc&lt;Mutex&gt;</code> 或 <code>Arc&lt;RwLock&gt;</code> 不迟。</p>
-<h2><a href="#5-parents-rcvec--为什么不能直接用-vec" aria-hidden="true" class="anchor" id="user-content-5-parents-rcvec--为什么不能直接用-vec"></a>5. parents: Rc&lt;Vec<Tensor>&gt; —— 为什么不能直接用 Vec<Tensor></h2>
-<p>这是全项目最重要的一个设计决策。看结构体注释（源码原文）：</p>
-<pre><code class="language-rust">/// 父节点列表。
-/// 注意：用 `Rc&lt;Vec&lt;_&gt;&gt;` 而不是 `Vec&lt;Tensor&gt;`——
-/// 若直接存 Vec，`derive(Clone)` 会递归深拷贝整棵祖先计算图，
-/// 深层图上每次建节点都是 O(图深) 的灾难。用 Rc 共享后克隆是 O(1)。
-parents: Rc&lt;Vec&lt;Tensor&gt;&gt;,
-</code></pre>
-<h3><a href="#51-深拷贝灾难是怎么发生的" aria-hidden="true" class="anchor" id="user-content-51-深拷贝灾难是怎么发生的"></a>5.1 深拷贝灾难是怎么发生的</h3>
-<p>每个运算在构造结果时都要记录父节点：</p>
-<pre><code class="language-rust">result.parents = Rc::new(vec![self.clone(), other.clone()]);   // 每个算子都这么干
+<h3><a href="#44-为什么是-arc-而不是-rc--refcell" aria-hidden="true" class="anchor" id="user-content-44-为什么是-arc-而不是-rc--refcell"></a>4.4 为什么是 Arc<Mutex> 而不是 Rc + RefCell</h3>
+<p>早期版本确实用过 <code>Rc</code> + <code>RefCell</code>（单线程、无锁，更轻）。但 <code>Rc</code>/<code>RefCell</code> 都不是 <code>Send</code>/<code>Sync</code>，会把计算图和整个模型锁死在单线程里，堵死 rayon 数据并行——而张量是全库最底层的类型，它不满足 <code>Send</code>，上层一切都无法跨线程。因此全库换成了 <code>Arc&lt;Mutex&gt;</code>（经 <code>Shared&lt;T&gt;</code> 薄封装）：张量可跨线程共享，为数据并行打开大门；加锁开销相对并行收益可以忽略；<code>Shared::borrow()</code>/<code>borrow_mut()</code> 保持原来的调用写法，数值语义逐位不变，checkpoint 格式也不受影响。</p>
+<h2><a href="#5-计算图为什么住在线性-tape-里" aria-hidden="true" class="anchor" id="user-content-5-计算图为什么住在线性-tape-里"></a>5. 计算图为什么住在线性 tape 里</h2>
+<p>早期版本把图结构挂在张量上：<code>parents: Arc&lt;Vec&lt;Tensor&gt;&gt;</code> + <code>backward: Option&lt;BackwardFn&gt;</code> 每节点各存一份。它留下了两个教训，正是现在改成线性 tape 的原因。</p>
+<h3><a href="#51-教训一绝不能存-parents-vectensor" aria-hidden="true" class="anchor" id="user-content-51-教训一绝不能存-parents-vectensor"></a>5.1 教训一：绝不能存 <code>parents: Vec&lt;Tensor&gt;</code></h3>
+<p>最早的版本 <code>parents</code> 直接存 <code>Vec&lt;Tensor&gt;</code>。每个运算在构造结果时都要记录父节点：</p>
+<pre><code class="language-rust">result.parents = vec![self.clone(), other.clone()];   // 每个算子都这么干
 </code></pre>
 <p>问题出在 <code>self.clone()</code>。如果 <code>parents</code> 的类型是 <code>Vec&lt;Tensor&gt;</code>，那么 <code>clone</code> 一个 <code>Tensor</code> 时：</p>
 <ul>
-<li><code>data</code>：<code>Rc</code> 共享 → O(1)</li>
+<li><code>data</code>：<code>Shared</code>/<code>Arc</code> 共享 → O(1)</li>
 <li><code>shape</code>：<code>Vec&lt;usize&gt;</code> → O(维度数)</li>
-<li><code>grad</code>：<code>Rc</code> 共享 → O(1)</li>
+<li><code>grad</code>：<code>Shared</code>/<code>Arc</code> 共享 → O(1)</li>
 <li><strong><code>parents</code>：<code>Vec&lt;Tensor&gt;</code> → 递归克隆所有父节点！</strong></li>
 </ul>
 <p>而父节点自己又有 <code>parents</code>……于是 <code>clone</code> 会<strong>递归复制整棵祖先子树</strong>。设计算图深度为 L：</p>
@@ -445,48 +442,39 @@ parents: Rc&lt;Vec&lt;Tensor&gt;&gt;,
 <td><strong>O(N·L²)</strong></td>
 </tr>
 <tr>
-<td><code>parents: Rc&lt;Vec&lt;Tensor&gt;&gt;</code></td>
-<td>O(1)（Rc 引用计数 +1）</td>
+<td><code>parents: Arc&lt;Vec&lt;Tensor&gt;&gt;</code></td>
+<td>O(1)（Arc 引用计数 +1）</td>
 <td>O(L)</td>
 <td>O(N·L)</td>
 </tr>
 </tbody>
 </table>
-<p>线性回归的计算图只有几层，L 很小，第 2 课那样写还能跑；但到了 GPT（几十层 Transformer），每步前向要建几百上千个节点，<code>O(L²)</code> 的复制会直接拖垮训练——这就是&quot;性能灾难&quot;。</p>
-<h3><a href="#52-第-2-课的旧代码-vs-现在的写法" aria-hidden="true" class="anchor" id="user-content-52-第-2-课的旧代码-vs-现在的写法"></a>5.2 第 2 课的旧代码 vs 现在的写法</h3>
-<p>第 2 课文档里的版本（能跑，但有问题）：</p>
-<pre><code class="language-rust">// ❌ 旧版：parents 直接存 Vec&lt;Tensor&gt;
-pub struct Tensor {
-    data: Rc&lt;RefCell&lt;Vec&lt;f32&gt;&gt;&gt;,
-    shape: Vec&lt;usize&gt;,
-    grad: Rc&lt;RefCell&lt;Vec&lt;f32&gt;&gt;&gt;,
-    requires_grad: bool,
-    parents: Vec&lt;Tensor&gt;,          // clone 时递归复制祖先图！
-    backward: Option&lt;BackwardFn&gt;,
-}
-</code></pre>
-<p>重构后的版本：</p>
-<pre><code class="language-rust">// ✅ 现在的版本：parents 用 Rc 共享
-pub struct Tensor {
-    // ……
-    parents: Rc&lt;Vec&lt;Tensor&gt;&gt;,      // clone 时只复制一个 Rc 句柄
-    backward: Option&lt;BackwardFn&gt;,
-}
-</code></pre>
-<p>对比要点：</p>
+<p>线性回归的计算图只有几层，L 很小，第 2 课那样写还能跑；但到了 Transformer（几十层 Transformer），每步前向要建几百上千个节点，<code>O(L²)</code> 的复制会直接拖垮训练——这就是&quot;性能灾难&quot;。这也是 4.4 节 <code>Rc</code>→<code>Arc</code> 改造的一部分：<strong>节点句柄必须共享，绝不能深拷贝</strong>。</p>
+<h3><a href="#52-教训二每节点一份-parents--backward-本身也是开销与负担" aria-hidden="true" class="anchor" id="user-content-52-教训二每节点一份-parents--backward-本身也是开销与负担"></a>5.2 教训二：每节点一份 <code>parents + backward</code> 本身也是开销与负担</h3>
+<p>即便用 <code>Arc&lt;Vec&lt;Tensor&gt;&gt;</code> 解决了深拷贝，每个节点仍要各挂一条父指针链和一个 <code>Option&lt;BackwardFn&gt;</code>：</p>
 <ul>
-<li><strong>旧版</strong>：<code>parents: Vec&lt;Tensor&gt;</code> 里存的是&quot;真实拥有的子图副本&quot;，克隆 = 深拷贝，图越深越慢。</li>
-<li><strong>新版</strong>：<code>parents: Rc&lt;Vec&lt;Tensor&gt;&gt;</code> 里存的是&quot;共享的子图句柄&quot;，克隆 = 引用计数 +1，O(1)。<strong>所有节点的 <code>parents</code> 共享同一棵祖先图</strong>，图在内存里只有一份。</li>
+<li><strong>建图期</strong>：每个算子要为结果组装 <code>parents</code>（Vec 分配 + Arc 装箱），克隆张量还要连带克隆这些字段；</li>
+<li><strong>反向期</strong>：要从 loss 出发 DFS 遍历这张指针图、三色标记去重、产出拓扑序再逆序执行——一套完整的图遍历算法，深层图上还有栈溢出风险（6.2 节历史上的&quot;迭代式 DFS&quot;补丁就是为此打的）。</li>
 </ul>
-<p>这也解释了为什么 <code>backward</code> 里能放心地 <code>for p in t.parents.iter()</code> 递归——遍历的是共享图，不会触发任何复制。</p>
-<h2><a href="#6-backward-的-dfs-拓扑排序" aria-hidden="true" class="anchor" id="user-content-6-backward-的-dfs-拓扑排序"></a>6. backward 的 DFS 拓扑排序</h2>
-<h3><a href="#61-为什么需要拓扑排序" aria-hidden="true" class="anchor" id="user-content-61-为什么需要拓扑排序"></a>6.1 为什么需要拓扑排序</h3>
-<p>反向传播要求梯度<strong>从输出端向输入端逐层传递</strong>：<code>z = (x·y) + w</code> 里，必须先执行 <code>z</code> 的 backward（把梯度分给 <code>t</code>、<code>w</code>），<code>t</code> 的梯度就绪后才能执行 <code>t</code> 的 backward（再分给 <code>x</code>、<code>y</code>）。执行顺序由计算图的依赖关系决定，而 DFS 后序 + 逆序执行恰好给出这个顺序。</p>
-<h3><a href="#62-代码迭代式-dfs--hashset-去重" aria-hidden="true" class="anchor" id="user-content-62-代码迭代式-dfs--hashset-去重"></a>6.2 代码：迭代式 DFS + HashSet 去重</h3>
+<p>现代框架（PyTorch 的 autograd.engine 等）用<strong>线性 tape</strong>：反向闭包按前向发生顺序登记进一张全局表，反向时<strong>逆序扫描</strong>即可——子节点总比父节点登记得晚，逆序天然就是拓扑逆序，一趟扫描搞定，不需要图遍历：</p>
+<pre><code class="language-rust">// autograd.rs：登记（前向时每个算子调一次）
+pub fn record(out: &amp;Tensor, parents: Vec&lt;Tensor&gt;, f: BackwardFn);
+
+// 反向时从 tape 末尾逆序扫，沿身份键可达的条目才执行
+for i in (0..tape.len()).rev() { /* 执行闭包，父键入可达集 */ }
+tape.retain(|e| !e.done);   // 只移除本次执行的条目
+</code></pre>
+<p><code>Tensor</code> 于是瘦身成纯数据本体（数据/形状/步长/梯度/开关），计算图住在 <code>autograd.rs</code> 的 <code>thread_local! TAPE</code>（<code>RefCell&lt;Vec&lt;TapeEntry&gt;&gt;</code>，线程局部）里。条目里的 <code>parents</code> 只是 <code>usize</code> 身份键（grad 缓冲地址），比存 <code>Vec&lt;Tensor&gt;</code> 句柄更轻，回溯时不持有任何张量锁。</p>
 <blockquote>
-<p>注：早期版本使用递归 DFS，后改为<strong>迭代式栈 DFS</strong>（三色标记法），
-因为深层计算图（4 层 Transformer + batch=16）的递归深度会超过 Windows 默认 1MB 栈。
-见 <code>src/autograd.rs</code>。</p>
+<p>历史备注：5.1 节的&quot;深拷贝灾难&quot;在今天以另一种形式被守住——<code>record</code> 的 <code>parents: Vec&lt;Tensor&gt;</code> 是一次性短命参数，登记完即丢；闭包捕获的 <code>Tensor</code> 全是 <code>Shared</code> 句柄的 O(1) clone。</p>
+</blockquote>
+<h2><a href="#6-backward逆序扫描线性-tape" aria-hidden="true" class="anchor" id="user-content-6-backward逆序扫描线性-tape"></a>6. backward：逆序扫描线性 tape</h2>
+<h3><a href="#61-为什么逆序就是拓扑序" aria-hidden="true" class="anchor" id="user-content-61-为什么逆序就是拓扑序"></a>6.1 为什么逆序就是拓扑序</h3>
+<p>反向传播要求梯度<strong>从输出端向输入端逐层传递</strong>：<code>z = (x·y) + w</code> 里，必须先执行 <code>z</code> 的 backward（把梯度分给 <code>t</code>、<code>w</code>），<code>t</code> 的梯度就绪后才能执行 <code>t</code> 的 backward（再分给 <code>x</code>、<code>y</code>）。</p>
+<p>线性 tape 按<strong>前向发生顺序</strong>追加：算 <code>t = x·y</code> 时 <code>t</code> 先登记，随后算 <code>z = t + w</code> 时 <code>z</code> 才登记——<strong>子节点总是比父节点登记得晚</strong>。于是从 tape 末尾向前逆序扫描，天然就是&quot;先子后父&quot;的合法反向执行序，不需要显式跑拓扑排序。</p>
+<h3><a href="#62-代码逆序单趟扫描--可达集裁剪" aria-hidden="true" class="anchor" id="user-content-62-代码逆序单趟扫描--可达集裁剪"></a>6.2 代码：逆序单趟扫描 + 可达集裁剪</h3>
+<blockquote>
+<p>见 <code>src/autograd.rs</code>。</p>
 </blockquote>
 <pre><code class="language-rust">pub fn backward(&amp;self) {
     assert_eq!(self.rank(), 0, &quot;backward() 只支持标量（0 维）输出，当前形状 {:?}&quot;, self.shape);
@@ -495,37 +483,21 @@ pub struct Tensor {
         g[0] = 1.0;                     // ① loss 的梯度 = 1（∂loss/∂loss = 1）
     }
 
-    // 迭代式 DFS 拓扑排序（避免递归栈溢出）
-    // 用显式栈模拟递归：每个元素 (node, child_index) 表示&quot;该节点的第 child_index 个子节点待访问&quot;
-    let mut order: Vec&lt;Tensor&gt; = Vec::new();
-    let mut visited: HashSet&lt;usize&gt; = HashSet::new();
-    let mut stack: Vec&lt;(Tensor, usize)&gt; = Vec::new();
+    let root = Shared::as_ptr(&amp;self.grad);   // 用 grad 地址作根身份键
+    TAPE.with(|t| {
+        let mut tape = t.borrow_mut();        // ② 借出本线程 tape（无锁）
+        let mut reachable: HashSet&lt;usize&gt; = HashSet::new();
+        reachable.insert(root);
 
-    let key = Rc::as_ptr(&amp;self.grad) as usize;   // 用 grad 的指针作节点唯一 ID
-    if visited.insert(key) {
-        stack.push((self.clone(), 0));
-    }
-
-    // ② 迭代式后序 DFS：先展开所有子节点，再入队
-    while let Some((node, idx)) = stack.last_mut() {
-        if *idx &lt; node.parents.len() {
-            let child = node.parents[*idx].clone();
-            *idx += 1;
-            let child_key = Rc::as_ptr(&amp;child.grad) as usize;
-            if visited.insert(child_key) {
-                stack.push((child, 0));           // ③ 先递归父节点
+        for i in (0..tape.len()).rev() {      // ③ 从末尾逆序扫描（逆序 == 拓扑逆序）
+            if reachable.contains(&amp;tape[i].out) {
+                (tape[i].f)();                //    执行链式法则闭包
+                reachable.extend(&amp;tape[i].parents);  // 父键入可达集，继续向上游回溯
+                tape[i].done = true;
             }
-        } else {
-            let (node, _) = stack.pop().unwrap();
-            order.push(node);                     // ④ 后序入队：子在前、父在后
         }
-    }
-
-    for t in order.iter().rev() {                 // ⑤ 逆序遍历：从根走向叶
-        if let Some(b) = &amp;t.backward {
-            b();                                  // 执行各节点的反向闭包
-        }
-    }
+        tape.retain(|e| !e.done);             // ④ 只移除本次执行的条目
+    });
 }
 </code></pre>
 <p>三个关键设计：</p>
@@ -538,16 +510,16 @@ pub struct Tensor {
 </thead>
 <tbody>
 <tr>
-<td><code>Rc::as_ptr(&amp;t.grad)</code> 做节点 ID</td>
-<td><code>Tensor</code> 没有自增 id；用梯度 <code>grad</code> 的堆地址当身份证最省事，同一张量的所有句柄地址相同</td>
+<td><code>Shared::as_ptr(&amp;t.grad)</code> 做身份键</td>
+<td><code>Tensor</code> 没有自增 id；用梯度 <code>grad</code> 的堆地址当身份证最省事，同一张量的所有句柄地址相同（不加锁，直接取内部指针）</td>
 </tr>
 <tr>
-<td><code>HashSet</code> 去重</td>
-<td>一个节点被多个运算共享（如 <code>x</code> 被用两次），DFS 可能从两条路径走到它。<strong>梯度只需也只需执行一次它的 backward</strong>，否则会重复累加</td>
+<td>可达集裁剪</td>
+<td>一个节点可能被多条路径回溯到（如 <code>x</code> 被用两次），闭包<strong>只能执行一次</strong>否则重复累加；可达集同时保证只反与 loss 相关的子图——流水线多 micro-batch 前向交错时，其它图的条目原样保留，等它们自己的 backward</td>
 </tr>
 <tr>
-<td>后序 DFS + 逆序执行</td>
-<td>后序 DFS 得到&quot;子在前、父在后&quot;（叶 → 根）；逆序执行变成&quot;根 → 叶&quot;，正是梯度从输出流向输入的次序</td>
+<td>逆序 == 拓扑逆序</td>
+<td>tape 按前向顺序追加，子节点总是登记得晚；从尾往前扫一遍就是&quot;根 → 叶&quot;的梯度流向，不需要显式图遍历</td>
 </tr>
 </tbody>
 </table>
@@ -557,53 +529,36 @@ pub struct Tensor {
         y ──┘            add ──► z
         w ───────────────┘
 </code></pre>
-<p>DFS 后序结果（子在前、父在后）：<code>order = [x, y, t, w, z]</code>，逆序执行（<code>z → w → t → y → x</code>）：</p>
+<p>本例 tape（按前向顺序）：<code>[mul(t=x·y), add(z=t+w)]</code>。逆序扫描（<code>z → t</code>）：</p>
 <table>
 <thead>
 <tr>
 <th>顺序</th>
-<th>节点</th>
-<th>执行的 backward</th>
+<th>条目</th>
+<th>执行的闭包</th>
 <th>效果</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>1</td>
-<td>z</td>
-<td>add 的闭包（收到的 g = 1）</td>
+<td>add</td>
+<td>（收到的 g = 1）</td>
 <td>t += 1，w += 1</td>
 </tr>
 <tr>
 <td>2</td>
-<td>w</td>
-<td>（叶子，无 backward）</td>
-<td>—</td>
-</tr>
-<tr>
-<td>3</td>
-<td>t = x·y</td>
-<td>mul 的闭包（收到的 g = 1）</td>
+<td>mul</td>
+<td>（收到的 g = 1）</td>
 <td>x += 1·y = 3，y += 1·x = 2</td>
-</tr>
-<tr>
-<td>4</td>
-<td>y</td>
-<td>（叶子，无 backward）</td>
-<td>—</td>
-</tr>
-<tr>
-<td>5</td>
-<td>x</td>
-<td>（叶子，无 backward）</td>
-<td>—</td>
 </tr>
 </tbody>
 </table>
+<p>叶子 x/y/w 的键回溯不到任何条目，扫描自然结束——它们的梯度已在上面两个闭包里被写入。</p>
 <p>和 <code>test_chain_rule</code> 验证的结果一致：<code>∂z/∂x = y = 3</code>、<code>∂z/∂y = x = 2</code>、<code>∂z/∂w = 1</code> ✓</p>
 <h2><a href="#7-modulersmodule-trait-与-zero_grad_all" aria-hidden="true" class="anchor" id="user-content-7-modulersmodule-trait-与-zero_grad_all"></a>7. module.rs：Module trait 与 zero_grad_all</h2>
 <h3><a href="#71-trait-定义" aria-hidden="true" class="anchor" id="user-content-71-trait-定义"></a>7.1 trait 定义</h3>
-<p>深度学习里一切&quot;可训练的结构&quot;（Linear、LayerNorm、Transformer Block、整个 GPT……）都需要回答一个问题：<strong>你有多少参数？</strong> <code>module.rs</code> 就把这个回答统一成接口：</p>
+<p>深度学习里一切&quot;可训练的结构&quot;（Linear、LayerNorm、Transformer Block、整个 Transformer……）都需要回答一个问题：<strong>你有多少参数？</strong> <code>module.rs</code> 就把这个回答统一成接口：</p>
 <pre><code class="language-rust">// src/module.rs（全文）
 use crate::tensor::Tensor;
 
@@ -644,43 +599,43 @@ impl Module for Embedding {
     }
 }
 </code></pre>
-<p>注意 <code>clone()</code> 在这里是安全的：因为 <code>Tensor</code> 内部全是 <code>Rc</code>（第 4、5 节），克隆只复制句柄，<strong>不复制数据</strong>——返回 <code>Vec&lt;Tensor&gt;</code> 给外部持有也不会有性能问题。</p>
+<p>注意 <code>clone()</code> 在这里是安全的：因为 <code>Tensor</code> 内部全是 <code>Arc</code>/<code>Shared</code> 句柄（第 4、5 节），克隆只复制句柄，<strong>不复制数据</strong>——返回 <code>Vec&lt;Tensor&gt;</code> 给外部持有也不会有性能问题。</p>
 <h3><a href="#73-组合模式大模块递归收集小模块的参数" aria-hidden="true" class="anchor" id="user-content-73-组合模式大模块递归收集小模块的参数"></a>7.3 组合模式：大模块递归收集小模块的参数</h3>
-<p><code>model.rs</code> 里的 <code>GPT</code> 由若干 <code>TransformerBlock</code> 组成，<code>TransformerBlock</code> 又由 <code>LayerNorm</code>、<code>MultiHeadAttention</code>、<code>Linear</code> 组成。每个组合模块实现 <code>Module</code> 时，把<strong>子模块的参数拼接起来</strong>：</p>
-<pre><code class="language-rust">// model.rs：GPT
-impl Module for GPT {
+<p><code>model.rs</code> 里的 <code>Transformer</code> 由若干 <code>TransformerBlock</code> 组成，<code>TransformerBlock</code> 又由 <code>LayerNorm</code>、<code>MultiHeadAttention</code>、<code>Linear</code> 组成。每个组合模块实现 <code>Module</code> 时，把<strong>子模块的参数拼接起来</strong>：</p>
+<pre><code class="language-rust">// model.rs：Transformer
+impl Module for Transformer {
     fn parameters(&amp;self) -&gt; Vec&lt;Tensor&gt; {
         let mut ps = self.tok_emb.parameters();      // 词嵌入
         for block in &amp;self.blocks {
             ps.extend(block.parameters());           // 每层 Transformer Block
         }
         ps.extend(self.ln_f.parameters());           // 最终 LayerNorm
-        ps.extend(self.lm_head.parameters());        // 输出头
+        // 输出头没有独立参数：forward 里用 tok_emb.table.transpose() 做权重绑定
         ps
     }
 }
 </code></pre>
 <p>因为 <code>parameters()</code> 是 trait 方法，<code>block.parameters()</code> 会自动递归调用 <code>TransformerBlock</code> 的实现，后者又调用 <code>MultiHeadAttention</code> 的实现……最终<strong>一棵参数树被拍平成一张参数表</strong>。</p>
-<pre><code>GPT.parameters()
+<pre><code>Transformer.parameters()
 ├── tok_emb.parameters()        → [table]
 ├── block[0].parameters()       → ln1[γ,β] + attn[c_q,c_k,c_v,c_proj] + ln2[γ,β] + mlp[W1,b1,W2,b2]
 ├── block[1].parameters()       → …
 └── ln_f.parameters()           → [γ, β]
     （lm_head 通过权重绑定复用 tok_emb.table.T，不单独存储）
 </code></pre>
-<h3><a href="#74-与优化器的配合mainrs-的-demo_xor" aria-hidden="true" class="anchor" id="user-content-74-与优化器的配合mainrs-的-demo_xor"></a>7.4 与优化器的配合（main.rs 的 demo_xor）</h3>
-<p><code>main.rs</code> 里第 7 课的 XOR 演示展示了完整闭环：</p>
+<h3><a href="#74-与优化器的配合cmdexperimentsrs-的-demo_xor" aria-hidden="true" class="anchor" id="user-content-74-与优化器的配合cmdexperimentsrs-的-demo_xor"></a>7.4 与优化器的配合（<code>cmd/experiments.rs</code> 的 demo_xor）</h3>
+<p><code>cmd/experiments.rs</code> 里第 7 课的 XOR 演示展示了完整闭环：</p>
 <pre><code class="language-rust">// ① 收集所有参数，一次性交给优化器
 let params: Vec&lt;Tensor&gt; = {
     let mut ps = fc1.parameters();
     ps.extend(fc2.parameters());
     ps
 };
-let opt = SGD::new(0.5, params);
+let mut opt = SGD::new(0.5, params);
 
 // ② 训练循环：前向 → 反向 → 更新 → 清梯度
 for step in 0..1000 {
-    let h = relu(&amp;fc1.forward(&amp;x_data));
+    let h = tanh(&amp;fc1.forward(&amp;x_data));
     let logits = fc2.forward(&amp;h);
     let loss = cross_entropy_loss(&amp;logits, &amp;y_targets);
     loss.backward();     // 自动算所有参数的梯度
@@ -721,31 +676,41 @@ for step in 0..1000 {
 </tbody>
 </table>
 <p><code>zero_grad_all</code> 就是&quot;把清梯度也统一成接口&quot;：传入任意 <code>&amp;dyn Module</code>，它调用 <code>parameters()</code> 拿到所有参数逐个清零。实际训练中优化器（如上面 <code>SGD::zero_grad</code>）自带同样的清零逻辑，而 <code>zero_grad_all</code> 的价值在于：<strong>不经过优化器也能直接清任意模块的梯度</strong>（比如想&quot;只求梯度、手动更新&quot;时）。任何新模块只要实现 <code>Module</code>，就能复用这套参数管理设施。</p>
-<h2><a href="#8-运行与测试" aria-hidden="true" class="anchor" id="user-content-8-运行与测试"></a>8. 运行与测试</h2>
+<h2><a href="#8-运行与验证" aria-hidden="true" class="anchor" id="user-content-8-运行与验证"></a>8. 运行与验证</h2>
 <pre><code class="language-bash">cargo test     # 全部测试通过
-cargo run      # 依次演示：XOR MLP → BPE 分词 → 小 GPT 训练与生成
+cargo run --release -- demo    # 依次演示：XOR MLP → BPE 分词 → 小 Transformer 训练与生成
 </code></pre>
 <p>至此，项目的&quot;地基&quot;（阶段一）全部完成。从下一课开始，所有新代码（层、损失、优化器、Transformer）都将站在 <code>tensor.rs</code> + <code>module.rs</code> 这两块基石之上。</p>
-<h2><a href="#9-动手练习" aria-hidden="true" class="anchor" id="user-content-9-动手练习"></a>9. 动手练习</h2>
+<h2><a href="#9-小结与下一课" aria-hidden="true" class="anchor" id="user-content-9-小结与下一课"></a>9. 小结与下一课</h2>
+<h3><a href="#本课小结" aria-hidden="true" class="anchor" id="user-content-本课小结"></a>本课小结</h3>
+<ul>
+<li>本课把项目按职责拆成 19 个 <code>.rs</code> 文件（<code>tensor</code> / <code>autograd</code> / <code>rope</code> / <code>attention</code> / <code>gpu</code> / <code>module</code> / <code>layers</code> / <code>loss</code> / <code>optim</code> / <code>rng</code> / <code>data</code> / <code>tokenizer</code> / <code>model</code> / <code>train</code> / <code>sample</code> / <code>config</code> / <code>checkpoint</code> / <code>cli</code> / <code>main</code>），依赖呈金字塔形，<code>tensor.rs</code> 是最底层地基
+<blockquote>
+<p>这是第 4 课时的规模。后续各课继续按同一个原则往 <code>src/</code> 里加模块（<code>moe</code> / <code>csa</code> / <code>mhc</code> / <code>vision</code> / <code>vqvae</code> / <code>hf</code> / <code>serve</code> / <code>align</code> / <code>rag</code> / <code>distributed</code> …… 以及 <code>src/cmd/</code> 下的子命令实现），现在远不止 19 个文件——<strong>以 <code>src/</code> 目录实际内容为准</strong>。</p>
+</blockquote>
+</li>
+<li><code>Shared&lt;T&gt;</code>（即 <code>Arc&lt;Mutex&lt;T&gt;&gt;</code>）= 共享（Arc）+ 可变（Mutex），是跨线程&quot;共享可变数据&quot;的标准方案（<code>data</code> 装的是 <code>Buffer</code>，见第 26 课的 bf16 存储）</li>
+<li><code>parents</code>/<code>backward</code> 不再挂在张量上：反向闭包经 <code>record</code> 登记进线程局部线性 tape（<code>thread_local!</code> + <code>RefCell</code>），条目只存 grad 地址身份键，<code>Tensor</code> 瘦身成纯数据本体</li>
+<li><code>backward</code> 逆序单趟扫描 tape（逆序 == 拓扑逆序）+ 可达集裁剪，保证梯度按依赖序从 loss 流回叶子</li>
+<li><code>Module</code> trait 统一&quot;收集参数&quot;，配合 <code>zero_grad_all</code>、优化器、训练循环形成完整闭环</li>
+</ul>
+<h3><a href="#拓展方向" aria-hidden="true" class="anchor" id="user-content-拓展方向"></a>拓展方向</h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
 <ol>
 <li>给 <code>Linear</code> 之外再写一个你自己的模块（比如 <code>BiasOnly { bias: Tensor }</code>），实现 <code>Module</code> trait，并用 <code>zero_grad_all</code> 清一次梯度，确认能编译通过。</li>
-<li>思考：<code>parameters()</code> 返回 <code>Vec&lt;Tensor&gt;</code> 时我们敢 <code>clone</code>，靠的是什么？如果 <code>data</code> 不是 <code>Rc</code> 而是裸 <code>Vec&lt;f32&gt;</code>，<code>clone</code> 一次要花多少钱？</li>
-<li>画一画 <code>z = (x·y) + w</code> 的计算图，标出 DFS 后序的 <code>order</code> 数组内容，再写出逆序执行的顺序（参考答案在第 6.3 节）。</li>
-<li>挑战题：把 <code>parents</code> 改成 <code>Vec&lt;Tensor&gt;</code>，跑 <code>cargo test</code>，确认功能仍然正确；再构造一个 100 层深的计算图，对比两种写法每次前向/反向的耗时，体会&quot;O(1) vs O(L)&quot;的差别。</li>
+<li>思考：<code>parameters()</code> 返回 <code>Vec&lt;Tensor&gt;</code> 时我们敢 <code>clone</code>，靠的是什么？如果 <code>data</code> 不是 <code>Shared</code> 而是裸 <code>Vec&lt;f32&gt;</code>，<code>clone</code> 一次要花多少钱？</li>
+<li>画一画 <code>z = (x·y) + w</code> 的计算图，标出 tape 上两条条目的登记顺序，再写出逆序扫描的执行顺序（参考答案在第 6.3 节）。</li>
+<li>拓展思考：早期版本的 <code>TAPE</code> 是 <code>static Mutex</code> 全局单锁，后来改成 <code>thread_local!</code> + <code>RefCell</code>（本项目已落地）——对照 <code>src/autograd.rs</code> 体会多线程训练下&quot;全局单锁竞争&quot;与&quot;线程局部无锁&quot;的取舍。</li>
 <li>阅读 <code>model.rs</code> 里 <code>TransformerBlock</code> 的 <code>impl Module</code>，数一数一个 Block 最终贡献多少个参数张量。</li>
 </ol>
-<h2><a href="#10-本课总结" aria-hidden="true" class="anchor" id="user-content-10-本课总结"></a>10. 本课总结</h2>
-<ul>
-<li>项目按职责拆成 12 个模块，依赖呈金字塔形，<code>tensor.rs</code> 是最底层地基</li>
-<li><code>Rc&lt;RefCell&lt;Vec&lt;f32&gt;&gt;&gt;</code> = 共享（Rc）+ 可变（RefCell），是单线程下&quot;共享可变数据&quot;的标准方案</li>
-<li><code>parents: Rc&lt;Vec&lt;Tensor&gt;&gt;</code> 让克隆从 O(图深) 降到 O(1)，避免深拷贝灾难</li>
-<li><code>backward</code> 用 <code>Rc::as_ptr</code> 做节点 ID、DFS 后序 + 逆序执行，保证梯度按拓扑序从 loss 流回叶子</li>
-<li><code>Module</code> trait 统一&quot;收集参数&quot;，配合 <code>zero_grad_all</code>、优化器、训练循环形成完整闭环</li>
-<li>下一课：在 Module 之上实现第一个神经网络层 Linear 与激活函数，搭建第一个真正的网络</li>
-</ul>
+<blockquote>
+<p><strong>下一课</strong>：<a href="05-%E7%BA%BF%E6%80%A7%E5%B1%82%E4%B8%8E%E6%BF%80%E6%B4%BB%E5%87%BD%E6%95%B0.md">第 5 课 线性层与激活函数</a> —— 在 Module 之上实现第一个神经网络层 Linear 与激活函数，搭建第一个真正的网络</p>
+</blockquote>
 
                 </div>
-                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 22 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 1.46 一路降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与全项目总结</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：GPU 加速训练与推理</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-03/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-05/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a></div></div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 51 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：学习率调度 —— warmup + cosine decay</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：Dropout —— 训练时的「随机失忆」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：RMSNorm —— 现代 LLM 的归一化标配</span></a><a class="series-nav-item" href="/post/rust-llm-guide-22/"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">第 22 课：SwiGLU 激活函数 —— LLaMA 的「门控」MLP</span></a><a class="series-nav-item" href="/post/rust-llm-guide-23/"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-24/"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星</span></a><a class="series-nav-item" href="/post/rust-llm-guide-25/"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">第 25 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-26/"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">第 26 课：混合精度训练（AMP）—— 用半精度加速，用全精度保底</span></a><a class="series-nav-item" href="/post/rust-llm-guide-27/"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">第 27 课：GPU 加速 —— 手写 WGSL 计算着色器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-28/"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a><a class="series-nav-item" href="/post/rust-llm-guide-29/"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-30/"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">第 30 课：Beam Search —— 贪心搜索的升级版</span></a><a class="series-nav-item" href="/post/rust-llm-guide-31/"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">第 31 课：Scaling Laws（缩放定律）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-32/"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">第 32 课：MoE 混合专家模型（Mixture of Experts）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-33/"><span class="series-nav-item-index">34</span><span class="series-nav-item-title">第 33 课：量化技术（Quantization）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-34/"><span class="series-nav-item-index">35</span><span class="series-nav-item-title">第 34 课：推测解码（Speculative Decoding）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-35/"><span class="series-nav-item-index">36</span><span class="series-nav-item-title">第 35 课：多 Token 预测（Multi-Token Prediction）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-36/"><span class="series-nav-item-index">37</span><span class="series-nav-item-title">第 36 课：RLHF 与人类对齐（Alignment）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-37/"><span class="series-nav-item-index">38</span><span class="series-nav-item-title">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-38/"><span class="series-nav-item-index">39</span><span class="series-nav-item-title">第 38 课：分布式训练（Distributed Training）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-39/"><span class="series-nav-item-index">40</span><span class="series-nav-item-title">第 39 课：工程化完善 —— 从算法实现到可用框架</span></a><a class="series-nav-item" href="/post/rust-llm-guide-40/"><span class="series-nav-item-index">41</span><span class="series-nav-item-title">第 40 课：把模型部署成 API 服务 —— 从「自己跑」到「给别人调」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-41/"><span class="series-nav-item-index">42</span><span class="series-nav-item-title">第 41 课：多模态 —— 图片理解与图片生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-42/"><span class="series-nav-item-index">43</span><span class="series-nav-item-title">第 42 课：知识蒸馏（Knowledge Distillation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-43/"><span class="series-nav-item-index">44</span><span class="series-nav-item-title">第 43 课：FP8 低精度训练（模拟）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-44/"><span class="series-nav-item-index">45</span><span class="series-nav-item-title">第 44 课：WSD 学习率调度（warmup-stable-decay）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-45/"><span class="series-nav-item-index">46</span><span class="series-nav-item-title">第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死</span></a><a class="series-nav-item" href="/post/rust-llm-guide-46/"><span class="series-nav-item-index">47</span><span class="series-nav-item-title">第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化</span></a><a class="series-nav-item" href="/post/rust-llm-guide-47/"><span class="series-nav-item-index">48</span><span class="series-nav-item-title">第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道</span></a><a class="series-nav-item" href="/post/rust-llm-guide-48/"><span class="series-nav-item-index">49</span><span class="series-nav-item-title">第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重</span></a><a class="series-nav-item" href="/post/rust-llm-guide-49/"><span class="series-nav-item-index">50</span><span class="series-nav-item-title">第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</span></a><a class="series-nav-item" href="/post/rust-llm-guide-50/"><span class="series-nav-item-index">51</span><span class="series-nav-item-title">第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-03/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-05/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a></div></div>
             </article>
         </main>
 <footer class="footer-content">
@@ -760,8 +725,8 @@ cargo run      # 依次演示：XOR MLP → BPE 分词 → 小 GPT 训练与生�
 <script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
 try{document.getElementById('main').innerHTML='';}catch(e){}</script>
 <script type="module">
-import init, * as bindings from '/web-rs-8ee8b4f1252fa02d.js';
-const wasm = await init({ module_or_path: '/web-rs-8ee8b4f1252fa02d_bg.wasm' });
+import init, * as bindings from '/web-rs-a99f5589204ec566.js';
+const wasm = await init({ module_or_path: '/web-rs-a99f5589204ec566_bg.wasm' });
 
 
 window.wasmBindings = bindings;

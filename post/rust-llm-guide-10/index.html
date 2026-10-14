@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>第 10 课：多头注意力 —— 让模型「多角度」看世界 - 干徒</title>
-    <meta name="description" content="将单头注意力扩展为多头注意力，让模型从多个表示子空间并行捕捉信息。">
+    <meta name="description" content="把一个头拆成多个头并行计算相关性，理清 reshape/permute 的形状变换与输出投影。">
     <meta name="author" content="干徒">
     <meta name="keywords" content="Rust, LLM, 注意力">
     <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-10">
     <meta property="og:title" content="第 10 课：多头注意力 —— 让模型「多角度」看世界 - 干徒">
-    <meta property="og:description" content="将单头注意力扩展为多头注意力，让模型从多个表示子空间并行捕捉信息。">
+    <meta property="og:description" content="把一个头拆成多个头并行计算相关性，理清 reshape/permute 的形状变换与输出投影。">
     <meta property="og:type" content="article">
     <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-10">
     <meta property="og:site_name" content="干徒的博客">
@@ -20,22 +20,22 @@
     <meta property="og:image:alt" content="第 10 课：多头注意力 —— 让模型「多角度」看世界 - 干徒">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="第 10 课：多头注意力 —— 让模型「多角度」看世界 - 干徒">
-    <meta name="twitter:description" content="将单头注意力扩展为多头注意力，让模型从多个表示子空间并行捕捉信息。">
+    <meta name="twitter:description" content="把一个头拆成多个头并行计算相关性，理清 reshape/permute 的形状变换与输出投影。">
     <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
     <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 10 课：多头注意力 —— 让模型「多角度」看世界","description":"将单头注意力扩展为多头注意力，让模型从多个表示子空间并行捕捉信息。","url":"https://ganto.me/post/rust-llm-guide-10","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 注意力","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 10 课：多头注意力 —— 让模型「多角度」看世界","description":"把一个头拆成多个头并行计算相关性，理清 reshape/permute 的形状变换与输出投影。","url":"https://ganto.me/post/rust-llm-guide-10","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 注意力","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
     </script>
     <link rel="stylesheet" href="/styles-84a0c1a16fd4b1bc.css">
-<link rel="modulepreload" href="/web-rs-8ee8b4f1252fa02d.js" crossorigin="anonymous" integrity="sha384-TxRN3IL8AIHuolVnquiA+u9SEBvUFMfUuLNiJ2VvN/bIfTer3FqW7bnpy6qNoFfK">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
-<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
+<link rel="modulepreload" href="/web-rs-a99f5589204ec566.js" crossorigin="anonymous" integrity="sha384-umfTmuv9naxm3y94Bh3NWTfgXO2lsKZY7liOaEQ/zp9/YvxyqCZMSoTUOtOsXZQ6">
 <link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous" integrity="sha384-2DHjVGrzcpbms06h5LAGWYB1zXEqfWTjATq1YsBBgX1CE2W+T4mRjoljwlXKhTcj">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
 <link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous" integrity="sha384-pfz3GoOS0du3Se5f5C1lkvbvMo0g507e24Rcu0dm29CmSCqxguUw3chk5PS1brtF">
-<link rel="preload" href="/web-rs-8ee8b4f1252fa02d_bg.wasm" crossorigin="anonymous" integrity="sha384-3wWr8DgnH4e2YxAuX2WFELRGjZBBSBguUlj/8PJRmz0t18sv4VhXf9yf2WFiiadO" as="fetch" type="application/wasm">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
+<link rel="preload" href="/web-rs-a99f5589204ec566_bg.wasm" crossorigin="anonymous" integrity="sha384-RN+hPytGjHtzCa+dPXlgO6NZwHHIA2reMSnH/98AjTuP+/n7D+fZxS0wwqc/Ie6I" as="fetch" type="application/wasm">
 
     <style>
 :root {
@@ -143,9 +143,11 @@
                 <div class="blog-content">
 <h1><a href="#第-10-课多头注意力--让模型多角度看世界" aria-hidden="true" class="anchor" id="user-content-第-10-课多头注意力--让模型多角度看世界"></a>第 10 课：多头注意力 —— 让模型&quot;多角度&quot;看世界</h1>
 <blockquote>
-<p>代码位置：<a href="src/attention.rs">src/attention.rs</a>（<code>MultiHeadAttention</code> 结构 + <code>forward</code>）
-底层算子：<a href="src/tensor.rs">src/tensor.rs</a>（<code>reshape</code> / <code>permute</code> / <code>matmul</code> / <code>softmax_last_dim</code>）</p>
+<p>代码位置：<a href="../src/attention.rs">src/attention.rs</a>（<code>MultiHeadAttention</code> 结构 + <code>forward</code>）
+底层算子：<a href="../src/tensor.rs">src/tensor.rs</a>（<code>reshape</code> / <code>permute</code> / <code>flash_attention</code>）
+RoPE 算子：<a href="../src/rope.rs">src/rope.rs</a>（<code>rotary_pair</code>）</p>
 </blockquote>
+<hr />
 <h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
 <ol>
 <li>为什么&quot;一个头&quot;不够？多个头到底多学到了什么？</li>
@@ -153,6 +155,7 @@
 <li>合并头之后为什么还要一个输出投影 <code>c_proj</code>？</li>
 <li><code>MultiHeadAttention::forward</code> 的 8 步，每一步形状怎么变？</li>
 </ol>
+<hr />
 <h2><a href="#2-动机一个头只能学一种相关性" aria-hidden="true" class="anchor" id="user-content-2-动机一个头只能学一种相关性"></a>2. 动机：一个头只能学一种&quot;相关性&quot;</h2>
 <p>第 9 课的注意力，一个查询位置对所有键算一组权重——它只能表达<strong>一种</strong>&quot;谁和谁相关&quot;的模式。</p>
 <p>但文本里的相关性是<strong>多种多样</strong>的：</p>
@@ -192,19 +195,25 @@
 <pre><code>MultiHead(Q, K, V) = Concat(head_1, ..., head_H) · W_O
 head_i = Attention(Q·W_i^Q, K·W_i^K, V·W_i^V)
 </code></pre>
+<hr />
 <h2><a href="#3-结构一览" aria-hidden="true" class="anchor" id="user-content-3-结构一览"></a>3. 结构一览</h2>
-<pre><code class="language-rust">struct MultiHeadAttention {
-    c_q: Linear,      // [D, D]
-    c_k: Linear,      // [D, D]
-    c_v: Linear,      // [D, D]
-    c_proj: Linear,   // [D, D] 输出投影
-    n_head: usize,
+<pre><code class="language-rust">pub struct MultiHeadAttention {
+    pub c_q: Linear,      // [D, D]
+    pub c_k: Linear,      // [D, kv_dim]，kv_dim = n_kv_head * head_dim
+    pub c_v: Linear,      // [D, kv_dim]
+    pub c_proj: Linear,   // [D, D] 输出投影
+    pub n_head: usize,
+    pub n_kv_head: usize, // GQA：K/V 的头数（= n_head 时就是标准 MHA）
+    n_rep: usize,         // n_head / n_kv_head（私有字段）
 }
 </code></pre>
 <p>数据流：</p>
 <pre><code>x → c_q / c_k / c_v 投影 → 拆头 → 每头各自算注意力 → 合并 → c_proj → 输出
 </code></pre>
-<p><code>n_head</code> 来自配置 <code>GPTConfig::tiny</code>：n_embd = 64，n_head = 4 → <strong>head_dim = 64 / 4 = 16</strong>。</p>
+<p><code>n_head</code> 来自配置 <code>TransformerConfig::tiny</code>：n_embd = 64，n_head = 4 → <strong>head_dim = 64 / 4 = 16</strong>。
+（<code>head_dim</code> 也可以显式写在配置里：<code>model.head_dim</code>，此时必须满足 <code>n_head × head_dim == n_embd</code>，
+构造时就会断言；<code>0</code> = 按 <code>n_embd / n_head</code> 推，是历史默认行为。）</p>
+<hr />
 <h2><a href="#4-拆头reshape--permute--reshape" aria-hidden="true" class="anchor" id="user-content-4-拆头reshape--permute--reshape"></a>4. 拆头：reshape + permute + reshape</h2>
 <pre><code class="language-rust">// 3. 拆头：[B, T, D] -&gt; [B*H, T, head_dim]
 //    （先 reshape 出 H 维，再 permute 把 H 提到第 2 维）
@@ -213,7 +222,7 @@ let q = q
     .permute(&amp;[0, 2, 1, 3])                       // -&gt; [B,H,T,head_dim]
     .reshape(vec![b * self.n_head, t, head_dim]); // -&gt; [B*H,T,head_dim]
 </code></pre>
-<h3><a href="#为什么不能直接-reshape-成-bh-t-head_dim" aria-hidden="true" class="anchor" id="user-content-为什么不能直接-reshape-成-bh-t-head_dim"></a>为什么不能直接 reshape 成 [B*H, T, head_dim]？</h3>
+<h3><a href="#41-为什么不能直接-reshape-成-bh-t-head_dim" aria-hidden="true" class="anchor" id="user-content-41-为什么不能直接-reshape-成-bh-t-head_dim"></a>4.1 为什么不能直接 reshape 成 [B*H, T, head_dim]？</h3>
 <p>关键在<strong>内存布局</strong>。以 D=8、H=2、head_dim=4、单个 token 为例，x 最后一维的数据排列是：</p>
 <pre><code>[ 头0的4维 | 头1的4维 ]     ← 头 0 在前、头 1 在后（行优先存储）
 </code></pre>
@@ -223,34 +232,32 @@ let q = q
 </ul>
 <p>所以必须先 <code>permute(&amp;[0, 2, 1, 3])</code> 把&quot;头&quot;维提到第 2 维（H 排在 T 前面），让<strong>每个 (b, h) 的数据在内存里连成一块</strong>，再 reshape 成 [B*H, T, head_dim]，才能保证每个&quot;批&quot;恰好是一个头。</p>
 <blockquote>
-<p><code>permute</code> 和 <code>reshape</code> 都不搬动数据，只改变&quot;维度解释&quot;；三步合起来的效果 = &quot;把 (b, h) 提成独立的批&quot;。
+<p>实现细节（strides 视图版）：<code>permute</code> 是零拷贝视图（只换 strides，不搬数据），紧随其后的 <code>reshape</code> 检测到非连续输入才把它 <code>contiguous()</code> 物化——物化按视图的逻辑顺序写入，落盘内存恰好就是&quot;每个 (b, h) 连成一块&quot;的布局。总共只拷贝一次，且位置发生在维度解释确定之后；三步合起来的效果 = &quot;把 (b, h) 提成独立的批&quot;。
 这正是第 1 课讲的行优先存储的实战应用。</p>
 </blockquote>
-<h3><a href="#kv-的拆头" aria-hidden="true" class="anchor" id="user-content-kv-的拆头"></a>K、V 的拆头</h3>
-<p>K、V 的拆法完全一样（注意这里的 T 变成了 <code>t_total</code>——带 KV cache 时更长，第 18 课讲解）：</p>
+<h3><a href="#42-kv-的拆头" aria-hidden="true" class="anchor" id="user-content-42-kv-的拆头"></a>4.2 K、V 的拆头</h3>
+<p>K、V 的拆法与 Q 完全一样，但头数用的是 <code>self.n_kv_head</code>（GQA 时 K/V 的头数少于 Q，<code>c_k</code> / <code>c_v</code> 的输出维度就是 <code>n_kv_head * head_dim</code>）。注意这里的 T 变成了 <code>t_total</code>——带 KV cache 时更长（第 25 课讲解）：</p>
 <pre><code class="language-rust">let k = k
-    .reshape(vec![b, t_total, self.n_head, head_dim])
+    .reshape(vec![b, t_total, self.n_kv_head, head_dim])
     .permute(&amp;[0, 2, 1, 3])
-    .reshape(vec![b * self.n_head, t_total, head_dim]);
+    .reshape(vec![b * self.n_kv_head, t_total, head_dim]);
 // v 同理
 </code></pre>
-<h3><a href="#为什么先整体投影再拆头是等价的" aria-hidden="true" class="anchor" id="user-content-为什么先整体投影再拆头是等价的"></a>为什么&quot;先整体投影再拆头&quot;是等价的？</h3>
-<p><code>c_q</code> 是 [D, D] 线性层。对头 h 来说，它取输出的第 h 块（head_dim 维），这正好是输入 x 经过 W_Q <strong>第 h 块列</strong>的作用——数学上<strong>等价于每个头一个独立的投影 W_h^Q</strong>（GPT-2 的实现也是这个思路，只是把投影合并写在一起）。</p>
+<h3><a href="#43-为什么先整体投影再拆头是等价的" aria-hidden="true" class="anchor" id="user-content-43-为什么先整体投影再拆头是等价的"></a>4.3 为什么&quot;先整体投影再拆头&quot;是等价的？</h3>
+<p><code>c_q</code> 是 [D, D] 线性层。对头 h 来说，它取输出的第 h 块（head_dim 维），这正好是输入 x 经过 W_Q <strong>第 h 块列</strong>的作用——数学上<strong>等价于每个头一个独立的投影 W_h^Q</strong>（经典实现也是这个思路，只是把投影合并写在一起）。</p>
+<hr />
 <h2><a href="#5-并行注意力一个批量-matmul-算完所有头" aria-hidden="true" class="anchor" id="user-content-5-并行注意力一个批量-matmul-算完所有头"></a>5. 并行注意力：一个批量 matmul 算完所有头</h2>
-<p>拆头后 [B*H, T, head_dim] 恰好是 <code>matmul</code> 支持的 3D 批量形状，第 9 课的公式一行不多、一行不少：</p>
-<pre><code class="language-rust">// 4. 注意力分数：scores = Q·Kᵀ / √d_k
-let scale = 1.0 / (head_dim as f32).sqrt();
-let kt = k.permute(&amp;[0, 2, 1]);                  // [B*H, head_dim, T_total]
-let scores = q.matmul(&amp;kt).mul_scalar(scale);    // [B*H, T, T_total]
-
-// 5. 因果掩码：把&quot;未来位置&quot;变成 -inf，softmax 后概率为 0
-let scores = scores.add(mask);
-
-// 6. softmax 得到注意力权重，加权求和
-let attn = scores.softmax_last_dim();            // [B*H, T, T_total]
-let out = attn.matmul(&amp;v);                       // [B*H, T, head_dim]
+<p>GQA 时 K/V 的头数比 Q 少（<code>n_rep = n_head / n_kv_head</code>），早期实现会先用 <code>repeat_kv</code> 把每个 KV 头复制 <code>n_rep</code> 次、把两边头数对齐。<strong>现在这一步不再物化</strong>：<code>flash_attention</code> 的 CPU 分块核按 Q 头 <code>hh / n_rep</code> 直接索引共享的 KV 头（GPU 路径在算子入口核外展开），省掉 <code>[B*n_head, T_total, head_dim]</code> 整块拷贝与对应的反向求和节点：</p>
+<pre><code class="language-rust">// 4. 拆头（GQA 不再物化 repeat_kv：flash_attention 的 CPU 分块核按 Q 头
+//    核内索引共享 KV 头，GPU 路径在 Tensor::flash_attention 内核外展开）
+let out = Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32);
+</code></pre>
+<p>拆头后的 Q 是 [B*H, T, head_dim]，正好是 <code>matmul</code> 支持的 3D 批量形状，第 9 课的公式（打分 → 掩码 → softmax → 加权求和）被一个融合算子一次算完：</p>
+<pre><code class="language-rust">// 5-7. 融合注意力：Q·Kᵀ/√d_k → softmax(+mask) → ·V 全在算子内部
+let out = Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32); // 调用点在 src/attention.rs
 </code></pre>
 <p>H 个头互不干扰，只是被&quot;压扁&quot;进了批维——这是拆头最大的好处：<strong>一次批量运算同时算完 H 个独立的注意力</strong>。</p>
+<hr />
 <h2><a href="#6-合并头拆头的逆操作" aria-hidden="true" class="anchor" id="user-content-6-合并头拆头的逆操作"></a>6. 合并头：拆头的逆操作</h2>
 <pre><code class="language-rust">// 7. 合并头回 [B, T, D]
 let out = out
@@ -286,6 +293,7 @@ let out = out
 </tbody>
 </table>
 <p>拼回后，每个 (b, t) 的 D 维 = <code>[头0的16维, 头1的16维, 头2的16维, 头3的16维]</code>，与拆头前的布局完全一致——因为 <code>matmul</code> 的批维上每个 (b, h) 都是独立的，头之间从不串扰。</p>
+<hr />
 <h2><a href="#7-输出投影-c_proj让模型决定怎么混" aria-hidden="true" class="anchor" id="user-content-7-输出投影-c_proj让模型决定怎么混"></a>7. 输出投影 c_proj：让模型决定&quot;怎么混&quot;</h2>
 <pre><code class="language-rust">// 8. 输出投影
 self.c_proj.forward(&amp;out)
@@ -298,8 +306,9 @@ self.c_proj.forward(&amp;out)
 <blockquote>
 <p>数学上：<code>Concat(head_1..head_H) · W_O</code>，W_O 就是 <code>c_proj</code> 的权重。</p>
 </blockquote>
+<hr />
 <h2><a href="#8-forward-全流程8-步形状对照表" aria-hidden="true" class="anchor" id="user-content-8-forward-全流程8-步形状对照表"></a>8. forward 全流程：8 步形状对照表</h2>
-<p>以 <code>GPTConfig::tiny</code>（D=64、H=4、head_dim=16）为例，B / T 视输入而定（训练演示时 B=8、T=block_size=32）：</p>
+<p>以 <code>TransformerConfig::tiny</code>（D=64、H=4、head_dim=16）为例，B / T 视输入而定（训练演示时 B=8、T=block_size=32）：</p>
 <table>
 <thead>
 <tr>
@@ -316,32 +325,32 @@ self.c_proj.forward(&amp;out)
 </tr>
 <tr>
 <td>① Q/K/V 投影</td>
-<td><code>c_q/c_k/c_v.forward(x).reshape([b,t,d])</code></td>
-<td>[B, T, 64] × 3</td>
+<td><code>c_q/c_k/c_v.forward(x).reshape(...)</code></td>
+<td>Q: [B, T, 64]；K/V: [B, T, kv_dim]（<code>kv_dim = n_kv_head * head_dim</code>）</td>
 </tr>
 <tr>
-<td>② KV cache（可选）</td>
-<td><code>cache.append(...)</code></td>
-<td>K/V 的 T 变成 T_total（第 18 课）</td>
+<td>② RoPE 旋转 Q/K</td>
+<td><code>rotary_pair(&amp;q, &amp;k, &amp;positions, head_dim, &amp;self.rope)</code>（第 20 课）</td>
+<td>形状不变（V 不旋转）</td>
 </tr>
 <tr>
-<td>③ 拆头</td>
+<td>③ KV cache（可选）</td>
+<td><code>cache.append(&amp;k, &amp;v)</code></td>
+<td>K/V 的 T 变成 T_total（第 25 课）</td>
+</tr>
+<tr>
+<td>④ 拆头</td>
 <td><code>reshape → permute → reshape</code></td>
-<td>[B*4, T, 16]</td>
+<td>Q: [B<em>4, T, 16]；K/V: [B</em>n_kv_head, T_total, 16]</td>
 </tr>
 <tr>
-<td>④ scores</td>
-<td><code>q.matmul(&amp;kt).mul_scalar(scale)</code></td>
-<td>[B*4, T, T_total]</td>
+<td>⑤ GQA 共享 K/V</td>
+<td>不再物化：<code>flash_attention</code> 核内按 <code>hh / n_rep</code> 索引</td>
+<td>K/V 保持 [B*n_kv_head, T_total, 16]</td>
 </tr>
 <tr>
-<td>⑤ 掩码</td>
-<td><code>scores.add(mask)</code></td>
-<td>[B*4, T, T_total]</td>
-</tr>
-<tr>
-<td>⑥ softmax + 加权求和</td>
-<td><code>softmax_last_dim()</code> → <code>matmul(&amp;v)</code></td>
+<td>⑥ 融合注意力</td>
+<td><code>Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32)</code></td>
 <td>[B*4, T, 16]</td>
 </tr>
 <tr>
@@ -356,33 +365,56 @@ self.c_proj.forward(&amp;out)
 </tr>
 </tbody>
 </table>
-<p>完整的 forward 骨架（略去 KV cache 分支，逻辑与源码一致）：</p>
-<pre><code class="language-rust">fn forward(&amp;self, x: &amp;Tensor, mask: &amp;Tensor, kv_cache: Option&lt;&amp;mut KVCache&gt;) -&gt; Tensor {
+<p>完整的 forward 骨架（逻辑与源码 <code>src/attention.rs</code> 的 <code>MultiHeadAttention::forward</code> 一致）：</p>
+<pre><code class="language-rust">pub fn forward(
+    &amp;self,
+    x: &amp;Tensor,
+    mask: Option&lt;&amp;Tensor&gt;,
+    kv_cache: Option&lt;&amp;mut KVCache&gt;,
+    base: usize, // 当前窗口在绝对序列中的起始位置（训练时 = 0，KV cache 推理时 = 缓存长度）
+) -&gt; Tensor {
     let (b, t, d) = (x.shape()[0], x.shape()[1], x.shape()[2]);
     let head_dim = d / self.n_head;
+    let kv_dim = self.n_kv_head * head_dim;
 
     // ① 投影得到 Q、K、V
     let q = self.c_q.forward(x).reshape(vec![b, t, d]);
-    let k = self.c_k.forward(x).reshape(vec![b, t, d]);
-    let v = self.c_v.forward(x).reshape(vec![b, t, d]);
+    let k = self.c_k.forward(x).reshape(vec![b, t, kv_dim]);
+    let v = self.c_v.forward(x).reshape(vec![b, t, kv_dim]);
 
-    // ③ 拆头
+    // ② RoPE：Q/K 按 head_dim 旋转（第 20 课），V 不转
+    //    注意 head_dim 是显式参数：GQA 下 Q/K 总宽不同，但两侧共用同一张逐头角度表
+    let mut positions = Vec::with_capacity(b * t);
+    for _ in 0..b {
+        positions.extend(base..base + t);
+    }
+    let (q, k) = q.reshape(vec![b * t, d])
+                  .rotary_pair(&amp;k.reshape(vec![b * t, kv_dim]), &amp;positions, head_dim, &amp;self.rope);
+    let (q, k) = (q.reshape(vec![b, t, d]), k.reshape(vec![b, t, kv_dim]));
+
+    // ③ KV cache：存&quot;已旋转的 K&quot;，只把新块追加到缓存末尾
+    let (k, v) = match kv_cache {
+        Some(cache) =&gt; { cache.append(&amp;k, &amp;v); (cache.k(), cache.v()) }
+        None =&gt; (k, v),
+    };
+    let t_total = k.shape()[1];
+
+    // ④ 拆头
     let q = q.reshape(vec![b, t, self.n_head, head_dim])
              .permute(&amp;[0, 2, 1, 3])
              .reshape(vec![b * self.n_head, t, head_dim]);
-    let k = k.reshape(vec![b, t_total, self.n_head, head_dim])
+    let k = k.reshape(vec![b, t_total, self.n_kv_head, head_dim])
              .permute(&amp;[0, 2, 1, 3])
-             .reshape(vec![b * self.n_head, t_total, head_dim]);
-    let v = v.reshape(vec![b, t_total, self.n_head, head_dim])
+             .reshape(vec![b * self.n_kv_head, t_total, head_dim]);
+    let v = v.reshape(vec![b, t_total, self.n_kv_head, head_dim])
              .permute(&amp;[0, 2, 1, 3])
-             .reshape(vec![b * self.n_head, t_total, head_dim]);
+             .reshape(vec![b * self.n_kv_head, t_total, head_dim]);
 
-    // ④⑤⑥ 注意力（第 9 课）
-    let scale = 1.0 / (head_dim as f32).sqrt();
-    let kt = k.permute(&amp;[0, 2, 1]);
-    let scores = q.matmul(&amp;kt).mul_scalar(scale).add(mask);
-    let attn = scores.softmax_last_dim();
-    let out = attn.matmul(&amp;v);
+    // ⑤ GQA：K/V 直接按 [B*n_kv_head, ...] 传入，不再 repeat_kv 物化——
+    //    flash_attention 的 CPU 分块核核内索引共享头，GPU 路径在算子入口展开
+
+    // ⑥ 融合注意力：打分 + 掩码 + softmax + 加权求和（第 9 课）
+    let out = Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32);
 
     // ⑦ 合并头，⑧ 输出投影
     let out = out.reshape(vec![b, self.n_head, t, head_dim])
@@ -391,6 +423,7 @@ self.c_proj.forward(&amp;out)
     self.c_proj.forward(&amp;out)
 }
 </code></pre>
+<hr />
 <h2><a href="#9-参数训练时谁在被更新" aria-hidden="true" class="anchor" id="user-content-9-参数训练时谁在被更新"></a>9. 参数：训练时谁在被更新？</h2>
 <p><code>Module for MultiHeadAttention</code> 负责收集全部可学习参数：</p>
 <pre><code class="language-rust">impl Module for MultiHeadAttention {
@@ -405,30 +438,42 @@ self.c_proj.forward(&amp;out)
 </code></pre>
 <p>前向算出的误差通过反向传播（第 2 课）一路传回这 8 个张量，4 个投影层的权重随训练不断调整——&quot;学什么相关性、怎么融合&quot;全都由数据决定。</p>
 <blockquote>
-<p><code>forward</code> 第 ② 步的 KV cache 只是<strong>推理时</strong>缓存历史 K/V 的加速手段，不改变计算结果，第 18 课专门讲解。</p>
+<p><code>Linear</code> 是否带 bias 由配置决定（<code>model.qkv_bias</code> / <code>model.o_bias</code>，默认 <code>true</code> 即上面这个历史口径）。
+置 <code>false</code> 时无 bias 的层<strong>连参数表都不进</strong>，4 个投影就只剩 4 个权重张量——HF 的 LLaMA 全系列是这个口径
+（见第 39 课 <code>import-hf</code>）。</p>
 </blockquote>
-<h2><a href="#10-运行与测试" aria-hidden="true" class="anchor" id="user-content-10-运行与测试"></a>10. 运行与测试</h2>
+<blockquote>
+<p><code>forward</code> 第 ③ 步的 KV cache 只是<strong>推理时</strong>缓存历史 K/V 的加速手段，不改变计算结果，第 25 课专门讲解。</p>
+</blockquote>
+<hr />
+<h2><a href="#10-运行与验证" aria-hidden="true" class="anchor" id="user-content-10-运行与验证"></a>10. 运行与验证</h2>
 <pre><code class="language-bash">cargo test   # tensor 的 test_permute / test_matmul_3d 验证拆头、批量 matmul 所需算子
-cargo run    # 演示 3 训练小 GPT：4 头注意力参与每一轮前向/反向
+cargo run --release -- demo    # 演示 3 训练小 Transformer：4 头注意力参与每一轮前向/反向
 </code></pre>
-<h2><a href="#11-动手练习" aria-hidden="true" class="anchor" id="user-content-11-动手练习"></a>11. 动手练习</h2>
-<ol>
-<li>把 <code>GPTConfig::tiny</code> 的 <code>n_head</code> 从 4 改成 8（head_dim = 8）重新训练，观察 loss 是否变化（代码有 <code>assert_eq!(head_dim * self.n_head, d)</code> 保证必须能整除）。</li>
-<li>手动构造一个 [2, 3, 8] 的 Tensor，按 <code>reshape([2,3,2,4]) → permute([0,2,1,3]) → reshape([4,3,4])</code> 手写一遍，画出每个元素的归属，验证第 4 节的内存布局分析。</li>
-<li>修改代码：去掉第 ⑧ 步 <code>c_proj</code>，直接返回合并后的 out，重新训练对比 loss（思考：表达能力损失在哪里）。</li>
-<li>阅读 <code>forward</code> 中 <code>kv_cache</code> 分支的 <code>cache.append</code>，解释为什么推理时它能省掉&quot;历史 token 的重复计算&quot;（第 18 课预告）。</li>
-</ol>
-<h2><a href="#12-本课总结" aria-hidden="true" class="anchor" id="user-content-12-本课总结"></a>12. 本课总结</h2>
+<h2><a href="#11-小结与下一课" aria-hidden="true" class="anchor" id="user-content-11-小结与下一课"></a>11. 小结与下一课</h2>
+<h3><a href="#本课小结" aria-hidden="true" class="anchor" id="user-content-本课小结"></a>本课小结</h3>
 <ul>
 <li>多头 = 把 D 切成 H 份，H 个注意力并行，学不同的相关性模式</li>
 <li>拆头三步曲：reshape（切块）→ permute（H 提前）→ reshape（压平 B·H），顺序不能乱</li>
 <li>合并是拆头的镜像；<code>c_proj</code> 负责融合各头信息</li>
 <li>一次批量 matmul 同时算所有头，高效且简洁</li>
-<li>下一步（第 11 课）：位置编码 + LayerNorm + 残差连接，拼出完整的 Transformer Block！</li>
 </ul>
+<h3><a href="#拓展方向" aria-hidden="true" class="anchor" id="user-content-拓展方向"></a>拓展方向</h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li>把 <code>TransformerConfig::tiny</code> 的 <code>n_head</code> 从 4 改成 8（head_dim = 8）重新训练，观察 loss 是否变化（代码有 <code>assert_eq!(head_dim * self.n_head, d)</code> 保证必须能整除）。</li>
+<li>手动构造一个 [2, 3, 8] 的 Tensor，按 <code>reshape([2,3,2,4]) → permute([0,2,1,3]) → reshape([4,3,4])</code> 手写一遍，画出每个元素的归属，验证第 4 节的内存布局分析。</li>
+<li>修改代码：去掉第 ⑧ 步 <code>c_proj</code>，直接返回合并后的 out，重新训练对比 loss（思考：表达能力损失在哪里）。</li>
+<li>阅读 <code>forward</code> 中 <code>kv_cache</code> 分支的 <code>cache.append</code>，解释为什么推理时它能省掉&quot;历史 token 的重复计算&quot;（第 25 课预告）。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="11-%E4%BD%8D%E7%BD%AE%E7%BC%96%E7%A0%81%E4%B8%8E%E5%BD%92%E4%B8%80%E5%8C%96.md">第 11 课 位置编码与归一化</a> —— 位置编码 + LayerNorm + 残差连接，拼出完整的 Transformer Block！</p>
+</blockquote>
 
                 </div>
-                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 22 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Rc&lt;RefCell&gt; 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 GPT 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 GPT —— 看 loss 从 1.46 一路降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：学习率调度与收尾 —— warmup、cosine decay 与全项目总结</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：GPU 加速训练与推理</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-09/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-11/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a></div></div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 51 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：学习率调度 —— warmup + cosine decay</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：Dropout —— 训练时的「随机失忆」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：RMSNorm —— 现代 LLM 的归一化标配</span></a><a class="series-nav-item" href="/post/rust-llm-guide-22/"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">第 22 课：SwiGLU 激活函数 —— LLaMA 的「门控」MLP</span></a><a class="series-nav-item" href="/post/rust-llm-guide-23/"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-24/"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星</span></a><a class="series-nav-item" href="/post/rust-llm-guide-25/"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">第 25 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-26/"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">第 26 课：混合精度训练（AMP）—— 用半精度加速，用全精度保底</span></a><a class="series-nav-item" href="/post/rust-llm-guide-27/"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">第 27 课：GPU 加速 —— 手写 WGSL 计算着色器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-28/"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a><a class="series-nav-item" href="/post/rust-llm-guide-29/"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-30/"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">第 30 课：Beam Search —— 贪心搜索的升级版</span></a><a class="series-nav-item" href="/post/rust-llm-guide-31/"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">第 31 课：Scaling Laws（缩放定律）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-32/"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">第 32 课：MoE 混合专家模型（Mixture of Experts）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-33/"><span class="series-nav-item-index">34</span><span class="series-nav-item-title">第 33 课：量化技术（Quantization）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-34/"><span class="series-nav-item-index">35</span><span class="series-nav-item-title">第 34 课：推测解码（Speculative Decoding）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-35/"><span class="series-nav-item-index">36</span><span class="series-nav-item-title">第 35 课：多 Token 预测（Multi-Token Prediction）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-36/"><span class="series-nav-item-index">37</span><span class="series-nav-item-title">第 36 课：RLHF 与人类对齐（Alignment）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-37/"><span class="series-nav-item-index">38</span><span class="series-nav-item-title">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-38/"><span class="series-nav-item-index">39</span><span class="series-nav-item-title">第 38 课：分布式训练（Distributed Training）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-39/"><span class="series-nav-item-index">40</span><span class="series-nav-item-title">第 39 课：工程化完善 —— 从算法实现到可用框架</span></a><a class="series-nav-item" href="/post/rust-llm-guide-40/"><span class="series-nav-item-index">41</span><span class="series-nav-item-title">第 40 课：把模型部署成 API 服务 —— 从「自己跑」到「给别人调」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-41/"><span class="series-nav-item-index">42</span><span class="series-nav-item-title">第 41 课：多模态 —— 图片理解与图片生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-42/"><span class="series-nav-item-index">43</span><span class="series-nav-item-title">第 42 课：知识蒸馏（Knowledge Distillation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-43/"><span class="series-nav-item-index">44</span><span class="series-nav-item-title">第 43 课：FP8 低精度训练（模拟）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-44/"><span class="series-nav-item-index">45</span><span class="series-nav-item-title">第 44 课：WSD 学习率调度（warmup-stable-decay）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-45/"><span class="series-nav-item-index">46</span><span class="series-nav-item-title">第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死</span></a><a class="series-nav-item" href="/post/rust-llm-guide-46/"><span class="series-nav-item-index">47</span><span class="series-nav-item-title">第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化</span></a><a class="series-nav-item" href="/post/rust-llm-guide-47/"><span class="series-nav-item-index">48</span><span class="series-nav-item-title">第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道</span></a><a class="series-nav-item" href="/post/rust-llm-guide-48/"><span class="series-nav-item-index">49</span><span class="series-nav-item-title">第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重</span></a><a class="series-nav-item" href="/post/rust-llm-guide-49/"><span class="series-nav-item-index">50</span><span class="series-nav-item-title">第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</span></a><a class="series-nav-item" href="/post/rust-llm-guide-50/"><span class="series-nav-item-index">51</span><span class="series-nav-item-title">第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-09/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-11/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a></div></div>
             </article>
         </main>
 <footer class="footer-content">
@@ -443,8 +488,8 @@ cargo run    # 演示 3 训练小 GPT：4 头注意力参与每一轮前向/反�
 <script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
 try{document.getElementById('main').innerHTML='';}catch(e){}</script>
 <script type="module">
-import init, * as bindings from '/web-rs-8ee8b4f1252fa02d.js';
-const wasm = await init({ module_or_path: '/web-rs-8ee8b4f1252fa02d_bg.wasm' });
+import init, * as bindings from '/web-rs-a99f5589204ec566.js';
+const wasm = await init({ module_or_path: '/web-rs-a99f5589204ec566_bg.wasm' });
 
 
 window.wasmBindings = bindings;

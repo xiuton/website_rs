@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 35 课：多 Token 预测（Multi-Token Prediction） - 干徒</title>
+    <meta name="description" content="一次预测未来多个 token，为模型提供更长远的监督信号，并可复用为推测解码的草稿。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 训练">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-35">
+    <meta property="og:title" content="第 35 课：多 Token 预测（Multi-Token Prediction） - 干徒">
+    <meta property="og:description" content="一次预测未来多个 token，为模型提供更长远的监督信号，并可复用为推测解码的草稿。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-35">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 35 课：多 Token 预测（Multi-Token Prediction） - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 35 课：多 Token 预测（Multi-Token Prediction） - 干徒">
+    <meta name="twitter:description" content="一次预测未来多个 token，为模型提供更长远的监督信号，并可复用为推测解码的草稿。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 35 课：多 Token 预测（Multi-Token Prediction）","description":"一次预测未来多个 token，为模型提供更长远的监督信号，并可复用为推测解码的草稿。","url":"https://ganto.me/post/rust-llm-guide-35","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 训练","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-84a0c1a16fd4b1bc.css">
+<link rel="modulepreload" href="/web-rs-a99f5589204ec566.js" crossorigin="anonymous" integrity="sha384-umfTmuv9naxm3y94Bh3NWTfgXO2lsKZY7liOaEQ/zp9/YvxyqCZMSoTUOtOsXZQ6">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous" integrity="sha384-2DHjVGrzcpbms06h5LAGWYB1zXEqfWTjATq1YsBBgX1CE2W+T4mRjoljwlXKhTcj">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous" integrity="sha384-pfz3GoOS0du3Se5f5C1lkvbvMo0g507e24Rcu0dm29CmSCqxguUw3chk5PS1brtF">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
+<link rel="preload" href="/web-rs-a99f5589204ec566_bg.wasm" crossorigin="anonymous" integrity="sha384-RN+hPytGjHtzCa+dPXlgO6NZwHHIA2reMSnH/98AjTuP+/n7D+fZxS0wwqc/Ie6I" as="fetch" type="application/wasm">
+
+    <style>
+:root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+.dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+
+    </style>
+    <style>
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .theme-toggle .icon-sun { display: none; }
+        .dark .theme-toggle .icon-sun { display: inline; }
+        .dark .theme-toggle .icon-moon { display: none; }
+    </style>
+    <script>
+(function() {
+    if (location.pathname.length > 1 && location.pathname.endsWith('/')) {
+        history.replaceState(null, '', location.pathname.replace(/\/+$/, '') + location.search + location.hash);
+    }
+    var theme = localStorage.getItem('theme');
+    if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+    }
+    var tbtn = document.getElementById('prerender-theme-toggle');
+    if (tbtn) {
+        tbtn.addEventListener('click', function() {
+            var d = document.documentElement;
+            var dark = d.classList.toggle('dark');
+            localStorage.setItem('theme', dark ? 'dark' : 'light');
+        });
+    }
+})();
+    </script>
+</head>
+<body>
+    <div id="main">
+        <div class="app">
+<div class="navbar-content">
+    <div class="navbar-ui">
+        <div class="navbar-title-wrapper">
+            <h1 class="navbar-title">干徒</h1>
+            <div class="navbar-glow"></div>
+        </div>
+        <div class="navbar-subtitle">这很酷</div>
+    </div>
+</div>
+<div class="navbar-sticky-wrap">
+    <div class="navbar-links">
+        <a class="nav-link nav-active" href="/">首页</a>
+        <a class="nav-link" href="/about">关于</a>
+        <a class="nav-link" href="/tags">书签</a>
+        <a class="nav-link" href="/search">搜索</a>
+        <a class="nav-link" href="/knowledge-graph">图谱</a>
+        <a class="nav-link" href="/ai-summary">AI摘要</a>
+        <div class="nav-item-with-sub">
+            <a class="nav-link" href="/dev">开发</a>
+            <div class="nav-submenu">
+                <a class="nav-sub-link" href="/circle-generator">圆形生成器</a>
+            </div>
+        </div>
+        <a class="nav-icon-btn rss-toggle" href="/rss" title="RSS 订阅" aria-label="RSS 订阅">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"/></svg>
+        </a>
+        <button class="nav-icon-btn theme-toggle" id="prerender-theme-toggle" aria-label="切换主题" title="切换主题">
+            <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
+            <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="16" height="16" fill="currentColor"><path d="M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"/></svg>
+        </button>
+    </div>
+</div>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 35 课：多 Token 预测（Multi-Token Prediction）</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-01</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">训练</span></div>
+                <div class="blog-content">
+<h1><a href="#第-35-课多-token-预测multi-token-prediction" aria-hidden="true" class="anchor" id="user-content-第-35-课多-token-预测multi-token-prediction"></a>第 35 课：多 Token 预测（Multi-Token Prediction）</h1>
+<blockquote>
+<p><strong>本课已落地为可运行代码</strong>：<code>src/speculative.rs</code> 的 <code>MtpHeads</code>（K 个 <code>Linear</code> 头 + 各头交叉熵损失）
+与 <code>MtpDrafter</code>（把 MTP 头当推测解码的草稿）+ <code>speculative</code> 子命令的第五节实验。
+与已有代码的衔接：预测头复用 <code>src/layers.rs</code> 的 <code>Linear</code> 层，主干隐状态由 <code>Transformer::forward_hidden_cached</code>
+提供；训练时只更新各头参数（主干可冻结），推理时一次前向即可给出往后 γ 个位置的分布。</p>
+</blockquote>
+<hr />
+<h2><a href="#1-标准自回归的局限" aria-hidden="true" class="anchor" id="user-content-1-标准自回归的局限"></a>1. 标准自回归的局限</h2>
+<p>标准 LLM 训练是 <strong>Next-Token Prediction（NTP）</strong>：给定前缀，预测下一个 token。</p>
+<p>$$
+\mathcal{L}<em>{NTP} = -\sum</em>{t=1}^{T} \log P(x_t | x_{&lt;t})
+$$</p>
+<p>这有一个根本问题：<strong>每一步只看到&quot;下一步&quot;的监督信号</strong>，模型无法学到&quot;为了未来 5 步都正确，当前这一步应该怎么选&quot;。</p>
+<blockquote>
+<p><strong>类比</strong>：下棋时，如果你只能看到下一步的胜负，很难学到深谋远虑的策略；但如果能看到未来 5 步的结果，你就能学到更好的走法。</p>
+</blockquote>
+<h2><a href="#2-multi-token-predictionmtp" aria-hidden="true" class="anchor" id="user-content-2-multi-token-predictionmtp"></a>2. Multi-Token Prediction（MTP）</h2>
+<p>Meta 在 2024 年的论文《Better &amp; Faster Large Language Models via Multi-token Prediction》中提出：</p>
+<p><strong>训练时同时预测未来 K 个 token，而不是只预测 1 个。</strong></p>
+<pre><code>输入: &quot;The cat sat on&quot;
+       │
+       ├──→ Head 1: 预测 &quot;cat&quot;     (next-1)
+       ├──→ Head 2: 预测 &quot;sat&quot;     (next-2)
+       ├──→ Head 3: 预测 &quot;on&quot;      (next-3)
+       └──→ Head 4: 预测 &quot;the&quot;     (next-4)
+       │
+       Loss = L_1 + L_2 + L_3 + L_4
+</code></pre>
+<h3><a href="#21-架构" aria-hidden="true" class="anchor" id="user-content-21-架构"></a>2.1 架构</h3>
+<pre><code>                共享的 Transformer Backbone
+                         │
+            ┌────────────┼────────────┐
+            │            │            │
+       ┌────▼────┐ ┌────▼────┐ ┌────▼────┐
+       │ Head 1  │ │ Head 2  │ │ Head 3  │
+       │(预测+1) │ │(预测+2) │ │(预测+3) │
+       └─────────┘ └─────────┘ └─────────┘
+</code></pre>
+<p>关键设计：</p>
+<ul>
+<li><strong>共享 Backbone</strong>：所有预测头共用同一个 Transformer 主干</li>
+<li><strong>独立预测头</strong>：每个头是一个独立的线性层（+ 可选的小 Transformer 层）</li>
+<li><strong>自回归依赖</strong>：Head K 的输入包含了 Head K-1 的预测结果（通过 embedding 层传递）</li>
+</ul>
+<h3><a href="#22-损失函数" aria-hidden="true" class="anchor" id="user-content-22-损失函数"></a>2.2 损失函数</h3>
+<p>$$
+\mathcal{L}<em>{MTP} = \sum</em>{k=1}<sup>{K} \mathcal{L}_{NTP}</sup>{(k)} = -\sum_{k=1}<sup>{K} \sum_{t=1}</sup>{T-k} \log P_k(x_{t+k} | x_{\leq t})
+$$</p>
+<p>其中 $P_k$ 是第 $k$ 个预测头的输出分布。</p>
+<h3><a href="#23-训练-vs-推理" aria-hidden="true" class="anchor" id="user-content-23-训练-vs-推理"></a>2.3 训练 vs 推理</h3>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>使用方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>训练</strong></td>
+<td>所有 K 个头同时训练，损失相加</td>
+</tr>
+<tr>
+<td><strong>标准推理</strong></td>
+<td>只用 Head 1（和标准 NTP 一样）</td>
+</tr>
+<tr>
+<td><strong>推测解码</strong></td>
+<td>Head 2~K 作为&quot;草稿模型&quot;，Head 1 做验证</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>核心价值</strong>：MTP 训练出的 Backbone 表征质量更高（因为要同时预测多个未来 token，被迫学到更好的&quot;计划&quot;能力），推理时可以和推测解码结合实现加速。</p>
+</blockquote>
+<h2><a href="#3-deepseek-的-mtp-实现" aria-hidden="true" class="anchor" id="user-content-3-deepseek-的-mtp-实现"></a>3. DeepSeek 的 MTP 实现</h2>
+<p>DeepSeek-V3 的 MTP 实现更加精细，引入了 <strong>顺序预测模块（Sequential Prediction Module）</strong>：</p>
+<pre><code>位置 t 的表示 h_t
+  │
+  ├──→ Head 1 → 预测 x_{t+1}
+  │         │
+  │         └──→ Embed(x_{t+1}) → 拼接 h_t → MTP Module 2 → Head 2 → 预测 x_{t+2}
+  │                                                                    │
+  │                                                                    └──→ ...
+</code></pre>
+<h3><a href="#31-与标准-mtp-的区别" aria-hidden="true" class="anchor" id="user-content-31-与标准-mtp-的区别"></a>3.1 与标准 MTP 的区别</h3>
+<table>
+<thead>
+<tr>
+<th>方面</th>
+<th>Meta MTP</th>
+<th>DeepSeek MTP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>头的输入</td>
+<td>独立（都来自 backbone）</td>
+<td>串行（后一个头依赖前一个头的输出）</td>
+</tr>
+<tr>
+<td>训练时</td>
+<td>只用于辅助损失</td>
+<td>同时用于训练和推测解码</td>
+</tr>
+<tr>
+<td>推理时</td>
+<td>丢弃额外头</td>
+<td>用作推测解码的草稿头</td>
+</tr>
+</tbody>
+</table>
+<h2><a href="#4-为什么-mtp-能提升质量" aria-hidden="true" class="anchor" id="user-content-4-为什么-mtp-能提升质量"></a>4. 为什么 MTP 能提升质量？</h2>
+<h3><a href="#41-更好的表征学习" aria-hidden="true" class="anchor" id="user-content-41-更好的表征学习"></a>4.1 更好的表征学习</h3>
+<p>同时预测多个未来 token，迫使模型学到的内部表征必须编码更丰富的语义信息。</p>
+<p>类比：</p>
+<ul>
+<li><strong>NTP</strong>：只看一步 → 学到&quot;这个词后面最常见的词是什么&quot;</li>
+<li><strong>MTP</strong>：看多步 → 学到&quot;这个句子接下来要表达什么意思&quot;</li>
+</ul>
+<h3><a href="#42-计划能力" aria-hidden="true" class="anchor" id="user-content-42-计划能力"></a>4.2 计划能力</h3>
+<p>模型必须在当前位置就&quot;计划&quot;好接下来几个 token 的输出，类似于人类写作时的&quot;提纲&quot;能力。</p>
+<h3><a href="#43-推理加速" aria-hidden="true" class="anchor" id="user-content-43-推理加速"></a>4.3 推理加速</h3>
+<p>多个预测头可以直接用于推测解码（无需额外的小模型），实现推理加速。</p>
+<h2><a href="#5-实验结果" aria-hidden="true" class="anchor" id="user-content-5-实验结果"></a>5. 实验结果</h2>
+<h3><a href="#51-meta-论文结果" aria-hidden="true" class="anchor" id="user-content-51-meta-论文结果"></a>5.1 Meta 论文结果</h3>
+<p>在代码生成任务上（HumanEval），MTP 的提升尤为显著：</p>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>标准 NTP</th>
+<th>MTP (K=4)</th>
+<th>提升</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>7B</td>
+<td>28.7%</td>
+<td>34.2%</td>
+<td>+5.5%</td>
+</tr>
+<tr>
+<td>13B</td>
+<td>35.3%</td>
+<td>40.7%</td>
+<td>+5.4%</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>有趣发现</strong>：MTP 对代码生成的提升大于自然语言，可能因为代码有更强的长程依赖和结构化模式。</p>
+</blockquote>
+<h3><a href="#52-deepseek-v3" aria-hidden="true" class="anchor" id="user-content-52-deepseek-v3"></a>5.2 DeepSeek-V3</h3>
+<p>DeepSeek-V3 使用 MTP 作为辅助训练目标，并在推理时用 MTP 头做推测解码，实现约 1.8× 的推理加速。</p>
+<h2><a href="#6-与其他方法的对比" aria-hidden="true" class="anchor" id="user-content-6-与其他方法的对比"></a>6. 与其他方法的对比</h2>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>训练时</th>
+<th>推理时</th>
+<th>是否需要额外参数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>标准 NTP</td>
+<td>预测 1 个 token</td>
+<td>自回归</td>
+<td>无</td>
+</tr>
+<tr>
+<td>MTP</td>
+<td>预测 K 个 token</td>
+<td>自回归 或 推测解码</td>
+<td>K-1 个预测头</td>
+</tr>
+<tr>
+<td>推测解码</td>
+<td>无变化</td>
+<td>小模型猜 + 大模型验</td>
+<td>需要额外小模型</td>
+</tr>
+<tr>
+<td>Medusa</td>
+<td>加多头</td>
+<td>多头同时猜 + 验证</td>
+<td>多个预测头</td>
+</tr>
+</tbody>
+</table>
+<h2><a href="#7-实现要点" aria-hidden="true" class="anchor" id="user-content-7-实现要点"></a>7. 实现要点</h2>
+<h3><a href="#71-预测头的参数效率" aria-hidden="true" class="anchor" id="user-content-71-预测头的参数效率"></a>7.1 预测头的参数效率</h3>
+<p>预测头不应太重——如果每个头都是一个完整 Transformer 层，参数量会暴增。</p>
+<p>推荐配置：</p>
+<pre><code>Head K = Linear(d_model → d_model) → TransformerLayer(1层) → Linear(d_model → vocab_size)
+</code></pre>
+<p>或更轻量：</p>
+<pre><code>Head K = Linear(d_model → vocab_size)  // 最简单，效果也不错
+</code></pre>
+<h3><a href="#72-梯度累积" aria-hidden="true" class="anchor" id="user-content-72-梯度累积"></a>7.2 梯度累积</h3>
+<p>MTP 的 K 个损失会累加，总梯度比 NTP 大 K 倍。需要：</p>
+<ul>
+<li>调低学习率，或</li>
+<li>对每个头的损失做 $1/K$ 的缩放</li>
+</ul>
+<blockquote>
+<p>梯度累积本身的机制（上游梯度按实际微批数 <code>1/N</code> 缩放、尾窗处理）归属 <a href="28-%E6%A2%AF%E5%BA%A6%E7%B4%AF%E7%A7%AF.md">第 28 课 梯度累积</a>，这里只谈&quot;K 个头叠加&quot;带来的那一档尺度差异。</p>
+</blockquote>
+<h2><a href="#8-本仓库实现要点" aria-hidden="true" class="anchor" id="user-content-8-本仓库实现要点"></a>8. 本仓库实现要点</h2>
+<p>上面的原理已全部落地为可运行代码。MTP 相关组件与第 34 课共用 <a href="../src/speculative.rs"><code>src/speculative.rs</code></a>（单测跑 <code>cargo test speculative</code> / <code>cargo test mtp</code>，数量以实际输出为准），
+CLI 入口是 <a href="../README.md"><code>speculative</code></a> 子命令（通过 <code>--mtp-heads</code> / <code>--mtp-steps</code> 控制）。</p>
+<h3><a href="#81-代码结构" aria-hidden="true" class="anchor" id="user-content-81-代码结构"></a>8.1 代码结构</h3>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>位置</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MtpHeads</code></td>
+<td><code>speculative.rs</code></td>
+<td>K 个 <code>Linear</code> 预测头：第 k 个头把位置 i 的隐状态映射到位置 i+k+1 的 token logits。提供 <code>new(k, n_embd, vocab)</code>、<code>logits(hidden)</code>（返回 K+1 个 logits 张量）、<code>loss(hidden, targets)</code>（各头交叉熵之和的均值）</td>
+</tr>
+<tr>
+<td><code>MtpDrafter</code></td>
+<td><code>speculative.rs</code></td>
+<td>拿 MTP 头当推测解码的草稿来源：实现 <code>Drafter</code> trait，一次前向即可给出往后 γ 个位置的候选分布（不必自回归），但各分布彼此条件独立，接受率通常低于小模型草稿</td>
+</tr>
+<tr>
+<td><code>Drafter</code> trait</td>
+<td><code>speculative.rs</code></td>
+<td>草稿来源统一接口：<code>propose()</code>/<code>commit()</code>/<code>reset()</code>，<code>MtpDrafter</code> 和 <code>ModelDrafter</code> 均实现此 trait</td>
+</tr>
+<tr>
+<td><code>SpecDecoder</code></td>
+<td><code>speculative.rs</code></td>
+<td>推测解码执行体，可接受任意 <code>Drafter</code> 实现（包括 <code>MtpDrafter</code>）</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#82-cli-用法" aria-hidden="true" class="anchor" id="user-content-82-cli-用法"></a>8.2 CLI 用法</h3>
+<pre><code class="language-bash"># 训练 MTP 头并用于推测解码（K=4 头，80 步训练）
+cargo run --release -- speculative --mtp-heads 4 --mtp-steps 80
+
+# 调整 MTP 头数（K=2 头，更轻量）
+cargo run --release -- speculative --mtp-heads 2 --mtp-steps 80
+
+# 对比：用小模型草稿 vs MTP 头草稿（不传 --mtp-heads 即用 ModelDrafter）
+cargo run --release -- speculative --gamma 4 --max-new 48
+</code></pre>
+<hr />
+<h2><a href="#9-小结与下一课" aria-hidden="true" class="anchor" id="user-content-9-小结与下一课"></a>9. 小结与下一课</h2>
+<h3><a href="#本课小结" aria-hidden="true" class="anchor" id="user-content-本课小结"></a>本课小结</h3>
+<ul>
+<li>NTP 每步只有一个&quot;下一步&quot;的监督信号；MTP 让模型同时预测未来 K 个 token，逼迫表征编码更长的语义结构</li>
+<li>损失是各头交叉熵之和的均值；训练时 K 个头一起训，标准推理只用 Head 1，推测解码时 Head 2~K 当草稿</li>
+<li>Meta 的版本各头独立、只作辅助损失；DeepSeek-V3 改成串行依赖，并把额外头直接用于推测解码</li>
+<li>实测收益：Meta 论文在 HumanEval 上 7B 从 28.7% → 34.2%（K=4）；DeepSeek-V3 推理约 1.8× 加速</li>
+<li>本仓库的落点是 <code>MtpHeads</code>（K 个 <code>Linear</code> + 各头交叉熵）与 <code>MtpDrafter</code>（当草稿用，各分布条件独立、接受率通常低于小模型草稿）</li>
+</ul>
+<h3><a href="#拓展方向" aria-hidden="true" class="anchor" id="user-content-拓展方向"></a>拓展方向</h3>
+<blockquote>
+<p>核心内容已全部实现（<code>src/speculative.rs</code> 的 <code>MtpHeads</code> / <code>MtpDrafter</code>），这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li><strong>实现 MTP 训练</strong>：在现有 Transformer 模型上添加 3 个额外预测头，实现 K=4 的多 token 预测。</li>
+<li><strong>对比实验</strong>：在相同数据和步数下，分别用 NTP 和 MTP 训练小模型，对比 loss 曲线和生成质量。</li>
+<li><strong>MTP + 推测解码</strong>：用 MTP 的 Head 2~K 作为草稿头，Head 1 做验证，实现推测解码。</li>
+<li><strong>代码 vs 文本</strong>：分别在代码和自然语言数据上训练 MTP，观察哪种数据获益更大。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="36-RLHF%E4%B8%8E%E5%AF%B9%E9%BD%90.md">第 36 课 RLHF 与人类对齐（Alignment）</a> —— 到这里模型&quot;会预测、会加速&quot;，下一课解决&quot;答得好不好&quot;——用人类偏好把模型对齐到有用、无害、诚实。</p>
+</blockquote>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 51 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：学习率调度 —— warmup + cosine decay</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：Dropout —— 训练时的「随机失忆」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：RMSNorm —— 现代 LLM 的归一化标配</span></a><a class="series-nav-item" href="/post/rust-llm-guide-22/"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">第 22 课：SwiGLU 激活函数 —— LLaMA 的「门控」MLP</span></a><a class="series-nav-item" href="/post/rust-llm-guide-23/"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-24/"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星</span></a><a class="series-nav-item" href="/post/rust-llm-guide-25/"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">第 25 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-26/"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">第 26 课：混合精度训练（AMP）—— 用半精度加速，用全精度保底</span></a><a class="series-nav-item" href="/post/rust-llm-guide-27/"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">第 27 课：GPU 加速 —— 手写 WGSL 计算着色器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-28/"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a><a class="series-nav-item" href="/post/rust-llm-guide-29/"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-30/"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">第 30 课：Beam Search —— 贪心搜索的升级版</span></a><a class="series-nav-item" href="/post/rust-llm-guide-31/"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">第 31 课：Scaling Laws（缩放定律）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-32/"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">第 32 课：MoE 混合专家模型（Mixture of Experts）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-33/"><span class="series-nav-item-index">34</span><span class="series-nav-item-title">第 33 课：量化技术（Quantization）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-34/"><span class="series-nav-item-index">35</span><span class="series-nav-item-title">第 34 课：推测解码（Speculative Decoding）</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-35/"><span class="series-nav-item-index">36</span><span class="series-nav-item-title">第 35 课：多 Token 预测（Multi-Token Prediction）</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-36/"><span class="series-nav-item-index">37</span><span class="series-nav-item-title">第 36 课：RLHF 与人类对齐（Alignment）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-37/"><span class="series-nav-item-index">38</span><span class="series-nav-item-title">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-38/"><span class="series-nav-item-index">39</span><span class="series-nav-item-title">第 38 课：分布式训练（Distributed Training）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-39/"><span class="series-nav-item-index">40</span><span class="series-nav-item-title">第 39 课：工程化完善 —— 从算法实现到可用框架</span></a><a class="series-nav-item" href="/post/rust-llm-guide-40/"><span class="series-nav-item-index">41</span><span class="series-nav-item-title">第 40 课：把模型部署成 API 服务 —— 从「自己跑」到「给别人调」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-41/"><span class="series-nav-item-index">42</span><span class="series-nav-item-title">第 41 课：多模态 —— 图片理解与图片生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-42/"><span class="series-nav-item-index">43</span><span class="series-nav-item-title">第 42 课：知识蒸馏（Knowledge Distillation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-43/"><span class="series-nav-item-index">44</span><span class="series-nav-item-title">第 43 课：FP8 低精度训练（模拟）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-44/"><span class="series-nav-item-index">45</span><span class="series-nav-item-title">第 44 课：WSD 学习率调度（warmup-stable-decay）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-45/"><span class="series-nav-item-index">46</span><span class="series-nav-item-title">第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死</span></a><a class="series-nav-item" href="/post/rust-llm-guide-46/"><span class="series-nav-item-index">47</span><span class="series-nav-item-title">第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化</span></a><a class="series-nav-item" href="/post/rust-llm-guide-47/"><span class="series-nav-item-index">48</span><span class="series-nav-item-title">第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道</span></a><a class="series-nav-item" href="/post/rust-llm-guide-48/"><span class="series-nav-item-index">49</span><span class="series-nav-item-title">第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重</span></a><a class="series-nav-item" href="/post/rust-llm-guide-49/"><span class="series-nav-item-index">50</span><span class="series-nav-item-title">第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</span></a><a class="series-nav-item" href="/post/rust-llm-guide-50/"><span class="series-nav-item-index">51</span><span class="series-nav-item-title">第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-34/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 34 课：推测解码（Speculative Decoding）</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-36/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 36 课：RLHF 与人类对齐（Alignment）</span></a></div></div>
+            </article>
+        </main>
+<footer class="footer-content">
+    <div class="copyright">
+        <span>2019-2026 </span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"/></svg>
+        <span> 干徒 / Ganto</span>
+    </div>
+</footer>
+        </div>
+    </div>
+<script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
+try{document.getElementById('main').innerHTML='';}catch(e){}</script>
+<script type="module">
+import init, * as bindings from '/web-rs-a99f5589204ec566.js';
+const wasm = await init({ module_or_path: '/web-rs-a99f5589204ec566_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script>
+</body>
+</html>

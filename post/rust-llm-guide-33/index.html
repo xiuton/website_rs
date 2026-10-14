@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 33 课：量化技术（Quantization） - 干徒</title>
+    <meta name="description" content="用更少比特表示权重：RTN、Hessian 与 AWQ 三条路线，以及 int8/int4 的精度代价。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 量化">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-33">
+    <meta property="og:title" content="第 33 课：量化技术（Quantization） - 干徒">
+    <meta property="og:description" content="用更少比特表示权重：RTN、Hessian 与 AWQ 三条路线，以及 int8/int4 的精度代价。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-33">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 33 课：量化技术（Quantization） - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 33 课：量化技术（Quantization） - 干徒">
+    <meta name="twitter:description" content="用更少比特表示权重：RTN、Hessian 与 AWQ 三条路线，以及 int8/int4 的精度代价。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 33 课：量化技术（Quantization）","description":"用更少比特表示权重：RTN、Hessian 与 AWQ 三条路线，以及 int8/int4 的精度代价。","url":"https://ganto.me/post/rust-llm-guide-33","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 量化","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-84a0c1a16fd4b1bc.css">
+<link rel="modulepreload" href="/web-rs-a99f5589204ec566.js" crossorigin="anonymous" integrity="sha384-umfTmuv9naxm3y94Bh3NWTfgXO2lsKZY7liOaEQ/zp9/YvxyqCZMSoTUOtOsXZQ6">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous" integrity="sha384-2DHjVGrzcpbms06h5LAGWYB1zXEqfWTjATq1YsBBgX1CE2W+T4mRjoljwlXKhTcj">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous" integrity="sha384-pfz3GoOS0du3Se5f5C1lkvbvMo0g507e24Rcu0dm29CmSCqxguUw3chk5PS1brtF">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
+<link rel="preload" href="/web-rs-a99f5589204ec566_bg.wasm" crossorigin="anonymous" integrity="sha384-RN+hPytGjHtzCa+dPXlgO6NZwHHIA2reMSnH/98AjTuP+/n7D+fZxS0wwqc/Ie6I" as="fetch" type="application/wasm">
+
+    <style>
+:root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+.dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+
+    </style>
+    <style>
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .theme-toggle .icon-sun { display: none; }
+        .dark .theme-toggle .icon-sun { display: inline; }
+        .dark .theme-toggle .icon-moon { display: none; }
+    </style>
+    <script>
+(function() {
+    if (location.pathname.length > 1 && location.pathname.endsWith('/')) {
+        history.replaceState(null, '', location.pathname.replace(/\/+$/, '') + location.search + location.hash);
+    }
+    var theme = localStorage.getItem('theme');
+    if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+    }
+    var tbtn = document.getElementById('prerender-theme-toggle');
+    if (tbtn) {
+        tbtn.addEventListener('click', function() {
+            var d = document.documentElement;
+            var dark = d.classList.toggle('dark');
+            localStorage.setItem('theme', dark ? 'dark' : 'light');
+        });
+    }
+})();
+    </script>
+</head>
+<body>
+    <div id="main">
+        <div class="app">
+<div class="navbar-content">
+    <div class="navbar-ui">
+        <div class="navbar-title-wrapper">
+            <h1 class="navbar-title">干徒</h1>
+            <div class="navbar-glow"></div>
+        </div>
+        <div class="navbar-subtitle">这很酷</div>
+    </div>
+</div>
+<div class="navbar-sticky-wrap">
+    <div class="navbar-links">
+        <a class="nav-link nav-active" href="/">首页</a>
+        <a class="nav-link" href="/about">关于</a>
+        <a class="nav-link" href="/tags">书签</a>
+        <a class="nav-link" href="/search">搜索</a>
+        <a class="nav-link" href="/knowledge-graph">图谱</a>
+        <a class="nav-link" href="/ai-summary">AI摘要</a>
+        <div class="nav-item-with-sub">
+            <a class="nav-link" href="/dev">开发</a>
+            <div class="nav-submenu">
+                <a class="nav-sub-link" href="/circle-generator">圆形生成器</a>
+            </div>
+        </div>
+        <a class="nav-icon-btn rss-toggle" href="/rss" title="RSS 订阅" aria-label="RSS 订阅">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"/></svg>
+        </a>
+        <button class="nav-icon-btn theme-toggle" id="prerender-theme-toggle" aria-label="切换主题" title="切换主题">
+            <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
+            <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="16" height="16" fill="currentColor"><path d="M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"/></svg>
+        </button>
+    </div>
+</div>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 33 课：量化技术（Quantization）</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-01</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">量化</span></div>
+                <div class="blog-content">
+<h1><a href="#第-33-课量化技术quantization" aria-hidden="true" class="anchor" id="user-content-第-33-课量化技术quantization"></a>第 33 课：量化技术（Quantization）</h1>
+<blockquote>
+<p><strong>本课已落地为可运行代码</strong>：<code>src/quant.rs</code>（单测跑 <code>cargo test quant</code>，数量以实际输出为准）+ <code>quant</code> 子命令——RTN / Hessian 量化 / AWQ 三种
+weight-only 量化、int8 / int4、校准集（Hessian <code>XᵀX</code>、act-order、阻尼、分块）、逐层误差报告与落盘。
+与已有代码的衔接：量化作用于 <code>src/tensor.rs</code> 中的权重数据（<code>Vec&lt;f32&gt;</code>），
+checkpoint（<code>src/checkpoint.rs</code>，<code>LLMCP2</code>）头部会记一笔 <code>QuantMeta</code>（位宽 + 算法，旧档为 <code>None</code>）：
+存档里写出的仍是 f32 权重，需要省显存时按这份记录调 <code>requantize_after_load</code> 重放一次量化即可。</p>
+</blockquote>
+<hr />
+<h2><a href="#1-为什么需要量化" aria-hidden="true" class="anchor" id="user-content-1-为什么需要量化"></a>1. 为什么需要量化？</h2>
+<p>一个 7B 参数的模型，以 FP32 存储需要 <strong>28GB</strong> 显存（7B × 4字节），以 FP16 也需要 <strong>14GB</strong>。
+这意味着普通消费级显卡（如 RTX 3060 12GB）根本放不下一个 7B 模型。</p>
+<p>量化的核心思想：<strong>用更少的比特数表示每个参数</strong>。</p>
+<table>
+<thead>
+<tr>
+<th>精度</th>
+<th>每参数字节</th>
+<th>7B 模型大小</th>
+<th>精度损失</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FP32</td>
+<td>4</td>
+<td>28 GB</td>
+<td>无</td>
+</tr>
+<tr>
+<td>FP16/BF16</td>
+<td>2</td>
+<td>14 GB</td>
+<td>极小</td>
+</tr>
+<tr>
+<td>INT8</td>
+<td>1</td>
+<td>7 GB</td>
+<td>小</td>
+</tr>
+<tr>
+<td>INT4</td>
+<td>0.5</td>
+<td>3.5 GB</td>
+<td>中等</td>
+</tr>
+<tr>
+<td>INT2</td>
+<td>0.25</td>
+<td>1.75 GB</td>
+<td>较大</td>
+</tr>
+</tbody>
+</table>
+<h2><a href="#2-量化的基本原理" aria-hidden="true" class="anchor" id="user-content-2-量化的基本原理"></a>2. 量化的基本原理</h2>
+<h3><a href="#21-线性量化公式" aria-hidden="true" class="anchor" id="user-content-21-线性量化公式"></a>2.1 线性量化公式</h3>
+<p>$$
+x_q = \text{round}\left(\frac{x}{s}\right) + z
+$$</p>
+<p>其中：</p>
+<ul>
+<li>$s$ 是<strong>缩放因子（scale）</strong></li>
+<li>$z$ 是<strong>零点（zero point）</strong></li>
+<li>$x_q$ 是量化后的整数值</li>
+</ul>
+<p>反量化（从整数恢复浮点近似值）：</p>
+<p>$$
+\hat{x} = s \cdot (x_q - z)
+$$</p>
+<h3><a href="#22-对称量化-vs-非对称量化" aria-hidden="true" class="anchor" id="user-content-22-对称量化-vs-非对称量化"></a>2.2 对称量化 vs 非对称量化</h3>
+<p><strong>对称量化</strong>（Symmetric）：零点固定为 0，数据范围关于 0 对称
+$$
+s = \frac{\max(|x|)}{2^{b-1} - 1}, \quad z = 0
+$$</p>
+<p><strong>非对称量化</strong>（Asymmetric）：零点可变，适合数据分布不对称的情况
+$$
+s = \frac{\max(x) - \min(x)}{2^b - 1}, \quad z = \text{round}\left(\frac{-\min(x)}{s}\right)
+$$</p>
+<h2><a href="#3-量化粒度" aria-hidden="true" class="anchor" id="user-content-3-量化粒度"></a>3. 量化粒度</h2>
+<table>
+<thead>
+<tr>
+<th>粒度</th>
+<th>说明</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Per-Tensor</strong></td>
+<td>整个张量共享一组 scale/zero_point</td>
+<td>简单但精度低</td>
+</tr>
+<tr>
+<td><strong>Per-Channel</strong></td>
+<td>每个输出通道一组 scale/zero_point</td>
+<td>权重量化常用</td>
+</tr>
+<tr>
+<td><strong>Per-Group</strong></td>
+<td>每 g 个元素一组（如 g=128）</td>
+<td>Hessian 量化/AWQ 常用</td>
+</tr>
+<tr>
+<td><strong>Per-Token</strong></td>
+<td>每个 token 的激活值一组</td>
+<td>激活值量化</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>直觉</strong>：张量不同位置的数值范围差异很大。Per-Group 量化给每 128 个元素一个独立的 scale，比整个张量共用一个 scale 精度高得多。</p>
+</blockquote>
+<h2><a href="#4-量化方法分类" aria-hidden="true" class="anchor" id="user-content-4-量化方法分类"></a>4. 量化方法分类</h2>
+<h3><a href="#41-训练后量化post-training-quantization-ptq" aria-hidden="true" class="anchor" id="user-content-41-训练后量化post-training-quantization-ptq"></a>4.1 训练后量化（Post-Training Quantization, PTQ）</h3>
+<p>模型训练完后直接量化，<strong>不需要重新训练</strong>。</p>
+<h4><a href="#round-to-nearestrtn" aria-hidden="true" class="anchor" id="user-content-round-to-nearestrtn"></a>Round-to-Nearest（RTN）</h4>
+<p>最简单的量化方法：直接四舍五入到最近的整数格点。</p>
+<p>$$
+W_q = \text{round}(W / s) \cdot s
+$$</p>
+<p><strong>缺点</strong>：INT4 下精度损失大（误差是逐列独立的，没有误差补偿）。</p>
+<h4><a href="#hessian-量化2022" aria-hidden="true" class="anchor" id="user-content-hessian-量化2022"></a>Hessian 量化（2022）</h4>
+<p>基于**二阶信息（Hessian）**的逐层量化：量化某一列时，用 Hessian 信息补偿剩余列的误差。</p>
+<p>核心思想（OBQ/OBS 方法）：</p>
+<ol>
+<li>量化权重 $w_q$ 的某一列</li>
+<li>未量化的列用 Hessian 逆矩阵调整，补偿量化误差</li>
+<li>逐列推进，每列量化后都更新剩余列</li>
+</ol>
+<p>$$
+\delta_{\text{col}} = -\frac{w_q - \text{quant}(w_q)}{[H^{-1}]<em>{qq}} \cdot (H^{-1})</em>{:,q}
+$$</p>
+<p><strong>优势</strong>：INT4 下精度远好于 RTN，是目前最广泛使用的 PTQ 方法之一。</p>
+<h4><a href="#awqactivation-aware-weight-quantization2023" aria-hidden="true" class="anchor" id="user-content-awqactivation-aware-weight-quantization2023"></a>AWQ（Activation-aware Weight Quantization，2023）</h4>
+<p>核心洞察：<strong>不是所有权重同等重要</strong>。对应激活值大的权重通道更重要（对输出影响更大）。</p>
+<p>做法：量化前先对权重按激活值的重要性做缩放（per-channel scaling），再量化。</p>
+<p>$$
+W' = W \cdot \text{diag}(s), \quad s_j = \left(\frac{|X_j|_{\text{mean}}}{\max(|X|_{\text{mean}})}\right)^{\alpha}
+$$</p>
+<h4><a href="#gguf--llamacpp" aria-hidden="true" class="anchor" id="user-content-gguf--llamacpp"></a>GGUF / llama.cpp</h4>
+<p>实际部署中最流行的量化格式（由 llama.cpp 项目定义）：</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Q4_0</td>
+<td>4-bit 对称量化，每 32 个权重一组</td>
+</tr>
+<tr>
+<td>Q4_K_M</td>
+<td>4-bit，K-quant，中等质量</td>
+</tr>
+<tr>
+<td>Q5_K_M</td>
+<td>5-bit，K-quant，较高质量</td>
+</tr>
+<tr>
+<td>Q8_0</td>
+<td>8-bit 对称量化</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#42-量化感知训练quantization-aware-training-qat" aria-hidden="true" class="anchor" id="user-content-42-量化感知训练quantization-aware-training-qat"></a>4.2 量化感知训练（Quantization-Aware Training, QAT）</h3>
+<p>在训练过程中模拟量化效果，让模型&quot;学会&quot;适应低精度表示。</p>
+<pre><code>前向传播：
+  W_fake = quantize(W_real)   // 前向用量化权重（模拟推理）
+  y = x @ W_fake
+
+反向传播：
+  grad 通过 STE (Straight-Through Estimator) 传回 W_real
+  W_real -= lr * grad         // 更新原始高精度权重
+</code></pre>
+<p><strong>STE（直通估计器）</strong>：量化操作的梯度在数学上是 0（round 不可微），STE 假设梯度直接穿过量化层，即 $\frac{\partial W_q}{\partial W} \approx 1$。</p>
+<h3><a href="#43-量化在-llm-推理中的实际应用" aria-hidden="true" class="anchor" id="user-content-43-量化在-llm-推理中的实际应用"></a>4.3 量化在 LLM 推理中的实际应用</h3>
+<pre><code>原始 FP16 模型 (14GB)
+  ↓ Hessian 量化 / AWQ / GGUF 量化
+INT4 模型 (3.5GB)
+  ↓ 在 RTX 3060 (12GB) 上加载
+  ↓ 推理时反量化到 FP16 做矩阵乘
+  ↓ 性能损失 &lt; 2%（perplexity 增加 &lt; 0.5）
+</code></pre>
+<h2><a href="#5-int8-量化详细过程" aria-hidden="true" class="anchor" id="user-content-5-int8-量化详细过程"></a>5. INT8 量化详细过程</h2>
+<p>以权重矩阵 $W \in \mathbb{R}^{m \times n}$ 的 Per-Channel INT8 量化为例：</p>
+<pre><code>对于每个输出通道 j (共 n 个):
+  1. 计算该通道的最大绝对值: max_j = max(|W[:, j]|)
+  2. 计算缩放因子: scale_j = max_j / 127
+  3. 量化: W_q[:, j] = round(W[:, j] / scale_j)   // 范围 [-127, 127]
+  4. 存储: W_q (INT8) + scale (FP32, 每通道一个)
+
+推理时:
+  1. 反量化: W_hat[:, j] = W_q[:, j] * scale_j    // 恢复到 FP16
+  2. 正常矩阵乘: Y = X @ W_hat
+</code></pre>
+<h2><a href="#6-混合精度量化mixed-precision-quantization" aria-hidden="true" class="anchor" id="user-content-6-混合精度量化mixed-precision-quantization"></a>6. 混合精度量化（Mixed-Precision Quantization）</h2>
+<p>不同层对量化的敏感度不同：</p>
+<ul>
+<li><strong>Embedding 层</strong>和<strong>输出层</strong>对精度敏感（直接影响词预测），通常保持 FP16</li>
+<li><strong>注意力层</strong>中等敏感，可用 INT8</li>
+<li><strong>FFN 层</strong>参数量最大但相对鲁棒，可用 INT4</li>
+</ul>
+<pre><code>Embedding (FP16) → Attention (INT8) → FFN (INT4) → ... → Output (FP16)
+</code></pre>
+<h2><a href="#7-本仓库实现要点" aria-hidden="true" class="anchor" id="user-content-7-本仓库实现要点"></a>7. 本仓库实现要点</h2>
+<p>上面的原理已全部落地为可运行代码。核心文件是 <a href="../src/quant.rs"><code>src/quant.rs</code></a>（单测跑 <code>cargo test quant</code>，数量以实际输出为准），
+CLI 入口是 <a href="../README.md"><code>quant</code></a> 子命令。</p>
+<h3><a href="#71-代码结构" aria-hidden="true" class="anchor" id="user-content-71-代码结构"></a>7.1 代码结构</h3>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>位置</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>QBits</code> / <code>QAxis</code> / <code>QuantMeta</code></td>
+<td><code>quant.rs</code></td>
+<td>位宽、量化轴、元信息（位宽 + 算法名）</td>
+</tr>
+<tr>
+<td><code>quantize_channel_sym</code> / <code>quantize_row_sym</code></td>
+<td><code>quant.rs</code></td>
+<td>对称量化 + 反量化（逐通道 / 逐 token）</td>
+</tr>
+<tr>
+<td><code>pack_u8</code> / <code>unpack_u8</code> / <code>pack_u4</code> / <code>unpack_u4</code></td>
+<td><code>quant.rs</code></td>
+<td>位打包与往返</td>
+</tr>
+<tr>
+<td><code>hess_quantize_with_hinv</code></td>
+<td><code>quant.rs</code></td>
+<td>Hessian 量化：Cholesky 逆 + 逐通道误差补偿 + 分块 + act-order</td>
+</tr>
+<tr>
+<td><code>awq_best_alpha</code></td>
+<td><code>quant.rs</code></td>
+<td>AWQ：按代理误差在 0~1 网格搜索最优缩放指数 α</td>
+</tr>
+<tr>
+<td><code>Calibration</code></td>
+<td><code>quant.rs</code></td>
+<td>Hessian <code>XᵀX</code> + 激活均值 + 合并，供 Hessian 量化/AWQ 校准</td>
+</tr>
+<tr>
+<td><code>Transformer::quantize_weights</code> / <code>dequantize_weights</code></td>
+<td><code>model.rs</code></td>
+<td>逐层量化 / 反量化（挂到模型权重上）</td>
+</tr>
+<tr>
+<td><code>requantize_after_load</code></td>
+<td><code>checkpoint.rs</code></td>
+<td>加载后按 <code>QuantMeta</code> 重放量化（存档写 f32，省显存时重放）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>退化诚实性</strong>：只有拿到<strong>全矩阵 Hessian</strong> 才是真 Hessian 量化——对角 Hessian 的 $H^{-1}$ 是对角阵，
+补偿量恒为 0，<code>hess_quantize</code> 内部直接走 <code>hinv = None</code>，码值与 RTN 逐位相同；缺校准统计同样退回 RTN。
+因此 <code>Linear::quantize_weight</code> 只在 <code>HessianKind::Full</code> 时才把该层记成 <code>QuantMethod::Hess</code>，
+否则如实记 <code>Rtn</code>；<code>QuantSummary::degraded</code> 统计&quot;请求的算法没真正生效&quot;的层数，
+<code>describe()</code> 会在摘要里追加警告（见 <code>src/layers.rs</code> 的 <code>real_hess</code> 判定）。
+校准规模默认 <code>CalibOpts::max_tokens = 4096</code>（该量化论文常用量级）：512 时 Hessian 的
+通道协方差估计噪声明显，补偿质量打折。</p>
+<h3><a href="#72-cli-用法" aria-hidden="true" class="anchor" id="user-content-72-cli-用法"></a>7.2 CLI 用法</h3>
+<pre><code class="language-bash"># RTN 直接取整（不需要校准集）
+cargo run --release -- quant --bits int8 --method rtn
+
+# Hessian 量化（默认 64 样本校准 + act-order + 阻尼）
+cargo run --release -- quant --bits int4 --method hess --eval
+
+# AWQ（逐层搜索最优 α）
+cargo run --release -- quant --bits int8 --method awq --eval
+
+# 落盘量化权重（out_dir/quant.ckpt）
+cargo run --release -- quant --bits int8 --method hess --out out_dir/quant.ckpt
+</code></pre>
+<hr />
+<h2><a href="#8-小结与下一课" aria-hidden="true" class="anchor" id="user-content-8-小结与下一课"></a>8. 小结与下一课</h2>
+<h3><a href="#本课小结" aria-hidden="true" class="anchor" id="user-content-本课小结"></a>本课小结</h3>
+<ul>
+<li>量化的本质是&quot;用更少的比特表示每个参数&quot;：FP32 的 7B 模型 28GB，INT8 掉到 7GB、INT4 掉到 3.5GB</li>
+<li>两条基本口径：对称量化（<code>z = 0</code>，权重常用）与非对称量化（<code>z</code> 可变，适合分布不对称的激活）</li>
+<li>粒度决定精度：Per-Tensor → Per-Channel → Per-Group（Hessian / AWQ 常用）→ Per-Token</li>
+<li>PTQ 三条路线：RTN（最简单）、Hessian（逐列误差补偿，INT4 下远好于 RTN）、AWQ（按激活重要性缩放）</li>
+<li>QAT 用 STE 让梯度穿过 <code>round</code>，让模型&quot;学会&quot;适应低精度</li>
+<li>本仓库把上面原理全部落地为 <code>src/quant.rs</code> + <code>quant</code> 子命令，并有<strong>退化诚实性</strong>约束：只有拿到全矩阵 Hessian 才记成 <code>Hess</code>，否则如实记 <code>Rtn</code> 并由 <code>degraded</code> 统计（§7.1）</li>
+</ul>
+<h3><a href="#拓展方向" aria-hidden="true" class="anchor" id="user-content-拓展方向"></a>拓展方向</h3>
+<blockquote>
+<p>核心内容已全部实现（<code>src/quant.rs</code> + <code>quant</code> 子命令），这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li><strong>实现 INT8 量化</strong>：写一个函数，接受 FP32 张量，输出 INT8 量化值 + scale，再实现反量化。</li>
+<li><strong>量化误差分析</strong>：对比原始 FP32 权重和 INT8 反量化后的权重，计算 MSE 和最大误差。</li>
+<li><strong>Per-Channel vs Per-Tensor</strong>：分别用两种粒度量化同一个权重矩阵，对比精度差异。</li>
+<li><strong>PTQ 推理对比</strong>：将模型权重 INT8 量化后做推理，对比量化前后的 loss / 困惑度。</li>
+<li><strong>换一套数值表示</strong>：本课的量化是&quot;整数码 + scale&quot;这条线（int8 / int4）；训练侧还有另一条线——
+<strong>8 位浮点（FP8，E4M3 / E5M2）</strong>，见<a href="43-FP8%E4%BD%8E%E7%B2%BE%E5%BA%A6.md">第 43 课</a>。对比两者在误差分布上的差别：
+定点量化的误差是绝对均匀的，浮点的相对误差才均匀，所以 FP8 能装下跨越几个数量级的梯度。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="34-%E6%8E%A8%E6%B5%8B%E8%A7%A3%E7%A0%81.md">第 34 课 推测解码（Speculative Decoding）</a> —— 量化省的是显存与带宽，下一课从&quot;一次生成多个 token&quot;的角度解决同一个 memory-bound 瓶颈。</p>
+</blockquote>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 51 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：学习率调度 —— warmup + cosine decay</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：Dropout —— 训练时的「随机失忆」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：RMSNorm —— 现代 LLM 的归一化标配</span></a><a class="series-nav-item" href="/post/rust-llm-guide-22/"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">第 22 课：SwiGLU 激活函数 —— LLaMA 的「门控」MLP</span></a><a class="series-nav-item" href="/post/rust-llm-guide-23/"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-24/"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星</span></a><a class="series-nav-item" href="/post/rust-llm-guide-25/"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">第 25 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-26/"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">第 26 课：混合精度训练（AMP）—— 用半精度加速，用全精度保底</span></a><a class="series-nav-item" href="/post/rust-llm-guide-27/"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">第 27 课：GPU 加速 —— 手写 WGSL 计算着色器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-28/"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a><a class="series-nav-item" href="/post/rust-llm-guide-29/"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-30/"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">第 30 课：Beam Search —— 贪心搜索的升级版</span></a><a class="series-nav-item" href="/post/rust-llm-guide-31/"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">第 31 课：Scaling Laws（缩放定律）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-32/"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">第 32 课：MoE 混合专家模型（Mixture of Experts）</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-33/"><span class="series-nav-item-index">34</span><span class="series-nav-item-title">第 33 课：量化技术（Quantization）</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-34/"><span class="series-nav-item-index">35</span><span class="series-nav-item-title">第 34 课：推测解码（Speculative Decoding）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-35/"><span class="series-nav-item-index">36</span><span class="series-nav-item-title">第 35 课：多 Token 预测（Multi-Token Prediction）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-36/"><span class="series-nav-item-index">37</span><span class="series-nav-item-title">第 36 课：RLHF 与人类对齐（Alignment）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-37/"><span class="series-nav-item-index">38</span><span class="series-nav-item-title">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-38/"><span class="series-nav-item-index">39</span><span class="series-nav-item-title">第 38 课：分布式训练（Distributed Training）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-39/"><span class="series-nav-item-index">40</span><span class="series-nav-item-title">第 39 课：工程化完善 —— 从算法实现到可用框架</span></a><a class="series-nav-item" href="/post/rust-llm-guide-40/"><span class="series-nav-item-index">41</span><span class="series-nav-item-title">第 40 课：把模型部署成 API 服务 —— 从「自己跑」到「给别人调」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-41/"><span class="series-nav-item-index">42</span><span class="series-nav-item-title">第 41 课：多模态 —— 图片理解与图片生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-42/"><span class="series-nav-item-index">43</span><span class="series-nav-item-title">第 42 课：知识蒸馏（Knowledge Distillation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-43/"><span class="series-nav-item-index">44</span><span class="series-nav-item-title">第 43 课：FP8 低精度训练（模拟）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-44/"><span class="series-nav-item-index">45</span><span class="series-nav-item-title">第 44 课：WSD 学习率调度（warmup-stable-decay）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-45/"><span class="series-nav-item-index">46</span><span class="series-nav-item-title">第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死</span></a><a class="series-nav-item" href="/post/rust-llm-guide-46/"><span class="series-nav-item-index">47</span><span class="series-nav-item-title">第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化</span></a><a class="series-nav-item" href="/post/rust-llm-guide-47/"><span class="series-nav-item-index">48</span><span class="series-nav-item-title">第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道</span></a><a class="series-nav-item" href="/post/rust-llm-guide-48/"><span class="series-nav-item-index">49</span><span class="series-nav-item-title">第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重</span></a><a class="series-nav-item" href="/post/rust-llm-guide-49/"><span class="series-nav-item-index">50</span><span class="series-nav-item-title">第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</span></a><a class="series-nav-item" href="/post/rust-llm-guide-50/"><span class="series-nav-item-index">51</span><span class="series-nav-item-title">第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-32/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 32 课：MoE 混合专家模型（Mixture of Experts）</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-34/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 34 课：推测解码（Speculative Decoding）</span></a></div></div>
+            </article>
+        </main>
+<footer class="footer-content">
+    <div class="copyright">
+        <span>2019-2026 </span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"/></svg>
+        <span> 干徒 / Ganto</span>
+    </div>
+</footer>
+        </div>
+    </div>
+<script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
+try{document.getElementById('main').innerHTML='';}catch(e){}</script>
+<script type="module">
+import init, * as bindings from '/web-rs-a99f5589204ec566.js';
+const wasm = await init({ module_or_path: '/web-rs-a99f5589204ec566_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script>
+</body>
+</html>

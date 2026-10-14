@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩 - 干徒</title>
+    <meta name="description" content="按块压缩 KV 的「个数」，用局部 + 细压缩 + 粗压缩三层覆盖把长上下文开销压下来。">
+    <meta name="author" content="干徒">
+    <meta name="keywords" content="Rust, LLM, 注意力">
+    <link rel="canonical" href="https://ganto.me/post/rust-llm-guide-49">
+    <meta property="og:title" content="第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩 - 干徒">
+    <meta property="og:description" content="按块压缩 KV 的「个数」，用局部 + 细压缩 + 粗压缩三层覆盖把长上下文开销压下来。">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ganto.me/post/rust-llm-guide-49">
+    <meta property="og:site_name" content="干徒的博客">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩 - 干徒">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩 - 干徒">
+    <meta name="twitter:description" content="按块压缩 KV 的「个数」，用局部 + 细压缩 + 粗压缩三层覆盖把长上下文开销压下来。">
+    <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩","description":"按块压缩 KV 的「个数」，用局部 + 细压缩 + 粗压缩三层覆盖把长上下文开销压下来。","url":"https://ganto.me/post/rust-llm-guide-49","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 注意力","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+    </script>
+    <link rel="stylesheet" href="/styles-84a0c1a16fd4b1bc.css">
+<link rel="modulepreload" href="/web-rs-a99f5589204ec566.js" crossorigin="anonymous" integrity="sha384-umfTmuv9naxm3y94Bh3NWTfgXO2lsKZY7liOaEQ/zp9/YvxyqCZMSoTUOtOsXZQ6">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous" integrity="sha384-2DHjVGrzcpbms06h5LAGWYB1zXEqfWTjATq1YsBBgX1CE2W+T4mRjoljwlXKhTcj">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous" integrity="sha384-E7XrAE0tjDaRj+uif7xg0rIvO4VMl9KbHNgq94n8VQaTlxijO4YyNOEWxo5jD9IU">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous" integrity="sha384-lNXbLTw7Z18z5HtM0HV3R7/8J+II5Ei18I53QeIZolR+l1nGEBr27UjMtT/DJpiC">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous" integrity="sha384-pfz3GoOS0du3Se5f5C1lkvbvMo0g507e24Rcu0dm29CmSCqxguUw3chk5PS1brtF">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous" integrity="sha384-5JBHRbmtlt+1itRKLdoRs4hjdIQ0pUfmNhwtAJCq+u7x+x3KJJzzps279xv7KZFv">
+<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous" integrity="sha384-63GOaGGIhEHCB9m4vzzYEBfUIIUWiAYuNlk/LB2TuDDcjK13LO2II01K9xxO0fFG">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous" integrity="sha384-xqSmg18C2FmchYWi9fb4cSqOW4ZNNo4b7NWZK1eW+fOqg4no+2F+zETwKUf1PJy3">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous" integrity="sha384-2v8X0XAeO26J0vmoLhIbIeAjVzFnrY9iLhlYJcksTMp7Ip2tbDcoX4vD/hCan7M7">
+<link rel="preload" href="/web-rs-a99f5589204ec566_bg.wasm" crossorigin="anonymous" integrity="sha384-RN+hPytGjHtzCa+dPXlgO6NZwHHIA2reMSnH/98AjTuP+/n7D+fZxS0wwqc/Ie6I" as="fetch" type="application/wasm">
+
+    <style>
+:root {
+            --bg-base: #f8f4ed;
+            --bg-elevated: #fdfbf7;
+            --bg-subtle: #f0ebe0;
+            --text-primary: #3e3327;
+            --text-secondary: #7a6c5a;
+            --text-tertiary: #a49480;
+            --border-default: #e0d6c5;
+            --border-subtle: #ede4d5;
+            --accent: #6a9b50;
+            --accent-rgb: 106, 155, 80;
+            --accent-soft: rgba(106, 155, 80, 0.1);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --radius-full: 999px;
+        }
+.dark {
+            --bg-base: #1b1612;
+            --bg-elevated: #241e19;
+            --bg-subtle: #2d2620;
+            --text-primary: #ede4d6;
+            --text-secondary: #b0a290;
+            --text-tertiary: #7d7060;
+            --border-default: #3a3229;
+            --border-subtle: #2a241f;
+            --accent: #78b860;
+            --accent-rgb: 120, 184, 96;
+            --accent-soft: rgba(120, 184, 96, 0.12);
+        }
+
+    </style>
+    <style>
+        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .theme-toggle .icon-sun { display: none; }
+        .dark .theme-toggle .icon-sun { display: inline; }
+        .dark .theme-toggle .icon-moon { display: none; }
+    </style>
+    <script>
+(function() {
+    if (location.pathname.length > 1 && location.pathname.endsWith('/')) {
+        history.replaceState(null, '', location.pathname.replace(/\/+$/, '') + location.search + location.hash);
+    }
+    var theme = localStorage.getItem('theme');
+    if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+    }
+    var tbtn = document.getElementById('prerender-theme-toggle');
+    if (tbtn) {
+        tbtn.addEventListener('click', function() {
+            var d = document.documentElement;
+            var dark = d.classList.toggle('dark');
+            localStorage.setItem('theme', dark ? 'dark' : 'light');
+        });
+    }
+})();
+    </script>
+</head>
+<body>
+    <div id="main">
+        <div class="app">
+<div class="navbar-content">
+    <div class="navbar-ui">
+        <div class="navbar-title-wrapper">
+            <h1 class="navbar-title">干徒</h1>
+            <div class="navbar-glow"></div>
+        </div>
+        <div class="navbar-subtitle">这很酷</div>
+    </div>
+</div>
+<div class="navbar-sticky-wrap">
+    <div class="navbar-links">
+        <a class="nav-link nav-active" href="/">首页</a>
+        <a class="nav-link" href="/about">关于</a>
+        <a class="nav-link" href="/tags">书签</a>
+        <a class="nav-link" href="/search">搜索</a>
+        <a class="nav-link" href="/knowledge-graph">图谱</a>
+        <a class="nav-link" href="/ai-summary">AI摘要</a>
+        <div class="nav-item-with-sub">
+            <a class="nav-link" href="/dev">开发</a>
+            <div class="nav-submenu">
+                <a class="nav-sub-link" href="/circle-generator">圆形生成器</a>
+            </div>
+        </div>
+        <a class="nav-icon-btn rss-toggle" href="/rss" title="RSS 订阅" aria-label="RSS 订阅">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"/></svg>
+        </a>
+        <button class="nav-icon-btn theme-toggle" id="prerender-theme-toggle" aria-label="切换主题" title="切换主题">
+            <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
+            <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="16" height="16" fill="currentColor"><path d="M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"/></svg>
+        </button>
+    </div>
+</div>
+        <main class="main-content">
+            <article class="blog-post prerender-article">
+                <h1>第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</h1>
+                <div class="prerender-meta">
+                    <span>2026-09-01</span>
+                    <span>干徒</span>
+                </div>
+                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">注意力</span></div>
+                <div class="blog-content">
+<h1><a href="#第-49-课csa--hca-混合注意力--把长序列注意力分层压缩" aria-hidden="true" class="anchor" id="user-content-第-49-课csa--hca-混合注意力--把长序列注意力分层压缩"></a>第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</h1>
+<blockquote>
+<p><strong>本课已落地为可运行代码</strong>：<a href="../src/csa.rs"><code>src/csa.rs</code></a>（三层覆盖 + 覆盖不变式 + 解析账本），
+接入 <a href="../src/attention.rs"><code>src/attention.rs</code></a> 的注意力分派与 <a href="../src/model.rs"><code>src/model.rs</code></a> 的 <code>TransformerBlock</code>，
+演示命令 <a href="../src/cmd/experiments.rs"><code>src/cmd/experiments.rs</code></a> 的 <code>cmd_csa</code>。
+配置开关：<code>model.csa_block</code> / <code>csa_top_k</code> / <code>hca_block</code>（默认全 <code>0</code> = 关闭）/ 命令 <code>cargo run -- csa</code>。</p>
+<p>与第 23 课（MLA）/ 第 25 课（Flash Attention）的关系：Flash Attention 解决的是<strong>怎么把
+全量注意力算得省内存</strong>，但它每个 query 仍然要看 <code>O(T)</code> 个 key；MLA 压的是 KV 的<strong>维度</strong>。
+本课压的是 KV 的<strong>个数</strong>——把&quot;每个 query 能看多少 key&quot;从 <code>T</code> 降到 <code>m + k + T/(m·h)</code>，
+这是长上下文（几十万 token）里真正卡脖子的那一维。</p>
+</blockquote>
+<hr />
+<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<ol>
+<li>长序列注意力的瓶颈到底是&quot;内存&quot;还是&quot;算力&quot;？为什么 Flash Attention 不够？</li>
+<li>为什么&quot;把序列按块做均值&quot;能压缩？压缩之后一个 query 还能不能看到<strong>全部历史</strong>？</li>
+<li>最重要的一个问题：一个压缩块<strong>什么时候</strong>才允许被看见？为什么是&quot;块末位置 ≤ i&quot;而不是&quot;块起点 ≤ i&quot;？</li>
+<li>三层（局部 / 细压缩 / 粗压缩）各自解决什么？为什么它们能并进<strong>一次</strong> softmax？</li>
+<li>压缩换来了什么、代价是什么？（本课的账本：KV 字节 + 每 query 槽位数）</li>
+</ol>
+<hr />
+<h2><a href="#2-为什么要压缩而不是更快的全量注意力" aria-hidden="true" class="anchor" id="user-content-2-为什么要压缩而不是更快的全量注意力"></a>2. 为什么要&quot;压缩&quot;而不是&quot;更快的全量注意力&quot;</h2>
+<p>Flash Attention 的在线 softmax 让中间矩阵 <code>P</code> 不落地，显存从 <code>O(T²)</code> 降到 <code>O(T)</code>。
+但<strong>计算量没变</strong>：每个 query 仍要跟 <code>T</code> 个 key 打分，总 FLOPs 还是 <code>O(T²·d)</code>。
+当 <code>T = 256K</code> 时，即便显存够，算力与访存也扛不住。</p>
+<p>要真正压下去，只有一条路：<strong>让每个 query 不必看全部 key</strong>。这就是稀疏 / 压缩注意力。
+本课采用的分层做法与 DeepSeek 系列的长上下文思路一致：</p>
+<pre><code class="language-text">   Level 0 局部全分辨率：最近 m 个位置，一个不漏          —— 保证&quot;眼前看得清&quot;
+   Level 1 细压缩（CSA）：已完成的 m 长块做块内均值压缩，
+                          再按 q·Kc 打分做 top-k 稀疏选择 —— 保证&quot;远处有重点&quot;
+   Level 2 粗压缩（HCA）：把 Level 1 的块再压 hca_block 倍，
+                          稠密注意力，提供廉价全局覆盖     —— 保证&quot;再远也不瞎&quot;
+</code></pre>
+<p>三层覆盖的位置<strong>合并</strong>起来，才是这个 query 真正&quot;看到&quot;的上下文。</p>
+<hr />
+<h2><a href="#3-块均值压缩csa-的基石" aria-hidden="true" class="anchor" id="user-content-3-块均值压缩csa-的基石"></a>3. 块均值压缩：CSA 的基石</h2>
+<p>把序列按 <code>m</code> 切成块，每块用<strong>块内均值</strong>当它的代表向量：</p>
+<pre><code class="language-text">  K_c[j] = (1/m) · Σ_{s=0}^{m-1} K[j·m + s]        // 第 j 个块的代表 key
+  V_c[j] = (1/m) · Σ_{s=0}^{m-1} V[j·m + s]        // 第 j 个块的代表 value
+</code></pre>
+<p>块均值是一个<strong>线性</strong>算子（求和后乘 <code>1/m</code>），所以它对 <code>K</code> / <code>V</code> 是**(反)可微的**——
+<code>block_mean</code> 的梯度会平均地摊回块内每个原始位置。这条性质很重要：CSA 不是&quot;先离线压好、
+再当常数用&quot;，而是就长在计算图里、端到端训练。</p>
+<h3><a href="#31-关键判据块末位置--i-才算完成" aria-hidden="true" class="anchor" id="user-content-31-关键判据块末位置--i-才算完成"></a>3.1 关键判据：块<strong>末位置</strong> ≤ i 才算完成</h3>
+<p>这是本课最容易写错、也最危险的一处。query <code>i</code> 只能看<strong>已经完全落在它之前</strong>的块：</p>
+<pre><code class="language-text">  B_i = floor((i+1) / m)          // 严格正确的&quot;已完成块数&quot;
+  可见块 = 第 0..B_i-1 块          // 覆盖原始位置 [0, B_i·m)
+</code></pre>
+<p><strong>绝对不是</strong> <code>块起点 ≤ i</code>。举个例子，<code>m = 4</code>、<code>i = 2</code>：</p>
+<ul>
+<li>第 0 块的起点是 <code>0 ≤ 2</code>，但它的成员是位置 <code>0,1,2,3</code>——位置 <code>3</code> 还没生成。</li>
+<li>若按&quot;块起点 ≤ i&quot;判定，就把未来的 token <code>3</code> 平均进了 <code>K_c[0]</code>，query <code>i=2</code> 于是&quot;偷看&quot;到了位置 3。</li>
+<li>训练时这会让 loss 虚假地变好，推理时又根本复现不了——是所有因果注意力里最典型的信息泄漏。</li>
+</ul>
+<p>正确的 <code>B_i = floor((i+1)/m)</code> 在 <code>i = 2, m = 4</code> 时给出 <code>B_i = 0</code>：第 0 块不可见，因为位置 3 还没到。
+到 <code>i = 3</code> 时 <code>B_i = 1</code>，第 0 块才可见。这条判据由 <a href="../src/csa.rs"><code>fine_blocks</code></a> 实现，并被
+<code>covered_positions</code> 与三个因果性单测死死钉住。</p>
+<h3><a href="#32-局部窗口补上最近的一截" aria-hidden="true" class="anchor" id="user-content-32-局部窗口补上最近的一截"></a>3.2 局部窗口补上&quot;最近的一截&quot;</h3>
+<p>只压缩是不够的——块均值会把最近 <code>m-1</code> 个位置的信息糊掉，而&quot;眼前&quot;恰恰最需要清晰。
+所以 Level 0 用<strong>全分辨率</strong>的滑动窗口覆盖最近 <code>m</code> 个位置 <code>[i-m+1, i]</code>。</p>
+<p>细压缩覆盖 <code>[0, B_i·m)</code>，局部覆盖 <code>[i-m+1, i]</code>。二者<strong>必然相接</strong>：</p>
+<pre><code class="language-text">  B_i·m = floor((i+1)/m)·m &gt; i + 1 - m     ⇒     两块区间重叠或相邻
+</code></pre>
+<p>所以并集恰好是 <code>[0, i]</code>，一个不多、一个不少。这就是<strong>覆盖不变式</strong>，由
+<a href="../src/csa.rs"><code>covered_positions</code></a> 计算并在 <code>csa</code> 子命令第一节里对 <code>m ∈ {2,4,8,16}</code>、
+<code>i ∈ [0, T)</code> 全部核对。</p>
+<hr />
+<h2><a href="#4-hca给再远补一层廉价全局覆盖" aria-hidden="true" class="anchor" id="user-content-4-hca给再远补一层廉价全局覆盖"></a>4. HCA：给&quot;再远&quot;补一层廉价全局覆盖</h2>
+<p>CSA 的 top-k 稀疏有个缺点：被 top-k 丢掉的远距离块就<strong>彻底看不到了</strong>。
+HCA（Hierarchical Compressed Attention）在细块之上<strong>再平均 <code>hca_block</code> 倍</strong>，
+得到一个更粗的表示，然后对它做<strong>稠密</strong>（不稀疏）注意力：</p>
+<pre><code class="language-text">  K_c2[g] = (1/h) · Σ_{t=0}^{h-1} K_c[g·h + t]      // 粗块 = h 个细块的平均
+</code></pre>
+<p>粗块数量只有 <code>floor(T / (m·h))</code>，非常少，所以&quot;稠密看一遍&quot;的代价很低。
+它带来的是<strong>冗余覆盖</strong>：粗块的成员细块必然也是已完成的，因此不会引入任何新位置——
+覆盖不变式不被破坏，但 top-k 漏掉的远距离信息有了兜底。</p>
+<p>三层合并后的每 query 槽位数：</p>
+<pre><code class="language-text">  slots = m              // 局部窗口
+        + k              // 细压缩保留的块数（top_k，0 = 全部已完成块）
+        + floor(T/(m·h))  // 粗压缩块数（hca_block = h ≥ 2 时才 &gt; 0）
+</code></pre>
+<hr />
+<h2><a href="#5-三层怎么并进一次-softmax" aria-hidden="true" class="anchor" id="user-content-5-三层怎么并进一次-softmax"></a>5. 三层怎么并进<strong>一次</strong> softmax</h2>
+<p>朴素做法是分三次注意力再加权合并，但那要引入额外的合并权重、也不等价于一次归一化。
+本课的做法是：<strong>三层只是把不同范围的 key 放进同一行分数</strong>，拼接后<strong>一次 softmax</strong>：</p>
+<pre><code class="language-text">  scores  = [ q·K_loc (m 个) | q·Kc_sel (k 个) | q·Kc2 (T/(m·h) 个) ]     // [g, t, S]
+  mask    = [ 局部掩码      | 细压缩掩码      | 粗压缩掩码 ]              // 同形、逐行同序
+  P       = masked_softmax(scores, mask)                                  // 一次归一化
+  out     = P · [V_loc | Vc_sel | Vc2]                                    // 加权求和
+</code></pre>
+<p>这样做的好处：</p>
+<ol>
+<li><strong>语义干净</strong>：等价于&quot;在并集 <code>[0, i]</code> 上做一次普通因果注意力&quot;，只是把并集拆成三段、各自用合适的粒度表示。</li>
+<li><strong>实现省事</strong>：一次 softmax 的反向就是标准 softmax 反向，不用为三个分支各写一套合并逻辑。</li>
+<li><strong>数值稳定</strong>：复用张量库已有的 <code>masked_softmax</code>（减去行最大值再 exp）。</li>
+</ol>
+<p>⚠️ <strong>坑</strong>：拼接后的掩码必须与拼接后的分数<strong>逐行同序</strong>。第一版把局部掩码和压缩掩码各自
+按&quot;整块&quot;拼起来（<code>[全部局部][全部压缩]</code>）再 <code>reshape</code> 成 <code>[g,t,S]</code>，结果每行的掩码与分数错位，
+某些行被整行 <code>-inf</code> 淹没（那时候还会直接算成 <code>NaN</code>；现在 <code>masked_softmax</code> 对整行全屏蔽的行
+会输出全 0 而不是 <code>NaN</code>，但<strong>掩码错位依旧会让那一行丢光真正的 key、结果照样是错的</strong>，
+只是不再以 NaN 的形式报警）。正确做法是<strong>先算好总槽数 <code>S</code>，再把每层的掩码
+写到该行的对应偏移</strong> <code>row + 0 / row + m / row + m + k</code>。这条已作为注释写死在
+<a href="../src/csa.rs"><code>attention</code></a> 里。</p>
+<hr />
+<h2><a href="#6-本仓库实现要点" aria-hidden="true" class="anchor" id="user-content-6-本仓库实现要点"></a>6. 本仓库实现要点</h2>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../src/csa.rs"><code>src/csa.rs</code></a> <code>CsaOpts</code></td>
+<td>纯数据开关（<code>block</code> / <code>top_k</code> / <code>hca_block</code>），<code>From&lt;&amp;TransformerConfig&gt;</code> 从配置读入；<code>derive(Default)</code> 即&quot;全关&quot;</td>
+</tr>
+<tr>
+<td><a href="../src/csa.rs"><code>src/csa.rs</code></a> <code>fine_blocks</code> / <code>coarse_blocks</code> / <code>covered_positions</code></td>
+<td>因果判据与覆盖不变式的<strong>整数版</strong>实现，单测与 <code>csa</code> 子命令共用；把&quot;因果性&quot;从几百行张量代码里抽出来单独核对</td>
+</tr>
+<tr>
+<td><a href="../src/csa.rs"><code>src/csa.rs</code></a> <code>select_topk</code></td>
+<td>分数降序取前 k，<strong>同分时小下标优先</strong>，保证可复现</td>
+</tr>
+<tr>
+<td><a href="../src/csa.rs"><code>src/csa.rs</code></a> <code>block_mean</code> / <code>expand_gqa</code> / <code>gather_seq</code> / <code>concat_last</code></td>
+<td>张量辅助：块均值压缩、GQA 头展开、按索引取行、沿最后一维拼接（<code>Tensor::external</code> 自定义反向）</td>
+</tr>
+<tr>
+<td><a href="../src/csa.rs"><code>src/csa.rs</code></a> <code>attention</code></td>
+<td>三层前向：局部窗口 → 块均值 → top-k → HCA → <code>concat_last</code> 拼分数 → 一次 <code>masked_softmax</code> → 加权值</td>
+</tr>
+<tr>
+<td><a href="../src/attention.rs"><code>src/attention.rs</code></a></td>
+<td><code>MultiHeadAttention</code> 新增 <code>csa: CsaOpts</code> 字段；<code>attend</code> 按 <code>use_csa</code> 分派到 <code>crate::csa::attention</code> 或原 <code>Tensor::flash_attention</code></td>
+</tr>
+<tr>
+<td><a href="../src/model.rs"><code>src/model.rs</code></a></td>
+<td><code>TransformerConfig</code> 新增 <code>csa_block</code> / <code>csa_top_k</code> / <code>hca_block</code>；<code>TransformerBlock::new</code> 把配置写进 <code>a.csa</code></td>
+</tr>
+<tr>
+<td><a href="../src/cmd/experiments.rs"><code>src/cmd/experiments.rs</code></a> <code>cmd_csa</code></td>
+<td><code>csa</code> 子命令：覆盖不变式 → KV 字节账本 → top-k 稀疏算力账本</td>
+</tr>
+</tbody>
+</table>
+<p><strong>两个实现细节</strong>：</p>
+<ul>
+<li><code>sd</code>（用于 top-k 选择的稠密块分数）包在 <code>crate::tensor::no_grad</code> 里。它只用来<strong>选块</strong>、
+从不进入最终输出/反向；若不包，它会在 tape 上留下永远不可达的节点，每步堆积、内存只涨不降。</li>
+<li>GQA 下 KV 头要按 <code>n_rep = n_head / n_kv_head</code> 展开成 Q 头的粒度再做注意力；梯度经
+<code>gather_rows</code> 的反向自动折回共享的 KV 头（单测 <code>test_gqa_kv_gradient_accumulates_across_heads</code> 验证）。</li>
+</ul>
+<h3><a href="#默认路径逐位不变" aria-hidden="true" class="anchor" id="user-content-默认路径逐位不变"></a>默认路径逐位不变</h3>
+<ul>
+<li>默认 <code>csa_block = 0</code>（<code>CsaOpts::enabled()</code> 为假）：<code>attend</code> 走原 <code>Tensor::flash_attention</code>，
+与加本课之前<strong>逐位一致</strong>；</li>
+<li>CSA 是<strong>纯数据开关</strong>，<code>TransformerBlock::new</code> 只是把配置写进 <code>a.csa</code>，<strong>不构造任何参数、
+不消耗任何随机数</strong>——所以同种子下开关前后的参数名与参数值逐位相同（单测
+<code>test_csa_changes_training_same_seed</code> 断言参数表一致、前向改变、数值有限）；</li>
+<li>只对<strong>无 KV cache 的全量前向</strong>（训练 / 预填）生效；带 cache 的自回归解码回退原路径
+（<code>use_csa = self.csa.enabled() &amp;&amp; kv_cache.is_none()</code>）。</li>
+</ul>
+<h3><a href="#代码地图" aria-hidden="true" class="anchor" id="user-content-代码地图"></a>代码地图</h3>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../src/csa.rs"><code>src/csa.rs</code></a></td>
+<td><code>CsaOpts</code>、因果判据（<code>fine_blocks</code> / <code>coarse_blocks</code> / <code>covered_positions</code>）、<code>select_topk</code>、张量辅助、三层 <code>attention</code>、字节 / 算力账本</td>
+</tr>
+<tr>
+<td><a href="../src/attention.rs"><code>src/attention.rs</code></a></td>
+<td><code>attend</code> 里按 <code>use_csa</code> 在 CSA 与 <code>flash_attention</code> 之间分派</td>
+</tr>
+<tr>
+<td><a href="../src/model.rs"><code>src/model.rs</code></a></td>
+<td><code>TransformerConfig</code> 的三个开关字段与 <code>TransformerBlock</code> 的接线</td>
+</tr>
+<tr>
+<td><a href="../src/cmd/experiments.rs"><code>src/cmd/experiments.rs</code></a></td>
+<td><code>cmd_csa</code> 的三节账本打印</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2><a href="#7-运行与验证" aria-hidden="true" class="anchor" id="user-content-7-运行与验证"></a>7. 运行与验证</h2>
+<pre><code class="language-bash"># CSA 单测（覆盖不变式 / 因果性 / 块均值 / top-k / GQA / 稠密等价 / 梯度有限差分 / 账本）
+cargo test csa
+
+# 同种子对照：csa_block = 0 vs 4 走完整前向
+cargo test csa_changes_training_same_seed
+
+# 端到端账本：三节演示（覆盖不变式 → KV 字节 → 稀疏算力）
+cargo run --release -- csa
+</code></pre>
+<p>配置示例：</p>
+<pre><code class="language-jsonc">{
+  &quot;model&quot;: {
+    &quot;csa_block&quot;: 16,   // 局部窗口 = 压缩块宽 m = 16（≥ 2 才启用；默认 0 关闭）
+    &quot;csa_top_k&quot;: 8,    // 细压缩每 query 保留 8 个已完成块（0 = 稠密）
+    &quot;hca_block&quot;: 4     // 粗压缩在细块之上再平均 4 倍（&lt; 2 = 关闭 HCA）
+  }
+}
+</code></pre>
+<h3><a href="#71-实测账本cargo-run---release----csa默认参数-t512n_kv8hd64hca4top_k8" aria-hidden="true" class="anchor" id="user-content-71-实测账本cargo-run---release----csa默认参数-t512n_kv8hd64hca4top_k8"></a>7.1 实测账本（<code>cargo run --release -- csa</code>，默认参数 <code>T=512</code>、<code>n_kv=8</code>、<code>hd=64</code>、<code>hca=4</code>、<code>top_k=8</code>）</h3>
+<p><strong>第一节：覆盖不变式</strong>（<code>m ∈ {2,4,8,16}</code>、HCA 开 / 关，检查全部 <code>T</code> 个 query）</p>
+<table>
+<thead>
+<tr>
+<th>m</th>
+<th>HCA</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2 / 4 / 8 / 16</td>
+<td>关 / 开</td>
+<td>并集 == <code>[0,i]</code> ✓（全部通过）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>第二节：KV 字节账本</strong>（f32，K + V 两份；全量缓存 2.00 MB）</p>
+<table>
+<thead>
+<tr>
+<th>块宽 m</th>
+<th>全量字节</th>
+<th>压缩后字节</th>
+<th>压缩比</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2</td>
+<td>2,097,152</td>
+<td>1,056,768</td>
+<td>1.98x</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2,097,152</td>
+<td>540,672</td>
+<td>3.88x</td>
+</tr>
+<tr>
+<td>8</td>
+<td>2,097,152</td>
+<td>294,912</td>
+<td>7.11x</td>
+</tr>
+<tr>
+<td>16</td>
+<td>2,097,152</td>
+<td>196,608</td>
+<td><strong>10.67x</strong></td>
+</tr>
+<tr>
+<td>32</td>
+<td>2,097,152</td>
+<td>196,608</td>
+<td><strong>10.67x</strong></td>
+</tr>
+<tr>
+<td>64</td>
+<td>2,097,152</td>
+<td>294,912</td>
+<td>7.11x</td>
+</tr>
+</tbody>
+</table>
+<p>压缩缓存 = <code>2·(m + T/m)·n_kv·hd·4</code>，长度约 <code>m + T/m</code>，在 <code>m ≈ √T</code> 处取最小。
+本题 <code>√512 ≈ 22.6</code>，实测最优在 <code>m = 16~32</code> 之间（同为 10.67x）。
+<strong>注意</strong>：这是<strong>存储口径</strong>——同样 <code>T</code> 个历史，缓存从 <code>T</code> 行降到约 <code>m + T/m</code> 行。
+但 <code>m</code> 接近 <code>T</code> 时局部窗口本身就等于全长，压缩无从谈起（<code>m = T</code> 时账本反而更大），
+所以压缩只在 <code>m ≪ T</code> 时成立。</p>
+<p><strong>第三节：top-k 稀疏算力账本</strong>（每 query 参与打分的槽位数；全量每 query 131,072 FLOPs）</p>
+<table>
+<thead>
+<tr>
+<th>m</th>
+<th>top-k</th>
+<th>局部</th>
+<th>细压缩</th>
+<th>粗压缩</th>
+<th>总槽位</th>
+<th>稀疏度</th>
+<th>算力比</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>4</td>
+<td>8</td>
+<td>4</td>
+<td>8</td>
+<td>32</td>
+<td>44</td>
+<td>0.086</td>
+<td>11.64x</td>
+</tr>
+<tr>
+<td>8</td>
+<td>8</td>
+<td>8</td>
+<td>8</td>
+<td>16</td>
+<td>32</td>
+<td>0.063</td>
+<td><strong>16.00x</strong></td>
+</tr>
+<tr>
+<td>16</td>
+<td>8</td>
+<td>16</td>
+<td>8</td>
+<td>8</td>
+<td>32</td>
+<td>0.063</td>
+<td><strong>16.00x</strong></td>
+</tr>
+<tr>
+<td>32</td>
+<td>8</td>
+<td>32</td>
+<td>8</td>
+<td>4</td>
+<td>44</td>
+<td>0.086</td>
+<td>11.64x</td>
+</tr>
+</tbody>
+</table>
+<p><code>m</code> 调大能省细压缩块数、但局部窗口变长；<code>top-k</code> 调小能省算力、但更依赖块均值选得准。
+两者都要与覆盖不变式一起看：省下来的槽位必须真的落在 <code>[0, i]</code> 内。</p>
+<table>
+<thead>
+<tr>
+<th>测试</th>
+<th>验证内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_coverage_invariant_exact_range</code></td>
+<td>任意 <code>m/h/i</code>，三层可见位置并集恰为 <code>[0,i]</code>，一个不多一个不少</td>
+</tr>
+<tr>
+<td><code>test_no_future_leak_in_coverage</code></td>
+<td>任何可见位置都 ≤ <code>i</code>（不泄漏未来）</td>
+</tr>
+<tr>
+<td><code>test_fine_block_causal_boundary</code></td>
+<td>细压缩只在&quot;块末位置 ≤ i&quot;时可见（<code>i=2,m=4</code> → 0 块；<code>i=3</code> → 1 块）</td>
+</tr>
+<tr>
+<td><code>test_coarse_block_causal_boundary</code></td>
+<td>粗压缩块数同样满足因果边界</td>
+</tr>
+<tr>
+<td><code>test_block_mean_matches_manual_and_drops_tail</code></td>
+<td>块均值与手工对照，且尾部不足一块被丢弃</td>
+</tr>
+<tr>
+<td><code>test_select_topk_picks_highest_and_ties_by_index</code></td>
+<td>top-k 取最高分，同分小下标优先，候选不足时只返回候选</td>
+</tr>
+<tr>
+<td><code>test_attention_shape_and_differs_from_flash</code></td>
+<td>输出与 <code>flash_attention</code> 同形；开启后数值确实改变；全部有限</td>
+</tr>
+<tr>
+<td><code>test_forward_has_no_future_leak</code></td>
+<td>改掉 <code>i</code> 之后的 K/V，query <code>i</code> 的输出不变（前向口径的无泄漏）</td>
+</tr>
+<tr>
+<td><code>test_gqa_heads_share_kv_but_score_independently</code></td>
+<td>GQA 下同组 Q 头共享 KV 但各自打分</td>
+</tr>
+<tr>
+<td><code>test_dense_topk_equals_full_block_attention</code></td>
+<td><code>top_k = 0</code> 与 <code>top_k = 块数</code> 等价（softmax 对槽位顺序不敏感）</td>
+</tr>
+<tr>
+<td><code>test_gradient_matches_finite_difference</code></td>
+<td>稠密配置下的解析反向与有限差分一致</td>
+</tr>
+<tr>
+<td><code>test_gqa_kv_gradient_accumulates_across_heads</code></td>
+<td>共享 KV 头的梯度跨 Q 头正确累加</td>
+</tr>
+<tr>
+<td><code>test_ledger_is_monotone_and_sane</code></td>
+<td>账本在 <code>m ≪ T</code> 时确实更省；<code>m = T</code> 时如实更大</td>
+</tr>
+<tr>
+<td><code>test_csa_changes_training_same_seed</code>（model.rs）</td>
+<td>同种子不新增参数、前向改变、数值有限</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#常见坑实测踩出来的" aria-hidden="true" class="anchor" id="user-content-常见坑实测踩出来的"></a>常见坑（实测踩出来的）</h3>
+<h4><a href="#1-掩码必须与分数逐行同序否则整行--inf--nan" aria-hidden="true" class="anchor" id="user-content-1-掩码必须与分数逐行同序否则整行--inf--nan"></a>1. 掩码必须与分数<strong>逐行同序</strong>，否则整行 <code>-inf</code> → <code>NaN</code></h4>
+<p>见 §5 的 ⚠️。这是本次唯一一个&quot;测试直接报 NaN&quot;的 bug：<code>mask_flat</code> 按&quot;层&quot;拼接再 <code>reshape</code>，
+与按&quot;行&quot;拼接的分数错位。修法是先算 <code>total_s = m + k + nb2</code>，再把每层掩码写到 <code>row + 偏移</code>。
+（<code>masked_softmax</code> 现在对整行全屏蔽会输出全 0、不再产生 <code>NaN</code>，所以同类错误今后可能<strong>静默</strong>
+给出错结果而不是当场报错——掩码与分数的对齐仍必须逐行核对。）</p>
+<h4><a href="#2-gather_seq-里源序列长度--输出序列长度" aria-hidden="true" class="anchor" id="user-content-2-gather_seq-里源序列长度--输出序列长度"></a>2. <code>gather_seq</code> 里源序列长度 ≠ 输出序列长度</h4>
+<p>局部窗口取的是 <code>[gk, t, hd]</code> 的 K，输出却是 <code>[g, t, m, hd]</code>（GQA 下 <code>g ≠ gk</code>）；
+细压缩取的是 <code>[g, nb, hd]</code> 的块均值，输出 <code>[g, t, k, hd]</code>（<code>nb ≠ t</code>）。
+第一版把源的 <code>(g, t)</code> 与输出的 <code>(g, t)</code> 混用同一个参数，<code>reshape</code> 直接断言失败。
+正确做法是把源的 <code>(gx, nx)</code> 与输出的 <code>(g_out, t_out)</code> <strong>分开传</strong>。</p>
+<h4><a href="#3-别把解析账本当成实测性能" aria-hidden="true" class="anchor" id="user-content-3-别把解析账本当成实测性能"></a>3. 别把解析账本当成实测性能</h4>
+<p><code>csa</code> 子命令打印的字节与 FLOPs 都是<strong>纸面账本</strong>——本仓库没有为 CSA 写融合 kernel，
+算子仍是 CPU 上的一堆 <code>gather</code>/<code>mul</code>/<code>softmax</code>。这份账本能说明&quot;压缩在原理上省了多少&quot;，
+<strong>说明不了&quot;跑得快了多少&quot;</strong>。能实测到的是正确性（覆盖不变式、无未来泄漏、梯度有限差分）。
+真实收益取决于算子融合与内存带宽，这需要真正的 kernel 实现。</p>
+<hr />
+<h2><a href="#8-小结与下一课" aria-hidden="true" class="anchor" id="user-content-8-小结与下一课"></a>8. 小结与下一课</h2>
+<h3><a href="#本课小结" aria-hidden="true" class="anchor" id="user-content-本课小结"></a>本课小结</h3>
+<p>CSA + HCA 把&quot;每个 query 能看多少 key&quot;从 <code>T</code> 压到 <code>m + k + T/(m·h)</code>，并用覆盖不变式保证可见位置的并集恰为 <code>[0, i]</code>；账本上的字节与算力收益要等融合 kernel 才能兑现。</p>
+<h3><a href="#拓展方向" aria-hidden="true" class="anchor" id="user-content-拓展方向"></a>拓展方向</h3>
+<ul>
+<li><strong>融合 kernel</strong>：把&quot;块均值 + 打分 + top-k + 加权求和&quot;写成一个内核，才能真正兑现账本里的算力收益。</li>
+<li><strong>压缩块缓存</strong>：推理时把已完成块的 <code>K_c</code> / <code>V_c</code> 常驻，新的 token 只更新最近一个块；
+这样 <code>m + T/m</code> 的存储账本才在推理里落地。</li>
+<li><strong>top-k 的近似</strong>：现在是精确选 top-k（<code>O(nb log nb)</code>）。可换成&quot;按块均值范数预筛 + 精确重排&quot;，
+把选择本身也降到亚线性。</li>
+<li><strong>与 MLA 组合</strong>：MLA 压 KV 的<strong>维度</strong>、CSA 压 KV 的<strong>个数</strong>，两者正交，可以叠加。</li>
+<li><strong>可学习的压缩</strong>：块均值是最朴素的压缩。可以换成每块一个小的线性投影，让模型自己决定&quot;怎么压&quot;。</li>
+</ul>
+<blockquote>
+<p><strong>下一课</strong>：<a href="50-MLA%E8%A7%A3%E8%80%A6RoPE%E4%B8%8E%E6%9D%83%E9%87%8D%E5%90%B8%E6%94%B6.md">第 50 课 MLA 解耦 RoPE + 权重吸收</a> —— 压 KV 的维度：MLA 解耦 RoPE 与权重吸收。</p>
+</blockquote>
+
+                </div>
+                <div class="series-nav"><div class="series-nav-header"><svg xmlns="http://www.w3.org/2000/svg" view_box="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke_width="2" stroke_linecap="round" stroke_linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 51 章</span></div></div><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：学习率调度 —— warmup + cosine decay</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：Dropout —— 训练时的「随机失忆」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：RMSNorm —— 现代 LLM 的归一化标配</span></a><a class="series-nav-item" href="/post/rust-llm-guide-22/"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">第 22 课：SwiGLU 激活函数 —— LLaMA 的「门控」MLP</span></a><a class="series-nav-item" href="/post/rust-llm-guide-23/"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-24/"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星</span></a><a class="series-nav-item" href="/post/rust-llm-guide-25/"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">第 25 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-26/"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">第 26 课：混合精度训练（AMP）—— 用半精度加速，用全精度保底</span></a><a class="series-nav-item" href="/post/rust-llm-guide-27/"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">第 27 课：GPU 加速 —— 手写 WGSL 计算着色器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-28/"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a><a class="series-nav-item" href="/post/rust-llm-guide-29/"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-30/"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">第 30 课：Beam Search —— 贪心搜索的升级版</span></a><a class="series-nav-item" href="/post/rust-llm-guide-31/"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">第 31 课：Scaling Laws（缩放定律）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-32/"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">第 32 课：MoE 混合专家模型（Mixture of Experts）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-33/"><span class="series-nav-item-index">34</span><span class="series-nav-item-title">第 33 课：量化技术（Quantization）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-34/"><span class="series-nav-item-index">35</span><span class="series-nav-item-title">第 34 课：推测解码（Speculative Decoding）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-35/"><span class="series-nav-item-index">36</span><span class="series-nav-item-title">第 35 课：多 Token 预测（Multi-Token Prediction）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-36/"><span class="series-nav-item-index">37</span><span class="series-nav-item-title">第 36 课：RLHF 与人类对齐（Alignment）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-37/"><span class="series-nav-item-index">38</span><span class="series-nav-item-title">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-38/"><span class="series-nav-item-index">39</span><span class="series-nav-item-title">第 38 课：分布式训练（Distributed Training）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-39/"><span class="series-nav-item-index">40</span><span class="series-nav-item-title">第 39 课：工程化完善 —— 从算法实现到可用框架</span></a><a class="series-nav-item" href="/post/rust-llm-guide-40/"><span class="series-nav-item-index">41</span><span class="series-nav-item-title">第 40 课：把模型部署成 API 服务 —— 从「自己跑」到「给别人调」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-41/"><span class="series-nav-item-index">42</span><span class="series-nav-item-title">第 41 课：多模态 —— 图片理解与图片生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-42/"><span class="series-nav-item-index">43</span><span class="series-nav-item-title">第 42 课：知识蒸馏（Knowledge Distillation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-43/"><span class="series-nav-item-index">44</span><span class="series-nav-item-title">第 43 课：FP8 低精度训练（模拟）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-44/"><span class="series-nav-item-index">45</span><span class="series-nav-item-title">第 44 课：WSD 学习率调度（warmup-stable-decay）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-45/"><span class="series-nav-item-index">46</span><span class="series-nav-item-title">第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死</span></a><a class="series-nav-item" href="/post/rust-llm-guide-46/"><span class="series-nav-item-index">47</span><span class="series-nav-item-title">第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化</span></a><a class="series-nav-item" href="/post/rust-llm-guide-47/"><span class="series-nav-item-index">48</span><span class="series-nav-item-title">第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道</span></a><a class="series-nav-item" href="/post/rust-llm-guide-48/"><span class="series-nav-item-index">49</span><span class="series-nav-item-title">第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-49/"><span class="series-nav-item-index">50</span><span class="series-nav-item-title">第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-50/"><span class="series-nav-item-index">51</span><span class="series-nav-item-title">第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</span></a></div><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-48/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-50/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</span></a></div></div>
+            </article>
+        </main>
+<footer class="footer-content">
+    <div class="copyright">
+        <span>2019-2026 </span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"/></svg>
+        <span> 干徒 / Ganto</span>
+    </div>
+</footer>
+        </div>
+    </div>
+<script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
+try{document.getElementById('main').innerHTML='';}catch(e){}</script>
+<script type="module">
+import init, * as bindings from '/web-rs-a99f5589204ec566.js';
+const wasm = await init({ module_or_path: '/web-rs-a99f5589204ec566_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script>
+</body>
+</html>
