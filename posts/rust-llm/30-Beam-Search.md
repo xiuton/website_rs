@@ -1,0 +1,196 @@
+# 第 30 课：Beam Search —— 贪心搜索的升级版
+
+> 代码位置：[src/sample.rs](../src/sample.rs)（`beam_search` 函数）
+>
+> 对比：第 15 课实现了 temperature + top-k + top-p 采样
+
+---
+
+## 1. 本课要搞懂的问题
+
+1. Greedy Search、Beam Search、随机采样三者的区别是什么？
+2. Beam Search 为什么能生成更"优质"的序列？
+3. 什么是长度惩罚？为什么需要它？
+4. Beam Search 适合什么场景？不适合什么场景？
+
+---
+
+## 2. 三种解码策略对比
+
+### 2.1 Greedy Search（贪心搜索）
+
+每步选概率最高的 token：
+
+```
+next_token = argmax(P(token | context))
+```
+
+- 优点：简单、快
+- 缺点：容易陷入局部最优，生成重复内容
+
+### 2.2 Random Sampling（随机采样）
+
+按概率分布随机采样：
+
+```
+next_token ~ P(token | context) / temperature
+```
+
+第 15 课实现了 temperature + top-k + top-p。
+
+- 优点：多样性高，有创意
+- 缺点：可能生成不连贯的内容
+
+### 2.3 Beam Search（束搜索）
+
+维护 k 个候选序列（beam），每步扩展后保留 top-k：
+
+```
+初始：beam = [prompt]
+每步：
+    对每个 beam，扩展所有可能的 next token
+    从所有候选中选得分最高的 k 个
+返回：得分最高的完整序列
+```
+
+- 优点：全局最优（在束宽 k 内），生成质量高
+- 缺点：慢（每步 k 倍计算量），确定性（没有创意）
+
+---
+
+## 3. Beam Search 算法
+
+### 3.1 详细步骤
+
+```
+beam_size = 4
+初始 beams = [(prompt, log_prob=0)]
+
+Step 1:
+    对每个 beam，计算所有 vocab 的 log_prob
+    保留 top-4 候选：[(prompt+tok1, -0.1), (prompt+tok2, -0.3), ...]
+
+Step 2:
+    对每个 beam，扩展所有 vocab
+    保留 top-4：[(prompt+tok1+tok5, -0.2), ...]
+
+...直到生成 EOS 或达到 max_len
+```
+
+### 3.2 得分计算
+
+每个 beam 的得分是**累积 log 概率**：
+
+```
+score = Σ log P(token_i | context)
+```
+
+用 log 概率而不是概率，避免数值下溢（很多小概率相乘会变成 0）。
+
+---
+
+## 4. 长度惩罚
+
+**问题**：短序列天然得分高（累积的 log_prob 项数少）。
+
+**解决**：用长度惩罚归一化：
+
+```
+final_score = log_prob / len^α
+```
+
+- α = 0：不惩罚（等价于不归一化，本项目 CLI 的默认值是 0.6）
+- α > 0：偏好长序列
+- α < 0：偏好短序列
+
+Google NMT 论文使用 α = 0.6。
+
+---
+
+## 5. Beam Search vs 采样
+
+| | Beam Search | 采样（temperature/top-k/top-p） |
+|---|-----------|-------------------------------|
+| 确定性 | ✅ 确定性（给定 beam_size） | ❌ 随机性 |
+| 多样性 | 低 | 高 |
+| 质量 | 高（全局最优） | 中（局部随机） |
+| 速度 | 慢（k 倍计算量） | 快 |
+| 适用场景 | 翻译、摘要、问答 | 创意写作、对话 |
+
+---
+
+## 6. 实现要点
+
+### 6.1 数据结构
+
+```rust
+// 每个 beam: (token_ids, cumulative_log_prob)
+let mut beams: Vec<(Vec<usize>, f64)> = vec![(prompt_ids, 0.0)];
+```
+
+### 6.2 提前终止
+
+某个 beam 生成结束标记后就不再扩展；所有 beam 都结束了就提前停止。
+
+> 本项目现在用的是**真实的 EOS 特殊 token**（`tokenizer.eos_id()`，见第 1 课的特殊 token 设计）：
+> 分词器带特殊 token 时它是真实 id，旧 checkpoint 或无特殊 token 的词表下为 `None`，
+> 此时不做提前终止。选中的序列末尾若带 EOS，解码前会被摘掉（EOS 是结束符，不是内容）。
+
+### 6.3 KV Cache 兼容
+
+Beam Search 中每个 beam 的 KV Cache 独立，需要为每个 beam 维护一份。
+本项目实现里每条 beam 持有一份**独立的 KV Cache**（`Beam.cache`）：新候选的缓存从父路径 `fork` 出来，
+兄弟路径前缀相同、缓存自然一致，之后每条 beam 只喂自己最后一个 token 做增量前向。
+是否启用由 `KvOpts` 决定，关闭时退化为全量前向。
+
+---
+
+## 7. 集成状态
+
+`beam_search` 函数已完整实现（`sample.rs`），并通过 `generate` 子命令的 `--beam` 参数接入 CLI。
+
+### 7.1 命令行用法
+
+```bash
+# 基础 Beam Search（beam_size=5）
+cargo run --release -- generate --config config/config.json --prompt "The fox" --beam 5 --max-new 100
+
+# 带长度惩罚的 Beam Search（偏好长序列）
+cargo run --release -- generate --config config/config.json --prompt "The fox" --beam 8 --length-penalty 0.8 --max-new 100
+```
+
+### 7.2 参数说明
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--beam <size>` | int | 无（不指定则用采样） | 束宽，通常 4-10 |
+| `--length-penalty <α>` | float | `0.6` | 长度惩罚指数（Google NMT 推荐 0.6） |
+
+### 7.3 注意事项
+
+- 指定 `--beam` 时，temperature / top-k / top-p 参数无效（Beam Search 是确定性的）
+- Beam Search 每步需计算 beam_size 倍的前向，速度比采样慢
+- 不指定 `--beam` 时默认使用采样生成（temperature + top-k + top-p）
+
+---
+
+## 8. 小结与下一课
+
+### 本课小结
+
+- Beam Search 维护 k 个候选，每步扩展后保留 top-k
+- 得分必须是累积 **log 概率**：`sample.rs` 的 `beam_search` 先对 logits 做 `log_softmax`（减最大值做数值稳定化，`log_z = max + ln Σ exp(l − max)`，被屏蔽的 `-inf` 自然为 0），再逐 token 累加；直接用原始 logit 累加会带上尺度偏置
+- 长度惩罚 α 解决短序列天然得分高的偏置
+- 适合翻译、摘要等"精确"任务；不适合创意写作
+- 速度是采样的 k 倍（k = beam_size）
+
+### 拓展方向
+
+> 核心内容已全部实现，这里是进阶拓展。
+
+1. **扫 `--beam`**：用 `--beam 2 / 5 / 10` 跑同一个 prompt，对比生成质量与耗时——验证第 5 节"慢 k 倍"的比例。
+2. **扫 `--length-penalty`**：`0 / 0.6 / 1.0` 各跑一次，观察生成长度是否真的随 α 变长（第 4 节）。
+3. **验 log_softmax 的必要性**：临时把 `beam_search` 里的 `log_softmax` 换成直接用原始 logit 累加，对比同一 prompt 的排序结果，体会第 8 节里说的"尺度偏置"。
+4. **看 beam 的缓存分叉**：在 `Beam.cache` 的 `fork` 处加一行计数，确认同一前缀的兄弟 beam 没有各自重算一遍历史 K/V（6.3 节）。
+
+> **下一课**：[第 31 课 Scaling Laws（缩放定律）](31-Scaling-Laws.md) —— 解码策略这条线收尾，下一课跳到训练侧的第一性原理——参数量、数据量、算力与 loss 之间的幂律关系。

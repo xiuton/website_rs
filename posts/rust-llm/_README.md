@@ -1,105 +1,130 @@
 # rust-llm 系列文章配置说明
 
-## 配置文件
+本系列采用**「元数据集中在 `_config.toml`」**的写法：章节 Markdown 里**不写 front matter**，
+所有标题、摘要、标签都在 [_config.toml](_config.toml) 里维护。
 
-[_config.toml](_config.toml) 存储本系列文章的默认元数据，避免每篇文章重复填写相同字段。
+## 一、配置字段
 
-## 配置字段
+### 1. 系列级默认值（顶层字段）
 
 ```toml
-author = "干徒"                        # 作者
-series = "Rust 大语言模型 学习指南"      # 系列名称
-summary = "系列文档摘要"               # 系列摘要（用于首页列表展示）
-tags = ["Rust", "LLM"]                 # 默认标签（会与文章标签合并）
-date = "2026-09-01 12:00:00"           # 默认日期
-slug_prefix = "rust-llm-guide"         # slug 前缀，生成格式：{prefix}-{order}
+series      = "Rust 大语言模型 学习指南"   # 系列名称（首页入口标题、文章页系列导航）
+author      = "干徒"                      # 默认作者
+date        = "2026-09-01 12:00:00"       # 默认日期
+tags        = ["Rust", "LLM"]             # 默认标签（与章节标签合并）
+slug_prefix = "rust-llm-guide"            # slug 前缀，生成格式：{prefix}-{order:02}
+summary     = "系列摘要"                   # 只用于首页「文档入口」卡片
 ```
 
-## 文章 front matter
+### 2. 章节级元数据（`[chapters]` 表）
 
-每篇文章只需填写**独有的字段**，配置文件中的字段会自动填充：
+键 = **章节文件名去掉 `.md`**：
 
-```yaml
----
-title: "第 1 课：张量 Tensor —— 一切的基础"
-tags: ["张量"]
-summary: "张量是深度学习里所有数据的统一容器..."
----
+```toml
+[chapters."01-张量与基本运算"]
+title   = "第 1 课：张量 Tensor —— 一切的基础"
+summary = "从零实现张量的多维数组表示、内存布局与矩阵乘法。"
+tags    = ["张量"]
 ```
 
-## 合并规则
+每个条目支持的字段与 front matter 完全一致：
 
-| 字段 | 合并方式 | 说明 |
-|------|---------|------|
-| `author` | 覆盖 | front matter 有值则用，否则用配置 |
-| `series` | 覆盖 | front matter 有值则用，否则用配置 |
-| `date` | 覆盖 | front matter 有值则用，否则用配置 |
-| `summary` | 覆盖 | front matter 有值则用，否则用配置 |
-| `tags` | 合并 | 配置 tags + 文章 tags，去重 |
-| `slug` | 自动生成 | 格式：`{slug_prefix}-{order:02}` |
-| `order` | 优先 front matter | front matter 有值则用，否则从文件名数字提取（如 `01-xxx.md` → `1`） |
+| 字段 | 说明 |
+|------|------|
+| `title` | 章节标题（**不写则自动从文件名派生**） |
+| `summary` | 章节摘要（SEO description、列表展示、搜索索引） |
+| `tags` | 章节标签（与顶层 `tags`、front matter 合并去重） |
+| `date` / `author` / `series` | 覆盖系列级默认值 |
+| `order` | 章节序号（不写则从文件名 `NN-` 前缀提取） |
+| `slug` | 自定义 URL（不写则用 `{slug_prefix}-{order:02}`） |
+| `catalog` | 覆盖系列目录页路径段（默认取文件夹名 `rust-llm`） |
 
-## 首页列表展示
+键也可以写成**纯编号**（模糊匹配文件名前缀）：
 
-系列文档在首页列表中合并展示，使用以下规则：
-- 标题：使用配置文件的 `series` 字段
-- 摘要：使用配置文件的 `summary` 字段（如果配置了）
-- 作者：使用配置文件的 `author` 字段
-- 日期：使用所有章节中最晚的日期
-- 标签：合并所有文章的标签（配置文件 + 所有章节），去重
+```toml
+[chapters."02"]
+title = "第 2 课：自动微分 Autograd"
+```
 
-## 排序规则
+也可以用数组写法 `[[chapters]]`（优先级高于表，适合字段较多的条目）：
 
-系列文档按以下优先级排序：
+```toml
+[[chapters]]
+file    = "03-张量运算扩展"
+title   = "第 3 课：张量运算扩展"
+tags    = ["张量"]
+order   = 3
+```
+
+## 二、章节 Markdown 长什么样
+
+只有正文，**没有 `---` 元数据块**：
+
+```markdown
+# 第 1 课：张量 Tensor —— 一切的基础
+
+正文从这里直接开始……
+```
+
+> ⚠️ 注意：正文顶部的 `---` 水平分割线请勿写在文件最前面（前面至少要有一个标题或正文行），
+> 否则会被当成 front matter 的起始标记。
+
+## 三、取值优先级
+
+按「具体 → 笼统」排列，前者有值则胜出：
+
+```
+front matter  >  [chapters] 章节配置  >  顶层系列默认值  >  派生兜底（文件名）
+```
+
+`tags` 是唯一例外，三个来源**合并去重**：
+
+```
+顶层 tags  →  章节 tags  →  front matter tags
+```
+
+派生兜底只在「文件完全没有 front matter」时启用：
+
+| 字段 | 派生规则 |
+|------|---------|
+| `title` | 章节键去掉 `NN-` 前缀，`-`/`_` 换成空格（如 `01-张量与基本运算` → `张量与基本运算`） |
+| `order` | 文件名首个 `${数字}-` 段（如 `25-KV-Cache.md` → `25`） |
+
+## 四、编译期校验
+
+`cargo build` 时会对 `_config.toml` 做一致性检查，问题以 `cargo:warning` 输出：
+
+| 提示 | 含义 |
+|------|------|
+| `[chapters] 条目 "xx" 未匹配到任何章节文件` | 键拼错了，或章节文件被改名/删除 |
+| `[chapters] 条目 "xx" 同时匹配了 a.md 与 b.md` | 编号键产生了歧义，请改写成完整文件名 |
+| `[chapters] 条目 "xx" 是按编号匹配到 yy.md 的` | 模糊匹配成功但建议写成完整文件名 |
+| `[front matter 未闭合]` | 文件开头有 `---` 却没有收尾的 `---`，正文会被当成元数据吞掉 |
+| `[标题为空]` | 既没配 `title` 也无法派生，请补配置 |
+
+> 说明：`cargo` 只在构建脚本**重新执行**时打印这些警告；如果只是想立刻看一遍全部提示，
+> 可以先 `touch build.rs`（或改动任意 `posts/` 下的文件）再执行 `cargo build`。
+
+## 五、排序规则
+
+系列目录页与章节导航按以下优先级排序：
+
 1. `order` 字段（升序）
 2. 文件名字典序（升序）
 3. `date` 字段（降序）
 
-## 示例
+## 六、覆盖配置
 
-**配置文件 `_config.toml`：**
-```toml
-author = "干徒"
-series = "Rust 大语言模型 学习指南"
-summary = "不使用任何深度学习框架，仅用 Rust 标准库从零手写张量、自动微分、Transformer，最终训练出一个能生成文本的小型 GPT 模型。"
-tags = ["Rust", "LLM"]
-date = "2026-09-01 12:00:00"
-slug_prefix = "rust-llm-guide"
-```
+某一章需要「破例」时，直接在章节 Markdown 里加 front matter 即可，它会覆盖 `_config.toml`
+（`tags` 仍然合并）：
 
-**文章 `01-张量与基本运算.md`：**
-```yaml
+```markdown
 ---
-title: "第 1 课：张量 Tensor —— 一切的基础"
-tags: ["张量"]
-summary: "张量是深度学习里所有数据的统一容器..."
+title: "特别篇：从零手写调度器"
+summary: "本篇不跟随系列摘要"
+date: "2026-10-01 09:00:00"
+tags: ["特别"]
 ---
 ```
 
-**生成的最终元数据：**
-```json
-{
-  "slug": "rust-llm-guide-01",
-  "title": "第 1 课：张量 Tensor —— 一切的基础",
-  "date": "2026-09-01 12:00:00",
-  "author": "干徒",
-  "tags": ["Rust", "LLM", "张量"],
-  "series": "Rust 大语言模型 学习指南",
-  "series_summary": "不使用任何深度学习框架，仅用 Rust 标准库从零手写张量、自动微分、Transformer，最终训练出一个能生成文本的小型 GPT 模型。",
-  "order": 1
-}
-```
-
-## 覆盖配置
-
-如果某篇文章需要不同的值，直接在 front matter 中指定即可：
-
-```yaml
----
-title: "特别篇"
-author: "其他作者"    # 覆盖配置文件的 author
-date: "2026-10-01"   # 覆盖配置文件的 date
-summary: "特别篇摘要" # 覆盖配置文件的 summary
-tags: ["特别"]        # 会与配置的 ["Rust", "LLM"] 合并
----
-```
+这种写法可以和「只写配置」的章节混用，互不影响。

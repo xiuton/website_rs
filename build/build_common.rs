@@ -26,6 +26,25 @@ pub struct PostData {
     pub series_summary: String,
 }
 
+/// 章节级配置：`_config.toml` 中 `[chapters]` 表或 `[[chapters]]` 数组的一条
+///
+/// 每个字段都对应 front matter 中的同名字段，取值时 front matter 优先。
+/// 有了它，章节 Markdown 就可以完全不写 front matter。
+#[derive(Debug, Default, Clone)]
+pub struct ChapterConfig {
+    /// 匹配键：章节文件名（不含 `.md`）或系列内章节编号
+    pub key: String,
+    pub title: Option<String>,
+    pub summary: Option<String>,
+    pub author: Option<String>,
+    pub date: Option<String>,
+    pub series: Option<String>,
+    pub tags: Vec<String>,
+    pub order: Option<i32>,
+    pub slug: Option<String>,
+    pub catalog: Option<String>,
+}
+
 /// 目录配置文件结构体
 /// 从 _config.toml 读取的默认值，文章 front matter 中的值会覆盖这些默认值
 #[derive(Debug, Default)]
@@ -36,6 +55,84 @@ pub struct DirConfig {
     pub date: Option<String>,
     pub slug_prefix: Option<String>,
     pub summary: Option<String>,
+    /// 章节级配置，顺序即匹配优先级：`[[chapters]]` 在前，`[chapters]` 表在后
+    pub chapters: Vec<ChapterConfig>,
+    /// `[series]` 分组是否显式出现（用于校验与提示）
+    pub has_series_block: bool,
+}
+
+/// 从 toml 的字符串/整数键中取出章节匹配键
+fn chapter_key_of(key: &str, value: &toml::Value, key_hint: Option<&str>) -> String {
+    // 表写法：键本身就是匹配键
+    if let Some(hint) = key_hint {
+        return hint.to_string();
+    }
+    // 数组写法：条目内显式给 file / key / id
+    if let Some(v) = value.get("file").and_then(|v| v.as_str()) {
+        return v.trim().to_string();
+    }
+    if let Some(v) = value.get("key").and_then(|v| v.as_str()) {
+        return v.trim().to_string();
+    }
+    if let Some(v) = value.get("id").and_then(|v| v.as_str()) {
+        return v.trim().to_string();
+    }
+    key.trim().to_string()
+}
+
+/// 解析一个章节条目（`[chapters]` 表值与 `[[chapters]]` 数组元素共用）
+fn parse_chapter_entry(key: &str, value: &toml::Value, key_hint: Option<&str>) -> ChapterConfig {
+    let mut chapter = ChapterConfig {
+        key: chapter_key_of(key, value, key_hint),
+        ..Default::default()
+    };
+    if chapter.key.is_empty() {
+        return chapter;
+    }
+
+    if let Some(v) = value.get("title").and_then(|v| v.as_str()) {
+        chapter.title = Some(v.to_string());
+    }
+    if let Some(v) = value.get("summary").and_then(|v| v.as_str()) {
+        chapter.summary = Some(v.to_string());
+    }
+    if let Some(v) = value.get("author").and_then(|v| v.as_str()) {
+        chapter.author = Some(v.to_string());
+    }
+    if let Some(v) = value.get("date").and_then(|v| v.as_str()) {
+        chapter.date = Some(v.to_string());
+    }
+    if let Some(v) = value.get("series").and_then(|v| v.as_str()) {
+        chapter.series = Some(v.to_string());
+    }
+    if let Some(v) = value.get("slug").and_then(|v| v.as_str()) {
+        let s = v.trim();
+        if !s.is_empty() {
+            chapter.slug = Some(s.to_string());
+        }
+    }
+    if let Some(v) = value.get("catalog").and_then(|v| v.as_str()) {
+        let s = v.trim();
+        if !s.is_empty() {
+            chapter.catalog = Some(s.to_string());
+        }
+    }
+    // order 允许整数或数字字符串
+    if let Some(v) = value.get("order") {
+        if let Some(n) = v.as_integer() {
+            chapter.order = Some(n as i32);
+        } else if let Some(s) = v.as_str() {
+            chapter.order = s.trim().parse::<i32>().ok();
+        }
+    }
+    if let Some(tags) = value.get("tags").and_then(|v| v.as_array()) {
+        chapter.tags = tags
+            .iter()
+            .filter_map(|t| t.as_str().map(|s| s.to_string()))
+            .collect();
+    }
+
+    chapter
 }
 
 /// 从目录下的 _config.toml 读取配置
@@ -51,7 +148,8 @@ pub fn load_dir_config(dir: &Path) -> DirConfig {
             match toml::from_str::<toml::Value>(&content) {
                 Ok(value) => {
                     let mut config = DirConfig::default();
-                    
+
+                    // ── 顶层字段（原有语义，保持不变）──
                     if let Some(author) = value.get("author").and_then(|v| v.as_str()) {
                         config.author = Some(author.to_string());
                     }
@@ -78,7 +176,64 @@ pub fn load_dir_config(dir: &Path) -> DirConfig {
                     if let Some(summary) = value.get("summary").and_then(|v| v.as_str()) {
                         config.summary = Some(summary.to_string());
                     }
-                    
+
+                    // ── [series] 分组（可选）：同名字段覆盖顶层写法 ──
+                    if let Some(series_tbl) = value.get("series").and_then(|v| v.as_table()) {
+                        config.has_series_block = true;
+                        if let Some(v) = series_tbl.get("author").and_then(|v| v.as_str()) {
+                            config.author = Some(v.to_string());
+                        }
+                        if let Some(v) = series_tbl.get("name").and_then(|v| v.as_str()) {
+                            config.series = Some(v.to_string());
+                        }
+                        if let Some(v) = series_tbl.get("series").and_then(|v| v.as_str()) {
+                            config.series = Some(v.to_string());
+                        }
+                        if let Some(v) = series_tbl.get("summary").and_then(|v| v.as_str()) {
+                            config.summary = Some(v.to_string());
+                        }
+                        if let Some(v) = series_tbl.get("date").and_then(|v| v.as_str()) {
+                            config.date = Some(v.to_string());
+                        }
+                        if let Some(v) = series_tbl.get("slug_prefix").and_then(|v| v.as_str()) {
+                            config.slug_prefix = Some(v.to_string());
+                        }
+                        if let Some(tags) = series_tbl.get("tags").and_then(|v| v.as_array()) {
+                            config.tags = tags
+                                .iter()
+                                .filter_map(|t| t.as_str().map(|s| s.to_string()))
+                                .collect();
+                        }
+                    }
+
+                    // ── [[chapters]] 数组（优先）──
+                    if let Some(arr) = value.get("chapters").and_then(|v| v.as_array()) {
+                        for entry in arr {
+                            let key = entry
+                                .get("file")
+                                .or_else(|| entry.get("key"))
+                                .or_else(|| entry.get("id"))
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            if key.trim().is_empty() {
+                                eprintln!(
+                                    "cargo:warning=[_config.toml] {:?} 的 [[chapters]] 条目缺少 file/key/id 字段，已跳过",
+                                    config_path
+                                );
+                                continue;
+                            }
+                            config.chapters.push(parse_chapter_entry(&key, entry, Some(&key)));
+                        }
+                    }
+
+                    // ── [chapters] 表 ──
+                    if let Some(tbl) = value.get("chapters").and_then(|v| v.as_table()) {
+                        for (key, entry) in tbl {
+                            config.chapters.push(parse_chapter_entry(key, entry, Some(key)));
+                        }
+                    }
+
                     config
                 }
                 Err(e) => {
@@ -92,6 +247,70 @@ pub fn load_dir_config(dir: &Path) -> DirConfig {
             DirConfig::default()
         }
     }
+}
+
+/// 章节条目的匹配优先级（数字越小越优先）
+///
+/// 1. 文件名词干完全相等
+/// 2. 条目是数字编号，等于文件名首个 `-`/`_` 前的片段（`01` ↔ `01-张量.md`）
+/// 3. 条目是数字编号，等于章节 order（`1` ↔ `01-张量.md` 的 order=1）
+fn chapter_match_rank(key: &str, filename: &str, order: i32) -> Option<u8> {
+    let key = key.trim();
+    if key.is_empty() {
+        return None;
+    }
+    if key == filename {
+        return Some(0);
+    }
+
+    let key_num = key.parse::<i32>().ok();
+
+    let prefix = filename
+        .split(|c| c == '-' || c == '_')
+        .next()
+        .unwrap_or("");
+    if let Some(n) = key_num {
+        if prefix == key || prefix.parse::<i32>().map(|p| p == n).unwrap_or(false) {
+            return Some(1);
+        }
+        if n == order {
+            return Some(2);
+        }
+    }
+    None
+}
+
+/// 在目录配置中查找当前章节的章节级配置
+#[allow(dead_code)]
+pub fn find_chapter<'a>(cfg: &'a DirConfig, filename: &str, order: i32) -> Option<&'a ChapterConfig> {
+    let mut best: Option<(u8, usize, &ChapterConfig)> = None;
+    for (idx, chapter) in cfg.chapters.iter().enumerate() {
+        if let Some(rank) = chapter_match_rank(&chapter.key, filename, order) {
+            let better = match best {
+                None => true,
+                Some((best_rank, best_idx, _)) => (rank, idx) < (best_rank, best_idx),
+            };
+            if better {
+                best = Some((rank, idx, chapter));
+            }
+        }
+    }
+    best.map(|(_, _, c)| c)
+}
+
+/// 章节条目的匹配排名（供构建期校验重复匹配使用）
+pub fn chapter_rank(key: &str, filename: &str, order: i32) -> Option<u8> {
+    chapter_match_rank(key, filename, order)
+}
+
+/// 由文件名/章节键派生标题：去掉 `NN-` / `NN_` 前缀，`-` / `_` 换成空格
+pub fn derive_title(key: &str) -> String {
+    let trimmed = key.trim();
+    let body = match trimmed.split_once(['-', '_']) {
+        Some((head, tail)) if !head.is_empty() && head.chars().all(|c| c.is_ascii_digit()) => tail,
+        _ => trimmed,
+    };
+    body.replace(['-', '_'], " ").trim().to_string()
 }
 
 pub fn escape_rust_string(s: &str) -> String {
@@ -316,6 +535,9 @@ pub fn scan_dir(
 ) {
     // 读取当前目录的配置文件
     let dir_config = load_dir_config(dir);
+
+    // 记录每个 [chapters] 条目命中的章节文件（构建期校验用）
+    let mut matched: Vec<Option<String>> = vec![None; dir_config.chapters.len()];
     
     match fs::read_dir(dir) {
         Ok(entries) => {
@@ -349,6 +571,7 @@ pub fn scan_dir(
                                         posts,
                                         date_count,
                                         &dir_config,
+                                        Some(&mut matched),
                                     );
                                 }
                             }
@@ -361,6 +584,16 @@ pub fn scan_dir(
             eprintln!("cargo:warning=Failed to read directory {:?}: {}", dir, e);
         }
     }
+
+    // ── 校验：配置里写了但没有任何章节文件命中的条目 ──
+    for (idx, chapter) in dir_config.chapters.iter().enumerate() {
+        if matched.get(idx).map(|m| m.is_none()).unwrap_or(true) {
+            eprintln!(
+                "cargo:warning=[_config.toml] [chapters] 条目 \"{}\" 未匹配到任何章节文件（目录 {:?}）",
+                chapter.key, dir
+            );
+        }
+    }
 }
 
 pub fn process_post(
@@ -370,19 +603,29 @@ pub fn process_post(
     posts: &mut Vec<PostData>,
     date_count: &mut HashMap<String, i32>,
     dir_config: &DirConfig,
+    mut matched_chapters: Option<&mut Vec<Option<String>>>,
 ) {
-    let mut in_front_matter = false;
+    // 解析 front matter 是否构成一个完整块（用于决定是否启用「由文件名派生标题」兜底）
+    //
+    // 规则：front matter 必须位于文件**开头**（允许前面有 UTF-8 BOM 或空行），
+    // 否则第一个 `---` 只是正文里的水平分割线，不能被当成元数据起点。
+    // 这样也顺带避免「正文顶部的分割线把整篇内容吞掉」这类事故。
+    let mut front_matter_started = false;
+    let mut front_matter_closed = false;
     let mut front_matter = String::new();
     let mut post_content = String::new();
     let mut in_front_matter_content = false;
+    let mut seen_content = false;
 
     for line in content.lines() {
-        if line == "---" {
-            if !in_front_matter {
-                in_front_matter = true;
+        let stripped = line.trim_start_matches('\u{feff}').trim();
+        if stripped == "---" && !seen_content {
+            if !front_matter_started {
+                front_matter_started = true;
                 in_front_matter_content = true;
                 continue;
-            } else {
+            } else if in_front_matter_content {
+                front_matter_closed = true;
                 in_front_matter_content = false;
                 continue;
             }
@@ -390,51 +633,50 @@ pub fn process_post(
         if in_front_matter_content {
             front_matter.push_str(line);
             front_matter.push('\n');
-        } else if in_front_matter {
+        } else {
             post_content.push_str(line);
             post_content.push('\n');
         }
+        if !in_front_matter_content {
+            seen_content = true;
+        }
     }
 
-    let title = strip_yaml_quotes(
-        &front_matter
-            .lines()
-            .find(|l| l.starts_with("title:"))
-            .map(|l| l.replace("title:", "").trim().to_string())
-            .unwrap_or_default(),
-    );
+    // 出现开头的 `---` 却没有收尾的 `---`：整篇会被当成元数据，必须提示
+    if front_matter_started && !front_matter_closed {
+        eprintln!(
+            "cargo:warning=[front matter 未闭合] {}：文件开头的 `---` 没有对应的收尾 `---`，正文会被当成元数据吞掉",
+            filename
+        );
+    }
 
-    let date = strip_yaml_quotes(
-        &front_matter
-            .lines()
-            .find(|l| l.starts_with("date:"))
-            .map(|l| l.replace("date:", "").trim().to_string())
-            .unwrap_or_default(),
-    );
-    
-    // 如果 front matter 中没有 date，使用配置文件的默认值
-    let date = if date.is_empty() {
-        dir_config.date.clone().unwrap_or_default()
-    } else {
-        date
-    };
+    // 完全没有 front matter 块 → 允许从 _config.toml / 文件名派生元数据
+    let no_front_matter = !(front_matter_started && front_matter_closed);
 
-    let author = strip_yaml_quotes(
-        &front_matter
+    /// 取一个 front matter 字段（去引号），空串视为「未设置」
+    fn fm_field(front_matter: &str, key: &str) -> Option<String> {
+        let prefix = format!("{}:", key);
+        let raw = front_matter
             .lines()
-            .find(|l| l.starts_with("author:"))
-            .map(|l| l.replace("author:", "").trim().to_string())
-            .unwrap_or_default(),
-    );
-    
-    // 如果 front matter 中没有 author，使用配置文件的默认值
-    let author = if author.is_empty() {
-        dir_config.author.clone().unwrap_or_default()
-    } else {
-        author
-    };
+            .find(|l| l.starts_with(prefix.as_str()))
+            .map(|l| l[prefix.len()..].trim().to_string())?;
+        let value = strip_yaml_quotes(&raw);
+        if value.is_empty() { None } else { Some(value) }
+    }
 
-    let tags = front_matter
+    /// front matter → 兜底（章节配置 / 目录配置）
+    fn pick(fm: Option<String>, fallback: impl FnOnce() -> String) -> String {
+        fm.unwrap_or_else(fallback)
+    }
+
+    let title_from_fm = fm_field(&front_matter, "title");
+    let date_from_fm = fm_field(&front_matter, "date");
+    let author_from_fm = fm_field(&front_matter, "author");
+    let summary_from_fm = fm_field(&front_matter, "summary");
+    let series_from_fm = fm_field(&front_matter, "series");
+    let slug_from_fm = fm_field(&front_matter, "slug");
+
+    let tags_from_fm: Vec<String> = front_matter
         .lines()
         .find(|l| l.starts_with("tags:"))
         .map(|l| {
@@ -447,49 +689,8 @@ pub fn process_post(
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
-    
-    // 合并配置文件的 tags 和 front matter 的 tags
-    // 配置文件的 tags 在前，front matter 的 tags 在后，去重
-    let mut merged_tags = dir_config.tags.clone();
-    for tag in tags {
-        if !merged_tags.contains(&tag) {
-            merged_tags.push(tag);
-        }
-    }
-    let tags = merged_tags;
 
-    let summary = strip_yaml_quotes(
-        &front_matter
-            .lines()
-            .find(|l| l.starts_with("summary:"))
-            .map(|l| l.replace("summary:", "").trim().to_string())
-            .unwrap_or_default(),
-    );
-    
-    // 如果 front matter 中没有 summary，使用配置文件的默认值
-    let summary = if summary.is_empty() {
-        dir_config.summary.clone().unwrap_or_default()
-    } else {
-        summary
-    };
-
-    // 系列字段：同一 series 名的文章属于同一个多章节文档
-    let series = strip_yaml_quotes(
-        &front_matter
-            .lines()
-            .find(|l| l.starts_with("series:"))
-            .map(|l| l.replace("series:", "").trim().to_string())
-            .unwrap_or_default(),
-    );
-    
-    // 如果 front matter 中没有 series，使用配置文件的默认值
-    let series = if series.is_empty() {
-        dir_config.series.clone().unwrap_or_default()
-    } else {
-        series
-    };
-
-    // 章节顺序：优先从 front matter 读取，否则从文件名提取数字
+    // 章节顺序：front matter → 章节配置 → 文件名首个数字段
     let order_from_front_matter = front_matter
         .lines()
         .find(|l| l.starts_with("order:"))
@@ -500,20 +701,124 @@ pub fn process_post(
         .next()
         .and_then(|s| s.parse::<i32>().ok())
         .unwrap_or(0);
-    
-    let order = order_from_front_matter.unwrap_or(order_from_filename);
 
-    // 目录页 slug：直接使用文档文件夹名称（category），不再从 front matter 读取
-    // 对于无 series 字段的分类目录文章，catalog 仅作为分类标识，不触发系列聚合
-    let catalog = category.to_string();
+    // 章节级配置查找需要用到 order，因此先算文件名 order 作为匹配依据
+    let order_for_match = order_from_front_matter.unwrap_or(order_from_filename);
+    let chapter_idx = dir_config
+        .chapters
+        .iter()
+        .position(|c| chapter_rank(&c.key, filename, order_for_match).is_some());
+    let chapter = chapter_idx.map(|idx| &dir_config.chapters[idx]);
 
-    // 文章 slug：优先使用 front matter 中自定义的 slug
-    // 系列文档未定义时使用文件名，普通文章未定义时使用日期生成
-    let custom_slug = front_matter
-        .lines()
-        .find(|l| l.starts_with("slug:"))
-        .map(|l| strip_yaml_quotes(&l.replace("slug:", "").trim().to_string()))
+    // 校验：一个数字编号条目同时被多个文件「非精确」命中，说明配置有歧义
+    if let (Some(idx), Some(rank), Some(matched)) = (
+        chapter_idx,
+        chapter.and_then(|c| chapter_rank(&c.key, filename, order_for_match)),
+        matched_chapters.as_deref_mut(),
+    ) {
+        if let Some(slot) = matched.get_mut(idx) {
+            if let Some(prev) = slot.as_ref() {
+                eprintln!(
+                    "cargo:warning=[_config.toml] [chapters] 条目 \"{}\" 同时匹配了 {}.md 与 {}.md，建议改写成完整文件名",
+                    dir_config.chapters[idx].key, prev, filename
+                );
+            } else if rank > 0 {
+                eprintln!(
+                    "cargo:warning=[_config.toml] [chapters] 条目 \"{}\" 是按编号匹配到 {}.md 的，建议改写成完整文件名以免歧义",
+                    dir_config.chapters[idx].key, filename
+                );
+            }
+            *slot = Some(filename.to_string());
+        }
+    }
+
+    let chapter_order = chapter.and_then(|c| c.order);
+
+    let order = order_from_front_matter
+        .or(chapter_order)
+        .unwrap_or(order_from_filename);
+
+    // ── 标题：front matter → 章节配置 → （无 front matter 时）文件名派生 ──
+    let title_from_config = chapter
+        .and_then(|c| c.title.clone())
         .filter(|s| !s.is_empty());
+    let title = title_from_fm
+        .or_else(|| title_from_config.clone())
+        .unwrap_or_else(|| {
+            if no_front_matter {
+                let key = chapter.map(|c| c.key.as_str()).unwrap_or(filename);
+                derive_title(key)
+            } else {
+                String::new()
+            }
+        });
+    if title.is_empty() {
+        eprintln!(
+            "cargo:warning=[标题为空] posts/{}/{}：请在 front matter 或 _config.toml 的 [chapters] 中配置 title",
+            category, filename
+        );
+    }
+
+    // ── 日期：front matter → 章节配置 → 目录配置 ──
+    let date = pick(date_from_fm, || {
+        chapter
+            .and_then(|c| c.date.clone())
+            .or_else(|| dir_config.date.clone())
+            .unwrap_or_default()
+    });
+
+    // ── 作者：front matter → 章节配置 → 目录配置 ──
+    let author = pick(author_from_fm, || {
+        chapter
+            .and_then(|c| c.author.clone())
+            .or_else(|| dir_config.author.clone())
+            .unwrap_or_default()
+    });
+
+    // ── 标签：目录配置 + 章节配置 + front matter，依次去重合并 ──
+    let mut tags = dir_config.tags.clone();
+    if let Some(chapter) = chapter {
+        for tag in &chapter.tags {
+            if !tags.contains(tag) {
+                tags.push(tag.clone());
+            }
+        }
+    }
+    for tag in tags_from_fm {
+        if !tags.contains(&tag) {
+            tags.push(tag);
+        }
+    }
+
+    // ── 摘要：front matter → 章节配置 → 目录配置 ──
+    // 章节配置存在时（即便同值），也要优先于目录配置，否则每章都会拿到系列摘要
+    let summary = pick(summary_from_fm, || {
+        if let Some(s) = chapter.and_then(|c| c.summary.clone()) {
+            return s;
+        }
+        if chapter.is_some() && no_front_matter {
+            return String::new();
+        }
+        dir_config.summary.clone().unwrap_or_default()
+    });
+
+    // ── 系列：front matter → 章节配置 → 目录配置 ──
+    let series = pick(series_from_fm, || {
+        chapter
+            .and_then(|c| c.series.clone())
+            .or_else(|| dir_config.series.clone())
+            .unwrap_or_default()
+    });
+
+    // 目录页 slug：默认使用文档文件夹名称（category），章节配置可覆盖
+    let catalog = chapter
+        .and_then(|c| c.catalog.clone())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| category.to_string());
+
+    // 文章 slug：优先使用 front matter 中自定义的 slug，其次章节配置
+    // 系列文档未定义时使用 slug_prefix + order，普通文章未定义时使用日期生成
+    let custom_slug = slug_from_fm.or_else(|| chapter.and_then(|c| c.slug.clone()));
 
     let slug = if let Some(slug) = custom_slug {
         slug

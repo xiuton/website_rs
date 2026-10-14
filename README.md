@@ -9,7 +9,8 @@
 - ⚡ **WebAssembly 驱动** — 基于 Rust 编译为 Wasm，接近原生的运行性能
 - 📝 **Markdown 博客** — Front Matter 元数据，comrak 渲染，highlight.js 代码高亮
 - 📚 **多章节文档支持** — 同一 `series` + 同一文件夹的文章自动聚合为文档，文章页显示章节目录与上下篇导航，首页列表合并显示为一条文档入口；子目录下无 `series` 字段的文章作为分类归总独立显示
-- ⚙️ **目录配置文件** — 系列文档支持 `_config.toml` 配置文件，统一管理重复元数据（author、series、tags、date、slug_prefix），文章 front matter 只需填写独有字段
+- ⚙️ **目录配置文件** — 系列文档支持 `_config.toml` 配置文件，统一管理重复元数据（author、series、tags、date、slug_prefix）
+- 🗂️ **章节元数据集中配置** — `_config.toml` 的 `[chapters]` / `[[chapters]]` 可逐章配置 `title`/`summary`/`tags`，章节 Markdown **可以完全不写 front matter**；两种写法可逐文件混用
 - 🏷️ **标签系统** — 文章标签展示
 - 🔖 **书签管理** — TOML 配置的书签页面，支持搜索筛选
 - 🎮 **操场 (Playground)** — 代码实验环境
@@ -159,7 +160,7 @@ date = "2026-09-01 12:00:00"
 slug_prefix = "rust-guide"
 ```
 
-每篇文章只需填写独有字段，配置文件的值会自动填充：
+第一种用法：文章只写独有字段，配置文件的值自动填充：
 
 ```yaml
 ---
@@ -169,11 +170,62 @@ summary: "Rust 的所有权系统是其核心特性之一..."
 ---
 ```
 
+第二种用法（章节元数据集中配置）：**章节文件里一个字段都不写**，全部放进 `_config.toml` 的
+`[chapters]` 表，键是章节文件名（不含 `.md`）：
+
+```toml
+# posts/rust-guide/_config.toml（在顶层字段之后追加）
+[chapters."01-所有权"]
+title   = "第一章 所有权"
+summary = "Rust 的所有权系统是其核心特性之一..."
+tags    = ["所有权"]
+
+# 键也可以写成纯编号（模糊匹配文件名前缀）
+[chapters."02"]
+title = "第二章 借用与生命周期"
+```
+
+也可以使用等价的数组写法（优先级高于表，适合字段较多的条目）：
+
+```toml
+[[chapters]]
+file  = "03-生命周期"
+title = "第三章 生命周期"
+order = 3
+```
+
+对应的章节文件只剩正文：
+
+```markdown
+# 第一章 所有权
+
+正文直接开始……
+```
+
+> ⚠️ 正文顶部的 `---` 水平分割线不要写在文件最前面（前面至少要有一行标题或正文），
+> 否则会被当成 front matter 的起始标记。
+
 **合并规则：**
-- `author`、`series`、`date`、`summary`：front matter 有值则用，否则用配置文件
-- `tags`：配置文件 + front matter 合并，去重
-- `slug`：自动生成 `{slug_prefix}-{order:02}`（如 `rust-guide-03`）
-- `order`：优先从 front matter 读取，否则从文件名数字提取（如 `03-xxx.md` → `3`）
+
+| 字段 | 合并方式 | 说明 |
+|------|---------|------|
+| `title` | 覆盖 | front matter → `[chapters]` → （无 front matter 时）文件名派生 |
+| `author`、`series`、`date` | 覆盖 | front matter → `[chapters]` → 配置文件顶层 |
+| `summary` | 覆盖 | front matter → `[chapters]` → 配置文件顶层（顶层 `summary` 同时作为首页入口的系列摘要） |
+| `tags` | 合并 | 顶层 + `[chapters]` + front matter，三处合并去重 |
+| `slug` | 自动生成 | front matter / `[chapters]` 自定义优先，否则 `{slug_prefix}-{order:02}`（如 `rust-guide-03`） |
+| `order` | 优先 front matter | 其次 `[chapters]`，最后从文件名数字提取（如 `03-xxx.md` → `3`） |
+| `catalog` | 目录名 | 默认取文件夹名，`[chapters]` 可覆盖 |
+
+**章节键匹配规则（依次尝试）：**
+
+1. 与文件名去掉扩展名后完全相等（`[chapters."01-所有权"]`）
+2. 键是数字编号，与文件名首个 `-`/`_` 前的片段相等（`[chapters."01"]` ↔ `01-所有权.md`）
+3. 键是数字编号，与章节 `order` 相等（`[chapters."1"]`）
+
+**编译期校验：** 配置中的章节条目若没有匹配到任何章节文件、或同一个条目匹配到多个文件、
+或章节最终标题为空，构建时都会输出 `cargo:warning` 提示，格式说明见
+`posts/rust-llm/_README.md`。
 
 **首页列表展示：** 系列文档在首页列表中合并展示，使用以下规则：
 - 标题：使用配置文件的 `series` 字段
@@ -200,6 +252,22 @@ order: 3
 slug: "rust-guide-03"
 ---
 ```
+
+**`[series]` 分组（可选）：** 若想把系列元数据与章节表在视觉上分开，可以改用 `[series]` 分组，
+其中字段与顶层同名字段等价，且优先于顶层写法：
+
+```toml
+[series]
+name        = "Rust 学习指南"   # 等价于顶层 series
+summary     = "系列文档摘要"     # 等价于顶层 summary
+author      = "干徒"
+tags        = ["Rust"]
+slug_prefix = "rust-guide"
+```
+
+**参考实现：** `posts/rust-llm/` 就是「章节零 front matter」的完整示例，
+其 [_config.toml](posts/rust-llm/_config.toml) 集中维护 51 章元数据，
+细节见 [配置说明](posts/rust-llm/_README.md)。
 
 **目录页路径：** 由文件夹名自动决定，无需在 front matter 中配置。例如 `posts/rust-guide/` 下的系列文章，目录页地址为 `/series/rust-guide`。
 
@@ -237,9 +305,9 @@ slug: "rust-guide-03"
 │   ├── ganto/               # 文章分类归总（无 series 字段，文章独立显示）
 │   │   └── ...
 │   ├── rust-llm/            # 多章节文档（有 series 字段，自动聚合为系列）
-│   │   ├── _config.toml     # 系列配置文件（author、series、tags 等默认值）
+│   │   ├── _config.toml     # 系列配置 + [chapters] 逐章元数据
 │   │   ├── _README.md       # 配置文件使用说明
-│   │   ├── 00-学习计划.md
+│   │   ├── 00-学习计划.md     # 章节文件无 front matter，正文直接开始
 │   │   └── ...
 │   └── ...
 ├── src/

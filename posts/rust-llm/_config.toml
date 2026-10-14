@@ -1,9 +1,278 @@
 # rust-llm 系列文章配置
-# 此配置文件中的值会作为默认值，如果文章 front matter 中有相同字段，则以 front matter 为准
+#
+# 本文件支持两种用法，可混用：
+#   1) 顶层字段：系列级默认值，逐章生效（原有用法，语义不变）
+#   2) [chapters] / [[chapters]]：章节级元数据，键为章节文件名（不含 .md）
+#      有了它，章节 Markdown 就可以完全不写 front matter
+#
+# 取值优先级（前者有值则胜出）：
+#   front matter  >  [chapters] 章节配置  >  顶层系列默认值  >  派生兜底（文件名）
+#   tags 例外：顶层 + 章节 + front matter 三处合并去重
 
+# ── 系列级默认值 ────────────────────────────────────────────
 series = "Rust 大语言模型 学习指南"
-summary = "Rust实现的大预言模型学习项目"
 author = "干徒"
 date = "2026-09-01 12:00:00"
 tags = ["Rust", "LLM"]
 slug_prefix = "rust-llm-guide"
+
+# 系列摘要：仅用于首页「文档入口」卡片；各章摘要见下方 [chapters]
+summary = "使用 Rust 标准库从零手写张量、自动微分与 Transformer，逐步搭出一个真实可用的 LLM 训练与推理框架。"
+
+# ── 章节级元数据 ────────────────────────────────────────────
+# 键 = 章节文件名（不含 .md）；也可写成 "01" 这种编号（会模糊匹配文件名前缀）
+
+[chapters."00-学习计划"]
+title   = "从零用 Rust 实现大语言模型 —— 学习计划"
+summary = "整体路线图：12 个阶段 50 课，从张量、自动微分一路走到 GPU 加速、量化与部署。"
+tags    = ["学习计划"]
+
+[chapters."01-张量与基本运算"]
+title   = "第 1 课：张量 Tensor —— 一切的基础"
+summary = "从零实现张量的多维数组表示、内存布局与矩阵乘法，搞清深度学习里所有数据的统一容器。"
+tags    = ["张量"]
+
+[chapters."02-自动微分"]
+title   = "第 2 课：自动微分 Autograd —— 让模型学会「自我修正」"
+summary = "用计算图与链式法则实现反向传播，让每个参数的梯度自动算出来。"
+tags    = ["自动微分"]
+
+[chapters."03-张量运算扩展"]
+title   = "第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法"
+summary = "补齐广播规则、sum/mean 归约、数值稳定的 softmax 与 3D 批量矩阵乘法及其反向传播。"
+tags    = ["张量"]
+
+[chapters."04-模块化重构"]
+title   = "第 4 课：模块化重构 —— 项目结构分层与 Arc<Mutex>/Shared 架构"
+summary = "把张量库拆成独立模块，引入 Shared 共享可变数据、线程局部 tape 与 Module trait。"
+tags    = ["架构"]
+
+[chapters."05-线性层与激活函数"]
+title   = "第 5 课：线性层与激活函数 —— 神经网络的「积木」"
+summary = "实现 Linear 层、权重初始化与 ReLU/GELU/Tanh 激活函数，并用 Module trait 统一管理参数。"
+tags    = ["神经网络"]
+
+[chapters."06-损失函数与优化器"]
+title   = "第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」"
+summary = "实现 MSE 与 CrossEntropy 损失、SGD 优化器，串起前向-反向-更新-清零的完整训练循环。"
+tags    = ["优化器"]
+
+[chapters."07-第一个MLP"]
+title   = "第 7 课：第一个 MLP —— 教会神经网络算 XOR"
+summary = "用隐藏层 + 非线性激活解决线性不可分的 XOR，反过来验证自己的反向传播实现是对的。"
+tags    = ["MLP"]
+
+[chapters."08-BPE分词器"]
+title   = "第 8 课：BPE 分词器 —— 让模型「读懂」文字"
+summary = "手写字节级 BPE：从语料统计合并规则，实现训练、编码与解码全过程。"
+tags    = ["分词器"]
+
+[chapters."09-注意力机制"]
+title   = "第 9 课：注意力机制 —— 让 token 互相「看」"
+summary = "从 Q/K/V 投影讲到缩放点积注意力，用 -inf 掩码保证模型只能看过去。"
+tags    = ["注意力"]
+
+[chapters."10-多头注意力"]
+title   = "第 10 课：多头注意力 —— 让模型「多角度」看世界"
+summary = "把一个头拆成多个头并行计算相关性，理清 reshape/permute 的形状变换与输出投影。"
+tags    = ["注意力"]
+
+[chapters."11-位置编码与归一化"]
+title   = "第 11 课：位置编码与归一化 —— 让序列带上「位置感」"
+summary = "用正弦位置编码补上注意力看不见的位置信息，再用 LayerNorm 与残差连接稳住深层网络。"
+tags    = ["归一化"]
+
+[chapters."12-完整Transformer模型"]
+title   = "第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型"
+summary = "把 Embedding、注意力、MLP、LayerNorm 拼成完整 Transformer，输入 token id 输出下一个词的 logits。"
+tags    = ["Transformer"]
+
+[chapters."13-训练循环"]
+title   = "第 13 课：训练循环 —— 让模型真正开始学习"
+summary = "严格按六步训练循环执行 forward/backward/step，并用梯度裁剪镇住梯度爆炸。"
+tags    = ["训练"]
+
+[chapters."14-数据加载"]
+title   = "第 14 课：数据加载 —— 文本如何变成训练样本"
+summary = "从纯文本切出「输入 x / 目标 y 平移一位」的自监督样本，理解 batch_size 与 block_size。"
+tags    = ["数据"]
+
+[chapters."15-推理与采样"]
+title   = "第 15 课：推理与采样 —— 让模型「创造性」地生成"
+summary = "把 logits 变成文本：temperature、top-k、top-p 采样与重复惩罚，并理清停止条件。"
+tags    = ["推理"]
+
+[chapters."16-训练小Transformer"]
+title   = "第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16"
+summary = "在小语料上完整跑通训练并生成文本，逐列读懂 step/lr/loss/tok-s 训练日志。"
+tags    = ["训练"]
+
+[chapters."17-AdamW优化器"]
+title   = "第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」"
+summary = "实现一阶/二阶动量、偏差修正与解耦权重衰减，理解 AdamW 每一行公式的来历。"
+tags    = ["优化器"]
+
+[chapters."18-学习率调度"]
+title   = "第 18 课：学习率调度 —— warmup + cosine decay"
+summary = "用 LRScheduler 实现 warmup 升温与余弦退火，体会学习率曲线对训练稳定性的影响。"
+tags    = ["训练"]
+
+[chapters."19-Dropout"]
+title   = "第 19 课：Dropout —— 训练时的「随机失忆」"
+summary = "实现反转 Dropout，抑制过拟合，并搞清它在 Transformer 的哪些位置生效、推理时为何关闭。"
+tags    = ["正则化"]
+
+[chapters."20-RoPE旋转位置编码"]
+title   = "第 20 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力"
+summary = "用正交旋转把相对位置编码进 Q/K 点积，让位置信息与 KV Cache 天然兼容。"
+tags    = ["位置编码"]
+
+[chapters."21-RMSNorm"]
+title   = "第 21 课：RMSNorm —— 现代 LLM 的归一化标配"
+summary = "去掉均值减法与偏置项，用均方根归一化换来计算量下降，并推导它的反向传播。"
+tags    = ["归一化"]
+
+[chapters."22-SwiGLU"]
+title   = "第 22 课：SwiGLU 激活函数 —— LLaMA 的「门控」MLP"
+summary = "用门控机制改造 MLP，在相同参数量下取得更好的效果，替换掉经典 GELU。"
+tags    = ["激活函数"]
+
+[chapters."23-GQA分组查询注意力"]
+title   = "第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器"
+summary = "让多个查询头共享 K/V 头，在 MHA 与 MQA 之间取得质量与 KV Cache 体积的平衡。"
+tags    = ["注意力"]
+
+[chapters."24-Flash-Attention"]
+title   = "第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星"
+summary = "用分块与在线 softmax 避免物化完整的 T×T 注意力矩阵，从根上省下显存。"
+tags    = ["注意力"]
+
+[chapters."25-KV-Cache"]
+title   = "第 25 课：KV Cache —— 让逐 token 生成不再重复计算"
+summary = "缓存历史 token 的 K/V，使逐 token 生成的每步开销从 O(T) 降到 O(1)，且分布完全一致。"
+tags    = ["推理"]
+
+[chapters."26-混合精度训练"]
+title   = "第 26 课：混合精度训练（AMP）—— 用半精度加速，用全精度保底"
+summary = "用 FP16 做前向反向换速度、FP32 存主权重保精度，配合动态损失缩放避免梯度下溢。"
+tags    = ["训练"]
+
+[chapters."27-GPU加速"]
+title   = "第 27 课：GPU 加速 —— 手写 WGSL 计算着色器"
+summary = "用 wgpu + WGSL 手写算子把耗时计算搬上 GPU，并保证不可用时自动回退 CPU、数值不出错。"
+tags    = ["GPU"]
+
+[chapters."28-梯度累积"]
+title   = "第 28 课：梯度累积 —— 小显存也能跑大 batch"
+summary = "用多个小 batch 累积梯度模拟大 batch，理解上游梯度为何要除以累积步数。"
+tags    = ["训练"]
+
+[chapters."29-LoRA低秩适配"]
+title   = "第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型"
+summary = "用低秩矩阵近似权重更新，冻结主干只训适配器，把微调成本压到极低。"
+tags    = ["微调"]
+
+[chapters."30-Beam-Search"]
+title   = "第 30 课：Beam Search —— 贪心搜索的升级版"
+summary = "同时保留多条候选路径并施加长度惩罚，在质量与多样性之间取更优的解码结果。"
+tags    = ["推理"]
+
+[chapters."31-Scaling-Laws"]
+title   = "第 31 课：Scaling Laws（缩放定律）"
+summary = "loss 与参数量、数据量、算力呈稳定幂律关系，并据此推导最优配比与训练预算。"
+tags    = ["缩放定律"]
+
+[chapters."32-MoE混合专家模型"]
+title   = "第 32 课：MoE 混合专家模型（Mixture of Experts）"
+summary = "用稀疏激活把参数量与计算量解耦：每 token 只走少数专家，并处理负载均衡问题。"
+tags    = ["MoE"]
+
+[chapters."33-量化技术"]
+title   = "第 33 课：量化技术（Quantization）"
+summary = "用更少比特表示权重：RTN、Hessian 与 AWQ 三条路线，以及 int8/int4 的精度代价。"
+tags    = ["量化"]
+
+[chapters."34-推测解码"]
+title   = "第 34 课：推测解码（Speculative Decoding）"
+summary = "小模型起草、大模型一次并行验证，用拒绝采样保证输出分布与原模型严格一致。"
+tags    = ["推理"]
+
+[chapters."35-多token预测"]
+title   = "第 35 课：多 Token 预测（Multi-Token Prediction）"
+summary = "一次预测未来多个 token，为模型提供更长远的监督信号，并可复用为推测解码的草稿。"
+tags    = ["训练"]
+
+[chapters."36-RLHF与对齐"]
+title   = "第 36 课：RLHF 与人类对齐（Alignment）"
+summary = "从奖励模型到 PPO，再到 DPO / GRPO，让模型输出符合人类偏好而非只是「接着往下写」。"
+tags    = ["对齐"]
+
+[chapters."37-RAG检索增强生成"]
+title   = "第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）"
+summary = "分块、向量化、检索与重排，把外部知识塞进上下文，缓解知识截止与幻觉。"
+tags    = ["RAG"]
+
+[chapters."38-分布式训练"]
+title   = "第 38 课：分布式训练（Distributed Training）"
+summary = "集合通信、数据并行、ZeRO 与张量/流水线并行，理解大模型如何在多卡上摊开。"
+tags    = ["分布式"]
+
+[chapters."39-工程化完善"]
+title   = "第 39 课：工程化完善 —— 从算法实现到可用框架"
+summary = "补齐 CLI、配置、分词器持久化、checkpoint 与 SFT/微调工作流，把算法组装成可用框架。"
+tags    = ["工程化"]
+
+[chapters."40-把模型部署成API服务"]
+title   = "第 40 课：把模型部署成 API 服务 —— 从「自己跑」到「给别人调」"
+summary = "把模型包装成 OpenAI 兼容的 HTTP 服务，用状态机实现 SSE 流式输出与并发排队。"
+tags    = ["部署"]
+
+[chapters."41-多模态"]
+title   = "第 41 课：多模态 —— 图片理解与图片生成"
+summary = "手写 ViT 视觉塔与 VQ-VAE 码本，把图像变成 token 与文本拼进同一条序列。"
+tags    = ["多模态"]
+
+[chapters."42-知识蒸馏"]
+title   = "第 42 课：知识蒸馏（Knowledge Distillation）"
+summary = "用教师的软标签替代 one-hot 硬标签，通过温度调节把「暗知识」传给学生模型。"
+tags    = ["蒸馏"]
+
+[chapters."43-FP8低精度"]
+title   = "第 43 课：FP8 低精度训练（模拟）"
+summary = "E4M3/E5M2 编解码与分块缩放，量化 FP8 训练的数值误差，并说清纯模拟的边界。"
+tags    = ["低精度"]
+
+[chapters."44-WSD学习率调度"]
+title   = "第 44 课：WSD 学习率调度（warmup-stable-decay）"
+summary = "把学习率曲线改成 warmup → 恒定 → 退火三段，摆脱「必须预先定死总步数」的约束。"
+tags    = ["训练"]
+
+[chapters."45-QK-Norm"]
+title   = "第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死"
+summary = "在注意力内部对 Q/K 逐头做 RMSNorm，抑制打分幅度失控，稳定大模型训练。"
+tags    = ["注意力"]
+
+[chapters."46-Muon优化器"]
+title   = "第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化"
+summary = "用 Newton–Schulz 迭代把动量矩阵正交化，按谱范数而非逐坐标缩放更新量。"
+tags    = ["优化器"]
+
+[chapters."47-mHC流形约束超连接"]
+title   = "第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道"
+summary = "把单条残差流拓成多条并用双随机矩阵耦合，用 Sinkhorn 投影同时保证信号不放大与保均值。"
+tags    = ["架构"]
+
+[chapters."48-FP4量化感知训练"]
+title   = "第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重"
+summary = "把权重压到 4 位（E2M1 + 分块 scale）并算清精度与压缩比的账，解释为何离不开分块缩放。"
+tags    = ["低精度"]
+
+[chapters."49-CSA-HCA混合注意力"]
+title   = "第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩"
+summary = "按块压缩 KV 的「个数」，用局部 + 细压缩 + 粗压缩三层覆盖把长上下文开销压下来。"
+tags    = ["注意力"]
+
+[chapters."50-MLA解耦RoPE与权重吸收"]
+title   = "第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent"
+summary = "补齐 MLA 的解耦 RoPE，并借权重吸收让解码时 K/V 全程不物化，进一步压缩 KV Cache。"
+tags    = ["注意力"]
