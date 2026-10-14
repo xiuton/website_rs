@@ -8,10 +8,11 @@
 - 📱 **响应式设计** — 适配桌面端与移动端，工具栏自动调整位置
 - ⚡ **WebAssembly 驱动** — 基于 Rust 编译为 Wasm，接近原生的运行性能
 - 📝 **Markdown 博客** — Front Matter 元数据，comrak 渲染，highlight.js 代码高亮
-- 📚 **多章节文档支持** — 同一 `series` + 同一文件夹的文章自动聚合为文档，文章页显示章节目录与上下篇导航，首页列表合并显示为一条文档入口；子目录下无 `series` 字段的文章作为分类归总独立显示
-- ⚙️ **目录配置文件** — 系列文档支持 `_config.toml` 配置文件，统一管理重复元数据（author、series、tags、date、slug_prefix）
+- 📚 **多章节文档支持** — 同一 `series` + 同一文件夹的文章自动聚合为文档，文章页底部显示**可折叠的章节目录**（默认折叠，只露标题行与上下篇）与「目录页」入口；首页列表合并显示为一条文档入口；子目录下无 `series` 字段的文章作为分类归总独立显示
+- ⚙️ **目录配置文件** — 系列文档支持 `_config.toml` 配置文件，统一管理重复元数据（author、series、tags、date、summary）
 - 🗂️ **章节元数据集中配置** — `_config.toml` 的 `[chapters]` / `[[chapters]]` 可逐章配置 `title`/`summary`/`tags`，章节 Markdown **可以完全不写 front matter**；两种写法可逐文件混用
-- 🏷️ **标签系统** — 文章标签展示
+- 🔗 **slug 生成策略可选** — `slug_prefix`（`rust-llm-guide-01`）或 `slug_style = "date"`（`20240511`，同日期依次 `-2`/`-3`）；构建期检查全局 slug 唯一性，撞车直接告警
+- 🏷️ **标签系统** — 文章标签展示；首页卡片标签超过 10 个时折叠为「+N」，点击展开/收起
 - 🔖 **书签管理** — TOML 配置的书签页面，支持搜索筛选
 - 🎮 **操场 (Playground)** — 代码实验环境
 - 🔧 **开发工具页** — 内置开发辅助功能
@@ -32,7 +33,7 @@
 | 样式 | SCSS (Sass) |
 | Markdown 渲染 | [comrak](https://docs.rs/comrak) (GFM 兼容) |
 | 代码高亮 | [highlight.js 11](https://highlightjs.org/) |
-| Markdown 解析 | pulldown-cmark (首页预览) |
+| HTTP 客户端 | gloo-net（加载 posts.json / markov.json 等预生成数据） |
 | 路由 | dioxus-router 0.6.3 |
 | 构建脚本 | `build.rs` 编译期解析博客文章 |
 | 数据生成 | `build/` 目录下多个 `build_*.rs` 模块（posts.json、rss、atom、搜索索引、摘要、SEO 文件等） |
@@ -95,13 +96,47 @@ trunk serve
 trunk serve --port 8081
 ```
 
+> `trunk serve` 只提供 **SPA**（页面由 Wasm 在浏览器里渲染），不带 SEO 预渲染页；
+> 而且它在**每次源码/文章变动时会重建整个 `dist/`**，之前生成的 `dist/post/**` 会被清掉。
+> 这是正常的：开发时看 SPA 就够了，预渲染页只在打包发布前生成
+> （`./scripts/build.ps1`）。如果发现预渲染页「不见了」，重新跑一次构建脚本即可。
+
 ### 构建生产版本
 
+```powershell
+# 一条命令跑完「生成数据 → 编译 Wasm → SEO 预渲染」
+./scripts/build.ps1
+
+# 参数
+./scripts/build.ps1 -DevMode        # debug 构建（更快、产物更大）
+./scripts/build.ps1 -NoPrerender    # 跳过预渲染
+./scripts/build.ps1 -Clean          # 先删 dist/ 再构建
+```
+
+手动分步执行时，**顺序不能颠倒**：
+
 ```bash
-trunk build --release
+cargo build --release --bin web-rs   # 1. 触发 build.rs，生成 static/*.json
+trunk build --release                # 2. 编译 Wasm，并把 static/ 复制进 dist/
+cargo run --release --bin prerender  # 3. 依赖 dist/static/posts.json，逐篇生成静态页
 ```
 
 构建产物输出到 `dist/` 目录。
+
+> ⚠️ **顺序为什么重要**：`build.rs` 负责把 `posts/` 解析成 `static/posts.json`、
+> `markov.json`、`search-index.json`、RSS/Atom、sitemap 等数据文件；`trunk build`
+> 再通过 `<link data-trunk rel="copy-dir" href="static">` 把它们复制进 `dist/static/`。
+> `prerender` 读的是 `dist/static/posts.json`，所以第 1、2 步必须走在它前面。
+> 如果跳过第 1 步（或改完文章没重新构建），页面会因缺少数据文件而报
+> `加载 xxx.json 失败`。
+>
+> 另外：`trunk build` / `trunk serve` 会**重建整个 `dist/`**，所以预渲染页在每次
+> trunk 构建后都需要重新生成（`./scripts/build.ps1` 已包含这一步）。
+
+**关于 SRI：** [Trunk.toml](Trunk.toml) 中设置了 `no_sri = true`。Trunk 默认会把
+integrity 摘要写进 `index.html`，但它热重载时会替换资源文件，浏览器如果缓存了旧的
+`index.html` 就会因摘要不匹配而拒绝加载资源（`Failed to find a valid digest ...`）。
+静态托管下文件名本身已带内容指纹，SRI 收益很低，因此统一关闭。
 
 生成文章静态页（SEO 预渲染，爬虫无需执行 JS 即可读取全文）：
 
@@ -158,6 +193,10 @@ summary = "系列文档摘要"
 tags = ["Rust"]
 date = "2026-09-01 12:00:00"
 slug_prefix = "rust-guide"
+# 章节 slug 生成方式，可选（默认 prefix）：
+#   "prefix" → rust-guide-01、rust-guide-02…
+#   "date"   → 20240511、20240511-2…（与普通文章一致）
+slug_style = "prefix"
 ```
 
 第一种用法：文章只写独有字段，配置文件的值自动填充：
@@ -213,9 +252,30 @@ order = 3
 | `author`、`series`、`date` | 覆盖 | front matter → `[chapters]` → 配置文件顶层 |
 | `summary` | 覆盖 | front matter → `[chapters]` → 配置文件顶层（顶层 `summary` 同时作为首页入口的系列摘要） |
 | `tags` | 合并 | 顶层 + `[chapters]` + front matter，三处合并去重 |
-| `slug` | 自动生成 | front matter / `[chapters]` 自定义优先，否则 `{slug_prefix}-{order:02}`（如 `rust-guide-03`） |
+| `slug` | 自动生成 | front matter / `[chapters]` 自定义优先，否则按 `slug_style` 生成（见下） |
 | `order` | 优先 front matter | 其次 `[chapters]`，最后从文件名数字提取（如 `03-xxx.md` → `3`） |
 | `catalog` | 目录名 | 默认取文件夹名，`[chapters]` 可覆盖 |
+
+**slug 生成规则：**
+
+| `slug_style` | 系列章节的 slug | 例子 |
+|--------------|----------------|------|
+| `"prefix"`（默认） | `{slug_prefix}-{order:02}` | `rust-guide-01`、`rust-guide-02` |
+| `"date"` | 用日期（与普通文章相同），同日期依次加 `-2`、`-3` | `20240511`、`20240511-2` |
+
+- 没有 `slug_prefix` 时，系列章节回退为文件名，避免多章都落到同一个 slug 上。
+- 日期编号按 **`日期` → `order` → `文件名`** 排序后分配，因此跨机器、跨构建都稳定
+  （不会因为文件系统遍历顺序不同而让 `-2` 落到别的章节上）。
+- 没有数字序号的章节（如 `vue one.md`）必须靠 `[chapters]` 里的 `order`、
+  或改用 `slug_style = "date"` 来区分，否则会撞成同一个 slug。
+
+**slug 唯一性校验：** 构建时会全量检查一遍，发现重复立刻告警并指出是哪两篇
+（重复的 slug 会让后一篇永远无法通过 URL 访问）：
+
+```
+cargo:warning=[slug 重复] "2023-docs-00" 同时属于 5分钟快速入门Taro.md 与 css常用场景.md：
+后一篇将无法通过 URL 访问。请在 _config.toml 中为章节设置 order、或使用 slug_style = "date"、或直接指定 slug
+```
 
 **章节键匹配规则（依次尝试）：**
 
@@ -271,12 +331,16 @@ slug_prefix = "rust-guide"
 
 **目录页路径：** 由文件夹名自动决定，无需在 front matter 中配置。例如 `posts/rust-guide/` 下的系列文章，目录页地址为 `/series/rust-guide`。
 
-**文章分类归总：** 如果子目录下的文章没有 `series` 字段，该目录仅作为分类归总（如 `posts/ganto/`），文章会像普通文章一样独立显示，文件夹名作为分类标签。
+**文章分类归总：** 如果子目录下的文章没有 `series` 字段，该目录仅作为分类归总（如 `posts/old-docs/`），文章会像普通文章一样独立显示，文件夹名作为分类标签。
 
 同一 `series` 的文章会被自动聚合（以文件夹为单位区分，同名 `series` 在不同文件夹中视为不同系列）：
 
-- 文章页显示**章节目录**（按 `order` 排序、当前章高亮）与**上一篇/下一篇**导航
+- 文章页底部显示**可折叠的章节目录**（按 `order` 排序、当前章高亮、默认折叠）与**上一篇/下一篇**导航
+  - 折叠/展开由标题行控制：点标题行任意位置切换，箭头随之翻转
+  - 「目录页」按钮位于列表上方，折叠时也可点击
+  - 折叠状态保持在 DOM 上（`<details>`），无 JS 时同样可用
 - 首页列表只显示一条**文档入口**（带"系列 · 共 N 章"标记），不会列出每个章节
+- 首页卡片的标签超过 10 个时折叠为「+N」按钮，点击展开全部、再点收起
 - 点击文档入口进入**目录页**（`/series/<目录名>`），从目录页再进入各章节
 
 > `build.rs` 会在编译时扫描 `posts/` 目录，解析所有 `.md` 文件的 Front Matter，
@@ -290,7 +354,7 @@ slug_prefix = "rust-guide"
 │   └── workflows/
 │       └── build.yml        # GitHub Actions CI/CD（含 SEO 预渲染步骤）
 ├── build/                   # 构建期数据生成模块（build.rs 调用）
-│   ├── build_common.rs      # 共享工具
+│   ├── build_common.rs      # 共享工具：扫描 posts、front matter 解析、_config.toml、slug 分配
 │   ├── build_posts_json.rs  # 生成 posts.json
 │   ├── build_rss.rs         # RSS 订阅
 │   ├── build_atom.rs        # Atom 订阅
@@ -300,9 +364,12 @@ slug_prefix = "rust-guide"
 │   └── ...                  # 其余 build_*.rs 模块
 ├── data/                    # 应用数据
 │   └── bookmarks.toml       # 书签配置
+├── docs/                    # 设计文档
+│   └── optimization-analysis.md
 ├── posts/                   # 博客 Markdown 文章
-│   ├── Rust所有权.md
-│   ├── ganto/               # 文章分类归总（无 series 字段，文章独立显示）
+│   ├── Rust所有权.md         # 根目录文章：slug 用日期，如 20230111
+│   ├── old-docs/            # 分类归总目录（无 series 字段，文章独立显示）
+│   │   ├── _config.toml     # slug_style = "date"
 │   │   └── ...
 │   ├── rust-llm/            # 多章节文档（有 series 字段，自动聚合为系列）
 │   │   ├── _config.toml     # 系列配置 + [chapters] 逐章元数据
@@ -310,6 +377,8 @@ slug_prefix = "rust-guide"
 │   │   ├── 00-学习计划.md     # 章节文件无 front matter，正文直接开始
 │   │   └── ...
 │   └── ...
+├── scripts/
+│   └── build.ps1            # 一键构建：生成数据 → trunk build → 预渲染
 ├── src/
 │   ├── bin/
 │   │   ├── new.rs           # CLI 工具：新建博客文章
@@ -361,7 +430,7 @@ slug_prefix = "rust-guide"
 ├── Cargo.lock
 ├── LICENSE                  # MIT 许可证
 ├── README.md
-├── Trunk.toml               # Trunk 构建配置（Wasm 优化）
+├── Trunk.toml               # Trunk 构建配置（release + 关闭 SRI）
 ├── build.rs                 # 构建脚本（编译期解析文章）
 ├── index.html               # HTML 入口模板
 └── netlify.toml             # Netlify 部署配置（SPA 路由）
@@ -385,42 +454,50 @@ slug_prefix = "rust-guide"
 ```toml
 [dependencies]
 dioxus = { version = "0.6.3", features = ["web", "router"] }
-dioxus-web = "0.6.3"
-dioxus-hooks = "0.6.2"
-dioxus-router = "0.6.3"
 wasm-bindgen = "0.2.89"
-web-sys = "0.3.66"        # DOM / Storage / History API
-comrak = "0.20.0"          # Markdown → HTML (GFM)
-pulldown-cmark = "0.13.0"  # 首页文章预览
-toml = "0.8.8"            # 书签配置解析
-serde = "1.0"             # 序列化
-chrono = "0.4"            # 日期时间
-gloo-timers = "0.3.0"     # 异步定时器
+wasm-bindgen-futures = "0.4.39"
+web-sys = "0.3.66"          # DOM / Storage / History / Canvas
+js-sys = "0.3.66"           # Promise 等（异步延时等）
+serde = "1.0"               # 序列化
+serde_json = "1.0"          # 解析 posts.json / markov.json 等预生成数据
+toml = "0.8.8"              # 书签配置解析
+comrak = "0.20.0"           # Markdown → HTML (GFM)
+gloo-net = "0.5.0"          # 浏览器端 HTTP 请求
+futures-channel = "0.3.30"
+wee_alloc = "0.4.5"         # Wasm 内存分配器
+console_error_panic_hook = "0.1.7"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+chrono = "0.4"              # 仅 CLI 工具（new / prerender）用
 
 [build-dependencies]
-walkdir = "2.4.0"         # 构建时遍历 posts 目录
-comrak = "0.20.0"
-toml = "0.8.8"            # 解析 _config.toml 配置文件
+comrak = "0.20.0"           # front matter 之外的正文渲染
+regex = "1.11.0"
+toml = "0.8.8"              # 解析 _config.toml 配置文件
 ```
 
 ## 部署说明
 
 ### 静态文件部署
 
-```bash
-trunk build --release
+```powershell
+./scripts/build.ps1          # 生成数据 + 编译 Wasm + SEO 预渲染
 ```
 
 将 `dist/` 目录部署到任意静态 Web 服务器即可。
+
+> ⚠️ 只跑 `trunk build` 会得到「没有预渲染页」的产物：SPA 能正常跑，但爬虫看到的是空壳。
+> 完整发布请用 `./scripts/build.ps1`（等价于 `cargo build` → `trunk build` → `prerender`）。
 
 ### GitHub Pages（Actions 自动部署）
 
 推送代码到 `mod` 分支后，GitHub Actions 自动：
 
 1. 安装 Rust wasm 工具链
-2. 运行 `trunk build --release`
-3. 编译并运行 `prerender` 工具生成文章静态页与 `404.html`
-4. 将 `dist/` 部署到 `gh-pages` 分支
+2. `cargo build --release --target wasm32-unknown-unknown`（触发 `build.rs` 生成 `static/*.json`）
+3. 运行 `trunk build --release`（编译 Wasm，并把 `static/` 复制进 `dist/`）
+4. 编译并运行 `prerender` 工具生成文章静态页与 `404.html`
+5. 将 `dist/` 部署到 `gh-pages` 分支
 
 配置文件：[.github/workflows/build.yml](.github/workflows/build.yml)
 

@@ -12,9 +12,20 @@ series      = "Rust 大语言模型 学习指南"   # 系列名称（首页入�
 author      = "干徒"                      # 默认作者
 date        = "2026-09-01 12:00:00"       # 默认日期
 tags        = ["Rust", "LLM"]             # 默认标签（与章节标签合并）
-slug_prefix = "rust-llm-guide"            # slug 前缀，生成格式：{prefix}-{order:02}
+slug_prefix = "rust-llm-guide"            # slug 前缀（slug_style = "prefix" 时使用）
 summary     = "系列摘要"                   # 只用于首页「文档入口」卡片
+slug_style  = "prefix"                    # 章节 slug 生成方式，可选 "prefix" | "date"
 ```
+
+`slug_style` 的两种取值：
+
+| 取值 | 章节 slug | 例子 |
+|------|----------|------|
+| `"prefix"`（默认，本系列在用） | `{slug_prefix}-{order:02}` | `rust-llm-guide-01` |
+| `"date"` | 用日期，与普通文章一致；同日期依次 `-2`、`-3` | `20240511`、`20240511-2` |
+
+> 没有数字序号的章节（例如 `vue one.md`）必须靠 `order` 或 `slug_style = "date"` 区分，
+> 否则多章会撞成同一个 slug —— 构建时会给出 `cargo:warning=[slug 重复]` 告警。
 
 ### 2. 章节级元数据（`[chapters]` 表）
 
@@ -36,7 +47,7 @@ tags    = ["张量"]
 | `tags` | 章节标签（与顶层 `tags`、front matter 合并去重） |
 | `date` / `author` / `series` | 覆盖系列级默认值 |
 | `order` | 章节序号（不写则从文件名 `NN-` 前缀提取） |
-| `slug` | 自定义 URL（不写则用 `{slug_prefix}-{order:02}`） |
+| `slug` | 自定义 URL（不写则按 `slug_style` 生成） |
 | `catalog` | 覆盖系列目录页路径段（默认取文件夹名 `rust-llm`） |
 
 键也可以写成**纯编号**（模糊匹配文件名前缀）：
@@ -101,6 +112,23 @@ front matter  >  [chapters] 章节配置  >  顶层系列默认值  >  派生兜
 | `[chapters] 条目 "xx" 是按编号匹配到 yy.md 的` | 模糊匹配成功但建议写成完整文件名 |
 | `[front matter 未闭合]` | 文件开头有 `---` 却没有收尾的 `---`，正文会被当成元数据吞掉 |
 | `[标题为空]` | 既没配 `title` 也无法派生，请补配置 |
+| `[slug 重复]` | 多篇文章生成了同一个 URL（重复的那篇永远访问不到），见下 |
+
+**slug 重复**是唯一的全站级检查（不限于本目录）：只要有两条数据拿到同一个 slug 就会告警，
+并指出是哪两个文件：
+
+```
+cargo:warning=[slug 重复] "2023-docs-00" 同时属于 5分钟快速入门Taro.md 与 css常用场景.md：
+后一篇将无法通过 URL 访问。请在 _config.toml 中为章节设置 order、或使用 slug_style = "date"、或直接指定 slug
+```
+
+常见成因与修法：
+
+| 成因 | 修法 |
+|------|------|
+| 章节文件名没有数字前缀（`vue one.md`），`order` 全部兜底为 0 | 改名为 `01-vue-one.md`，或在 `[chapters]` 里写 `order`，或改用 `slug_style = "date"` |
+| 多篇文章 `date` 相同、且都用日期型 slug | 用 `slug_style = "date"`（会自动加 `-2`/`-3`）或给文件加数字前缀 |
+| 同一 `slug_prefix` + 相同 `order` | 检查 `order` 是否有重复 |
 
 > 说明：`cargo` 只在构建脚本**重新执行**时打印这些警告；如果只是想立刻看一遍全部提示，
 > 可以先 `touch build.rs`（或改动任意 `posts/` 下的文件）再执行 `cargo build`。

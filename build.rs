@@ -62,6 +62,9 @@ fn main() {
 
     scan_dir(posts_dir, posts_dir, "", &mut posts, &mut date_count);
 
+    // 统一分配日期型 slug（普通文章 + slug_style = "date" 的系列章节），并检查 slug 唯一性
+    assign_slugs(&mut posts);
+
     posts.sort_by(|a, b| b.date.cmp(&a.date));
 
     let mut output = String::from("pub const BLOG_POSTS: &[BlogPost] = &[\n");

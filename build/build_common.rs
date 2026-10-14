@@ -45,6 +45,16 @@ pub struct ChapterConfig {
     pub catalog: Option<String>,
 }
 
+/// 系列文章的 slug 生成方式（由 `_config.toml` 的 `slug_style` 指定）
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum SlugStyle {
+    /// 默认：`{slug_prefix}-{order:02}`（如 `rust-llm-guide-01`）
+    #[default]
+    Prefix,
+    /// 与普通文章一致：用日期生成（如 `20240511`，同日期依次 `-2`、`-3`）
+    Date,
+}
+
 /// 目录配置文件结构体
 /// 从 _config.toml 读取的默认值，文章 front matter 中的值会覆盖这些默认值
 #[derive(Debug, Default)]
@@ -55,6 +65,8 @@ pub struct DirConfig {
     pub date: Option<String>,
     pub slug_prefix: Option<String>,
     pub summary: Option<String>,
+    /// 系列章节的 slug 生成方式
+    pub slug_style: SlugStyle,
     /// 章节级配置，顺序即匹配优先级：`[[chapters]]` 在前，`[chapters]` 表在后
     pub chapters: Vec<ChapterConfig>,
     /// `[series]` 分组是否显式出现（用于校验与提示）
@@ -203,6 +215,18 @@ pub fn load_dir_config(dir: &Path) -> DirConfig {
                                 .iter()
                                 .filter_map(|t| t.as_str().map(|s| s.to_string()))
                                 .collect();
+                        }
+                    }
+
+                    // ── slug_style：系列章节的 slug 生成方式 ──
+                    if let Some(style) = value.get("slug_style").and_then(|v| v.as_str()) {
+                        match style.trim().to_ascii_lowercase().as_str() {
+                            "date" | "日期" => config.slug_style = SlugStyle::Date,
+                            "prefix" | "前缀" => config.slug_style = SlugStyle::Prefix,
+                            other => eprintln!(
+                                "cargo:warning=[_config.toml] {:?} 的 slug_style = {:?} 无法识别，可选值：\"prefix\"（默认）或 \"date\"",
+                                config_path, other
+                            ),
                         }
                     }
 
@@ -601,7 +625,8 @@ pub fn process_post(
     category: &str,
     filename: &str,
     posts: &mut Vec<PostData>,
-    date_count: &mut HashMap<String, i32>,
+    // 日期型 slug 统一在 assign_slugs 里分配（需要全局视角），这里不再使用
+    _date_count: &mut HashMap<String, i32>,
     dir_config: &DirConfig,
     mut matched_chapters: Option<&mut Vec<Option<String>>>,
 ) {
@@ -816,34 +841,27 @@ pub fn process_post(
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| category.to_string());
 
-    // 文章 slug：优先使用 front matter 中自定义的 slug，其次章节配置
-    // 系列文档未定义时使用 slug_prefix + order，普通文章未定义时使用日期生成
+    // 文章 slug：优先使用 front matter 中自定义的 slug，其次章节配置；
+    // 都没有时按目录配置的 slug_style 决定——
+    //   prefix（默认）：系列用 `{slug_prefix}-{order:02}`；无 prefix 则用文件名
+    //   date          ：与普通文章一致，用日期（如 `20240511`），
+    //                   因为有跨目录去重计数，这里先留空，待全部文章收集完再统一分配
+    // 普通文章始终按日期生成，同样延后到 assign_slugs 统一分配（保证计数确定性）
     let custom_slug = slug_from_fm.or_else(|| chapter.and_then(|c| c.slug.clone()));
 
     let slug = if let Some(slug) = custom_slug {
         slug
-    } else if !series.is_empty() {
-        // 系列文档：使用 slug_prefix + order 生成 slug，如果没有 prefix 则使用文件名
-        if let Some(prefix) = &dir_config.slug_prefix {
-            format!("{}-{:02}", prefix, order)
-        } else {
-            filename.to_string()
+    } else if !series.is_empty() && dir_config.slug_style == SlugStyle::Prefix {
+        match &dir_config.slug_prefix {
+            Some(prefix) => format!("{}-{:02}", prefix, order),
+            None => filename.to_string(),
         }
+    } else if !series.is_empty() && dir_config.slug_prefix.is_none() {
+        // 系列但既没有 slug_prefix、又选了日期风格：回退为文件名，避免撞成同一个 slug
+        filename.to_string()
     } else {
-        // 普通文章：使用日期生成 slug
-        let date_parts: Vec<&str> = date.split(' ').collect();
-        let date_str = if !date_parts.is_empty() {
-            date_parts[0].replace('-', "")
-        } else {
-            "00000000".to_string()
-        };
-        let count = date_count.entry(date_str.clone()).or_insert(0);
-        *count += 1;
-        if *count > 1 {
-            format!("{}-{}", date_str, *count)
-        } else {
-            date_str
-        }
+        // 待分配：普通文章 / date 风格的系列章节
+        String::new()
     };
 
     posts.push(PostData {
@@ -904,6 +922,80 @@ pub fn markov_tokenize(text: &str) -> Vec<String> {
     }
 
     tokens
+}
+
+/// 从日期字符串取出紧凑日期（`2024-05-11 12:00` → `20240511`）
+pub fn date_key(date: &str) -> String {
+    let digits: String = date
+        .split(' ')
+        .next()
+        .unwrap_or("")
+        .chars()
+        .filter(|c| c.is_ascii_digit())
+        .collect();
+    if digits.is_empty() {
+        "00000000".to_string()
+    } else {
+        digits
+    }
+}
+
+/// 统一分配「日期型 slug」，并检查全局 slug 唯一性
+///
+/// 需要延后到全部文章收集完再做的原因：
+/// 1. 系列章节可以共用同一个日期（如 `_config.toml` 里只写了一个 date），
+///    必须按日期统一编号才不会撞车；
+/// 2. 编号顺序必须稳定（按 日期 → order → 文件名 排序后分配），
+///    否则 `fs::read_dir` 的遍历顺序会让 `-2`/`-3` 在不同机器上落到不同章节。
+pub fn assign_slugs(posts: &mut [PostData]) {
+    // 收集所有待分配的文章，并按「日期 → order → 文件名」稳定排序：
+    // 同一个日期的多篇（典型是共用 date 的系列章节）会依次拿到
+    // `20240511`、`20240511-2`、`20240511-3`…
+    let mut pending: Vec<(String, i32, String, usize)> = posts
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| p.slug.is_empty())
+        .map(|(i, p)| (date_key(&p.date), p.order, p.filename.clone(), i))
+        .collect();
+    pending.sort();
+
+    let mut used: HashMap<String, usize> = HashMap::new();
+    for (key, _, _, i) in pending {
+        let slug = used.entry(key.clone()).or_insert(0);
+        *slug += 1;
+        posts[i].slug = if *slug > 1 {
+            format!("{}-{}", key, *slug)
+        } else {
+            key
+        };
+    }
+
+    // ── 全局 slug 唯一性检查：重复会让某篇文章永远访问不到 ──
+    let mut seen: HashMap<String, String> = HashMap::new();
+    let mut reported: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut duplicates: Vec<(String, String, String)> = Vec::new();
+    for post in posts.iter() {
+        if post.slug.is_empty() {
+            continue;
+        }
+        match seen.get(&post.slug) {
+            Some(prev) => {
+                if reported.insert(post.slug.clone()) {
+                    duplicates.push((post.slug.clone(), prev.clone(), post.filename.clone()));
+                }
+            }
+            None => {
+                seen.insert(post.slug.clone(), post.filename.clone());
+            }
+        }
+    }
+    for (slug, a, b) in duplicates {
+        eprintln!(
+            "cargo:warning=[slug 重复] \"{}\" 同时属于 {}.md 与 {}.md：后一篇将无法通过 URL 访问。\
+             请在 _config.toml 中为章节设置 order、或使用 slug_style = \"date\"、或直接指定 slug",
+            slug, a, b
+        );
+    }
 }
 
 /// 简单 LCG 伪随机数生成器
