@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JavaScript 高阶函数之 reduce - 干徒</title>
-    <meta name="description" content="MDN： https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce 关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为 累加器 reduce常见用例如下： let ">
+    <title>Rust所有权 - 干徒</title>
+    <meta name="description" content="旧文档归档">
     <meta name="author" content="干徒">
-    <meta name="keywords" content="JavaScript, Vue, 前端, 技术">
+    <meta name="keywords" content="Old, Rust, 后端, 技术">
     <link rel="canonical" href="https://ganto.me/post/20250220-2">
-    <meta property="og:title" content="JavaScript 高阶函数之 reduce - 干徒">
-    <meta property="og:description" content="MDN： https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce 关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为 累加器 reduce常见用例如下： let ">
+    <meta property="og:title" content="Rust所有权 - 干徒">
+    <meta property="og:description" content="旧文档归档">
     <meta property="og:type" content="article">
     <meta property="og:url" content="https://ganto.me/post/20250220-2">
     <meta property="og:site_name" content="干徒的博客">
@@ -17,25 +17,25 @@
     <meta property="og:image" content="https://ganto.me/static/images/og-image.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="JavaScript 高阶函数之 reduce - 干徒">
+    <meta property="og:image:alt" content="Rust所有权 - 干徒">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="JavaScript 高阶函数之 reduce - 干徒">
-    <meta name="twitter:description" content="MDN： https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce 关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为 累加器 reduce常见用例如下： let ">
+    <meta name="twitter:title" content="Rust所有权 - 干徒">
+    <meta name="twitter:description" content="旧文档归档">
     <meta name="twitter:image" content="https://ganto.me/static/images/og-image.png">
     <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"BlogPosting","headline":"JavaScript 高阶函数之 reduce","description":"MDN： https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce 关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为 累加器 reduce常见用例如下： let ","url":"https://ganto.me/post/20250220-2","datePublished":"2025-02-20","dateModified":"2025-02-20","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"JavaScript, Vue, 前端, 技术","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"Rust所有权","description":"旧文档归档","url":"https://ganto.me/post/20250220-2","datePublished":"2025-02-20","dateModified":"2025-02-20","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Old, Rust, 后端, 技术","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
     </script>
     <link rel="stylesheet" href="/styles-c3674ec134f9a612.css">
-<link rel="modulepreload" href="/web-rs-9744d5517cfe1d8b.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/web-rs-1fb22b055f912e2f.js" crossorigin="anonymous">
 <link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous">
 <link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous">
 <link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous">
-<link rel="preload" href="/web-rs-9744d5517cfe1d8b_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous">
+<link rel="preload" href="/web-rs-1fb22b055f912e2f_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm">
 
     <style>
 :root {
@@ -134,84 +134,44 @@
 </div>
         <main class="main-content">
             <article class="blog-post prerender-article">
-                <h1>JavaScript 高阶函数之 reduce</h1>
+                <h1>Rust所有权</h1>
                 <div class="prerender-meta">
                     <span>2025-02-20</span>
                     <span>干徒</span>
                 </div>
-                <div class="blog-tags"><span class="blog-tag">JavaScript</span><span class="blog-tag">Vue</span><span class="blog-tag">前端</span><span class="blog-tag">技术</span></div>
+                <div class="blog-tags"><span class="blog-tag">Old</span><span class="blog-tag">Rust</span><span class="blog-tag">后端</span><span class="blog-tag">技术</span></div>
                 <div class="blog-content">
-<blockquote>
-<p>MDN：<a href="https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce">https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce</a></p>
-</blockquote>
-<p>关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为<strong>累加器</strong></p>
-<p>reduce常见用例如下：</p>
-<pre><code class="language-js">let goods = [
-  { name: &quot;T恤&quot;, price: 99, count: 2 },
-  { name: &quot;polo衫&quot;, price: 120, count: 1 },
-  { name: &quot;牛仔裤&quot;, price: 197, count: 11 }
-]
-
-const goodsSum = goods.reduce((sum, item) =&gt; {
-  return sum + item.price * item.count;
-}, initSum = 0)
-
-console.log(goodsSum) // 2485
-
-</code></pre>
-<p>以上代码，我相信对于你那真是信手捏来...</p>
-<blockquote>
-<p>但是还是需要解释一下，reduce就是对goods数组中的每项的价格进行相加<br />
-reduce传递两个参数，第一个参数是一个回调函数，第二个参数是一个用于统计累加结果的初始值<br />
-reduce函数的第一个回调函数又有两个参数，第一个参数<code>sum</code>的初始状态等于reduce第二个参数<code>initSum</code>，在reduce执行完一次，第一个参数<code>sum</code>会变成reduce执行完返回的内容<br />
-reduce函数的第一个回调函数的第二个参数也就是goods数组中的每项<br />
-reduce执行次数与数组的长度有关</p>
-</blockquote>
-<p>在阅读vue官方文档的时候，发现了一段有趣的代码</p>
-<pre><code class="language-js">// plugins/i18n.js
-export default {
-  install: (app, options) =&gt; {
-    // 注入一个全局可用的 $translate() 方法
-    app.config.globalProperties.$translate = (key) =&gt; {
-      // 获取 `options` 对象的深层属性
-      // 使用 `key` 作为索引
-      return key.split('.').reduce((o, i) =&gt; {
-        if (o) return o[i]
-      }, options)
-    }
-  }
+<p>所有权系统是Rust中的一大特点<br />
+今日靓仔我啊，就来体验一番</p>
+<p>我们先来看一段代码</p>
+<pre><code class="language-rust">fn main() {
+    let s1 = String::from(&quot;hello&quot;);
+    let s2 = s1; // s1 的所有权转移给了 s2
+    println!(&quot;s1: {}, s2: {}&quot;, s1, s2); // 报错，s1 已经被移动了
 }
 
 </code></pre>
-<p>以上代码是vue中定义一个插件的代码，有趣的是其中的reduce函数</p>
-<p>我们将代码进行精简</p>
-<pre><code class="language-js">let obj = {
-  greetings: {
-    hello: &quot;你好&quot;
-  }
+<p><em><strong>你可能不了解rust代码，那么按照你熟悉的语言去理解他，大同小异</strong></em></p>
+<p>代码中先定义了一个String字符串类型的变量 <code>s1</code></p>
+<p>然后紧接着定义了一个变量 <code>s2</code>，此时需要注意，<code>s2</code> 的值是由 <code>s1</code> 赋值所得（可以先简单理解为赋值）<br />
+然后打印出 <code>s1</code>，<code>s2</code> 发现报错了</p>
+<p>问题就出现在 <code>let s2 = s1;</code> 这段代码，这里其实发生了所有权转移，也就是 <code>s1</code> 的所有权发生了向 <code>s2</code> 转移</p>
+<p>那么 <code>s1</code> 变量在所有权发生转移后，再进行访问，那么在rust中将是不合法的访问</p>
+<p>如果不需要所有权转移，而只是简单的拷贝，则可以使用clone函数</p>
+<pre><code class="language-rust">fn main() {
+    let mut s1 = String::from(&quot;hello&quot;);
+    let s2 = s1.clone(); // 深拷贝
+    println!(&quot;s1: {}, s2: {}&quot;, s1, s2);
+    s1.push_str(&quot; world&quot;); // 修改 s1
+    println!(&quot;s1: {}, s2: {}&quot;, s1, s2); // s2 的值没有改变，说明是深拷贝
 }
 
-const ret = &quot;greetings.hello&quot;.split('.').reduce((o, i) =&gt; {
-  if (o) {
-    return o[i]
-  }
-}, obj)
-
-console.log(ret)
-
 </code></pre>
-<p>以上代码是通过&quot;greetings.hello&quot;这段字符串，进而获取obj对象中的值</p>
-<p>以上代码<code>&quot;greetings.hello&quot;.split('.')</code> 就是数组 <code>[&quot;greetings&quot;, &quot;hello&quot;]</code></p>
-<p>reduce函数中的第一个回调函数中的第一个参数也就是<code>o</code>等于<code>obj</code>对象，第二个参数<code>i</code>变成了 <code>[&quot;greetings&quot;, &quot;hello&quot;]</code> 数组中的每项</p>
-<p>第一次执行 <code>o 是 {greetings: {hello: &quot;你好&quot;}}</code> <code>i 是 &quot;greetings&quot;</code> ，返回 <code>o[i] 也就是 {hello: &quot;你好&quot;}</code> 此时 <code>o 变成 {hello: &quot;你好&quot;}</code></p>
-<p>进入下一次reduce回调</p>
-<p>第二次执行 <code>o 是 {hello: &quot;你好&quot;}</code> <code>i 是 &quot;hello&quot;</code> ，返回 <code>o[i] 也就是 &quot;你好&quot;</code></p>
-<p>结束reduce</p>
-<p>返回 <code>&quot;你好&quot;</code></p>
-<p>啊？reduce函数还能这么用！</p>
+<p>以上代码，通过对 <code>s1</code> 进行修改，会发现 <code>s2</code> 没有被一同修改，说明 <code>clone()</code> 函数是深拷贝</p>
+<p>体验了rust中的所有权，很奇妙，像进了米奇妙妙屋...</p>
 
                 </div>
-                
+                <div class="series-nav"><div class="series-nav-actions"><a class="series-nav-btn" href="/series/old-docs/">目录页</a></div><details class="series-nav-details"><summary class="series-nav-summary"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Old Docs</span><span class="series-nav-count">共 33 章</span></div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="series-nav-chevron"><path d="m6 9 6 6 6-6"/></svg></summary><div class="series-nav-list"><a class="series-nav-item" href="/post/20250410/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">Rust 案例 - 计算器</span></a><a class="series-nav-item" href="/post/20250313/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">Rust镜像源</span></a><a class="series-nav-item active" href="/post/20250220-2/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">Rust所有权</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/20250220/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">JavaScript 高阶函数之 reduce</span></a><a class="series-nav-item" href="/post/20241220/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">JavaScript中的&quot;事件冒泡&quot;与&quot;事件捕获&quot;</span></a><a class="series-nav-item" href="/post/20240511/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">今天，学习Web Component</span></a><a class="series-nav-item" href="/post/20240415/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">Gin中间件上下文中的Set、Get函数的用法</span></a><a class="series-nav-item" href="/post/20240412/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">React中forwardRef的用法</span></a><a class="series-nav-item" href="/post/20240402/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">5分钟快速入门Taro</span></a><a class="series-nav-item" href="/post/20240328/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">React中使用Immer编写简洁的更新逻辑</span></a><a class="series-nav-item" href="/post/20240327/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">浅谈React中的mutation</span></a><a class="series-nav-item" href="/post/20240326/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">Go语言高并发编程初探</span></a><a class="series-nav-item" href="/post/20240315/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">windows终端命令受限</span></a><a class="series-nav-item" href="/post/20240313/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">TypeScript类型取反</span></a><a class="series-nav-item" href="/post/20240102/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">实现一个丝滑的暗黑模式切换动画</span></a><a class="series-nav-item" href="/post/20231221-2/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">Vue3.3+ 新特性 defineOptions</span></a><a class="series-nav-item" href="/post/20231221/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">Vue3 实验性特性 defineModel</span></a><a class="series-nav-item" href="/post/20231117-3/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">JavaScript闭包直接修改内部属性</span></a><a class="series-nav-item" href="/post/20231117-2/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">使用class实现评分</span></a><a class="series-nav-item" href="/post/20231117/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">函数柯里化</span></a><a class="series-nav-item" href="/post/20230831/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">自定义Typora主题分享</span></a><a class="series-nav-item" href="/post/20230829/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">git学习教程</span></a><a class="series-nav-item" href="/post/20230827/"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">博客园自定义主题</span></a><a class="series-nav-item" href="/post/20230816/"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">Golang学习笔记</span></a><a class="series-nav-item" href="/post/20230301/"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">Java学习笔记</span></a><a class="series-nav-item" href="/post/20230220-6/"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">规范和快捷键</span></a><a class="series-nav-item" href="/post/20230220-5/"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">黑苹果</span></a><a class="series-nav-item" href="/post/20230220-4/"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">防抖函数debounce</span></a><a class="series-nav-item" href="/post/20230220-3/"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">TypeScript学习笔记</span></a><a class="series-nav-item" href="/post/20230220-2/"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">css常用场景</span></a><a class="series-nav-item" href="/post/20230220/"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">ES6 标准入门 - 阮一峰</span></a><a class="series-nav-item" href="/post/20210105/"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">hexo-theme-heri主题开发简记</span></a><a class="series-nav-item" href="/post/20201222/"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">测试文章</span></a></div></details><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/20250313/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">Rust镜像源</span></a><a class="series-nav-page next" href="/post/20250220/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">JavaScript 高阶函数之 reduce</span></a></div></div>
             </article>
         </main>
 <footer class="footer-content">
@@ -226,8 +186,8 @@ console.log(ret)
 <script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
 try{document.getElementById('main').innerHTML='';}catch(e){}</script>
 <script type="module">
-import init, * as bindings from '/web-rs-9744d5517cfe1d8b.js';
-const wasm = await init({ module_or_path: '/web-rs-9744d5517cfe1d8b_bg.wasm' });
+import init, * as bindings from '/web-rs-1fb22b055f912e2f.js';
+const wasm = await init({ module_or_path: '/web-rs-1fb22b055f912e2f_bg.wasm' });
 
 
 window.wasmBindings = bindings;

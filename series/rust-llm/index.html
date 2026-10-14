@@ -20,16 +20,16 @@
     <meta name="twitter:title" content="Rust 大语言模型 学习指南 - 干徒">
     <meta name="twitter:description" content="整体路线图：12 个阶段 50 课，从张量、自动微分一路走到 GPU 加速、量化与部署。">
     <link rel="stylesheet" href="/styles-c3674ec134f9a612.css">
-<link rel="modulepreload" href="/web-rs-9744d5517cfe1d8b.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/web-rs-1fb22b055f912e2f.js" crossorigin="anonymous">
 <link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous">
 <link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous">
 <link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous">
-<link rel="preload" href="/web-rs-9744d5517cfe1d8b_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous">
+<link rel="preload" href="/web-rs-1fb22b055f912e2f_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm">
 
     <style>
 :root {
@@ -152,8 +152,8 @@
 <script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
 try{document.getElementById('main').innerHTML='';}catch(e){}</script>
 <script type="module">
-import init, * as bindings from '/web-rs-9744d5517cfe1d8b.js';
-const wasm = await init({ module_or_path: '/web-rs-9744d5517cfe1d8b_bg.wasm' });
+import init, * as bindings from '/web-rs-1fb22b055f912e2f.js';
+const wasm = await init({ module_or_path: '/web-rs-1fb22b055f912e2f_bg.wasm' });
 
 
 window.wasmBindings = bindings;
