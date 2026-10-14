@@ -12,6 +12,9 @@ use crate::components::icons::{TagIcon, ChevronLeftIcon, ChevronRightIcon};
 
 const ALL_CATEGORY: &str = "全部";
 
+/// 首页卡片最多平铺展示的标签数，超出部分折叠为「+N」
+const TAGS_COLLAPSED_MAX: usize = 10;
+
 fn get_page_size(size_from_url: Option<usize>) -> usize {
     if let Some(size) = size_from_url {
         return size;
@@ -224,17 +227,9 @@ pub fn Home() -> Element {
                                                 }}
                                             }
                                         }
-                                        div { class: "preview-tags",
-                                            {merged_tags.iter().map(|tag| {
-                                                rsx! {
-                                                    span { class: "preview-tag",
-                                                        TagIcon {}
-                                                        {tag}
-                                                    }
-                                                }
-                                            })}
-                                        }
                                     }
+                                    // 标签放在卡片链接之外：否则「+N / 收起」的点击会被链接吞掉而直接跳转
+                                    PreviewTags { slug: post.slug.to_string(), tags: merged_tags.clone() }
                                 }
                             }
                         })}
@@ -280,6 +275,65 @@ pub fn Home() -> Element {
                             option { value: "20", "20条/页" }
                             option { value: "50", "50条/页" }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 首页卡片的标签列表
+///
+/// 标签数超过 `TAGS_COLLAPSED_MAX` 时折叠，只平铺前 N 个，其余隐藏，
+/// 并显示「+N」按钮展开；展开后按钮变为「− 收起」。
+///
+/// 单独抽成组件（而不是写在列表的 map 里）是为了让每个卡片拥有独立的
+/// hook 作用域 —— 否则分页/筛选改变列表长度时，hook 顺序会错乱。
+#[component]
+fn PreviewTags(slug: String, tags: Vec<&'static str>) -> Element {
+    let mut expanded = use_signal(|| false);
+    // 组件实例按列表位置复用：换页/筛选后位置上的文章可能变了，
+    // 这里检测 slug 变化并复位，避免上一篇的「已展开」串到另一张卡片
+    let mut last_slug = use_signal(|| slug.clone());
+    if *last_slug.peek() != slug {
+        last_slug.set(slug.clone());
+        expanded.set(false);
+    }
+    let hidden_count = tags.len().saturating_sub(TAGS_COLLAPSED_MAX);
+    let is_expanded = expanded();
+
+    rsx! {
+        div {
+            class: "preview-tags",
+            id: "preview-tags-{slug}",
+            {tags.iter().enumerate().map(|(i, tag)| {
+                // 折叠时把超出部分标记为 is-hidden，由 CSS 隐藏
+                let hidden = !is_expanded && i >= TAGS_COLLAPSED_MAX;
+                rsx! {
+                    span {
+                        class: if hidden { "preview-tag is-hidden" } else { "preview-tag" },
+                        TagIcon {}
+                        {tag.to_string()}
+                    }
+                }
+            })}
+            if hidden_count > 0 {
+                button {
+                    class: "preview-tags-toggle",
+                    aria_expanded: if is_expanded { "true" } else { "false" },
+                    aria_controls: "preview-tags-{slug}",
+                    title: if is_expanded {
+                        "收起标签"
+                    } else {
+                        "展开全部 {tags.len()} 个标签"
+                    },
+                    onclick: move |_| expanded.toggle(),
+                    if is_expanded {
+                        span { class: "preview-tags-toggle-icon", "−" }
+                        span { "收起" }
+                    } else {
+                        span { class: "preview-tags-toggle-icon", "+" }
+                        span { "{hidden_count}" }
                     }
                 }
             }

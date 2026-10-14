@@ -1,7 +1,14 @@
 [build]
 # 使用 release 模式构建
 release = true
+# 关闭 SRI（sub-resource integrity）：
+# Trunk 会把 integrity 摘要写进 index.html，但 trunk serve 热重建时会替换资源文件，
+# 浏览器若缓存了旧的 index.html，就会因摘要不匹配而拒绝加载（Failed to find a valid digest ...）。
+# 本地开发与静态托管下这个校验弊大于利，直接关闭。
+no_sri = true
 
 [serve]
 # 开发服务器端口
 port = 8080
+# 热重载时同样不写 integrity，避免旧页面缓存导致资源被拦截
+no_sri = true

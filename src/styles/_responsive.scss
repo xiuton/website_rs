@@ -83,6 +83,20 @@
         }
     }
 
+    // 系列章节导航：窄屏下标题行允许换行，避免与右侧操作区挤压
+    .series-nav {
+      padding: 1rem 1.1rem;
+
+      .series-nav-summary {
+        flex-wrap: wrap;
+        row-gap: 0.3rem;
+      }
+
+      .series-nav-actions {
+        gap: 0.4rem;
+      }
+    }
+
     .modal-content {
         width: 95%;
         padding: 16px;

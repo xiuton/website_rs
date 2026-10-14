@@ -265,6 +265,18 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
         let idx = chapters.iter().position(|q| q.slug == post.slug).unwrap_or(0);
         let total = chapters.len();
 
+        // 与 SPA 保持一致：目录页路径取首章的 catalog（为空则退回 slug）
+        let catalog = chapters
+            .first()
+            .map(|c| {
+                if c.catalog.is_empty() {
+                    c.slug.clone()
+                } else {
+                    c.catalog.clone()
+                }
+            })
+            .unwrap_or_default();
+
         let mut list = String::new();
         for (i, ch) in chapters.iter().enumerate() {
             let active = i == idx;
@@ -305,7 +317,8 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
         };
 
         format!(
-            "<div class=\"series-nav\"><div class=\"series-nav-header\"><svg xmlns=\"http://www.w3.org/2000/svg\" view_box=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke_width=\"2\" stroke_linecap=\"round\" stroke_linejoin=\"round\" class=\"section-icon\"><path d=\"M4 19.5A2.5 2.5 0 0 1 6.5 17H20\"/><path d=\"M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z\"/></svg><div class=\"series-nav-heading\"><span class=\"series-nav-title\">{}</span><span class=\"series-nav-count\">共 {} 章</span></div></div><div class=\"series-nav-list\">{}</div><div class=\"series-nav-pager\">{}{}</div></div>",
+            "<div class=\"series-nav\"><div class=\"series-nav-actions\"><a class=\"series-nav-btn\" href=\"/series/{}/\">目录页</a></div><details class=\"series-nav-details\"><summary class=\"series-nav-summary\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"section-icon\"><path d=\"M4 19.5A2.5 2.5 0 0 1 6.5 17H20\"/><path d=\"M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z\"/></svg><div class=\"series-nav-heading\"><span class=\"series-nav-title\">{}</span><span class=\"series-nav-count\">共 {} 章</span></div><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"series-nav-chevron\"><path d=\"m6 9 6 6 6-6\"/></svg></summary><div class=\"series-nav-list\">{}</div></details><div class=\"series-nav-pager\">{}{}</div></div>",
+            esc(&catalog),
             esc(&post.series),
             total,
             list,

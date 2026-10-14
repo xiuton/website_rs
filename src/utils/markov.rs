@@ -18,18 +18,96 @@ pub struct ArticleChain {
 pub type MarkovData = HashMap<String, ArticleChain>;
 
 /// 加载 markov.json
+///
+/// 容错说明：`trunk serve` / `trunk build` 在重建期间会短暂清空 `dist/`，
+/// 此时请求会拿到 SPA 兜底页（HTML）甚至空响应，直接解析就会出现
+/// `expected value at line 1 column 1` 这种难懂的报错。
+/// 因此这里做一次「非 JSON 响应就重试」的处理，并给出能定位问题的错误信息。
 pub async fn load_markov() -> Result<MarkovData, JsValue> {
-    let resp = gloo_net::http::Request::get("/static/markov.json")
+    const URL: &str = "/static/markov.json";
+    const MAX_ATTEMPTS: u32 = 3;
+
+    let mut last_error = String::from("未知错误");
+
+    for attempt in 1..=MAX_ATTEMPTS {
+        match fetch_markov(URL).await {
+            Ok(data) => return Ok(data),
+            Err(LoadError::NotJson { status, content_type, preview }) => {
+                last_error = format!(
+                    "{} 返回的不是 JSON（status={} content-type={} 开头={:?}）。\
+                     通常是静态资源缺失或构建尚未完成——请确认 dist/static/markov.json 已生成",
+                    URL, status, content_type, preview
+                );
+            }
+            Err(LoadError::Other(msg)) => {
+                last_error = msg;
+            }
+        }
+
+        if attempt < MAX_ATTEMPTS {
+            sleep_ms(400 * attempt).await;
+        }
+    }
+
+    Err(JsValue::from_str(&last_error))
+}
+
+/// 简易异步延时（避免为一次重试引入 gloo-timers 依赖）
+async fn sleep_ms(ms: u32) {
+    let promise = js_sys::Promise::new(&mut |resolve, _reject| {
+        if let Some(window) = web_sys::window() {
+            let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, ms as i32);
+        }
+    });
+    let _ = wasm_bindgen_futures::JsFuture::from(promise).await;
+}
+
+/// 加载失败的两类原因：响应不是 JSON / 其他（请求或读取失败）
+enum LoadError {
+    NotJson {
+        status: u16,
+        content_type: String,
+        preview: String,
+    },
+    Other(String),
+}
+
+/// 发起一次请求并解析
+async fn fetch_markov(url: &str) -> Result<MarkovData, LoadError> {
+    let resp = gloo_net::http::Request::get(url)
         .send()
         .await
-        .map_err(|e| JsValue::from_str(&format!("请求失败: {}", e)))?;
+        .map_err(|e| LoadError::Other(format!("请求 {} 失败: {}", url, e)))?;
+
+    let status = resp.status();
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .unwrap_or_default();
 
     let text = resp
         .text()
         .await
-        .map_err(|e| JsValue::from_str(&format!("读取响应失败: {}", e)))?;
+        .map_err(|e| LoadError::Other(format!("读取 {} 响应失败: {}", url, e)))?;
 
-    serde_json::from_str(&text).map_err(|e| JsValue::from_str(&format!("JSON 解析失败: {}", e)))
+    // 先看首字符：HTML 兜底页 / 空响应都不必再走 serde，直接判定为非 JSON
+    if !text.trim_start().starts_with(['{', '[']) {
+        return Err(LoadError::NotJson {
+            status,
+            content_type,
+            preview: text.chars().take(60).collect(),
+        });
+    }
+
+    serde_json::from_str(&text).map_err(|e| {
+        LoadError::Other(format!(
+            "解析 {} 失败: {}（内容长度 {} 字节，content-type={}）",
+            url,
+            e,
+            text.len(),
+            content_type
+        ))
+    })
 }
 
 /// 需要过滤的 markdown 语法符号
