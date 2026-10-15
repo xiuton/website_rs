@@ -17,6 +17,9 @@ pub struct PostData {
     pub series: String,
     /// 章节在系列中的顺序，缺省为 0
     pub order: i32,
+    /// 系列内的排序键：按「显式 order → 时间先后 → 标题」拼成的可比较字符串
+    /// （构造规则见 process_post 内的注释）
+    pub sort_key: String,
     /// 系列目录页自定义路径段（由文件夹名自动生成），
     /// 空串表示文章在根目录下（非系列文档）
     pub catalog: String,
@@ -721,11 +724,13 @@ pub fn process_post(
         .find(|l| l.starts_with("order:"))
         .and_then(|l| l.replace("order:", "").trim().parse::<i32>().ok());
     
-    let order_from_filename = filename
+    // 文件名前缀的序号：返回 Option 以区分「显式写了 0」与「压根没写」
+    // （`00-学习计划.md` 的 0 是有效顺序，不能当成「没有排序依据」）
+    let order_from_filename_opt = filename
         .split('-')
         .next()
-        .and_then(|s| s.parse::<i32>().ok())
-        .unwrap_or(0);
+        .and_then(|s| s.parse::<i32>().ok());
+    let order_from_filename = order_from_filename_opt.unwrap_or(0);
 
     // 章节级配置查找需要用到 order，因此先算文件名 order 作为匹配依据
     let order_for_match = order_from_front_matter.unwrap_or(order_from_filename);
@@ -762,6 +767,12 @@ pub fn process_post(
     let order = order_from_front_matter
         .or(chapter_order)
         .unwrap_or(order_from_filename);
+
+    // 是否存在任何「显式排序依据」（三个来源之一），用于决定排序层级：
+    // 有 → 第一级（按 order）；没有 → 退化为 时间 → 标题
+    let has_explicit_order = order_from_front_matter.is_some()
+        || chapter_order.is_some()
+        || order_from_filename_opt.is_some();
 
     // ── 标题：front matter → 章节配置 → （无 front matter 时）文件名派生 ──
     let title_from_config = chapter
@@ -864,6 +875,21 @@ pub fn process_post(
         String::new()
     };
 
+    // ── 系列内排序键 ──
+    //
+    // 三级优先级，拼成一个可直接字符串比较的 key：
+    //   1. 显式 order（文件名 `NN-` 前缀 / front matter / [chapters] 配置）
+    //      → "0" + 7 位零填充，保证字典序与数值序一致（支持负数）
+    //   2. 没有任何 order 依据时，按时间「近的在前」（倒序）
+    //      → "1" + 日期时间的**逐位补数**串（见 invert_datetime：越晚越小）
+    //   3. 时间完全相同时，按标题（字典序）
+    // 前缀 "0" / "1" 保证「有 order 的永远排在没 order 的前面」。
+    let sort_key = if has_explicit_order {
+        format!("0{:07}", order)
+    } else {
+        format!("1{}{}", invert_datetime(&date), title)
+    };
+
     posts.push(PostData {
         title,
         date,
@@ -875,6 +901,7 @@ pub fn process_post(
         summary,
         series,
         order,
+        sort_key,
         catalog,
         filename: filename.to_string(),
         series_summary: dir_config.summary.clone().unwrap_or_default(),
@@ -938,6 +965,27 @@ pub fn date_key(date: &str) -> String {
     } else {
         digits
     }
+}
+
+/// 把日期时间转成「越晚越小」的字符串，用于按时间**倒序**排序（新的排前面）
+///
+/// 做法是逐位取 9 的补数（`9 - digit`），于是：
+///   `2025-02-20 22:14:00` → `88588588 88 86 00`（补数串）
+///   `2025-02-20 22:27:00` → `88588588 88 83 00`
+/// 后者的补数串更小 → 排序时排在前面，即时间更晚的优先。
+///
+/// 结果仍是可直接字典序比较的字符串，无需改动调用方的比较逻辑。
+fn invert_datetime(datetime: &str) -> String {
+    datetime
+        .chars()
+        .map(|c| {
+            if c.is_ascii_digit() {
+                (b'9' - (c as u8 - b'0')) as char
+            } else {
+                c
+            }
+        })
+        .collect()
 }
 
 /// 统一分配「日期型 slug」，并检查全局 slug 唯一性

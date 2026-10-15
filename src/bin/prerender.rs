@@ -35,8 +35,15 @@ mod prerender_impl {
         content_html: String,
         #[serde(default)]
         series: String,
+        /// 章节序号：排序已改用 sort_key，这里仅保留字段以便对照调试
         #[serde(default)]
+        #[allow(dead_code)]
         order: i32,
+        /// 系列内排序键（build.rs 预计算：显式 order → 时间 → 标题）
+        #[serde(default)]
+        sort_key: String,
+        #[serde(default)]
+        filename: String,
         #[serde(default)]
         catalog: String,
     }
@@ -261,7 +268,11 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
             .iter()
             .filter(|q| q.series == post.series)
             .collect();
-        chapters.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| b.date.cmp(&a.date)));
+        chapters.sort_by(|a, b| {
+            a.sort_key
+                .cmp(&b.sort_key)
+                .then_with(|| a.filename.cmp(&b.filename))
+        });
         let idx = chapters.iter().position(|q| q.slug == post.slug).unwrap_or(0);
         let total = chapters.len();
 
@@ -618,7 +629,11 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
                     let q_key = if !q.series.is_empty() && !q.catalog.is_empty() { &q.catalog } else { &q.series };
                     *q_key == series_key
                 }).collect();
-            chapters.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| b.date.cmp(&a.date)));
+            chapters.sort_by(|a, b| {
+            a.sort_key
+                .cmp(&b.sort_key)
+                .then_with(|| a.filename.cmp(&b.filename))
+        });
             let entry = chapters[0];
             let series_id = series_key;
             let out_dir = dist.join("series").join(&series_id);

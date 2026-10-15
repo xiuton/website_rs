@@ -34,10 +34,12 @@ pub fn SeriesView(slug: String) -> Element {
                     p_key == entry_key
                 })
                 .collect();
+            // 章节顺序由 build.rs 预计算的 sort_key 决定：
+            // 显式 order → 时间先后 → 标题（详见 build_common.rs）
             chapters.sort_by(|a, b| {
-                a.order.cmp(&b.order)
+                a.sort_key
+                    .cmp(b.sort_key)
                     .then_with(|| a.filename.cmp(&b.filename))
-                    .then_with(|| b.date.cmp(&a.date))
             });
             let intro = chapters.first().copied().unwrap_or(entry);
             (series, chapters, intro)

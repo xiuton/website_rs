@@ -71,7 +71,7 @@ fn main() {
 
     for post in &posts {
         output.push_str(&format!(
-            "    BlogPost {{\n        title: r#####\"{}\"#####,\n        date: r#####\"{}\"#####,\n        author: r#####\"{}\"#####,\n        tags: &[{}],\n        content: r#####\"{}\"#####,\n        slug: r#####\"{}\"#####,\n        category: r#####\"{}\"#####,\n        summary: r#####\"{}\"#####,\n        series: r#####\"{}\"#####,\n        order: {},\n        catalog: r#####\"{}\"#####,\n        filename: r#####\"{}\"#####,\n        series_summary: r#####\"{}\"#####,\n    }},\n",
+            "    BlogPost {{\n        title: r#####\"{}\"#####,\n        date: r#####\"{}\"#####,\n        author: r#####\"{}\"#####,\n        tags: &[{}],\n        content: r#####\"{}\"#####,\n        slug: r#####\"{}\"#####,\n        category: r#####\"{}\"#####,\n        summary: r#####\"{}\"#####,\n        series: r#####\"{}\"#####,\n        order: {},\n        sort_key: r#####\"{}\"#####,\n        catalog: r#####\"{}\"#####,\n        filename: r#####\"{}\"#####,\n        series_summary: r#####\"{}\"#####,\n    }},\n",
             post.title,
             post.date,
             post.author,
@@ -85,6 +85,7 @@ fn main() {
             post.summary,
             post.series,
             post.order,
+            escape_rust_string(&post.sort_key),
             post.catalog,
             post.filename,
             post.series_summary,

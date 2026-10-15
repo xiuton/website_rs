@@ -98,22 +98,11 @@ trunk serve --port 8081
 
 > `trunk serve` 只提供 **SPA**（页面由 Wasm 在浏览器里渲染），不带 SEO 预渲染页；
 > 而且它在**每次源码/文章变动时会重建整个 `dist/`**，之前生成的 `dist/post/**` 会被清掉。
-> 这是正常的：开发时看 SPA 就够了，预渲染页只在打包发布前生成
-> （`./scripts/build.ps1`）。如果发现预渲染页「不见了」，重新跑一次构建脚本即可。
+> 这是正常的：开发时看 SPA 就够了，预渲染页只在打包发布前生成。
 
 ### 构建生产版本
 
-```powershell
-# 一条命令跑完「生成数据 → 编译 Wasm → SEO 预渲染」
-./scripts/build.ps1
-
-# 参数
-./scripts/build.ps1 -DevMode        # debug 构建（更快、产物更大）
-./scripts/build.ps1 -NoPrerender    # 跳过预渲染
-./scripts/build.ps1 -Clean          # 先删 dist/ 再构建
-```
-
-手动分步执行时，**顺序不能颠倒**：
+**顺序不能颠倒**：
 
 ```bash
 cargo build --release --bin web-rs   # 1. 触发 build.rs，生成 static/*.json
@@ -131,7 +120,7 @@ cargo run --release --bin prerender  # 3. 依赖 dist/static/posts.json，逐篇
 > `加载 xxx.json 失败`。
 >
 > 另外：`trunk build` / `trunk serve` 会**重建整个 `dist/`**，所以预渲染页在每次
-> trunk 构建后都需要重新生成（`./scripts/build.ps1` 已包含这一步）。
+> trunk 构建后都需要重新生成（即重跑上面的第 3 步）。
 
 **关于 SRI：** [Trunk.toml](Trunk.toml) 中设置了 `no_sri = true`。Trunk 默认会把
 integrity 摘要写进 `index.html`，但它热重载时会替换资源文件，浏览器如果缓存了旧的
@@ -299,10 +288,23 @@ cargo:warning=[slug 重复] "2023-docs-00" 同时属于 5分钟快速入门Taro.
 - 日期：使用所有章节中最晚的日期
 - 标签：合并所有文章的标签（配置文件 + 所有章节），去重
 
-**排序规则：** 系列文档按以下优先级排序：
-1. `order` 字段（升序）
-2. 文件名字典序（升序）
-3. `date` 字段（降序）
+**系列章节的排序规则：** 按以下三级优先级，由 `build.rs` 预计算成 `sort_key` 后统一比较：
+
+| 优先级 | 依据 | 什么时候生效 |
+|--------|------|-------------|
+| 1 | **显式 `order`** | front matter `order`、`[chapters]` 的 `order`、或文件名 `NN-` 前缀（如 `01-所有权.md`）。**只要有一个来源给了序号就用序号**，值 0 也是有效序号 |
+| 2 | **时间倒序**（近的在前） | 完全没有序号可参考时——按完整 `YYYY-MM-DD HH:MM:SS` 排序，**时间越晚越靠前** |
+| 3 | **标题**（字典序） | 时间也相同时——按标题首字母顺序 |
+
+规则要点：
+
+- 有 `order` 的章节**永远排在没 `order` 的章节前面**（`sort_key` 用 `0`/`1` 前缀区分两个层级）。
+  想严格控制章节阅读顺序，请用 `NN-` 前缀或配 `order`；不写序号时会退化为「新的在前」。
+- 时间倒序通过对日期时间**逐位取 9 的补数**实现（`invert_datetime`）：越晚的时间得到的 key 越小，
+  字符串比较即可完成倒序，调用方无需反向比较。
+- 三级依据都相同（极少见）时才退化为文件名比较，保证结果完全确定。
+
+**首页「文档入口」取哪一章：** 取排序最靠前的那一章作为入口（标题/摘要用入口章 + 系列配置）。
 
 **文件过滤：** 以 `_` 开头的文件（如 `_README.md`、`_config.toml`）会被自动跳过，不会被识别为文章。
 
@@ -382,8 +384,6 @@ slug_prefix = "rust-guide"
 │   │   ├── 00-学习计划.md     # 章节文件无 front matter，正文直接开始
 │   │   └── ...
 │   └── ...
-├── scripts/
-│   └── build.ps1            # 一键构建：生成数据 → trunk build → 预渲染
 ├── src/
 │   ├── bin/
 │   │   ├── new.rs           # CLI 工具：新建博客文章
@@ -485,14 +485,16 @@ toml = "0.8.8"              # 解析 _config.toml 配置文件
 
 ### 静态文件部署
 
-```powershell
-./scripts/build.ps1          # 生成数据 + 编译 Wasm + SEO 预渲染
+```bash
+cargo build --release --bin web-rs   # 1. 生成 static/*.json
+trunk build --release                # 2. 编译 Wasm 并复制 static/ 进 dist/
+cargo run --release --bin prerender  # 3. 生成文章静态页与 404.html
 ```
 
 将 `dist/` 目录部署到任意静态 Web 服务器即可。
 
 > ⚠️ 只跑 `trunk build` 会得到「没有预渲染页」的产物：SPA 能正常跑，但爬虫看到的是空壳。
-> 完整发布请用 `./scripts/build.ps1`（等价于 `cargo build` → `trunk build` → `prerender`）。
+> 完整发布必须补上第 1 步（生成数据）和第 3 步（预渲染）。
 
 ### GitHub Pages（Actions 自动部署）
 

@@ -12,6 +12,9 @@ pub struct BlogPost {
     pub series: &'static str,
     /// 章节在系列中的顺序，缺省为 0
     pub order: i32,
+    /// 系列内的排序键：由 build.rs 预计算，按
+    /// 「显式 order → 时间先后 → 标题」拼成可比较的字符串
+    pub sort_key: &'static str,
     /// 系列目录页路径段（由文件夹名自动生成），空串表示根目录文章
     pub catalog: &'static str,
     /// 原始文件名（不含扩展名），用于排序

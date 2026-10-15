@@ -104,9 +104,14 @@ pub fn Home() -> Element {
                         p_key == series_key
                     })
                     .collect();
+                // 入口章 = 排序最靠前的一章（顺序规则见 build_common.rs 的 sort_key）
                 let entry = *chapters
                     .iter()
-                    .min_by(|a, b| a.order.cmp(&b.order).then_with(|| a.date.cmp(&b.date)))
+                    .min_by(|a, b| {
+                        a.sort_key
+                            .cmp(b.sort_key)
+                            .then_with(|| a.filename.cmp(&b.filename))
+                    })
                     .unwrap();
                 let last_date = chapters.iter().map(|c| c.date).max().unwrap_or(entry.date);
                 // 合并所有文章的标签，去重

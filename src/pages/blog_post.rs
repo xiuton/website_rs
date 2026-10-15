@@ -204,7 +204,12 @@ pub fn BlogPostView(slug: String) -> Element {
                 q_key == series_key
             })
             .collect();
-        chapters.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| b.date.cmp(&a.date)));
+        // 章节顺序由 build.rs 预计算的 sort_key 决定（显式 order → 时间 → 标题）
+        chapters.sort_by(|a, b| {
+            a.sort_key
+                .cmp(b.sort_key)
+                .then_with(|| a.filename.cmp(&b.filename))
+        });
         let idx = chapters.iter().position(|q| q.slug == p.slug)?;
         Some((series, chapters, idx))
     });
