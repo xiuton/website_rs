@@ -4,7 +4,6 @@ pub struct BlogPost {
     pub date: &'static str,
     pub author: &'static str,
     pub tags: &'static [&'static str],
-    pub content: &'static str,
     pub slug: &'static str,
     pub category: &'static str,
     pub summary: &'static str,
@@ -22,4 +21,3 @@ pub struct BlogPost {
     /// 系列级别的摘要（来自配置文件），用于首页列表展示
     pub series_summary: &'static str,
 }
-

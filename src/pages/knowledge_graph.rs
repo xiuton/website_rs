@@ -3,15 +3,15 @@
 
 use dioxus::prelude::*;
 use dioxus_router::prelude::use_navigator;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 
 use crate::routes::Route;
-use crate::utils::title;
 use crate::utils::knowledge_graph::{self, KnowledgeGraph};
+use crate::utils::title;
 use crate::BLOG_POSTS;
 
 // ============================================================================
@@ -51,7 +51,11 @@ fn text_color_for_bg(hex: &str) -> &'static str {
     let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(0);
     // 相对亮度公式 (sRGB)
     let luminance = 0.299 * r as f64 + 0.587 * g as f64 + 0.114 * b as f64;
-    if luminance > 180.0 { "#1f2937" } else { "#e5e7eb" }
+    if luminance > 180.0 {
+        "#1f2937"
+    } else {
+        "#e5e7eb"
+    }
 }
 
 #[derive(Clone)]
@@ -105,10 +109,7 @@ impl ForceGraph {
         let mut nodes = Vec::new();
         let mut slug_to_idx = HashMap::new();
 
-        let title_map: HashMap<&str, &str> = BLOG_POSTS
-            .iter()
-            .map(|p| (p.slug, p.title))
-            .collect();
+        let title_map: HashMap<&str, &str> = BLOG_POSTS.iter().map(|p| (p.slug, p.title)).collect();
 
         for (slug, article) in &kg.articles {
             let idx = nodes.len();
@@ -160,11 +161,7 @@ impl ForceGraph {
 
         let edges: Vec<GraphEdge> = edge_pairs
             .into_iter()
-            .map(|((source_idx, target_idx), weight)| GraphEdge {
-                source_idx,
-                target_idx,
-                weight,
-            })
+            .map(|((source_idx, target_idx), weight)| GraphEdge { source_idx, target_idx, weight })
             .collect();
 
         Self {
@@ -283,11 +280,7 @@ impl CanvasRenderer {
         let document = window.document()?;
         let canvas = document.get_element_by_id(canvas_id)?;
         let canvas: web_sys::HtmlCanvasElement = canvas.dyn_into().ok()?;
-        let ctx: web_sys::CanvasRenderingContext2d = canvas
-            .get_context("2d")
-            .ok()??
-            .dyn_into()
-            .ok()?;
+        let ctx: web_sys::CanvasRenderingContext2d = canvas.get_context("2d").ok()??.dyn_into().ok()?;
         Some(Self { canvas, ctx })
     }
 
@@ -324,11 +317,7 @@ impl CanvasRenderer {
             let color = community_color(&node.community);
             let is_hovered = graph.hovered == Some(i);
             let is_dragging = graph.dragging == Some(i);
-            let r = if is_hovered || is_dragging {
-                node.radius * 1.15
-            } else {
-                node.radius
-            };
+            let r = if is_hovered || is_dragging { node.radius * 1.15 } else { node.radius };
 
             if is_hovered || is_dragging {
                 ctx.set_fill_style_str(color);
@@ -403,7 +392,7 @@ pub fn KnowledgeGraphView() -> Element {
     let mut kg_data = use_signal(|| Option::<KnowledgeGraph>::None);
     let mut loading = use_signal(|| true);
     let mut error_msg = use_signal(|| Option::<String>::None);
-    let mut graph_rc = use_signal(|| SharedGraph::default());
+    let mut graph_rc = use_signal(SharedGraph::default);
     let mut communities = use_signal(Vec::new);
     let canvas_id = "kg-canvas";
     let nav = use_navigator();
@@ -435,11 +424,14 @@ pub fn KnowledgeGraphView() -> Element {
                 .location()
                 .search()
                 .ok()
-                .and_then(|s| {
-                    web_sys::UrlSearchParams::new_with_str(&s).ok()
-                })
+                .and_then(|s| web_sys::UrlSearchParams::new_with_str(&s).ok())
                 .and_then(|params| params.get("highlight"))
-                .map(|s| s.split(',').map(|slug| slug.trim().to_string()).filter(|s| !s.is_empty()).collect())
+                .map(|s| {
+                    s.split(',')
+                        .map(|slug| slug.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect()
+                })
                 .unwrap_or_default();
 
             if let Some(canvas_el) = document.get_element_by_id(canvas_id) {
@@ -461,7 +453,7 @@ pub fn KnowledgeGraphView() -> Element {
     });
 
     // 力模拟 + 渲染循环 + 事件绑定（只初始化一次）
-    let _graph_for_animation = graph_rc.clone();
+    let _graph_for_animation = graph_rc;
     use_effect(move || {
         let g_rc = _graph_for_animation.read().clone();
         // 等待数据就绪
@@ -471,7 +463,9 @@ pub fn KnowledgeGraphView() -> Element {
 
         let window = web_sys::window().unwrap();
         let document = window.document().unwrap();
-        let Some(canvas_el) = document.get_element_by_id(canvas_id) else { return };
+        let Some(canvas_el) = document.get_element_by_id(canvas_id) else {
+            return;
+        };
         let canvas: web_sys::HtmlCanvasElement = canvas_el.dyn_into().unwrap();
 
         // 初始化 renderer
@@ -498,18 +492,14 @@ pub fn KnowledgeGraphView() -> Element {
                 }
                 web_sys::window()
                     .unwrap()
-                    .request_animation_frame(
-                        anim_closure2.borrow().as_ref().unwrap().as_ref().unchecked_ref(),
-                    )
+                    .request_animation_frame(anim_closure2.borrow().as_ref().unwrap().as_ref().unchecked_ref())
                     .unwrap();
             }));
         }
 
         web_sys::window()
             .unwrap()
-            .request_animation_frame(
-                anim_closure.borrow().as_ref().unwrap().as_ref().unchecked_ref(),
-            )
+            .request_animation_frame(anim_closure.borrow().as_ref().unwrap().as_ref().unchecked_ref())
             .unwrap();
 
         // --- 事件绑定 ---
@@ -627,7 +617,7 @@ pub fn KnowledgeGraphView() -> Element {
     });
 
     // 点击导航
-    let graph_for_click = graph_rc.clone();
+    let graph_for_click = graph_rc;
     let nav_for_click = nav;
     let handle_node_click = move |_: Event<MouseData>| {
         if let Some(ref g) = *graph_for_click.read().borrow() {
@@ -642,7 +632,7 @@ pub fn KnowledgeGraphView() -> Element {
     };
 
     // Tooltip 信息
-    let graph_for_tooltip = graph_rc.clone();
+    let graph_for_tooltip = graph_rc;
     let tooltip_info = use_memo(move || {
         if let Some(ref g) = *graph_for_tooltip.read().borrow() {
             if let Some(idx) = g.hovered {

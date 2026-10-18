@@ -79,4 +79,4 @@ Text Example
 }
 
 #[cfg(target_arch = "wasm32")]
-fn main() {} 
+fn main() {}

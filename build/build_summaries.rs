@@ -17,9 +17,7 @@ fn split_sentences(text: &str) -> Vec<String> {
             '。' | '！' | '？' | '；' => true,
             '.' | '!' | '?' | ';' => {
                 // 英文标点：检查是否可能为缩写（如 e.g. Mr. vs.）
-                let next_is_end = i + 1 >= chars.len()
-                    || chars[i + 1].is_whitespace()
-                    || chars[i + 1] == '\n';
+                let next_is_end = i + 1 >= chars.len() || chars[i + 1].is_whitespace() || chars[i + 1] == '\n';
                 // 简单判断：前面是数字则可能是小数点，不是句子结束
                 let prev_is_digit = i > 0 && chars[i - 1].is_ascii_digit();
                 next_is_end && !prev_is_digit
@@ -96,12 +94,7 @@ fn sentence_similarity(a: &HashMap<String, f64>, b: &HashMap<String, f64>) -> f6
 }
 
 /// TextRank 核心：对句子图运行 PageRank
-fn text_rank(
-    sentences: &[String],
-    damping: f64,
-    max_iter: usize,
-    convergence_threshold: f64,
-) -> Vec<(usize, f64)> {
+fn text_rank(sentences: &[String], damping: f64, max_iter: usize, convergence_threshold: f64) -> Vec<(usize, f64)> {
     let n = sentences.len();
     if n == 0 {
         return Vec::new();
@@ -202,29 +195,14 @@ fn extractive_summary(text: &str, top_n: usize) -> Option<String> {
     let ranked = text_rank(&sentences, 0.85, 100, 1e-6);
 
     // 取 top-N，按原文顺序排列
-    let top_indices: Vec<usize> = ranked
-        .iter()
-        .take(top_n)
-        .map(|(idx, _)| *idx)
-        .collect();
+    let top_indices: Vec<usize> = ranked.iter().take(top_n).map(|(idx, _)| *idx).collect();
 
-    let mut ordered: Vec<(usize, &String)> = top_indices
-        .iter()
-        .map(|&idx| (idx, &sentences[idx]))
-        .collect();
+    let mut ordered: Vec<(usize, &String)> = top_indices.iter().map(|&idx| (idx, &sentences[idx])).collect();
     ordered.sort_by_key(|(idx, _)| *idx);
 
-    let summary: String = ordered
-        .into_iter()
-        .map(|(_, s)| s.as_str())
-        .collect::<Vec<_>>()
-        .join("");
+    let summary: String = ordered.into_iter().map(|(_, s)| s.as_str()).collect::<Vec<_>>().join("");
 
-    if summary == text.trim() {
-        Some(summary)
-    } else {
-        Some(summary)
-    }
+    Some(summary)
 }
 
 /// 根据 tags 推断一个适合在 UI 展示的分类名。
@@ -275,12 +253,13 @@ pub fn generate_ai_summaries(posts: &[PostData]) {
 
     for (idx, post) in posts.iter().enumerate() {
         // 对每篇文章运行 TextRank，取 top-5 句子
-        let summary = extractive_summary(&post.content, 5)
-            .unwrap_or_else(|| if post.summary.is_empty() {
+        let summary = extractive_summary(&post.content, 5).unwrap_or_else(|| {
+            if post.summary.is_empty() {
                 post.content.chars().take(200).collect()
             } else {
                 post.summary.clone()
-            });
+            }
+        });
 
         let escaped_summary = escape_json_string(&summary);
         let escaped_title = escape_json_string(&post.title);
@@ -309,4 +288,3 @@ pub fn generate_ai_summaries(posts: &[PostData]) {
     let dest = Path::new("static/summaries.json");
     std::fs::write(dest, &json).expect("Failed to write summaries json");
 }
-

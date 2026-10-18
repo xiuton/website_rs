@@ -30,3 +30,7 @@ Thumbs.db
 .env.local
 
 .trae/
+
+# Build generated post fragments
+/static/post-html/
+/static/posts-meta.json

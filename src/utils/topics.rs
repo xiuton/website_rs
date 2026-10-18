@@ -39,11 +39,7 @@ impl LdaData {
                     .and_then(|i| self.topic_names.get(i))
                     .cloned()
                     .unwrap_or_else(|| format!("主题 {}", tid));
-                ArticleTopic {
-                    topic_id: tid.clone(),
-                    topic_name: name,
-                    probability: *prob,
-                }
+                ArticleTopic { topic_id: tid.clone(), topic_name: name, probability: *prob }
             })
             .collect();
 
@@ -63,12 +59,8 @@ impl LdaData {
     }
 }
 
-/// 加载 LDA 主题数据
+/// 加载 LDA 主题数据（会话级缓存）
 pub async fn load_lda() -> Option<LdaData> {
-    let resp = gloo_net::http::Request::get("/static/lda-topics.json")
-        .send()
-        .await
-        .ok()?;
-    let text = resp.text().await.ok()?;
+    let text = crate::utils::cache::fetch_text("/static/lda-topics.json").await?;
     serde_json::from_str(&text).ok()
 }

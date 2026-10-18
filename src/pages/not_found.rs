@@ -1,12 +1,12 @@
-use dioxus::prelude::*;
-use dioxus_router::prelude::Link;
 use crate::routes::Route;
 use crate::utils::title;
+use dioxus::prelude::*;
+use dioxus_router::prelude::Link;
 
 #[component]
 pub fn NotFound(route: Vec<String>) -> Element {
     let route_str = route.join("/");
-    
+
     title::set_page_title("404 - 页面未找到");
 
     rsx! {
@@ -26,7 +26,7 @@ pub fn NotFound(route: Vec<String>) -> Element {
                         d: "M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                     }
                 }
-                h1 { 
+                h1 {
                     span { "🤔 " }
                     "404 - 页面未找到"
                 }
@@ -41,4 +41,4 @@ pub fn NotFound(route: Vec<String>) -> Element {
             }
         }
     }
-} 
+}

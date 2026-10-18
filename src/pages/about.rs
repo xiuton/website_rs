@@ -1,6 +1,6 @@
-use dioxus::prelude::*;
+use crate::components::icons::{EmailIcon, GitHubIcon};
 use crate::utils::title;
-use crate::components::icons::{GitHubIcon, EmailIcon};
+use dioxus::prelude::*;
 
 #[component]
 pub fn About() -> Element {
@@ -127,7 +127,7 @@ pub fn About() -> Element {
             section { class: "about-section contact-section",
                 h2 { "📫 联系我" }
                 div { class: "contact-links",
-                    a { 
+                    a {
                         href: "mailto:i@ganto.me",
                         class: "contact-link email-link",
                         aria_label: "发送邮件",
@@ -147,4 +147,4 @@ pub fn About() -> Element {
             }
         }
     }
-} 
+}

@@ -1,105 +1,105 @@
-use dioxus::prelude::*;
 use crate::utils::title;
+use dioxus::prelude::*;
 
 #[component]
 pub fn Playground() -> Element {
     title::set_page_title("操场 - 干徒");
 
     rsx! {
-        div { 
+        div {
             class: "playground-page",
             style: "background-image: url('/static/images/img.png');",
 
             // Glass gallery container
-            div { 
+            div {
                 class: "glass-gallery",
-                
+
                 // Bouncing glass element
-                div { 
+                div {
                     class: "glass-container bounce",
                     div { class: "glass-filter" }
                     div { class: "glass-specular" }
                 }
 
                 // Floating glass element
-                div { 
+                div {
                     class: "glass-container float",
                     div { class: "glass-filter" }
                     div { class: "glass-specular" }
                 }
 
                 // Pulsing glass element
-                div { 
+                div {
                     class: "glass-container pulse",
                     div { class: "glass-filter" }
                     div { class: "glass-specular" }
                 }
 
                 // Rotating glass element
-                div { 
+                div {
                     class: "glass-container rotate",
                     div { class: "glass-filter" }
                     div { class: "glass-specular" }
                 }
 
                 // Wobble glass element
-                div { 
+                div {
                     class: "glass-container wobble",
                     div { class: "glass-filter" }
                     div { class: "glass-specular" }
                 }
 
                 // Jelly glass element
-                div { 
+                div {
                     class: "glass-container jelly",
                     div { class: "glass-filter" }
                     div { class: "glass-specular" }
                 }
 
                 // New: Morph glass element
-                div { 
+                div {
                     class: "glass-container morph",
                     div { class: "glass-filter" }
                     div { class: "glass-specular" }
                 }
 
                 // New: Splash glass element
-                div { 
+                div {
                     class: "glass-container splash",
                     div { class: "glass-filter" }
                     div { class: "glass-specular" }
                 }
 
                 // New: Wave glass element
-                div { 
+                div {
                     class: "glass-container wave",
                     div { class: "glass-filter" }
                     div { class: "glass-specular" }
                 }
 
                 // New: Twist glass element
-                div { 
+                div {
                     class: "glass-container twist",
                     div { class: "glass-filter" }
                     div { class: "glass-specular" }
                 }
 
                 // New: Bubble glass element
-                div { 
+                div {
                     class: "glass-container bubble",
                     div { class: "glass-filter" }
                     div { class: "glass-specular" }
                 }
 
                 // New: Shatter glass element
-                div { 
+                div {
                     class: "glass-container shatter",
                     div { class: "glass-filter" }
                     div { class: "glass-specular" }
                 }
 
                 // Realistic glass element
-                div { 
+                div {
                     class: "glass-container realistic",
                     div { class: "glass-filter" }
                     div { class: "glass-distortion" }
@@ -282,7 +282,7 @@ pub fn Playground() -> Element {
                 }
 
                 // Liquid Glass Filter - balanced distortion
-                filter { 
+                filter {
                     id: "lg-realistic-distortion",
                     height: "200%",
                     width: "200%",
@@ -421,4 +421,4 @@ pub fn Playground() -> Element {
             }
         }
     }
-} 
+}

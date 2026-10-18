@@ -1,75 +1,33 @@
-use dioxus::prelude::*;
-use crate::routes::Route;
-use crate::BLOG_POSTS;
-use crate::models::BlogPost;
-use crate::utils::{title, code_highlight, storage};
 use crate::components::icons::{BackArrowIcon, HomeIcon, ScrollTopIcon, TagIcon, WideModeIcon};
-use crate::utils::search::SearchEngine;
+use crate::models::BlogPost;
+use crate::routes::Route;
 use crate::utils::knowledge_graph::{self, ArticleNode};
+use crate::utils::search::SearchEngine;
 use crate::utils::topics::{self, LdaData};
-use dioxus_router::prelude::{Link, use_route};
-use std::collections::HashMap;
-use serde::Deserialize;
+use crate::utils::{code_highlight, storage, title};
+use crate::BLOG_POSTS;
+use dioxus::prelude::*;
+use dioxus_router::prelude::{use_route, Link};
 
-fn prepare_blog_html(content: &str) -> String {
-    let html = crate::utils::markdown::markdown_to_html(content);
-    // 给无语言标记的代码块加上 plaintext
-    let html = html.replace("<pre><code>", "<pre><code class=\"language-plaintext\">");
-    // 从 language-* 类名提取语言标识，写入 data-lang 到 <pre>
-    let html = inject_data_lang(&html);
-    add_lazy_loading(&html)
+/// 预渲染页会把文章正文同时放进 `<template id="prerender-content">`。
+/// 首屏直接复用这份 HTML：无需再发请求，也不会出现「预渲染内容被清空 → 加载中」的闪跳。
+/// 客户端路由跳转（没有预渲染页）时返回 None，由调用方按需 fetch。
+fn take_prerendered_content(slug: &str) -> Option<String> {
+    let document = web_sys::window()?.document()?;
+    let template = document.get_element_by_id("prerender-content")?;
+    if template.get_attribute("data-slug").as_deref() != Some(slug) {
+        return None;
+    }
+    let html = template.inner_html();
+    template.remove();
+    Some(html)
 }
 
-/// 扫描 `<pre lang="XXX">`（comrak 输出），注入 `data-lang="XXX"`。
-/// 无 `lang` 属性的 `<pre>`（plaintext 块）不设标签。
-fn inject_data_lang(html: &str) -> String {
-    let mut result = String::with_capacity(html.len());
-    let mut rest = html;
-
-    while let Some(pos) = rest.find("<pre lang=\"") {
-        result.push_str(&rest[..pos]);
-        let after = &rest[pos + "<pre lang=\"".len()..];
-        let end = after.find('"').unwrap_or(0);
-        let lang = &after[..end];
-        use std::fmt::Write;
-        let _ = write!(result, "<pre lang=\"{lang}\" data-lang=\"{lang}\"");
-        rest = &after[end + 1..];
-    }
-    result.push_str(rest);
-    result
-}
-
-/// 为 <img> 标签添加 loading="lazy" 属性（如尚未设置）
-fn add_lazy_loading(html: &str) -> String {
-    let mut result = String::with_capacity(html.len());
-    let mut last_end = 0;
-
-    for (start, _) in html.match_indices("<img ") {
-        // 找到 img 标签的结束 >
-        let tag_start = start;
-        let tag_end = if let Some(end) = html[tag_start..].find('>') {
-            tag_start + end
-        } else {
-            continue;
-        };
-
-        result.push_str(&html[last_end..tag_start]);
-
-        let tag = &html[tag_start..tag_end];
-        // 只有尚未包含 loading 属性的才注入
-        if !tag.contains("loading=") {
-            result.push_str(&html[tag_start..tag_start + 5]); // "<img "
-            result.push_str("loading=\"lazy\" ");
-            result.push_str(&html[tag_start + 5..tag_end]);
-        } else {
-            result.push_str(tag);
-        }
-
-        last_end = tag_end;
-    }
-
-    result.push_str(&html[last_end..]);
-    result
+/// 按 slug 拉取构建期生成的文章 HTML 片段（会话级缓存，重复访问不重复下载）。
+async fn fetch_post_html(slug: &str) -> Option<String> {
+    let encoded = js_sys::encode_uri_component(slug);
+    let path = format!("/static/post-html/{encoded}.html");
+    crate::utils::cache::fetch_text(&path).await
 }
 
 #[component]
@@ -91,31 +49,61 @@ pub fn BlogPostView(slug: String) -> Element {
 
     let post = use_memo(move || {
         let s = current_slug();
-        BLOG_POSTS.iter()
-            .find(|p| p.slug == s)
+        BLOG_POSTS.iter().find(|p| p.slug == s)
+    });
+
+    // 首屏直接同步取预渲染模板里的正文，避免「先渲染加载中、再替换」的闪动；
+    // 客户端路由跳转时才按需拉取构建期生成的 HTML 片段。
+    // wasm 里因此不再需要打包全部文章正文，也不需要 comrak。
+    let initial_content = take_prerendered_content(&slug);
+    let has_initial_content = initial_content.is_some();
+    let mut content_html = use_signal(move || initial_content.unwrap_or_default());
+    let mut content_loading = use_signal(|| !has_initial_content);
+    let mut restored_initial = use_signal(|| has_initial_content);
+
+    use_effect(move || {
+        // 订阅路由变化（必须在提前返回之前读取）
+        let slug = current_slug();
+
+        if *restored_initial.peek() {
+            restored_initial.set(false);
+            return;
+        }
+
+        content_loading.set(true);
+        content_html.set(String::new());
+
+        let current = current_slug;
+        spawn(async move {
+            let html = fetch_post_html(&slug).await;
+            // 快速切换文章时丢弃过期响应
+            if current.peek().as_str() != slug.as_str() {
+                return;
+            }
+            match html {
+                Some(html) => content_html.set(html),
+                None => content_html.set("<p class=\"blog-content-error\">正文加载失败，请刷新重试。</p>".into()),
+            }
+            content_loading.set(false);
+        });
     });
 
     // 加载搜索引擎（关键词匹配相关文章）
-    let mut related_results = use_signal(|| Vec::<(String, String, String)>::new());
+    let mut related_results = use_signal(Vec::<(String, String, String)>::new);
 
     use_effect(move || {
         let slug = current_slug();
         spawn(async move {
             related_results.set(Vec::new());
-            if let Ok(resp) = gloo_net::http::Request::get("/static/search-index.json")
-                .send()
-                .await
-            {
-                if let Ok(text) = resp.text().await {
-                    let mut engine = SearchEngine::new();
-                    if engine.load(&text).is_ok() {
-                        let related = engine.get_related(&slug, 5);
-                        let items: Vec<_> = related
-                            .iter()
-                            .map(|r| (r.slug.clone(), r.title.clone(), r.category.clone()))
-                            .collect();
-                        related_results.set(items);
-                    }
+            if let Some(text) = crate::utils::cache::fetch_text("/static/search-index.json").await {
+                let mut engine = SearchEngine::new();
+                if engine.load(&text).is_ok() {
+                    let related = engine.get_related(&slug, 5);
+                    let items: Vec<_> = related
+                        .iter()
+                        .map(|r| (r.slug.clone(), r.title.clone(), r.category.clone()))
+                        .collect();
+                    related_results.set(items);
                 }
             }
         });
@@ -153,22 +141,11 @@ pub fn BlogPostView(slug: String) -> Element {
         if let Some(post) = post() {
             title::set_page_title(&format!("{} - 干徒", post.title));
 
-            let description = if !post.summary.is_empty() {
-                post.summary[..post.summary.len().min(160)].to_string()
-            } else {
-                crate::utils::markdown::clean_markdown_excerpt(post.content, 150)
-            };
+            let description: String = post.summary.chars().take(160).collect();
             let post_url = format!("https://ganto.me/post/{}", post.slug);
-            title::set_seo(&post.title, &description, &post_url);
+            title::set_seo(post.title, &description, &post_url);
             // 文章级 BlogPosting 结构化数据
-            title::set_article_jsonld(
-                &post.title,
-                &description,
-                &post_url,
-                &post.date,
-                &post.author,
-                post.tags,
-            );
+            title::set_article_jsonld(post.title, &description, &post_url, post.date, post.author, post.tags);
         }
         if post().is_some() {
             is_wide_mode.set(storage::get_blog_wide_mode());
@@ -180,6 +157,8 @@ pub fn BlogPostView(slug: String) -> Element {
     });
 
     use_effect(move || {
+        // 依赖 content_html：正文加载/切换后重新高亮代码块
+        let _ = content_html();
         if post().is_some() {
             code_highlight::reapply_highlight();
         }
@@ -205,11 +184,7 @@ pub fn BlogPostView(slug: String) -> Element {
             })
             .collect();
         // 章节顺序由 build.rs 预计算的 sort_key 决定（显式 order → 时间 → 标题）
-        chapters.sort_by(|a, b| {
-            a.sort_key
-                .cmp(b.sort_key)
-                .then_with(|| a.filename.cmp(&b.filename))
-        });
+        chapters.sort_by(|a, b| a.sort_key.cmp(b.sort_key).then_with(|| a.filename.cmp(b.filename)));
         let idx = chapters.iter().position(|q| q.slug == p.slug)?;
         Some((series, chapters, idx))
     });
@@ -217,11 +192,11 @@ pub fn BlogPostView(slug: String) -> Element {
     rsx! {
         div { class: "blog-container",
             if let Some(post) = post() {
-                article { 
+                article {
                     class: if is_wide_mode() { "blog-post wide-mode" } else { "blog-post" },
                     aria_label: article_label.as_deref().unwrap_or("文章"),
                     div { class: "blog-nav",
-                        button { 
+                        button {
                             class: "back-button",
                             aria_label: "后退",
                             onclick: move |_| {
@@ -233,14 +208,14 @@ pub fn BlogPostView(slug: String) -> Element {
                             },
                             BackArrowIcon {}
                         }
-                        Link { 
-                            to: Route::Home, 
+                        Link {
+                            to: Route::Home,
                             class: "back-button",
                             aria_label: "首页",
                             HomeIcon {}
                         }
                         span { class: "nav-divider" }
-                        button { 
+                        button {
                             class: "function-button",
                             aria_label: "回顶部",
                             onclick: move |_| {
@@ -250,7 +225,7 @@ pub fn BlogPostView(slug: String) -> Element {
                             },
                             ScrollTopIcon {}
                         }
-                        button { 
+                        button {
                             class: if is_wide_mode() { "function-button active" } else { "function-button" },
                             aria_label: if is_wide_mode() { "关闭宽屏" } else { "宽屏模式" },
                             onclick: move |_| {
@@ -275,9 +250,13 @@ pub fn BlogPostView(slug: String) -> Element {
                             span { class: "blog-author", {post.author} }
                         }
                     }
-                    div { 
+                    div {
                         class: "blog-content",
-                        dangerous_inner_html: prepare_blog_html(post.content)
+                        if content_loading() {
+                            div { class: "blog-content-loading", "正文加载中…" }
+                        } else {
+                            div { dangerous_inner_html: content_html() }
+                        }
                     }
                     // 系列章节导航（多章节文档）
                     {series_info.as_ref().map(|(series, chapters, idx)| {
@@ -741,170 +720,8 @@ pub fn BlogPostView(slug: String) -> Element {
     }
 }
 
-/// 马尔可夫链 AI 续写组件
-#[component]
-fn MarkovContinuation(slug: String) -> Element {
-    let mut data_loaded = use_signal(|| false);
-    let mut generator = use_signal(|| None::<crate::utils::markov::MarkovGenerator>);
-    let generating = use_signal(|| false);
-    let output = use_signal(|| String::new());
+mod markov;
+mod related;
 
-    // 只加载一次（slug 在组件声明期 clone 后使用）
-    let slug_for_load = slug.clone();
-    use_effect(move || {
-        if *data_loaded.read() { return; }
-        let s = slug_for_load.clone();
-        spawn(async move {
-            match crate::utils::markov::load_markov().await {
-                Ok(data) => {
-                    if data.contains_key(&s) {
-                        let gen = crate::utils::markov::MarkovGenerator::new(data);
-                        generator.set(Some(gen));
-                    }
-                }
-                Err(e) => {
-                    web_sys::console::error_1(&format!("加载 markov.json 失败: {:?}", e).into());
-                }
-            }
-            data_loaded.set(true);
-        });
-    });
-
-    let gen = generator.clone();
-    let out = output;
-    let mut gen_state = generating;
-
-    let handle_generate = move |_| {
-        if *gen_state.read() { return; }
-        gen_state.set(true);
-        let g = gen.cloned();
-        let mut out_w = out.clone();
-        let mut gs = gen_state.clone();
-        let s = slug.clone();
-        spawn(async move {
-            if let Some(ref gen) = g {
-                let text = gen.generate(&s, Some(""), 300);
-                out_w.set(text);
-            } else {
-                out_w.set("暂无该文章的续写模型。".into());
-            }
-            gs.set(false);
-        });
-    };
-
-    rsx! {
-        div { class: "markov-section",
-            div { class: "markov-header",
-                svg {
-                    xmlns: "http://www.w3.org/2000/svg",
-                    view_box: "0 0 24 24",
-                    width: "16", height: "16",
-                    fill: "none", stroke: "currentColor",
-                    stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round",
-                    path { d: "M12 2a10 10 0 1 0 10 10" }
-                    polyline { points: "12 12 18 12 18 6" }
-                }
-                span { "AI 续写" }
-                span { class: "markov-badge", "马尔可夫链" }
-            }
-            p { class: "markov-desc", "基于本文内容训练的 tri-gram 语言模型，自动生成下文片段。" }
-            div { class: "markov-actions",
-                button {
-                    class: "markov-btn",
-                    disabled: *generating.read() || !*data_loaded.read(),
-                    onclick: handle_generate,
-                    if *generating.read() { "生成中…" } else { "生成续写" }
-                }
-            }
-            if !output.read().is_empty() {
-                div { class: "markov-output",
-                    {output.read().as_str()}
-                }
-            }
-        }
-    }
-}
-
-/// 嵌入数据结构
-#[derive(Debug, Clone, Deserialize)]
-struct RelatedEntry {
-    slug: String,
-    score: f64,
-}
-
-/// 相关文章推荐组件（基于 TF-IDF 余弦相似度）
-#[component]
-fn RelatedArticles(slug: String) -> Element {
-    let mut loaded = use_signal(|| false);
-    let mut related = use_signal(|| Vec::<(String, f64)>::new());
-
-    use_effect(move || {
-        if *loaded.read() {
-            return;
-        }
-        let s = slug.clone();
-        spawn(async move {
-            let resp = gloo_net::http::Request::get("/static/embeddings.json")
-                .send()
-                .await;
-            if let Ok(resp) = resp {
-                if let Ok(text) = resp.text().await {
-                    if let Ok(data) = serde_json::from_str::<HashMap<String, Vec<RelatedEntry>>>(&text) {
-                        if let Some(entries) = data.get(&s) {
-                            let mut items: Vec<(String, f64)> = entries
-                                .iter()
-                                .take(5)
-                                .map(|e| (e.slug.clone(), e.score))
-                                .collect();
-                            items.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-                            related.set(items);
-                        }
-                    }
-                }
-            }
-            loaded.set(true);
-        });
-    });
-
-    let items = related.read().clone();
-
-    if items.is_empty() {
-        return rsx! {};
-    }
-
-    rsx! {
-        div { class: "related-articles-semantic",
-            h3 { class: "related-articles-semantic-title",
-                svg {
-                    xmlns: "http://www.w3.org/2000/svg",
-                    view_box: "0 0 24 24",
-                    width: "18", height: "18",
-                    fill: "none", stroke: "currentColor",
-                    stroke_width: "2",
-                    stroke_linecap: "round", stroke_linejoin: "round",
-                    path { d: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20" }
-                    path { d: "M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" }
-                }
-                "相关文章"
-            }
-            div { class: "related-articles-semantic-list",
-                {items.iter().map(|(related_slug, score)| {
-                    let title = BLOG_POSTS.iter()
-                        .find(|p| p.slug == *related_slug)
-                        .map(|p| &p.title[..])
-                        .unwrap_or(related_slug);
-                    let pct = (score * 100.0) as u8;
-                    let to = Route::BlogPostView { slug: related_slug.clone() };
-                    rsx! {
-                        Link {
-                            to,
-                            class: "related-articles-semantic-item",
-                            span { class: "related-articles-semantic-item-title", "{title}" }
-                            span { class: "related-articles-semantic-item-score", "{pct}%" }
-                        }
-                    }
-                })}
-            }
-        }
-    }
-} 
+use markov::MarkovContinuation;
+use related::RelatedArticles;

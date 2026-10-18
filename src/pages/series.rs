@@ -1,9 +1,9 @@
-use dioxus::prelude::*;
-use dioxus_router::prelude::Link;
 use crate::models::BlogPost;
 use crate::routes::Route;
-use crate::BLOG_POSTS;
 use crate::utils::title;
+use crate::BLOG_POSTS;
+use dioxus::prelude::*;
+use dioxus_router::prelude::Link;
 
 /// 系列（多章节文档）目录页
 /// 路由：/series/:slug —— slug 为系列的目录标识（文件夹名，即 catalog 字段），
@@ -23,27 +23,26 @@ pub fn SeriesView(slug: String) -> Element {
         .unwrap_or_else(|| "系列文档 - 干徒".to_string());
     title::set_page_title(&page_title);
 
-    let info: Option<(String, Vec<&'static BlogPost>, &'static BlogPost)> =
-        entry_post.map(|entry| {
-            let series = entry.series.to_string();
-            let entry_key = if !entry.series.is_empty() && !entry.catalog.is_empty() { entry.catalog } else { entry.series };
-            let mut chapters: Vec<&BlogPost> = BLOG_POSTS
-                .iter()
-                .filter(|p| {
-                    let p_key = if !p.series.is_empty() && !p.catalog.is_empty() { p.catalog } else { p.series };
-                    p_key == entry_key
-                })
-                .collect();
-            // 章节顺序由 build.rs 预计算的 sort_key 决定：
-            // 显式 order → 时间先后 → 标题（详见 build_common.rs）
-            chapters.sort_by(|a, b| {
-                a.sort_key
-                    .cmp(b.sort_key)
-                    .then_with(|| a.filename.cmp(&b.filename))
-            });
-            let intro = chapters.first().copied().unwrap_or(entry);
-            (series, chapters, intro)
-        });
+    let info: Option<(String, Vec<&'static BlogPost>, &'static BlogPost)> = entry_post.map(|entry| {
+        let series = entry.series.to_string();
+        let entry_key = if !entry.series.is_empty() && !entry.catalog.is_empty() {
+            entry.catalog
+        } else {
+            entry.series
+        };
+        let mut chapters: Vec<&BlogPost> = BLOG_POSTS
+            .iter()
+            .filter(|p| {
+                let p_key = if !p.series.is_empty() && !p.catalog.is_empty() { p.catalog } else { p.series };
+                p_key == entry_key
+            })
+            .collect();
+        // 章节顺序由 build.rs 预计算的 sort_key 决定：
+        // 显式 order → 时间先后 → 标题（详见 build_common.rs）
+        chapters.sort_by(|a, b| a.sort_key.cmp(b.sort_key).then_with(|| a.filename.cmp(b.filename)));
+        let intro = chapters.first().copied().unwrap_or(entry);
+        (series, chapters, intro)
+    });
 
     rsx! {
         div { class: "series-container",

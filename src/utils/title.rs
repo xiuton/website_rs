@@ -15,7 +15,9 @@ pub fn set_page_title(title: &str) {
 
 /// 更新或创建 meta 标签的 content 属性
 fn set_meta(attr_name: &str, attr_value: &str, content: &str) {
-    let Some(document) = window().and_then(|w| w.document()) else { return };
+    let Some(document) = window().and_then(|w| w.document()) else {
+        return;
+    };
     // 优先查找已有标签并更新
     let selector = match attr_name {
         "name" => format!("meta[name=\"{}\"]", attr_value),
@@ -38,7 +40,9 @@ fn set_meta(attr_name: &str, attr_value: &str, content: &str) {
 
 /// 更新或创建 canonical link 标签
 fn set_canonical(url: &str) {
-    let Some(document) = window().and_then(|w| w.document()) else { return };
+    let Some(document) = window().and_then(|w| w.document()) else {
+        return;
+    };
     if let Some(el) = document.query_selector("link[rel=\"canonical\"]").ok().flatten() {
         let _ = el.set_attribute("href", url);
         return;
@@ -63,16 +67,18 @@ pub fn set_page_canonical(path: &str) {
 
 /// 更新指定 id 的 JSON-LD 结构化数据（不存在则创建）
 fn set_jsonld(id: &str, json: &str) {
-    let Some(document) = window().and_then(|w| w.document()) else { return };
+    let Some(document) = window().and_then(|w| w.document()) else {
+        return;
+    };
     let selector = format!("script#{}", id);
     if let Some(el) = document.query_selector(&selector).ok().flatten() {
-        let _ = el.set_text_content(Some(json));
+        el.set_text_content(Some(json));
         return;
     }
     if let Ok(el) = document.create_element("script") {
         let _ = el.set_attribute("type", "application/ld+json");
         let _ = el.set_attribute("id", id);
-        let _ = el.set_text_content(Some(json));
+        el.set_text_content(Some(json));
         if let Some(head) = document.head() {
             let _ = head.append_child(&el);
         }
@@ -86,7 +92,11 @@ fn json_str(s: &str) -> String {
 
 /// 设置所有 SEO 相关 meta 标签 + canonical + 通用 WebPage 结构化数据
 pub fn set_seo(title: &str, description: &str, url: &str) {
-    let full_url = if url.starts_with("http") { url.to_string() } else { format!("{}{}", SITE_URL, url) };
+    let full_url = if url.starts_with("http") {
+        url.to_string()
+    } else {
+        format!("{}{}", SITE_URL, url)
+    };
     let doc_title = format!("{} - 干徒", title);
 
     set_page_title(&doc_title);
@@ -120,15 +130,12 @@ pub fn set_seo(title: &str, description: &str, url: &str) {
 }
 
 /// 设置文章页的 BlogPosting 结构化数据
-pub fn set_article_jsonld(
-    title: &str,
-    description: &str,
-    url: &str,
-    date: &str,
-    author: &str,
-    tags: &[&str],
-) {
-    let full_url = if url.starts_with("http") { url.to_string() } else { format!("{}{}", SITE_URL, url) };
+pub fn set_article_jsonld(title: &str, description: &str, url: &str, date: &str, author: &str, tags: &[&str]) {
+    let full_url = if url.starts_with("http") {
+        url.to_string()
+    } else {
+        format!("{}{}", SITE_URL, url)
+    };
     let jsonld = format!(
         r#"{{"@context":"https://schema.org","@type":"BlogPosting","headline":{},"description":{},"url":{},"datePublished":{},"dateModified":{},"inLanguage":"zh-CN","image":{},"author":{{"@type":"Person","name":{}}},"keywords":{},"publisher":{{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}}}"#,
         json_str(title),

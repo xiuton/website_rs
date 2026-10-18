@@ -1,0 +1,13 @@
+[package]
+name = "font-subset"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Rust 字体子集化 + WOFF2 编码（allsorts 负责裁剪，woofwoof 负责 woff2）。
+# 不依赖 Python/fonttools。只在需要重新生成 static/fonts/*.woff2 时运行：
+#     cargo run -p font-subset
+[dependencies]
+allsorts = "0.17"
+ttf-parser = "0.25"
+woofwoof = "1"

@@ -33,12 +33,12 @@
 | 样式 | SCSS (Sass) |
 | Markdown 渲染 | [comrak](https://docs.rs/comrak) (GFM 兼容) |
 | 代码高亮 | [highlight.js 11](https://highlightjs.org/) |
-| HTTP 客户端 | gloo-net（加载 posts.json / markov.json 等预生成数据） |
+| HTTP 客户端 | gloo-net（按需加载 `static/*.json` 与文章 HTML 片段） |
 | 路由 | dioxus-router 0.6.3 |
 | 构建脚本 | `build.rs` 编译期解析博客文章 |
-| 数据生成 | `build/` 目录下多个 `build_*.rs` 模块（posts.json、rss、atom、搜索索引、摘要、SEO 文件等） |
+| 数据生成 | `build/` 目录下多个 `build_*.rs` 模块（`posts-meta.json`、`post-html/`、rss、atom、搜索索引、摘要、SEO 文件等） |
 | 预渲染工具 | `src/bin/prerender.rs`（trunk 构建后生成文章静态页与 404.html） |
-| 字体 | Inter, JetBrains Mono, MiSans, 得意黑 |
+| 字体 | MiSans, JetBrains Mono, SmileySans（构建期按用字子集化为 woff2） |
 
 ## 环境要求
 
@@ -96,44 +96,54 @@ trunk serve
 trunk serve --port 8081
 ```
 
-> `trunk serve` 只提供 **SPA**（页面由 Wasm 在浏览器里渲染），不带 SEO 预渲染页；
-> 而且它在**每次源码/文章变动时会重建整个 `dist/`**，之前生成的 `dist/post/**` 会被清掉。
-> 这是正常的：开发时看 SPA 就够了，预渲染页只在打包发布前生成。
+> `trunk serve` 提供 **SPA**（页面由 Wasm 在浏览器里渲染）。`post_build` hook 也会顺带
+> 生成预渲染页，但开发时看 SPA 就够了；每次源码/文章变动会重建 `dist/`，预渲染页随之重新生成
+> （已通过 `[watch] ignore = ["dist"]` 避免 hook 写入触发无限重建）。
 
 ### 构建生产版本
 
-**顺序不能颠倒**：
+一条命令即可（[Trunk.toml](Trunk.toml) 的 `post_build` hook 会自动跑预渲染）：
 
 ```bash
-cargo build --release --bin web-rs   # 1. 触发 build.rs，生成 static/*.json
-trunk build --release                # 2. 编译 Wasm，并把 static/ 复制进 dist/
-cargo run --release --bin prerender  # 3. 依赖 dist/static/posts.json，逐篇生成静态页
+trunk build --release --no-default-features
 ```
+
+`--no-default-features` 会去掉仅开发环境需要的 Playground / Test 页面；
+本地开发直接 `trunk serve`（默认带上 `dev-pages`）。
 
 构建产物输出到 `dist/` 目录。
 
-> ⚠️ **顺序为什么重要**：`build.rs` 负责把 `posts/` 解析成 `static/posts.json`、
-> `markov.json`、`search-index.json`、RSS/Atom、sitemap 等数据文件；`trunk build`
-> 再通过 `<link data-trunk rel="copy-dir" href="static">` 把它们复制进 `dist/static/`。
-> `prerender` 读的是 `dist/static/posts.json`，所以第 1、2 步必须走在它前面。
-> 如果跳过第 1 步（或改完文章没重新构建），页面会因缺少数据文件而报
-> `加载 xxx.json 失败`。
+> **数据文件是自动生成的**：`build.rs` 把 `posts/` 解析成
+> `static/posts-meta.json`、`static/post-html/<slug>.html`、`markov.json`、
+> `search-index.json`、RSS/Atom、sitemap 等文件，Trunk 再通过
+> `<link data-trunk rel="copy-dir" href="static">` 复制进 `dist/static/`。
+> 预渲染工具读取 `dist/static/posts-meta.json` + `dist/static/post-html/`，
+> 因此不需要再手工分步执行。
 >
-> 另外：`trunk build` / `trunk serve` 会**重建整个 `dist/`**，所以预渲染页在每次
-> trunk 构建后都需要重新生成（即重跑上面的第 3 步）。
+> 如果站外还有小程序等消费者依赖旧的 `/static/posts.json`（含三份正文的 6 MB 大文件），
+> 设置环境变量 `WEBSITE_LEGACY_POSTS_JSON=1` 再构建即可恢复该产物。
+
+**关于字体：** 部署目录里只放 `cargo run -p font-subset` 生成的 woff2 子集
+（原始字体在 `assets/fonts/`，不参与部署）。子集化完全由 Rust 实现
+（allsorts + woofwoof），不依赖 Python/fonttools。新增文章后如果出现个别缺字
+（回退到系统字体），重跑一次该命令即可。
+
+**关于 wasm-opt：** `index.html` 里设置了 `data-wasm-opt="z"`，Trunk 会自动下载并使用
+binaryen 压缩 Wasm；如果本机没有网络，可临时改回 `data-wasm-opt="0"` 跳过该步骤。
 
 **关于 SRI：** [Trunk.toml](Trunk.toml) 中设置了 `no_sri = true`。Trunk 默认会把
 integrity 摘要写进 `index.html`，但它热重载时会替换资源文件，浏览器如果缓存了旧的
 `index.html` 就会因摘要不匹配而拒绝加载资源（`Failed to find a valid digest ...`）。
 静态托管下文件名本身已带内容指纹，SRI 收益很低，因此统一关闭。
 
-生成文章静态页（SEO 预渲染，爬虫无需执行 JS 即可读取全文）：
+需要单独重新生成文章静态页时（一般不需要）：
 
 ```bash
 cargo run --release --bin prerender
 ```
 
-该命令读取 `dist/static/posts.json`，为每篇文章生成 `dist/post/<slug>/index.html`，并将 `dist/index.html` 复制为 `dist/404.html`（GitHub Pages SPA 兜底）。CI 部署流程会自动执行此步骤。
+该命令为每篇文章生成 `dist/post/<slug>/index.html` 与系列目录页，并将 `dist/index.html`
+复制为 `dist/404.html`（GitHub Pages SPA 兜底）。CI 部署流程会通过 Trunk hook 自动执行。
 
 ### 清理并重新构建
 
@@ -350,8 +360,9 @@ slug_prefix = "rust-guide"
 - 首页卡片的标签超过 10 个时折叠为「+N」按钮，点击展开全部、再点收起
 - 点击文档入口进入**目录页**（`/series/<目录名>`），从目录页再进入各章节
 
-> `build.rs` 会在编译时扫描 `posts/` 目录，解析所有 `.md` 文件的 Front Matter，
-> 生成包含文章元数据和内容的 Rust 数组，嵌入到最终 Wasm 产物中。
+> `build.rs` 会在编译时扫描 `posts/` 目录，解析所有 `.md` 文件的 Front Matter：
+> 元数据（标题/日期/标签/摘要等）嵌入 Wasm，正文则生成到 `static/post-html/<slug>.html`
+> 由 SPA 按需加载。这样 Wasm 不需要打包全部文章原文，也不需要运行时 Markdown 渲染器。
 
 ## 项目结构
 
@@ -362,7 +373,7 @@ slug_prefix = "rust-guide"
 │       └── build.yml        # GitHub Actions CI/CD（含 SEO 预渲染步骤）
 ├── build/                   # 构建期数据生成模块（build.rs 调用）
 │   ├── build_common.rs      # 共享工具：扫描 posts、front matter 解析、_config.toml、slug 分配
-│   ├── build_posts_json.rs  # 生成 posts.json
+│   ├── build_posts_json.rs  # 生成 posts-meta.json 与 post-html/ 片段
 │   ├── build_rss.rs         # RSS 订阅
 │   ├── build_atom.rs        # Atom 订阅
 │   ├── build_search.rs      # 搜索索引
@@ -401,31 +412,37 @@ slug_prefix = "rust-guide"
 │   ├── pages/               # 页面组件（对应路由）
 │   │   ├── mod.rs
 │   │   ├── about.rs         # 关于页面
-│   │   ├── blog_post.rs     # 博客文章详情页
+│   │   ├── blog_post/       # 文章详情页（mod + markov 续写 + related 相关推荐）
 │   │   ├── dev.rs           # 开发工具页面
 │   │   ├── home.rs          # 首页（博客列表 + 分页 + 系列文档合并）
 │   │   ├── not_found.rs     # 404 页面
-│   │   ├── playground.rs    # 操场（代码实验）
+│   │   ├── playground.rs    # 操场（代码实验，仅 dev-pages）
 │   │   ├── tags.rs          # 书签页（搜索 + 筛选）
-│   │   └── test.rs          # 测试页面
+│   │   └── test.rs          # 测试页面（仅 dev-pages）
 │   ├── routes/
 │   │   └── mod.rs           # 路由定义（Dioxus Router）
 │   ├── utils/
 │   │   ├── mod.rs
+│   │   ├── cache.rs         # 静态数据会话级缓存 + 构建版本号
 │   │   ├── dark_mode.rs     # 暗色模式状态管理
 │   │   └── title.rs         # 页面标题设置
 │   ├── app.rs               # 应用根组件
 │   ├── lib.rs               # 库入口（模块声明 + 公开 API）
 │   ├── main.rs              # 程序入口
+│   ├── nav.rs               # 导航链接单一来源（导航栏与预渲染页共用）
 │   └── styles.scss          # 全局样式（Sass）
-├── static/                  # 静态资源
+├── tools/                   # 纯 Rust 辅助工具
+│   ├── font-subset/         # 字体子集化 + woff2（allsorts + woofwoof）
+│   └── mini-html/           # 小程序 HTML 标签转换（lol_html）
+├── assets/fonts/            # 原始字体（不参与部署）
+├── static/                  # 静态资源（生成物已在 .gitignore 中）
 │   ├── blog-images/         # 博客文章配图
-│   ├── fonts/               # 字体文件
-│   │   ├── IBMPlexSansSC-Medium.woff2
-│   │   ├── JetBrainsMonoNLNerdFont-Regular.ttf
-│   │   ├── MiSans-Regular.otf
-│   │   ├── NeueMachina-Bold.woff2
-│   │   └── SmileySans-Oblique.otf
+│   ├── fonts/               # 字体子集（cargo run -p font-subset 生成）
+│   │   ├── MiSans-subset.woff2
+│   │   ├── JetBrainsMono-subset.woff2
+│   │   └── SmileySans-subset.woff2
+│   ├── post-html/           # 每篇文章的 HTML 片段（SPA 按需加载）
+│   ├── posts-meta.json      # 文章元数据（预渲染 / 列表用）
 │   ├── images/              # 通用图片
 │   │   └── og-image.png     # 社交分享图（1200×630）
 │   ├── robots.txt           # 爬虫协议（指向 sitemap.xml）
@@ -464,21 +481,20 @@ wasm-bindgen-futures = "0.4.39"
 web-sys = "0.3.66"          # DOM / Storage / History / Canvas
 js-sys = "0.3.66"           # Promise 等（异步延时等）
 serde = "1.0"               # 序列化
-serde_json = "1.0"          # 解析 posts.json / markov.json 等预生成数据
+serde_json = "1.0"          # 解析 static/*.json 等预生成数据
 toml = "0.8.8"              # 书签配置解析
-comrak = "0.20.0"           # Markdown → HTML (GFM)
 gloo-net = "0.5.0"          # 浏览器端 HTTP 请求
 futures-channel = "0.3.30"
-wee_alloc = "0.4.5"         # Wasm 内存分配器
 console_error_panic_hook = "0.1.7"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = "0.4"              # 仅 CLI 工具（new / prerender）用
 
 [build-dependencies]
-comrak = "0.20.0"           # front matter 之外的正文渲染
+comrak = "0.20.0"           # 构建期 Markdown → HTML（wasm 中已不再包含）
 regex = "1.11.0"
 toml = "0.8.8"              # 解析 _config.toml 配置文件
+mini-html = { path = "tools/mini-html" }  # 小程序 HTML 转换（lol_html）
 ```
 
 ## 部署说明
@@ -486,24 +502,21 @@ toml = "0.8.8"              # 解析 _config.toml 配置文件
 ### 静态文件部署
 
 ```bash
-cargo build --release --bin web-rs   # 1. 生成 static/*.json
-trunk build --release                # 2. 编译 Wasm 并复制 static/ 进 dist/
-cargo run --release --bin prerender  # 3. 生成文章静态页与 404.html
+trunk build --release --no-default-features
 ```
 
-将 `dist/` 目录部署到任意静态 Web 服务器即可。
+将 `dist/` 目录部署到任意静态 Web 服务器即可。预渲染页由 Trunk 的 `post_build` hook 自动生成。
 
-> ⚠️ 只跑 `trunk build` 会得到「没有预渲染页」的产物：SPA 能正常跑，但爬虫看到的是空壳。
-> 完整发布必须补上第 1 步（生成数据）和第 3 步（预渲染）。
+> 如果临时需要旧产物（`dist/static/posts.json`），构建时设置 `WEBSITE_LEGACY_POSTS_JSON=1`。
 
 ### GitHub Pages（Actions 自动部署）
 
 推送代码到 `mod` 分支后，GitHub Actions 自动：
 
-1. 安装 Rust wasm 工具链
-2. `cargo build --release --target wasm32-unknown-unknown`（触发 `build.rs` 生成 `static/*.json`）
-3. 运行 `trunk build --release`（编译 Wasm，并把 `static/` 复制进 `dist/`）
-4. 编译并运行 `prerender` 工具生成文章静态页与 `404.html`
+1. 安装 Rust wasm 工具链、安装固定版本的 Trunk
+2. 运行格式检查、Clippy、单元测试
+3. `trunk build --release --no-default-features`（编译 Wasm、复制 `static/` 进 `dist/`）
+4. `post_build` hook 调用 `prerender` 生成文章静态页与 `404.html`
 5. 将 `dist/` 部署到 `gh-pages` 分支
 
 配置文件：[.github/workflows/build.yml](.github/workflows/build.yml)
@@ -556,52 +569,20 @@ cargo run --release --bin prerender  # 3. 生成文章静态页与 404.html
 
 ## Windows 开发环境补充
 
-### 安装 wasm-opt
+### wasm-opt
 
-Trunk 的 `--release` 构建需要 wasm-opt 来优化 Wasm 产物。
+`index.html` 中设置了 `data-wasm-opt="z"`，Trunk 在 `--release` 构建时会自动下载并使用
+[wasm-opt](https://github.com/WebAssembly/binaryen) 压缩 Wasm 体积，通常无需手工安装。
 
-**方法一：手动安装**
+如果网络受限，可以让 Trunk 使用本地已有的 wasm-opt（放到 `%USERPROFILE%\.cache\trunk\bin\`），
+或临时把 `index.html` 里的属性改成 `data-wasm-opt="0"` 跳过优化。
 
-1. 创建目录 `C:\Users\{用户名}\.cache\trunk\bin`
-2. 下载 wasm-opt：
-   ```powershell
-   $url = "https://github.com/WebAssembly/binaryen/releases/download/version_123/binaryen-version_123-x86_64-windows.tar.gz"
-   Invoke-WebRequest -Uri $url -OutFile "$env:USERPROFILE\.cache\trunk\bin\binaryen.tar.gz"
-   ```
-3. 解压并将 `binaryen-version_123\bin\wasm-opt.exe` 移动到 `C:\Users\{用户名}\.cache\trunk\bin\`
+> 注意：`data-wasm-opt-params` 不要写 `--all-features`。它会把 binaryen 的实验特性
+> （如 compact-imports）一起打开，产出的 wasm 浏览器会报
+> `Invalid import kind` 而无法实例化。当前只显式开启 Rust 实际使用的
+> `--enable-bulk-memory --enable-nontrapping-float-to-int`。
 
-**方法二：脚本自动化**
-
-```powershell
-# 创建目标目录
-$targetDir = "$env:USERPROFILE\.cache\trunk\bin"
-New-Item -ItemType Directory -Force -Path $targetDir
-
-# 下载
-$url = "https://github.com/WebAssembly/binaryen/releases/download/version_123/binaryen-version_123-x86_64-windows.tar.gz"
-Invoke-WebRequest -Uri $url -OutFile "$targetDir\binaryen.tar.gz"
-
-# 解压并移动
-tar -xf "$targetDir\binaryen.tar.gz" -C $targetDir
-Move-Item "$targetDir\binaryen-version_123\bin\wasm-opt.exe" $targetDir -Force
-
-# 清理
-Remove-Item "$targetDir\binaryen-version_123" -Recurse -Force
-Remove-Item "$targetDir\binaryen.tar.gz" -Force
-
-Write-Host "wasm-opt setup completed!"
-```
-
-> 开发模式 (`trunk serve`) 不需要 wasm-opt，只有 `trunk build --release` 才需要。
-
-### 关闭 Release 优化
-
-如果不需要 wasm-opt，可在 `Trunk.toml` 中设置：
-
-```toml
-[wasm]
-opt = false
-```
+> 开发模式（`trunk serve`）不会执行 wasm-opt。
 
 ## 贡献指南
 

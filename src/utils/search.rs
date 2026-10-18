@@ -43,20 +43,11 @@ pub struct Suggestion {
 /// 语义索引（词共现 + 自动补全 + tag 关联）
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 struct SemanticData {
     cooccur: HashMap<String, HashMap<String, f64>>,
     suggestions: Vec<String>,
     tag_relations: HashMap<String, Vec<String>>,
-}
-
-impl Default for SemanticData {
-    fn default() -> Self {
-        Self {
-            cooccur: HashMap::new(),
-            suggestions: Vec::new(),
-            tag_relations: HashMap::new(),
-        }
-    }
 }
 
 // ============================================================================
@@ -104,12 +95,7 @@ impl SearchEngine {
     /// 从 JSON 字符串加载搜索索引
     pub fn load(&mut self, json: &str) -> Result<(), serde_json::Error> {
         self.entries = serde_json::from_str(json)?;
-        self.slug_map = self
-            .entries
-            .iter()
-            .enumerate()
-            .map(|(i, e)| (e.slug.clone(), i))
-            .collect();
+        self.slug_map = self.entries.iter().enumerate().map(|(i, e)| (e.slug.clone(), i)).collect();
         self.loaded = true;
         Ok(())
     }
@@ -181,10 +167,7 @@ impl SearchEngine {
                     tokens.push(word);
                 }
             } else {
-                if i + 1 < chars.len()
-                    && !chars[i + 1].is_ascii_punctuation()
-                    && !chars[i + 1].is_whitespace()
-                {
+                if i + 1 < chars.len() && !chars[i + 1].is_ascii_punctuation() && !chars[i + 1].is_whitespace() {
                     let bigram: String = [c, chars[i + 1]].iter().collect();
                     tokens.push(bigram);
                 }
@@ -247,11 +230,7 @@ impl SearchEngine {
             .entries
             .iter()
             .filter_map(|entry| {
-                let doc_map: HashMap<&str, f64> = entry
-                    .keywords
-                    .iter()
-                    .map(|(k, v)| (k.as_str(), *v))
-                    .collect();
+                let doc_map: HashMap<&str, f64> = entry.keywords.iter().map(|(k, v)| (k.as_str(), *v)).collect();
 
                 // 点积
                 let dot_product: f64 = query_vec
@@ -264,31 +243,17 @@ impl SearchEngine {
                 }
 
                 // 查询向量模长（归一化因子）
-                let query_magnitude: f64 = query_vec
-                    .values()
-                    .map(|v| v * v)
-                    .sum::<f64>()
-                    .sqrt()
-                    .max(1e-10);
+                let query_magnitude: f64 = query_vec.values().map(|v| v * v).sum::<f64>().sqrt().max(1e-10);
 
-                let doc_magnitude: f64 = entry
-                    .keywords
-                    .iter()
-                    .map(|(_, v)| v * v)
-                    .sum::<f64>()
-                    .sqrt()
-                    .max(1e-10);
+                let doc_magnitude: f64 = entry.keywords.iter().map(|(_, v)| v * v).sum::<f64>().sqrt().max(1e-10);
 
                 // 余弦相似度 = 点积 / (|查询向量| × |文档向量|)
                 let mut score = dot_product / (query_magnitude * doc_magnitude);
 
                 // 标题精确匹配加分
                 let title_lower = entry.title.to_lowercase();
-                let exact_title_bonus = query_tokens
-                    .iter()
-                    .filter(|qt| title_lower.contains(qt.as_str()))
-                    .count() as f64
-                    * 0.2;
+                let exact_title_bonus =
+                    query_tokens.iter().filter(|qt| title_lower.contains(qt.as_str())).count() as f64 * 0.2;
                 score += exact_title_bonus;
 
                 if score > 0.0 {
@@ -324,7 +289,7 @@ impl SearchEngine {
 
         let prefix_lower = prefix.to_lowercase();
         let tokens = Self::tokenize(prefix);
-        if tokens.is_empty() && prefix_lower.len() < 1 {
+        if tokens.is_empty() && prefix_lower.is_empty() {
             return Vec::new();
         }
 
@@ -358,10 +323,7 @@ impl SearchEngine {
                     "tag"
                 };
 
-                results.push(Suggestion {
-                    text: suggestion.clone(),
-                    kind,
-                });
+                results.push(Suggestion { text: suggestion.clone(), kind });
             }
 
             // 达到上限
@@ -388,10 +350,7 @@ impl SearchEngine {
                     break;
                 }
                 if seen.insert(kw.to_string()) {
-                    results.push(Suggestion {
-                        text: kw.to_string(),
-                        kind: "keyword",
-                    });
+                    results.push(Suggestion { text: kw.to_string(), kind: "keyword" });
                 }
             }
         }
@@ -400,12 +359,11 @@ impl SearchEngine {
         results.sort_by(|a, b| {
             let a_is_title = if a.kind == "title" { 1 } else { 0 };
             let b_is_title = if b.kind == "title" { 1 } else { 0 };
-            b_is_title.cmp(&a_is_title)
-                .then_with(|| {
-                    let a_prefix = a.text.to_lowercase().starts_with(&prefix_lower);
-                    let b_prefix = b.text.to_lowercase().starts_with(&prefix_lower);
-                    b_prefix.cmp(&a_prefix)
-                })
+            b_is_title.cmp(&a_is_title).then_with(|| {
+                let a_prefix = a.text.to_lowercase().starts_with(&prefix_lower);
+                let b_prefix = b.text.to_lowercase().starts_with(&prefix_lower);
+                b_prefix.cmp(&a_prefix)
+            })
         });
 
         results
@@ -417,12 +375,7 @@ impl SearchEngine {
     }
 
     /// 分批获取搜索结果（用于分页）
-    pub fn search_with_expansion(
-        &self,
-        query: &str,
-        offset: usize,
-        limit: usize,
-    ) -> (Vec<SearchResult>, usize) {
+    pub fn search_with_expansion(&self, query: &str, offset: usize, limit: usize) -> (Vec<SearchResult>, usize) {
         let all = self.search(query);
         let total = all.len();
         let page: Vec<SearchResult> = all.into_iter().skip(offset).take(limit).collect();

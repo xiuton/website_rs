@@ -64,11 +64,7 @@ async fn sleep_ms(ms: u32) {
 
 /// 加载失败的两类原因：响应不是 JSON / 其他（请求或读取失败）
 enum LoadError {
-    NotJson {
-        status: u16,
-        content_type: String,
-        preview: String,
-    },
+    NotJson { status: u16, content_type: String, preview: String },
     Other(String),
 }
 
@@ -80,10 +76,7 @@ async fn fetch_markov(url: &str) -> Result<MarkovData, LoadError> {
         .map_err(|e| LoadError::Other(format!("请求 {} 失败: {}", url, e)))?;
 
     let status = resp.status();
-    let content_type = resp
-        .headers()
-        .get("content-type")
-        .unwrap_or_default();
+    let content_type = resp.headers().get("content-type").unwrap_or_default();
 
     let text = resp
         .text()
@@ -92,11 +85,7 @@ async fn fetch_markov(url: &str) -> Result<MarkovData, LoadError> {
 
     // 先看首字符：HTML 兜底页 / 空响应都不必再走 serde，直接判定为非 JSON
     if !text.trim_start().starts_with(['{', '[']) {
-        return Err(LoadError::NotJson {
-            status,
-            content_type,
-            preview: text.chars().take(60).collect(),
-        });
+        return Err(LoadError::NotJson { status, content_type, preview: text.chars().take(60).collect() });
     }
 
     serde_json::from_str(&text).map_err(|e| {
@@ -138,12 +127,7 @@ impl MarkovGenerator {
     /// - `slug`: 文章标识
     /// - `seed`: 可选的种子文本（将从中提取起始 token 对）
     /// - `max_tokens`: 最多生成的 token 数
-    pub fn generate(
-        &self,
-        slug: &str,
-        seed: Option<&str>,
-        max_tokens: usize,
-    ) -> String {
+    pub fn generate(&self, slug: &str, seed: Option<&str>, max_tokens: usize) -> String {
         let chain = match self.data.get(slug) {
             Some(c) => c,
             // 文章没有模型时从所有文章随机选一个种子

@@ -5,8 +5,7 @@ use std::path::Path;
 pub fn generate_semantic_index(posts: &[PostData]) {
     if posts.is_empty() {
         let dest = Path::new("static/semantic.json");
-        std::fs::write(dest, r#"{"cooccur":[],"suggestions":[]}"#)
-            .expect("Failed to write semantic index");
+        std::fs::write(dest, r#"{"cooccur":[],"suggestions":[]}"#).expect("Failed to write semantic index");
         return;
     }
 
@@ -19,7 +18,10 @@ pub fn generate_semantic_index(posts: &[PostData]) {
     for post in posts {
         let source = format!(
             "{} {} {} {} {}",
-            post.title, post.summary, post.tags.join(" "), post.category,
+            post.title,
+            post.summary,
+            post.tags.join(" "),
+            post.category,
             truncate_utf8_safe(&post.content, 2000)
         );
         let tokens = tokenize(&source);
@@ -49,7 +51,7 @@ pub fn generate_semantic_index(posts: &[PostData]) {
 
     // ── 提取每篇文章的 top-30 关键词 ──
     let mut article_keywords: Vec<Vec<(String, f64)>> = Vec::with_capacity(posts.len());
-    for (_i, dt) in doc_tokens_list.iter().enumerate() {
+    for dt in doc_tokens_list.iter() {
         let total: f64 = dt.values().sum();
         if total == 0.0 {
             article_keywords.push(Vec::new());
@@ -99,10 +101,7 @@ pub fn generate_semantic_index(posts: &[PostData]) {
     // 为每个词保留 top-15 共现词
     let mut cooccur_top: HashMap<String, Vec<(String, f64)>> = HashMap::new();
     for (word, neighbors) in &cooccur {
-        let mut sorted: Vec<(String, f64)> = neighbors
-            .iter()
-            .map(|(w, s)| (w.clone(), *s))
-            .collect();
+        let mut sorted: Vec<(String, f64)> = neighbors.iter().map(|(w, s)| (w.clone(), *s)).collect();
         sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         sorted.truncate(15);
         cooccur_top.insert(word.clone(), sorted);
@@ -138,10 +137,7 @@ pub fn generate_semantic_index(posts: &[PostData]) {
                 if i == j {
                     continue;
                 }
-                tag_relations
-                    .entry(t1.clone())
-                    .or_default()
-                    .push(t2.clone());
+                tag_relations.entry(t1.clone()).or_default().push(t2.clone());
             }
         }
     }
@@ -157,10 +153,7 @@ pub fn generate_semantic_index(posts: &[PostData]) {
             json.push(',');
         }
         first = false;
-        json.push_str(&format!(
-            r#""{}":{{"#,
-            escape_json_string(word),
-        ));
+        json.push_str(&format!(r#""{}":{{"#, escape_json_string(word),));
         let mut nfirst = true;
         for (nw, ns) in neighbors {
             if !nfirst {
@@ -211,4 +204,3 @@ pub fn generate_semantic_index(posts: &[PostData]) {
     let dest = Path::new("static/semantic.json");
     std::fs::write(dest, &json).expect("Failed to write semantic index");
 }
-

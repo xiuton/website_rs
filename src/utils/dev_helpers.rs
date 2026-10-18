@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
-use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen::JsCast;
+use wasm_bindgen_futures::spawn_local;
 
 use super::constants;
 
@@ -30,14 +30,10 @@ pub fn create_delayed_hide_timer(
         hide_cursor.set(true);
         hide_btn_timer.set(None);
     }) as Box<dyn FnOnce()>);
-    web_sys::window()
-        .and_then(|w| {
-            w.set_timeout_with_callback_and_timeout_and_arguments_0(
-                closure.unchecked_ref(),
-                delay_ms,
-            )
+    web_sys::window().and_then(|w| {
+        w.set_timeout_with_callback_and_timeout_and_arguments_0(closure.unchecked_ref(), delay_ms)
             .ok()
-        })
+    })
 }
 
 pub fn create_carousel_timer(
@@ -50,14 +46,10 @@ pub fn create_carousel_timer(
             current_bg_index.set((current_bg_index() + 1) % len);
         }
     }) as Box<dyn FnMut()>);
-    let handle = web_sys::window()
-        .and_then(|w| {
-            w.set_interval_with_callback_and_timeout_and_arguments_0(
-                closure.as_ref().unchecked_ref(),
-                CAROUSEL_INTERVAL_MS,
-            )
+    let handle = web_sys::window().and_then(|w| {
+        w.set_interval_with_callback_and_timeout_and_arguments_0(closure.as_ref().unchecked_ref(), CAROUSEL_INTERVAL_MS)
             .ok()
-        });
+    });
     closure.forget();
     handle
 }
@@ -72,12 +64,16 @@ pub fn load_single_image(url: &str) -> std::pin::Pin<Box<dyn std::future::Future
         let (tx, rx) = futures_channel::oneshot::channel();
         let tx_success = std::sync::Arc::new(std::sync::Mutex::new(Some(tx)));
         let tx_error = tx_success.clone();
-        let success_callback = wasm_bindgen::closure::Closure::once_into_js(
-            Box::new(move || { if let Some(tx) = tx_success.lock().ok().and_then(|mut g| g.take()) { let _ = tx.send(true); } }) as Box<dyn FnOnce()>
-        );
-        let error_callback = wasm_bindgen::closure::Closure::once_into_js(
-            Box::new(move || { if let Some(tx) = tx_error.lock().ok().and_then(|mut g| g.take()) { let _ = tx.send(false); } }) as Box<dyn FnOnce()>
-        );
+        let success_callback = wasm_bindgen::closure::Closure::once_into_js(Box::new(move || {
+            if let Some(tx) = tx_success.lock().ok().and_then(|mut g| g.take()) {
+                let _ = tx.send(true);
+            }
+        }) as Box<dyn FnOnce()>);
+        let error_callback = wasm_bindgen::closure::Closure::once_into_js(Box::new(move || {
+            if let Some(tx) = tx_error.lock().ok().and_then(|mut g| g.take()) {
+                let _ = tx.send(false);
+            }
+        }) as Box<dyn FnOnce()>);
         img.set_onload(Some(success_callback.unchecked_ref()));
         img.set_onerror(Some(error_callback.unchecked_ref()));
         img.set_src(&url);
@@ -87,7 +83,9 @@ pub fn load_single_image(url: &str) -> std::pin::Pin<Box<dyn std::future::Future
 
 pub fn fetch_and_set_random_image(mut img_url: Signal<Option<String>>) {
     spawn_local(async move {
-        let resp = gloo_net::http::Request::get(&format!("{}1", constants::API_IMAGES_RANDOM)).send().await;
+        let resp = gloo_net::http::Request::get(&format!("{}1", constants::API_IMAGES_RANDOM))
+            .send()
+            .await;
         if let Ok(response) = resp {
             if let Ok(text) = response.text().await {
                 let filenames = extract_filenames(&text);
@@ -105,13 +103,9 @@ pub async fn load_background_wall_images(
     mut bg_timer_handle: Signal<Option<i32>>,
     default_bg_image: &str,
 ) {
-    let resp = gloo_net::http::Request::get(&format!(
-        "{}{}",
-        constants::API_IMAGES_RANDOM,
-        BG_IMG_COUNT
-    ))
-    .send()
-    .await;
+    let resp = gloo_net::http::Request::get(&format!("{}{}", constants::API_IMAGES_RANDOM, BG_IMG_COUNT))
+        .send()
+        .await;
 
     let filenames = match resp {
         Ok(response) => match response.text().await {
@@ -146,10 +140,7 @@ pub async fn load_background_wall_images(
                                 w.clear_interval_with_handle(old_handle);
                             }
                         }
-                        let handle = create_carousel_timer(
-                            bg_imgs,
-                            current_bg_index,
-                        );
+                        let handle = create_carousel_timer(bg_imgs, current_bg_index);
                         bg_timer_handle.set(handle);
                     }
                 }

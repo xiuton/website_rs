@@ -1,8 +1,8 @@
+use super::{Footer, Navbar};
+use crate::routes::Route;
+use crate::utils::{dark_mode, title};
 use dioxus::prelude::*;
 use dioxus_router::prelude::Outlet;
-use crate::routes::Route;
-use super::{Navbar, Footer};
-use crate::utils::{dark_mode, title};
 
 #[component]
 pub fn Layout() -> Element {
@@ -14,9 +14,7 @@ pub fn Layout() -> Element {
     // 全局同步 canonical / og:url 为当前路径（页面级 set_seo 会覆盖此值）
     use_effect(move || {
         let _ = route;
-        let path = web_sys::window()
-            .and_then(|w| w.location().pathname().ok())
-            .unwrap_or_default();
+        let path = web_sys::window().and_then(|w| w.location().pathname().ok()).unwrap_or_default();
         if !path.is_empty() {
             title::set_page_canonical(&path);
         }
@@ -31,4 +29,4 @@ pub fn Layout() -> Element {
             Footer {}
         }
     }
-} 
+}

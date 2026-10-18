@@ -6,82 +6,78 @@ on:
   pull_request:
     branches: [ mod ]
 
+env:
+  # 固定版本，避免上游 latest 变化导致构建漂移
+  TRUNK_VERSION: "0.21.14"
+
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # 关键权限设置
-    
+      contents: write
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Setup Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       with:
         target: wasm32-unknown-unknown
-        
+        components: rustfmt, clippy
+
+    - name: Cache Rust build artifacts
+      uses: Swatinem/rust-cache@v2
+      with:
+        # 同时缓存 target/ 与 registry，避免每次全量重编译 wasm
+        cache-on-failure: true
+
     - name: Install Trunk
       run: |
-        curl -L https://github.com/thedodd/trunk/releases/latest/download/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xz
+        curl -L "https://github.com/trunk-rs/trunk/releases/download/v${TRUNK_VERSION}/trunk-x86_64-unknown-linux-gnu.tar.gz" | tar -xz
         sudo mv trunk /usr/local/bin/
         trunk --version
-        
-    - name: Cache Rust dependencies
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
-          
-    - name: Clean build artifacts
-      run: |
-        cargo clean
-        
-    - name: List posts directory
-      run: |
-        echo "=== Posts directory contents ==="
-        ls -la posts/
-        echo "=== Static directory before build ==="
-        ls -la static/
-        
-    - name: Run build.rs to generate static files
-      run: |
-        echo "=== Running build.rs ==="
-        cargo build --release --target wasm32-unknown-unknown 2>&1 | tail -20
-        
-    - name: List static directory after build.rs
-      run: |
-        echo "=== Static directory after build.rs ==="
-        ls -la static/
-        
-    - name: Build the project with trunk
-      run: |
-        echo "=== Running trunk build ==="
-        trunk build --release 2>&1 | tail -20
-        
-    - name: List static directory after trunk
-      run: |
-        echo "=== Static directory after trunk ==="
-        ls -la static/
-        echo "=== Dist static directory ==="
-        ls -la dist/static/
 
-    - name: Prerender article pages for SEO
+    - name: Format check
+      run: cargo fmt --all -- --check
+
+    - name: Clippy (wasm)
+      run: cargo clippy --target wasm32-unknown-unknown --lib --bin web-rs --no-default-features -- -D warnings
+
+    - name: Clippy (host tools)
+      run: cargo clippy --all-targets -- -D warnings
+
+    - name: Clippy (mini-html)
+      run: cargo clippy -p mini-html --all-targets -- -D warnings
+
+    - name: Unit tests
+      run: cargo test --workspace --exclude font-subset
+
+    # build.rs 负责生成 static/*.json，Trunk 负责 wasm + 复制静态资源，
+    # post_build hook（见 Trunk.toml）再自动生成文章预渲染页 —— 一条命令即可。
+    - name: Build with Trunk
+      run: trunk build --release --no-default-features
+
+    - name: Verify prerendered pages
       run: |
-        echo "=== Building prerender tool ==="
-        cargo build --release --bin prerender 2>&1 | tail -10
-        echo "=== Prerendering static post pages ==="
-        ./target/release/prerender
-        echo "=== Post prerender pages ==="
-        ls dist/post/ | head -20
+        test -f dist/static/posts-meta.json
+        test -d dist/post
+        test "$(find dist/post -name index.html | wc -l)" -gt 0
+        grep -q 'id="prerender-content"' dist/post/*/index.html || (echo "post page missing content template" && exit 1)
+        grep -q 'id="noscript-posts"' dist/index.html || (echo "home page missing noscript SEO block" && exit 1)
+        echo "prerendered: $(find dist/post -name index.html | wc -l) pages"
+
+    # 体积预算：防止后续改动把 wasm 又吹大（当前约 490 KB gzip）
+    - name: Bundle size budget
+      run: |
+        wasm_bytes=$(gzip -c dist/*.wasm | wc -c)
+        echo "wasm gzip: ${wasm_bytes} bytes"
+        test "$wasm_bytes" -lt 900000
 
     - name: Deploy to GitHub Pages
+      if: github.event_name == 'push'
       uses: peaceiris/actions-gh-pages@v4
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: dist
-        publish_branch: gh-pages 
+        publish_branch: gh-pages

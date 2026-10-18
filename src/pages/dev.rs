@@ -1,13 +1,12 @@
-use dioxus::prelude::*;
-use wasm_bindgen_futures::spawn_local;
-use crate::utils::title;
+use crate::components::icons::{CloseIcon, FullscreenIcon, RefreshIcon};
 use crate::utils::constants;
 use crate::utils::dev_helpers::{
-    create_delayed_hide_timer, create_carousel_timer,
-    fetch_and_set_random_image, load_background_wall_images,
+    create_carousel_timer, create_delayed_hide_timer, fetch_and_set_random_image, load_background_wall_images,
     HIDE_BTN_DELAY_MS,
 };
-use crate::components::icons::{RefreshIcon, FullscreenIcon, CloseIcon};
+use crate::utils::title;
+use dioxus::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 
 #[component]
 pub fn Dev() -> Element {
@@ -71,7 +70,6 @@ pub fn Dev() -> Element {
         if img_url().is_none() {
             fetch_and_set_random_image(img_url);
         }
-        
     });
 
     // 预加载背景墙图片
@@ -124,7 +122,7 @@ pub fn Dev() -> Element {
             }
             // 最上层的背景墙元素
             if is_background_mode() {
-                div { 
+                div {
                     class: if hide_cursor() { "background-wall hide-cursor" } else { "background-wall" },
                     onmousemove: move |_| {
                         show_exit_button.set(true);
@@ -161,7 +159,7 @@ pub fn Dev() -> Element {
                             }
                         }
                     })}
-                    div { 
+                    div {
                         class: "exit-button-container",
                         style: "position: fixed; top: 20px; right: 20px; z-index: 1000;",
                         onmouseenter: move |_| {

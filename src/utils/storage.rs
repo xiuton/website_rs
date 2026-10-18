@@ -1,5 +1,5 @@
-/// 全局 localStorage 配置管理
-/// 所有持久化存储的 key 统一在此定义，通过类型化 getter/setter 访问。
+//! 全局 localStorage 配置管理
+//! 所有持久化存储的 key 统一在此定义，通过类型化 getter/setter 访问。
 
 // ── Key Constants ──
 
@@ -37,9 +37,7 @@ pub fn set_theme(is_dark: bool) {
 
 /// 博客宽屏模式
 pub fn get_blog_wide_mode() -> bool {
-    get_str(KEY_BLOG_WIDE_MODE)
-        .map(|v| v == "true")
-        .unwrap_or(false)
+    get_str(KEY_BLOG_WIDE_MODE).map(|v| v == "true").unwrap_or(false)
 }
 
 pub fn set_blog_wide_mode(wide: bool) {
@@ -48,9 +46,7 @@ pub fn set_blog_wide_mode(wide: bool) {
 
 /// 博客每页显示条数
 pub fn get_blog_page_size() -> usize {
-    get_str(KEY_BLOG_PAGE_SIZE)
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(10)
+    get_str(KEY_BLOG_PAGE_SIZE).and_then(|v| v.parse().ok()).unwrap_or(10)
 }
 
 pub fn set_blog_page_size(size: usize) {

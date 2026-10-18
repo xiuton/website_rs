@@ -1,10 +1,11 @@
 use dioxus::prelude::*;
-use dioxus_router::prelude::{Routable};
+use dioxus_router::prelude::Routable;
 
 use crate::components::Layout;
 use crate::components::TestLayout;
 use crate::pages::{
-    About, Dev, Home, BlogPostView, Tags, NotFound, CircleGenerator, KnowledgeGraphView, Search, AiSummaryView, Rss, SeriesView,
+    About, AiSummaryView, BlogPostView, CircleGenerator, Dev, Home, KnowledgeGraphView, NotFound, Rss, Search,
+    SeriesView, Tags,
 };
 #[cfg(feature = "dev-pages")]
 use crate::pages::{Playground, Test};
@@ -38,7 +39,6 @@ pub enum Route {
     #[route("/:..route")]
     NotFound { route: Vec<String> },
     #[end_layout]
-
     #[layout(TestLayout)]
     #[route("/circle-generator")]
     CircleGenerator,

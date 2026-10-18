@@ -4,7 +4,7 @@
 //!   cargo run --release --bin prerender
 //!
 //! 功能：
-//! 1. 读取 dist/static/posts.json（含 content_html 全文），为每篇文章生成
+//! 1. 读取 static/posts-meta.json（元数据）与 static/post-html/*.html（正文），为每篇文章生成
 //!    dist/post/<slug>/index.html —— 爬虫无需执行 JS 即可读取完整内容
 //! 2. 为每个系列（series）文档生成 dist/series/<slug>/index.html 目录页
 //! 3. 将 dist/index.html 复制为 dist/404.html（GitHub Pages SPA 兜底）
@@ -180,18 +180,14 @@ mod prerender_impl {
                 break;
             }
         }
-        let text = text
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" ")
-            .trim()
-            .to_string();
+        let text = text.split_whitespace().collect::<Vec<_>>().join(" ").trim().to_string();
         text.chars().take(160).collect()
     }
 
     /// SPA 导航栏的静态 HTML（复用同一套 .navbar-* 样式类，外观与 SPA 完全一致）
-    /// 交互降级：sticky/涟漪依赖 JS 不可用；主题切换由下方内联脚本处理
-    const NAVBAR_HTML: &str = r#"<div class="navbar-content">
+    /// 交互降级：sticky/涟漪依赖 JS 不可用；主题切换由下方内联脚本处理。
+    /// 链接列表来自 `web_rs::nav::PUBLIC_NAV_LINKS`，与 Dioxus 导航栏共用同一份数据。
+    const NAVBAR_TEMPLATE: &str = r#"<div class="navbar-content">
     <div class="navbar-ui">
         <div class="navbar-title-wrapper">
             <h1 class="navbar-title">干徒</h1>
@@ -202,18 +198,7 @@ mod prerender_impl {
 </div>
 <div class="navbar-sticky-wrap">
     <div class="navbar-links">
-        <a class="nav-link nav-active" href="/">首页</a>
-        <a class="nav-link" href="/about">关于</a>
-        <a class="nav-link" href="/tags">书签</a>
-        <a class="nav-link" href="/search">搜索</a>
-        <a class="nav-link" href="/knowledge-graph">图谱</a>
-        <a class="nav-link" href="/ai-summary">AI摘要</a>
-        <div class="nav-item-with-sub">
-            <a class="nav-link" href="/dev">开发</a>
-            <div class="nav-submenu">
-                <a class="nav-sub-link" href="/circle-generator">圆形生成器</a>
-            </div>
-        </div>
+        <!--NAV_LINKS-->
         <a class="nav-icon-btn rss-toggle" href="/rss" title="RSS 订阅" aria-label="RSS 订阅">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"/></svg>
         </a>
@@ -223,6 +208,21 @@ mod prerender_impl {
         </button>
     </div>
 </div>"#;
+
+    /// 用共享链接数据填充导航栏模板
+    fn navbar_html() -> String {
+        let mut links = String::new();
+        for (href, label) in web_rs::nav::PUBLIC_NAV_LINKS {
+            if *href == "/dev" {
+                links.push_str(&format!(
+                    r#"<div class="nav-item-with-sub"><a class="nav-link" href="{href}">{label}</a><div class="nav-submenu"><a class="nav-sub-link" href="/circle-generator">圆形生成器</a></div></div>"#
+                ));
+            } else {
+                links.push_str(&format!(r#"<a class="nav-link" href="{href}">{label}</a>"#));
+            }
+        }
+        NAVBAR_TEMPLATE.replace("<!--NAV_LINKS-->", &links)
+    }
 
     /// SPA 页脚的静态 HTML（复用 .footer-content 样式）
     const FOOTER_HTML: &str = r#"<footer class="footer-content">
@@ -264,28 +264,15 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
         if post.series.is_empty() {
             return String::new();
         }
-        let mut chapters: Vec<&PostJson> = all_posts
-            .iter()
-            .filter(|q| q.series == post.series)
-            .collect();
-        chapters.sort_by(|a, b| {
-            a.sort_key
-                .cmp(&b.sort_key)
-                .then_with(|| a.filename.cmp(&b.filename))
-        });
+        let mut chapters: Vec<&PostJson> = all_posts.iter().filter(|q| q.series == post.series).collect();
+        chapters.sort_by(|a, b| a.sort_key.cmp(&b.sort_key).then_with(|| a.filename.cmp(&b.filename)));
         let idx = chapters.iter().position(|q| q.slug == post.slug).unwrap_or(0);
         let total = chapters.len();
 
         // 与 SPA 保持一致：目录页路径取首章的 catalog（为空则退回 slug）
         let catalog = chapters
             .first()
-            .map(|c| {
-                if c.catalog.is_empty() {
-                    c.slug.clone()
-                } else {
-                    c.catalog.clone()
-                }
-            })
+            .map(|c| if c.catalog.is_empty() { c.slug.clone() } else { c.catalog.clone() })
             .unwrap_or_default();
 
         let mut list = String::new();
@@ -375,6 +362,9 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
         );
 
         let content_html = strip_scripts(&post.content_html);
+        // 把正文同时存进 <template>：SPA 启动时直接取用，避免「清空预渲染内容 → 再 fetch」的闪跳。
+        let content_template =
+            format!("<template id=\"prerender-content\" data-slug=\"{}\">{}</template>", esc(&post.slug), content_html);
 
         format!(
             r#"<!DOCTYPE html>
@@ -441,6 +431,7 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
 {footer}
         </div>
     </div>
+{content_template}
 {clear_script}
 {wasm_script}
 </body>
@@ -457,11 +448,12 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
             preloads = preloads,
             vars_style = vars_style,
             theme_script = THEME_SCRIPT,
-            navbar = NAVBAR_HTML,
+            navbar = navbar_html(),
             footer = FOOTER_HTML,
             date = esc(&date),
             tag_html = tag_html,
             content_html = content_html,
+            content_template = content_template,
             series_html = series_html,
             clear_script = CLEAR_SCRIPT,
             wasm_script = wasm_script,
@@ -487,11 +479,7 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
         };
         let url = format!("{}/series/{}", SITE, series_id);
         let first_slug = &chapters[0].slug;
-        let last_date = chapters
-            .iter()
-            .map(|c| c.date.as_str())
-            .max()
-            .unwrap_or(&entry.date);
+        let last_date = chapters.iter().map(|c| c.date.as_str()).max().unwrap_or(&entry.date);
 
         let mut list = String::new();
         for (i, ch) in chapters.iter().enumerate() {
@@ -578,7 +566,7 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
             preloads = preloads,
             vars_style = vars_style,
             theme_script = THEME_SCRIPT,
-            navbar = NAVBAR_HTML,
+            navbar = navbar_html(),
             footer = FOOTER_HTML,
             total = total,
             first_slug = first_slug,
@@ -589,20 +577,92 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
         )
     }
 
+    /// 给首页注入 `<noscript>` 文章列表与 ItemList JSON-LD。
+    ///
+    /// 只在 `/` 的 HTML 上做，SPA 渲染时 `<noscript>` 不显示，不影响交互；
+    /// 未执行 JS 的爬虫仍能拿到最新文章的标题与链接。
+    fn inject_home_seo(index_html: &str, posts: &[PostJson]) -> String {
+        const MARKER: &str = "id=\"noscript-posts\"";
+        if index_html.contains(MARKER) {
+            return index_html.to_string();
+        }
+
+        let latest: Vec<&PostJson> = posts
+            .iter()
+            .filter(|p| !p.slug.is_empty() && !p.title.is_empty())
+            .take(20)
+            .collect();
+        if latest.is_empty() {
+            return index_html.to_string();
+        }
+
+        let mut list = String::new();
+        let mut items = Vec::with_capacity(latest.len());
+        for (i, post) in latest.iter().enumerate() {
+            let date: String = post.date.chars().take(10).collect();
+            list.push_str(&format!(
+                "<li><a href=\"/post/{}/\">{}</a> <time datetime=\"{}\">{}</time></li>",
+                esc(&post.slug),
+                esc(&post.title),
+                esc(&date),
+                esc(&date)
+            ));
+            items.push(format!(
+                r#"{{"@type":"ListItem","position":{},"url":"{}/post/{}","name":{}}}"#,
+                i + 1,
+                SITE,
+                esc(&post.slug),
+                json_escape(&post.title)
+            ));
+        }
+
+        let block = format!(
+            r#"<noscript id="noscript-posts"><section><h2>最新文章</h2><ul>{list}</ul></section></noscript>
+<script type="application/ld+json">{{"@context":"https://schema.org","@type":"ItemList","itemListElement":[{items}]}}</script>"#,
+            items = items.join(",")
+        );
+
+        index_html.replacen("</body>", &format!("{block}\n</body>"), 1)
+    }
+
     pub fn run() -> Result<(), String> {
-        let dist = Path::new(DIST);
+        // Trunk 的 post_build hook 在资源发布前触发：此时产物还在 dist/.stage/。
+        // 写入 .stage 后由 Trunk 统一挪到 dist/，这样 hook 与手工执行都能正常工作。
+        let dist = if Path::new("dist/.stage").is_dir() {
+            Path::new("dist/.stage")
+        } else {
+            Path::new(DIST)
+        };
         if !dist.is_dir() {
             return Err(format!("dist directory not found: {}", DIST));
         }
 
         let index_path = dist.join("index.html");
-        let index_html = fs::read_to_string(&index_path).map_err(|e| e.to_string())?;
+        let index_html =
+            fs::read_to_string(&index_path).map_err(|e| format!("读取 {} 失败: {e}", index_path.display()))?;
         let (css, vars_style, wasm_script, preloads) = extract_css_and_vars(&index_html);
 
-        let posts_path = dist.join("static").join("posts.json");
-        let posts_json = fs::read_to_string(&posts_path).map_err(|e| e.to_string())?;
-        let posts: Vec<PostJson> =
-            serde_json::from_str(&posts_json).map_err(|e| e.to_string())?;
+        // 元数据与正文都从源码树 static/ 读取（build.rs 刚生成），
+        // 不依赖 Trunk 的复制顺序；只把生成结果写进 dist/。
+        let posts_path = Path::new("static").join("posts-meta.json");
+        let posts_json =
+            fs::read_to_string(&posts_path).map_err(|e| format!("读取 {} 失败: {e}", posts_path.display()))?;
+        let mut posts: Vec<PostJson> = serde_json::from_str(&posts_json).map_err(|e| e.to_string())?;
+
+        let html_dir = Path::new("static").join("post-html");
+        let mut missing_html = 0usize;
+        for post in &mut posts {
+            if post.slug.is_empty() {
+                continue;
+            }
+            match fs::read_to_string(html_dir.join(format!("{}.html", post.slug))) {
+                Ok(html) => post.content_html = html,
+                Err(_) => missing_html += 1,
+            }
+        }
+        if missing_html > 0 {
+            eprintln!("warning: {missing_html} posts have no post-html fragment");
+        }
 
         let mut count = 0usize;
         for post in &posts {
@@ -620,20 +680,26 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
         let mut series_count = 0usize;
         let mut seen_series: BTreeSet<String> = BTreeSet::new();
         for post in &posts {
-            let series_key = if !post.series.is_empty() && !post.catalog.is_empty() { post.catalog.clone() } else { post.series.clone() };
+            let series_key = if !post.series.is_empty() && !post.catalog.is_empty() {
+                post.catalog.clone()
+            } else {
+                post.series.clone()
+            };
             if series_key.is_empty() || post.slug.is_empty() || !seen_series.insert(series_key.clone()) {
                 continue;
             }
-            let mut chapters: Vec<&PostJson> =
-                posts.iter().filter(|q| {
-                    let q_key = if !q.series.is_empty() && !q.catalog.is_empty() { &q.catalog } else { &q.series };
+            let mut chapters: Vec<&PostJson> = posts
+                .iter()
+                .filter(|q| {
+                    let q_key = if !q.series.is_empty() && !q.catalog.is_empty() {
+                        &q.catalog
+                    } else {
+                        &q.series
+                    };
                     *q_key == series_key
-                }).collect();
-            chapters.sort_by(|a, b| {
-            a.sort_key
-                .cmp(&b.sort_key)
-                .then_with(|| a.filename.cmp(&b.filename))
-        });
+                })
+                .collect();
+            chapters.sort_by(|a, b| a.sort_key.cmp(&b.sort_key).then_with(|| a.filename.cmp(&b.filename)));
             let entry = chapters[0];
             let series_id = series_key;
             let out_dir = dist.join("series").join(&series_id);
@@ -643,13 +709,15 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
             series_count += 1;
         }
 
+        // 首页 SEO：给 SPA 首页补一份 <noscript> 文章列表 + ItemList 结构化数据。
+        // 这样禁用 JS 的爬虫/读者也能看到最新文章入口，同时不影响 SPA 渲染。
+        let index_with_seo = inject_home_seo(&index_html, &posts);
+        fs::write(&index_path, index_with_seo).map_err(|e| e.to_string())?;
+
         // GitHub Pages SPA 兜底：未知路径加载 404.html（内容与 index.html 一致）
         fs::copy(&index_path, dist.join("404.html")).map_err(|e| e.to_string())?;
 
-        println!(
-            "[prerender] generated {} post pages + {} series pages + 404.html, css={}",
-            count, series_count, css
-        );
+        println!("[prerender] generated {} post pages + {} series pages + 404.html, css={}", count, series_count, css);
         Ok(())
     }
 }

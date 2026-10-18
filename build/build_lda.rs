@@ -1,4 +1,4 @@
-﻿use crate::build_common::*;
+use crate::build_common::*;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -67,12 +67,7 @@ struct LdaModel {
 }
 
 impl LdaModel {
-    fn new(
-        docs: &[Vec<String>],
-        topics: usize,
-        alpha: f64,
-        beta: f64,
-    ) -> Self {
+    fn new(docs: &[Vec<String>], topics: usize, alpha: f64, beta: f64) -> Self {
         // 构建词汇表
         let mut vocab: HashMap<String, usize> = HashMap::new();
         let mut idx_to_word: Vec<String> = Vec::new();
@@ -92,11 +87,7 @@ impl LdaModel {
         // 将文档 token 转为词索引
         let doc_tokens: Vec<Vec<usize>> = docs
             .iter()
-            .map(|doc| {
-                doc.iter()
-                    .filter_map(|w| vocab.get(w).copied())
-                    .collect()
-            })
+            .map(|doc| doc.iter().filter_map(|w| vocab.get(w).copied()).collect())
             .collect();
 
         // 初始化随机主题分配
@@ -117,18 +108,7 @@ impl LdaModel {
             topic_assignments.push(assigns);
         }
 
-        LdaModel {
-            topics,
-            vocab,
-            idx_to_word,
-            doc_tokens,
-            topic_assignments,
-            n_dt,
-            n_wt,
-            n_t,
-            alpha,
-            beta,
-        }
+        LdaModel { topics, vocab, idx_to_word, doc_tokens, topic_assignments, n_dt, n_wt, n_t, alpha, beta }
     }
 
     /// 运行 Gibbs Sampling
@@ -149,20 +129,19 @@ impl LdaModel {
                     // 计算每个主题的条件概率
                     let mut probs = vec![0.0; self.topics];
                     let mut total = 0.0;
-                    for t in 0..self.topics {
+                    for (t, p) in probs.iter_mut().enumerate() {
                         let p_dt = (self.n_dt[d][t] + self.alpha)
                             / (self.doc_tokens[d].len() as f64 + self.alpha * self.topics as f64);
-                        let p_wt = (self.n_wt[w][t] + self.beta)
-                            / (self.n_t[t] + self.beta * vocab_size as f64);
-                        probs[t] = p_dt * p_wt;
-                        total += probs[t];
+                        let p_wt = (self.n_wt[w][t] + self.beta) / (self.n_t[t] + self.beta * vocab_size as f64);
+                        *p = p_dt * p_wt;
+                        total += *p;
                     }
 
                     // 采样新主题
                     let mut r = rng.next_f64() * total;
                     let mut new_t = 0;
-                    for t in 0..self.topics {
-                        r -= probs[t];
+                    for (t, p) in probs.iter().enumerate() {
+                        r -= *p;
                         if r <= 0.0 {
                             new_t = t;
                             break;
@@ -196,16 +175,12 @@ impl LdaModel {
         let vocab_size = self.vocab.len();
         let total = self.n_t[t] + self.beta * vocab_size as f64;
 
-        let mut word_probs: Vec<(usize, f64)> = (0..vocab_size)
-            .map(|w| (w, (self.n_wt[w][t] + self.beta) / total))
-            .collect();
+        let mut word_probs: Vec<(usize, f64)> =
+            (0..vocab_size).map(|w| (w, (self.n_wt[w][t] + self.beta) / total)).collect();
         word_probs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         word_probs.truncate(n);
 
-        word_probs
-            .into_iter()
-            .map(|(w, p)| (self.idx_to_word[w].clone(), p))
-            .collect()
+        word_probs.into_iter().map(|(w, p)| (self.idx_to_word[w].clone(), p)).collect()
     }
 
     /// 为主题命名（基于 top meaningful words）
@@ -219,23 +194,28 @@ impl LdaModel {
                 let is_single_char = w.chars().count() == 1;
                 if is_single_char {
                     let c = w.chars().next().unwrap();
-                    let cjk_punct = ['，', '。', '、', '！', '？', '；', '：', '（', '）', '【', '】', '《', '》', '—', '…', '·', '～'];
-                    if cjk_punct.contains(&c) { return false; }
-                    if c.is_ascii_punctuation() { return false; }
+                    let cjk_punct = [
+                        '，', '。', '、', '！', '？', '；', '：', '（', '）', '【', '】', '《', '》', '—', '…', '·',
+                        '～',
+                    ];
+                    if cjk_punct.contains(&c) {
+                        return false;
+                    }
+                    if c.is_ascii_punctuation() {
+                        return false;
+                    }
                 }
-                let stop: &[&str] = &["的", "了", "是", "在", "有", "和", "与", "这", "那", "上", "下", "中", "个", "以", "就", "不", "也", "都", "而", "之", "其", "中", "或", "将", "被", "能"];
+                let stop: &[&str] = &[
+                    "的", "了", "是", "在", "有", "和", "与", "这", "那", "上", "下", "中", "个", "以", "就", "不",
+                    "也", "都", "而", "之", "其", "中", "或", "将", "被", "能",
+                ];
                 !stop.contains(w)
             })
             .take(3)
             .collect();
         if meaningful.is_empty() {
             // fallback: 直接用 top 2 词
-            top_words
-                .iter()
-                .take(2)
-                .map(|(w, _)| w.as_str())
-                .collect::<Vec<_>>()
-                .join("")
+            top_words.iter().take(2).map(|(w, _)| w.as_str()).collect::<Vec<_>>().join("")
         } else {
             meaningful.join(" / ")
         }
@@ -266,7 +246,7 @@ pub fn generate_lda_topics(posts: &[PostData]) {
         .collect();
 
     // 主题数：取文章数 / 2 和 8 的较小值，至少 3
-    let num_topics = (posts.len() / 2).max(3).min(8);
+    let num_topics = (posts.len() / 2).clamp(3, 8);
 
     let mut lda = LdaModel::new(&docs, num_topics, 0.1, 0.01);
     lda.train(200);
@@ -292,7 +272,9 @@ pub fn generate_lda_topics(posts: &[PostData]) {
     // 主题名称
     json.push_str(r#"  "topic_names": ["#);
     for t in 0..num_topics {
-        if t > 0 { json.push(','); }
+        if t > 0 {
+            json.push(',');
+        }
         json.push('"');
         json.push_str(&escape_json_string(&lda.topic_name(t)));
         json.push('"');
@@ -303,15 +285,8 @@ pub fn generate_lda_topics(posts: &[PostData]) {
     json.push_str(r#"  "articles": {"#);
     for (idx, post) in posts.iter().enumerate() {
         let dist = lda.doc_topic_distribution(idx);
-        let dist_json: Vec<String> = dist
-            .iter()
-            .map(|(t, p)| format!(r#""{}":{:.4}"#, t, p))
-            .collect();
-        json.push_str(&format!(
-            r#""{}":{{{}}}"#,
-            post.slug,
-            dist_json.join(",")
-        ));
+        let dist_json: Vec<String> = dist.iter().map(|(t, p)| format!(r#""{}":{:.4}"#, t, p)).collect();
+        json.push_str(&format!(r#""{}":{{{}}}"#, post.slug, dist_json.join(",")));
         if idx < posts.len() - 1 {
             json.push(',');
         }

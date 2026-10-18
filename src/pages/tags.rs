@@ -1,10 +1,10 @@
-use dioxus::prelude::*;
-use wasm_bindgen_futures::spawn_local;
-use wasm_bindgen::JsCast;
-use serde::{Serialize, Deserialize};
-use std::sync::LazyLock;
-use crate::utils::title;
 use crate::components::icons::{BookmarkIcon, GitHubIcon, SearchIcon};
+use crate::utils::title;
+use dioxus::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::sync::LazyLock;
+use wasm_bindgen::JsCast;
+use wasm_bindgen_futures::spawn_local;
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 struct Bookmark {
@@ -28,10 +28,7 @@ static BOOKMARKS: LazyLock<Vec<Bookmark>> = LazyLock::new(|| {
                 item.get("url").and_then(|v| v.as_str()),
                 item.get("description").and_then(|v| v.as_str()),
             ) {
-                let icon = item.get("icon")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
+                let icon = item.get("icon").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
                 Some(Bookmark {
                     title: title.to_string(),
@@ -57,11 +54,10 @@ fn scroll_to_first_highlight() {
                 }
             }
         }) as Box<dyn FnOnce()>);
-        let _handle = web_sys::window()
-            .and_then(|w| w.set_timeout_with_callback_and_timeout_and_arguments_0(
-                closure.unchecked_ref(),
-                100
-            ).ok());
+        let _handle = web_sys::window().and_then(|w| {
+            w.set_timeout_with_callback_and_timeout_and_arguments_0(closure.unchecked_ref(), 100)
+                .ok()
+        });
     });
 }
 
@@ -71,7 +67,7 @@ pub fn Tags() -> Element {
 
     let bookmark_manager = use_signal(|| BOOKMARKS.clone());
     let mut search_text = use_signal(String::new);
-    let mut search_query = use_signal(String::new);  // 实际的搜索关键词
+    let mut search_query = use_signal(String::new); // 实际的搜索关键词
 
     // 处理搜索
     let handle_search = move |_| {
@@ -95,11 +91,11 @@ pub fn Tags() -> Element {
         let search = search_query().to_lowercase();
         let bookmarks = bookmark_manager.read();
 
-        bookmarks.iter()
+        bookmarks
+            .iter()
             .map(|b| {
                 let matches = if !search.is_empty() {
-                    b.title.to_lowercase().contains(&search) ||
-                    b.description.to_lowercase().contains(&search)
+                    b.title.to_lowercase().contains(&search) || b.description.to_lowercase().contains(&search)
                 } else {
                     false
                 };
@@ -182,7 +178,7 @@ fn get_bookmark_icon(icon_name: &str) -> Element {
                     }
                 }}
             }
-        },
-        _ => rsx! { BookmarkIcon {} }
+        }
+        _ => rsx! { BookmarkIcon {} },
     }
-} 
+}

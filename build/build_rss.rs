@@ -12,13 +12,21 @@ fn format_rfc2822(date_str: &str) -> String {
         return date_str.to_string();
     }
 
-    let year: i32 = match parts[0].parse() { Ok(y) => y, Err(_) => return date_str.to_string() };
-    let month: u32 = match parts[1].parse() { Ok(m) => m, Err(_) => return date_str.to_string() };
-    let day: u32 = match parts[2].parse() { Ok(d) => d, Err(_) => return date_str.to_string() };
+    let year: i32 = match parts[0].parse() {
+        Ok(y) => y,
+        Err(_) => return date_str.to_string(),
+    };
+    let month: u32 = match parts[1].parse() {
+        Ok(m) => m,
+        Err(_) => return date_str.to_string(),
+    };
+    let day: u32 = match parts[2].parse() {
+        Ok(d) => d,
+        Err(_) => return date_str.to_string(),
+    };
 
-    let month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    let month_abbr = if month >= 1 && month <= 12 {
+    let month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let month_abbr = if (1..=12).contains(&month) {
         month_names[(month - 1) as usize]
     } else {
         return date_str.to_string();
@@ -56,31 +64,16 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
         r#"<ttl>60</ttl>"#,
     ));
 
-    xml.push_str(&format!(
-        "<lastBuildDate>{}</lastBuildDate>\n",
-        escape_xml(&last_build_date)
-    ));
-    xml.push_str(&format!(
-        "<pubDate>{}</pubDate>\n",
-        escape_xml(&last_build_date)
-    ));
+    xml.push_str(&format!("<lastBuildDate>{}</lastBuildDate>\n", escape_xml(&last_build_date)));
+    xml.push_str(&format!("<pubDate>{}</pubDate>\n", escape_xml(&last_build_date)));
 
     let total = posts.len().min(20);
     for post in posts.iter().take(total) {
         xml.push_str("<item>\n");
-        xml.push_str(&format!(
-            "  <title>{}</title>\n",
-            escape_xml(&post.title)
-        ));
-        xml.push_str(&format!(
-            "  <link>https://ganto.me/post/{}</link>\n",
-            escape_xml(&post.slug)
-        ));
+        xml.push_str(&format!("  <title>{}</title>\n", escape_xml(&post.title)));
+        xml.push_str(&format!("  <link>https://ganto.me/post/{}</link>\n", escape_xml(&post.slug)));
         xml.push_str("  <guid isPermaLink=\"true\">");
-        xml.push_str(&format!(
-            "https://ganto.me/post/{}",
-            escape_xml(&post.slug)
-        ));
+        xml.push_str(&format!("https://ganto.me/post/{}", escape_xml(&post.slug)));
         xml.push_str("</guid>\n");
 
         // RSS pubDate 格式: RFC 2822（如 Mon, 29 Jan 2026 00:00:00 +0800）
@@ -88,10 +81,7 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
         xml.push_str(&format!("  <pubDate>{}</pubDate>\n", escape_xml(&pub_date)));
 
         // RSS 2.0 规范要求 author 使用 email 格式: email@domain (Name)
-        xml.push_str(&format!(
-            "  <author>i@ganto.me ({})</author>\n",
-            escape_xml(&post.author)
-        ));
+        xml.push_str(&format!("  <author>i@ganto.me ({})</author>\n", escape_xml(&post.author)));
 
         // description: 优先使用 summary，否则转 HTML 后提取纯文本前 500 字符
         let description_text = if !post.summary.is_empty() {
@@ -101,23 +91,14 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
             let text = strip_html_tags(&html);
             text.chars().take(500).collect()
         };
-        xml.push_str(&format!(
-            "  <description><![CDATA[{}]]></description>\n",
-            description_text
-        ));
+        xml.push_str(&format!("  <description><![CDATA[{}]]></description>\n", description_text));
 
         // content:encoded: 全文 HTML，CDATA 包裹
         let html = md_to_html(&post.content);
-        xml.push_str(&format!(
-            "  <content:encoded><![CDATA[{}]]></content:encoded>\n",
-            html
-        ));
+        xml.push_str(&format!("  <content:encoded><![CDATA[{}]]></content:encoded>\n", html));
 
         for tag in &post.tags {
-            xml.push_str(&format!(
-                "  <category>{}</category>\n",
-                escape_xml(tag)
-            ));
+            xml.push_str(&format!("  <category>{}</category>\n", escape_xml(tag)));
         }
         xml.push_str("</item>\n");
     }
@@ -131,4 +112,3 @@ pub fn generate_rss_feed(posts: &[PostData], out_dir: &str) {
     let dest_feed = Path::new("static/feed.xml");
     std::fs::write(dest_feed, &xml).expect("Failed to write feed.xml to static/");
 }
-

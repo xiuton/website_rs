@@ -1,10 +1,10 @@
 mod footer;
-mod navbar;
-mod layout;
-mod test_layout;
 pub mod icons;
+mod layout;
+mod navbar;
+mod test_layout;
 
 pub use footer::Footer;
-pub use navbar::Navbar;
 pub use layout::Layout;
+pub use navbar::Navbar;
 pub use test_layout::TestLayout;

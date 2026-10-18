@@ -3,6 +3,10 @@ name = "web-rs"
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+members = [".", "tools/font-subset", "tools/mini-html"]
+resolver = "2"
+
 [features]
 default = ["dev-pages"]
 dev-pages = []
@@ -30,10 +34,8 @@ js-sys = "0.3.66"
 serde = { version = "1.0.195", features = ["derive"] }
 serde_json = "1.0.111"
 toml = "0.8.8"
-comrak = "0.20.0"
 futures-channel = "0.3.30"
 gloo-net = "0.5.0"
-wee_alloc = "0.4.5"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = "0.4.31"
@@ -42,6 +44,7 @@ chrono = "0.4.31"
 comrak = "0.20.0"
 regex = "1.11.0"
 toml = "0.8.8"
+mini-html = { path = "tools/mini-html" }
 
 [profile.release]
 opt-level = "z"

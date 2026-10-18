@@ -1,0 +1,11 @@
+[package]
+name = "mini-html"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# 把文章 HTML 转换成小程序可用的标签结构。
+# 用真正的 HTML 解析器（lol_html）代替原来的正则替换，
+# 避免嵌套标签、属性里的 '>'、大小写等问题。
+[dependencies]
+lol_html = "3"

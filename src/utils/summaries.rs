@@ -14,12 +14,8 @@ pub struct ArticleSummary {
     pub category: String,
 }
 
-/// 加载 AI 摘要列表
+/// 加载 AI 摘要列表（会话级缓存）
 pub async fn load_summaries() -> Option<Vec<ArticleSummary>> {
-    let resp = gloo_net::http::Request::get("/static/summaries.json")
-        .send()
-        .await
-        .ok()?;
-    let text = resp.text().await.ok()?;
+    let text = crate::utils::cache::fetch_text("/static/summaries.json").await?;
     serde_json::from_str(&text).ok()
 }

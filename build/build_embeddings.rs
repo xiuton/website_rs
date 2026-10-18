@@ -1,4 +1,4 @@
-﻿use crate::build_common::*;
+use crate::build_common::*;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -108,19 +108,12 @@ pub fn generate_article_embeddings(posts: &[PostData]) {
         if json.len() > 1 {
             json.push(',');
         }
-        json.push_str(&format!(
-            r#""{}":["#,
-            escape_json_string(&posts[i].slug)
-        ));
+        json.push_str(&format!(r#""{}":["#, escape_json_string(&posts[i].slug)));
         for (k, (j, score)) in related.iter().enumerate() {
             if k > 0 {
                 json.push(',');
             }
-            json.push_str(&format!(
-                r#"{{"slug":"{}","score":{:.4}}}"#,
-                escape_json_string(&posts[*j].slug),
-                score
-            ));
+            json.push_str(&format!(r#"{{"slug":"{}","score":{:.4}}}"#, escape_json_string(&posts[*j].slug), score));
         }
         json.push(']');
     }

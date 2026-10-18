@@ -1,5 +1,5 @@
-use dioxus::prelude::*;
 use crate::utils::storage;
+use dioxus::prelude::*;
 
 pub fn use_dark_mode() -> Signal<bool> {
     use_signal(|| {

@@ -1,3 +1,9 @@
+[tools]
+# Trunk 0.21 默认的 binaryen 版本太旧（version_123），
+# 无法识别 Rust 1.9x 生成的 bulk-memory 指令，wasm-opt 会直接报校验错误。
+# 固定到较新的版本，保证本地与 CI 使用同一套优化器。
+wasm_opt = "version_133"
+
 [build]
 # 使用 release 模式构建
 release = true
@@ -12,3 +18,19 @@ no_sri = true
 port = 8080
 # 热重载时同样不写 integrity，避免旧页面缓存导致资源被拦截
 no_sri = true
+
+# 忽略构建输出目录，避免 post_build hook 写入 dist 触发无限重建
+[watch]
+ignore = ["dist"]
+
+# ============================================================
+# 构建后自动生成静态文章页（SEO）
+# ------------------------------------------------------------
+# 以前需要手工执行三步：cargo build → trunk build → cargo run --bin prerender，
+# 而且 trunk 会清空 dist/，顺序错了就得重来。挂到 post_build 后，
+# `trunk build --release` 和 `trunk serve` 都会自动补齐预渲染页。
+# ============================================================
+[[hooks]]
+stage = "post_build"
+command = "cargo"
+command_arguments = ["run", "--release", "--bin", "prerender"]

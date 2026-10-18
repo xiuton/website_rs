@@ -86,7 +86,7 @@
     <link rel="alternate" type="application/rss+xml" title="干徒的博客 RSS" href="/static/feed.xml">
     <link rel="alternate" type="application/atom+xml" title="干徒的博客 Atom" href="/static/atom.xml">
     <link data-trunk rel="scss" href="src/styles.scss" data-sass-options='{"style":"compressed","sourceMap":false,"quietDeps":true}' />
-    <link data-trunk rel="rust" data-bin="web-rs" data-wasm-opt="0" />
+    <link data-trunk rel="rust" data-bin="web-rs" data-wasm-opt="z" data-wasm-opt-params="--enable-bulk-memory --enable-nontrapping-float-to-int" />
     <script>
         window.addEventListener('error', function(e) {
             if (e.target && (e.target.tagName === 'LINK' || e.target.tagName === 'IMG' || e.target.tagName === 'SCRIPT')) {

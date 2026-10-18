@@ -1,6 +1,6 @@
-use dioxus::prelude::*;
-use dioxus_router::prelude::{Outlet, Link};
 use crate::routes::Route;
+use dioxus::prelude::*;
+use dioxus_router::prelude::{Link, Outlet};
 
 #[component]
 pub fn TestLayout() -> Element {
@@ -16,4 +16,4 @@ pub fn TestLayout() -> Element {
             Outlet::<Route> {}
         }
     }
-} 
+}

@@ -1,8 +1,7 @@
+use comrak::ComrakOptions;
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use std::collections::HashMap;
-use comrak::ComrakOptions;
-use toml;
 
 pub struct PostData {
     pub title: String,
@@ -97,10 +96,7 @@ fn chapter_key_of(key: &str, value: &toml::Value, key_hint: Option<&str>) -> Str
 
 /// 解析一个章节条目（`[chapters]` 表值与 `[[chapters]]` 数组元素共用）
 fn parse_chapter_entry(key: &str, value: &toml::Value, key_hint: Option<&str>) -> ChapterConfig {
-    let mut chapter = ChapterConfig {
-        key: chapter_key_of(key, value, key_hint),
-        ..Default::default()
-    };
+    let mut chapter = ChapterConfig { key: chapter_key_of(key, value, key_hint), ..Default::default() };
     if chapter.key.is_empty() {
         return chapter;
     }
@@ -141,10 +137,7 @@ fn parse_chapter_entry(key: &str, value: &toml::Value, key_hint: Option<&str>) -
         }
     }
     if let Some(tags) = value.get("tags").and_then(|v| v.as_array()) {
-        chapter.tags = tags
-            .iter()
-            .filter_map(|t| t.as_str().map(|s| s.to_string()))
-            .collect();
+        chapter.tags = tags.iter().filter_map(|t| t.as_str().map(|s| s.to_string())).collect();
     }
 
     chapter
@@ -168,26 +161,23 @@ pub fn load_dir_config(dir: &Path) -> DirConfig {
                     if let Some(author) = value.get("author").and_then(|v| v.as_str()) {
                         config.author = Some(author.to_string());
                     }
-                    
+
                     if let Some(series) = value.get("series").and_then(|v| v.as_str()) {
                         config.series = Some(series.to_string());
                     }
-                    
+
                     if let Some(tags) = value.get("tags").and_then(|v| v.as_array()) {
-                        config.tags = tags
-                            .iter()
-                            .filter_map(|t| t.as_str().map(|s| s.to_string()))
-                            .collect();
+                        config.tags = tags.iter().filter_map(|t| t.as_str().map(|s| s.to_string())).collect();
                     }
-                    
+
                     if let Some(date) = value.get("date").and_then(|v| v.as_str()) {
                         config.date = Some(date.to_string());
                     }
-                    
+
                     if let Some(slug_prefix) = value.get("slug_prefix").and_then(|v| v.as_str()) {
                         config.slug_prefix = Some(slug_prefix.to_string());
                     }
-                    
+
                     if let Some(summary) = value.get("summary").and_then(|v| v.as_str()) {
                         config.summary = Some(summary.to_string());
                     }
@@ -214,10 +204,7 @@ pub fn load_dir_config(dir: &Path) -> DirConfig {
                             config.slug_prefix = Some(v.to_string());
                         }
                         if let Some(tags) = series_tbl.get("tags").and_then(|v| v.as_array()) {
-                            config.tags = tags
-                                .iter()
-                                .filter_map(|t| t.as_str().map(|s| s.to_string()))
-                                .collect();
+                            config.tags = tags.iter().filter_map(|t| t.as_str().map(|s| s.to_string())).collect();
                         }
                     }
 
@@ -292,10 +279,7 @@ fn chapter_match_rank(key: &str, filename: &str, order: i32) -> Option<u8> {
 
     let key_num = key.parse::<i32>().ok();
 
-    let prefix = filename
-        .split(|c| c == '-' || c == '_')
-        .next()
-        .unwrap_or("");
+    let prefix = filename.split(['-', '_']).next().unwrap_or("");
     if let Some(n) = key_num {
         if prefix == key || prefix.parse::<i32>().map(|p| p == n).unwrap_or(false) {
             return Some(1);
@@ -360,9 +344,11 @@ fn char_at(bytes: &[u8], i: usize) -> (char, usize) {
     match c {
         _ if c < 0x80 => (c as char, 1),
         _ if c < 0xE0 => {
-            if i + 1 < bytes.len() && (bytes[i+1] & 0xC0) == 0x80 {
-                if let Ok(s) = std::str::from_utf8(&bytes[i..i+2]) {
-                    if let Some(ch) = s.chars().next() { return (ch, 2); }
+            if i + 1 < bytes.len() && (bytes[i + 1] & 0xC0) == 0x80 {
+                if let Ok(s) = std::str::from_utf8(&bytes[i..i + 2]) {
+                    if let Some(ch) = s.chars().next() {
+                        return (ch, 2);
+                    }
                 }
             }
             ('\u{FFFD}', 1)
@@ -370,14 +356,18 @@ fn char_at(bytes: &[u8], i: usize) -> (char, usize) {
         _ if c < 0xF0 => {
             let end = std::cmp::min(i + 3, bytes.len());
             if let Ok(s) = std::str::from_utf8(&bytes[i..end]) {
-                if let Some(ch) = s.chars().next() { return (ch, s.len()); }
+                if let Some(ch) = s.chars().next() {
+                    return (ch, s.len());
+                }
             }
             ('\u{FFFD}', 1)
         }
         _ => {
             let end = std::cmp::min(i + 4, bytes.len());
             if let Ok(s) = std::str::from_utf8(&bytes[i..end]) {
-                if let Some(ch) = s.chars().next() { return (ch, s.len()); }
+                if let Some(ch) = s.chars().next() {
+                    return (ch, s.len());
+                }
             }
             ('\u{FFFD}', 1)
         }
@@ -400,7 +390,7 @@ fn escape_html_code(html: &str) -> String {
 
     while i < bytes.len() {
         if !in_code {
-            if i + 5 < bytes.len() && &bytes[i..i+5] == b"<code" {
+            if i + 5 < bytes.len() && &bytes[i..i + 5] == b"<code" {
                 // 把开标签 <code ...> 完整复制出来，跳过其内部 > 再开始转义
                 in_code = true;
                 i += push_utf8(&mut result, bytes, i);
@@ -413,33 +403,42 @@ fn escape_html_code(html: &str) -> String {
                 }
                 continue;
             }
+        } else if i + 7 < bytes.len() && &bytes[i..i + 7] == b"</code>" {
+            result.push_str("</code>");
+            i += 7;
+            in_code = false;
+            continue;
         } else {
-            if i + 7 < bytes.len() && &bytes[i..i+7] == b"</code>" {
-                result.push_str("</code>");
-                i += 7;
-                in_code = false;
-                continue;
-            } else {
-                match bytes[i] {
-                    b'<' => { result.push_str("&lt;"); i += 1; continue; }
-                    b'>' => { result.push_str("&gt;"); i += 1; continue; }
-                    b'&' => {
-                        let rest = &bytes[i..];
-                        let min_len = rest.len().min(6);
-                        let slice = std::str::from_utf8(&rest[..min_len]).unwrap_or("");
-                        if slice.starts_with("&lt;") || slice.starts_with("&gt;")
-                            || slice.starts_with("&amp;") || slice.starts_with("&quot;")
-                            || slice.starts_with("&apos;") || slice.starts_with("&#")
-                        {
-                            // 已有实体，原样保留
-                        } else {
-                            result.push_str("&amp;");
-                            i += 1;
-                            continue;
-                        }
-                    }
-                    _ => {}
+            match bytes[i] {
+                b'<' => {
+                    result.push_str("&lt;");
+                    i += 1;
+                    continue;
                 }
+                b'>' => {
+                    result.push_str("&gt;");
+                    i += 1;
+                    continue;
+                }
+                b'&' => {
+                    let rest = &bytes[i..];
+                    let min_len = rest.len().min(6);
+                    let slice = std::str::from_utf8(&rest[..min_len]).unwrap_or("");
+                    if slice.starts_with("&lt;")
+                        || slice.starts_with("&gt;")
+                        || slice.starts_with("&amp;")
+                        || slice.starts_with("&quot;")
+                        || slice.starts_with("&apos;")
+                        || slice.starts_with("&#")
+                    {
+                        // 已有实体，原样保留
+                    } else {
+                        result.push_str("&amp;");
+                        i += 1;
+                        continue;
+                    }
+                }
+                _ => {}
             }
         }
         let (ch, len) = char_at(bytes, i);
@@ -539,18 +538,14 @@ pub fn tokenize(text: &str) -> Vec<String> {
 
 /// 停用词（常见无意义词）
 pub const STOP_WORDS: &[&str] = &[
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "could",
-    "should", "may", "might", "can", "shall", "to", "of", "in", "for",
-    "on", "with", "at", "by", "from", "as", "into", "through", "during",
-    "before", "after", "above", "below", "between", "out", "off", "over",
-    "under", "again", "further", "then", "once", "here", "there", "when",
-    "where", "why", "how", "all", "both", "each", "few", "more", "most",
-    "other", "some", "such", "no", "nor", "not", "only", "own", "same",
-    "so", "than", "too", "very", "and", "but", "or", "if", "this", "that",
-    "it", "its", "we", "you", "he", "she", "they", "my", "your", "our",
-    "their", "me", "him", "her", "us", "them", "i", "just", "about",
-    "also", "what", "which", "who", "whom",
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did",
+    "will", "would", "could", "should", "may", "might", "can", "shall", "to", "of", "in", "for", "on", "with", "at",
+    "by", "from", "as", "into", "through", "during", "before", "after", "above", "below", "between", "out", "off",
+    "over", "under", "again", "further", "then", "once", "here", "there", "when", "where", "why", "how", "all", "both",
+    "each", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than",
+    "too", "very", "and", "but", "or", "if", "this", "that", "it", "its", "we", "you", "he", "she", "they", "my",
+    "your", "our", "their", "me", "him", "her", "us", "them", "i", "just", "about", "also", "what", "which", "who",
+    "whom",
 ];
 
 pub fn scan_dir(
@@ -565,31 +560,25 @@ pub fn scan_dir(
 
     // 记录每个 [chapters] 条目命中的章节文件（构建期校验用）
     let mut matched: Vec<Option<String>> = vec![None; dir_config.chapters.len()];
-    
+
     match fs::read_dir(dir) {
         Ok(entries) => {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if let Ok(file_type) = entry.file_type() {
                     if file_type.is_dir() {
-                        let dir_name = path
-                            .file_name()
-                            .and_then(|n| n.to_str())
-                            .unwrap_or("");
+                        let dir_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
                         scan_dir(&path, _base_dir, dir_name, posts, date_count);
                     } else if file_type.is_file() {
                         if let Some(ext) = path.extension() {
                             if ext == "md" {
-                                let filename = path
-                                    .file_stem()
-                                    .and_then(|n| n.to_str())
-                                    .unwrap_or("");
-                                
+                                let filename = path.file_stem().and_then(|n| n.to_str()).unwrap_or("");
+
                                 // 跳过以 _ 开头的文件（如 _README.md）
                                 if filename.starts_with('_') {
                                     continue;
                                 }
-                                
+
                                 if let Ok(content) = fs::read_to_string(&path) {
                                     process_post(
                                         &content,
@@ -631,7 +620,7 @@ pub fn process_post(
     // 日期型 slug 统一在 assign_slugs 里分配（需要全局视角），这里不再使用
     _date_count: &mut HashMap<String, i32>,
     dir_config: &DirConfig,
-    mut matched_chapters: Option<&mut Vec<Option<String>>>,
+    matched_chapters: Option<&mut Vec<Option<String>>>,
 ) {
     // 解析 front matter 是否构成一个完整块（用于决定是否启用「由文件名派生标题」兜底）
     //
@@ -689,7 +678,11 @@ pub fn process_post(
             .find(|l| l.starts_with(prefix.as_str()))
             .map(|l| l[prefix.len()..].trim().to_string())?;
         let value = strip_yaml_quotes(&raw);
-        if value.is_empty() { None } else { Some(value) }
+        if value.is_empty() {
+            None
+        } else {
+            Some(value)
+        }
     }
 
     /// front matter → 兜底（章节配置 / 目录配置）
@@ -723,13 +716,10 @@ pub fn process_post(
         .lines()
         .find(|l| l.starts_with("order:"))
         .and_then(|l| l.replace("order:", "").trim().parse::<i32>().ok());
-    
+
     // 文件名前缀的序号：返回 Option 以区分「显式写了 0」与「压根没写」
     // （`00-学习计划.md` 的 0 是有效顺序，不能当成「没有排序依据」）
-    let order_from_filename_opt = filename
-        .split('-')
-        .next()
-        .and_then(|s| s.parse::<i32>().ok());
+    let order_from_filename_opt = filename.split('-').next().and_then(|s| s.parse::<i32>().ok());
     let order_from_filename = order_from_filename_opt.unwrap_or(0);
 
     // 章节级配置查找需要用到 order，因此先算文件名 order 作为匹配依据
@@ -741,11 +731,9 @@ pub fn process_post(
     let chapter = chapter_idx.map(|idx| &dir_config.chapters[idx]);
 
     // 校验：一个数字编号条目同时被多个文件「非精确」命中，说明配置有歧义
-    if let (Some(idx), Some(rank), Some(matched)) = (
-        chapter_idx,
-        chapter.and_then(|c| chapter_rank(&c.key, filename, order_for_match)),
-        matched_chapters.as_deref_mut(),
-    ) {
+    if let (Some(idx), Some(rank), Some(matched)) =
+        (chapter_idx, chapter.and_then(|c| chapter_rank(&c.key, filename, order_for_match)), matched_chapters)
+    {
         if let Some(slot) = matched.get_mut(idx) {
             if let Some(prev) = slot.as_ref() {
                 eprintln!(
@@ -764,30 +752,23 @@ pub fn process_post(
 
     let chapter_order = chapter.and_then(|c| c.order);
 
-    let order = order_from_front_matter
-        .or(chapter_order)
-        .unwrap_or(order_from_filename);
+    let order = order_from_front_matter.or(chapter_order).unwrap_or(order_from_filename);
 
     // 是否存在任何「显式排序依据」（三个来源之一），用于决定排序层级：
     // 有 → 第一级（按 order）；没有 → 退化为 时间 → 标题
-    let has_explicit_order = order_from_front_matter.is_some()
-        || chapter_order.is_some()
-        || order_from_filename_opt.is_some();
+    let has_explicit_order =
+        order_from_front_matter.is_some() || chapter_order.is_some() || order_from_filename_opt.is_some();
 
     // ── 标题：front matter → 章节配置 → （无 front matter 时）文件名派生 ──
-    let title_from_config = chapter
-        .and_then(|c| c.title.clone())
-        .filter(|s| !s.is_empty());
-    let title = title_from_fm
-        .or_else(|| title_from_config.clone())
-        .unwrap_or_else(|| {
-            if no_front_matter {
-                let key = chapter.map(|c| c.key.as_str()).unwrap_or(filename);
-                derive_title(key)
-            } else {
-                String::new()
-            }
-        });
+    let title_from_config = chapter.and_then(|c| c.title.clone()).filter(|s| !s.is_empty());
+    let title = title_from_fm.or_else(|| title_from_config.clone()).unwrap_or_else(|| {
+        if no_front_matter {
+            let key = chapter.map(|c| c.key.as_str()).unwrap_or(filename);
+            derive_title(key)
+        } else {
+            String::new()
+        }
+    });
     if title.is_empty() {
         eprintln!(
             "cargo:warning=[标题为空] posts/{}/{}：请在 front matter 或 _config.toml 的 [chapters] 中配置 title",
@@ -908,8 +889,6 @@ pub fn process_post(
     });
 }
 
-/// 简单 LCG 伪随机数生成器
-
 /// 为马尔可夫链对文本进行分词（保留标点，中文逐字）
 pub fn markov_tokenize(text: &str) -> Vec<String> {
     let disallowed = ['#', '`', '~', '|', '>', '*'];
@@ -978,13 +957,7 @@ pub fn date_key(date: &str) -> String {
 fn invert_datetime(datetime: &str) -> String {
     datetime
         .chars()
-        .map(|c| {
-            if c.is_ascii_digit() {
-                (b'9' - (c as u8 - b'0')) as char
-            } else {
-                c
-            }
-        })
+        .map(|c| if c.is_ascii_digit() { (b'9' - (c as u8 - b'0')) as char } else { c })
         .collect()
 }
 
@@ -1018,11 +991,7 @@ pub fn assign_slugs(posts: &mut [PostData]) {
         let key = date_key(&datetime);
         let slug = used.entry(key.clone()).or_insert(0);
         *slug += 1;
-        posts[i].slug = if *slug > 1 {
-            format!("{}-{}", key, *slug)
-        } else {
-            key
-        };
+        posts[i].slug = if *slug > 1 { format!("{}-{}", key, *slug) } else { key };
     }
 
     // ── 全局 slug 唯一性检查：重复会让某篇文章永远访问不到 ──

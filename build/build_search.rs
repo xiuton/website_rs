@@ -13,7 +13,7 @@ pub fn generate_search_index(posts: &[PostData]) {
 
     // ── Pass 1: 收集每篇文章的 token 计数 & 文档频率 ──
     struct DocTokens {
-        counts: HashMap<String, f64>,   // token → 原始计数（含标题/标签加权）
+        counts: HashMap<String, f64>, // token → 原始计数（含标题/标签加权）
     }
 
     let mut doc_tokens_list: Vec<DocTokens> = Vec::with_capacity(posts.len());
@@ -22,7 +22,10 @@ pub fn generate_search_index(posts: &[PostData]) {
     for post in posts {
         let source = format!(
             "{} {} {} {} {}",
-            post.title, post.summary, post.tags.join(" "), post.category,
+            post.title,
+            post.summary,
+            post.tags.join(" "),
+            post.category,
             truncate_utf8_safe(&post.content, 2000)
         );
         let tokens = tokenize(&source);
@@ -69,10 +72,7 @@ pub fn generate_search_index(posts: &[PostData]) {
     for dt in &doc_tokens_list {
         let total: f64 = dt.counts.values().sum();
         if total == 0.0 {
-            vectors.push(TfidfVector {
-                pairs: Vec::new(),
-                magnitude: 0.0,
-            });
+            vectors.push(TfidfVector { pairs: Vec::new(), magnitude: 0.0 });
             continue;
         }
 
@@ -115,10 +115,7 @@ pub fn generate_search_index(posts: &[PostData]) {
             };
 
             // 构建 longer 的快速查找表（token → value）
-            let long_map: HashMap<&str, f64> = longer
-                .iter()
-                .map(|(k, v)| (k.as_str(), *v))
-                .collect();
+            let long_map: HashMap<&str, f64> = longer.iter().map(|(k, v)| (k.as_str(), *v)).collect();
 
             let mut dot = 0.0;
             for (token, val_i) in shorter {
@@ -136,11 +133,7 @@ pub fn generate_search_index(posts: &[PostData]) {
         }
 
         score_list.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        let related: Vec<String> = score_list
-            .into_iter()
-            .take(5)
-            .map(|(idx, _)| posts[idx].slug.clone())
-            .collect();
+        let related: Vec<String> = score_list.into_iter().take(5).map(|(idx, _)| posts[idx].slug.clone()).collect();
 
         related_slugs.push(related);
     }

@@ -24,13 +24,8 @@ pub fn generate_atom_feed(posts: &[PostData], out_dir: &str) {
         r#"<id>https://ganto.me</id>"#,
     ));
 
-    xml.push_str(&format!(
-        "<link rel=\"self\" href=\"https://ganto.me/static/atom.xml\"/>\n"
-    ));
-    xml.push_str(&format!(
-        "<updated>{}</updated>\n",
-        escape_xml(&updated)
-    ));
+    xml.push_str("<link rel=\"self\" href=\"https://ganto.me/static/atom.xml\"/>\n");
+    xml.push_str(&format!("<updated>{}</updated>\n", escape_xml(&updated)));
     xml.push_str(concat!(
         "<author><name>干徒</name></author>\n",
         "<generator uri=\"https://ganto.me\">website-rs</generator>\n",
@@ -40,35 +35,17 @@ pub fn generate_atom_feed(posts: &[PostData], out_dir: &str) {
     for post in posts.iter().take(total) {
         xml.push_str("<entry>\n");
 
-        xml.push_str(&format!(
-            "  <title>{}</title>\n",
-            escape_xml(&post.title)
-        ));
+        xml.push_str(&format!("  <title>{}</title>\n", escape_xml(&post.title)));
 
-        xml.push_str(&format!(
-            "  <link href=\"https://ganto.me/post/{}\"/>\n",
-            escape_xml(&post.slug)
-        ));
+        xml.push_str(&format!("  <link href=\"https://ganto.me/post/{}\"/>\n", escape_xml(&post.slug)));
 
-        xml.push_str(&format!(
-            "  <id>https://ganto.me/post/{}</id>\n",
-            escape_xml(&post.slug)
-        ));
+        xml.push_str(&format!("  <id>https://ganto.me/post/{}</id>\n", escape_xml(&post.slug)));
 
-        xml.push_str(&format!(
-            "  <updated>{}</updated>\n",
-            escape_xml(&format_rfc3339(&post.date))
-        ));
+        xml.push_str(&format!("  <updated>{}</updated>\n", escape_xml(&format_rfc3339(&post.date))));
 
-        xml.push_str(&format!(
-            "  <published>{}</published>\n",
-            escape_xml(&format_rfc3339(&post.date))
-        ));
+        xml.push_str(&format!("  <published>{}</published>\n", escape_xml(&format_rfc3339(&post.date))));
 
-        xml.push_str(&format!(
-            "  <author><name>{}</name></author>\n",
-            escape_xml(&post.author)
-        ));
+        xml.push_str(&format!("  <author><name>{}</name></author>\n", escape_xml(&post.author)));
 
         // summary: 优先使用 summary，否则转 HTML 后提取纯文本前 500 字符
         let summary_text = if !post.summary.is_empty() {
@@ -78,23 +55,14 @@ pub fn generate_atom_feed(posts: &[PostData], out_dir: &str) {
             let text = strip_html_tags(&html);
             text.chars().take(500).collect()
         };
-        xml.push_str(&format!(
-            "  <summary><![CDATA[{}]]></summary>\n",
-            summary_text
-        ));
+        xml.push_str(&format!("  <summary><![CDATA[{}]]></summary>\n", summary_text));
 
         // content: 全文 HTML，CDATA 包裹
         let html = md_to_html(&post.content);
-        xml.push_str(&format!(
-            "  <content type=\"html\"><![CDATA[{}]]></content>\n",
-            html
-        ));
+        xml.push_str(&format!("  <content type=\"html\"><![CDATA[{}]]></content>\n", html));
 
         for tag in &post.tags {
-            xml.push_str(&format!(
-                "  <category term=\"{}\"/>\n",
-                escape_xml(tag)
-            ));
+            xml.push_str(&format!("  <category term=\"{}\"/>\n", escape_xml(tag)));
         }
 
         xml.push_str("</entry>\n");

@@ -1,25 +1,22 @@
+use crate::components::icons::RssIcon;
+use crate::routes::Route;
 use dioxus::prelude::*;
 use dioxus_router::prelude::Link;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use crate::routes::Route;
-use crate::components::icons::RssIcon;
 
 #[component]
 pub fn Navbar(is_dark: Signal<bool>) -> Element {
-    let nav_items: &[(&str, &str)] = &[
-        ("/", "首页"),
-        ("/about", "关于"),
-        ("/tags", "书签"),
-        ("/search", "搜索"),
-        ("/knowledge-graph", "图谱"),
-        ("/ai-summary", "AI摘要"),
-        ("/dev", "开发"),
+    // 链接列表来自 nav.rs（与预渲染页共用），dev-pages 专属项按 feature 追加
+    let nav_links = {
+        // 未启用 dev-pages 时 `links` 不会再被修改，`mut` 看似多余
+        #[allow(unused_mut)]
+        let mut links = crate::nav::PUBLIC_NAV_LINKS.to_vec();
         #[cfg(feature = "dev-pages")]
-        ("/playground", "操场"),
-        #[cfg(feature = "dev-pages")]
-        ("/test", "测试"),
-    ];
+        links.extend_from_slice(crate::nav::DEV_ONLY_NAV_LINKS);
+        links
+    };
+    let nav_items = &nav_links[..];
 
     let onclick = move |e: Event<MouseData>| {
         let window = web_sys::window().expect("Failed to get window");
@@ -28,13 +25,27 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
         let coords = e.client_coordinates();
         let x = coords.x;
         let y = coords.y;
-        let width = window.inner_width().expect("Failed to get inner width").as_f64().expect("Failed to convert width to f64");
-        let height = window.inner_height().expect("Failed to get inner height").as_f64().expect("Failed to convert height to f64");
+        let width = window
+            .inner_width()
+            .expect("Failed to get inner width")
+            .as_f64()
+            .expect("Failed to convert width to f64");
+        let height = window
+            .inner_height()
+            .expect("Failed to get inner height")
+            .as_f64()
+            .expect("Failed to convert height to f64");
         let end_radius = ((x.max(width - x)).powi(2) + (y.max(height - y)).powi(2)).sqrt();
-        html.set_attribute("style", &format!("--x: {}px; --y: {}px; --r: {}px", x, y, end_radius)).expect("Failed to set style attribute");
-        let supports_transition = js_sys::eval("Boolean(document.startViewTransition)").expect("Failed to eval startViewTransition").as_bool().unwrap_or(false);
+        html.set_attribute("style", &format!("--x: {}px; --y: {}px; --r: {}px", x, y, end_radius))
+            .expect("Failed to set style attribute");
+        let supports_transition = js_sys::eval("Boolean(document.startViewTransition)")
+            .expect("Failed to eval startViewTransition")
+            .as_bool()
+            .unwrap_or(false);
         if supports_transition {
-            let _ = js_sys::eval("document.startViewTransition(() => { document.documentElement.classList.toggle('dark'); })");
+            let _ = js_sys::eval(
+                "document.startViewTransition(() => { document.documentElement.classList.toggle('dark'); })",
+            );
         } else {
             let class = html.class_name();
             if class.contains("dark") {
@@ -60,13 +71,13 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
         if sub_menu_open() {
             let window = web_sys::window().unwrap();
             let document = window.document().unwrap();
-            let mut sub_open = sub_menu_open.clone();
+            let mut sub_open = sub_menu_open;
             let closure = Closure::<dyn FnMut(_)>::new(move |e: web_sys::Event| {
                 let target = e.target().unwrap();
                 let el = target.dyn_ref::<web_sys::Element>();
                 if let Some(el) = el {
-                    if !el.closest(".nav-sub-trigger").ok().flatten().is_some()
-                        && !el.closest(".nav-submenu-popup").ok().flatten().is_some()
+                    if el.closest(".nav-sub-trigger").ok().flatten().is_none()
+                        && el.closest(".nav-submenu-popup").ok().flatten().is_none()
                     {
                         sub_open.set(false);
                     }
@@ -79,22 +90,20 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
         }
     });
 
-    let is_active = move |href: &str| {
-        match href {
-            "/" => matches!(route, Route::Home | Route::BlogPostView { slug: _ }),
-            "/about" => matches!(route, Route::About),
-            "/tags" => matches!(route, Route::Tags),
-            "/search" => matches!(route, Route::Search),
-            "/knowledge-graph" => matches!(route, Route::KnowledgeGraphView),
-            "/ai-summary" => matches!(route, Route::AiSummaryView),
-            "/dev" => matches!(route, Route::Dev),
-            "/rss" => matches!(route, Route::Rss),
-            #[cfg(feature = "dev-pages")]
-            "/playground" => matches!(route, Route::Playground),
-            #[cfg(feature = "dev-pages")]
-            "/test" => matches!(route, Route::Test),
-            _ => false
-        }
+    let is_active = move |href: &str| match href {
+        "/" => matches!(route, Route::Home | Route::BlogPostView { slug: _ }),
+        "/about" => matches!(route, Route::About),
+        "/tags" => matches!(route, Route::Tags),
+        "/search" => matches!(route, Route::Search),
+        "/knowledge-graph" => matches!(route, Route::KnowledgeGraphView),
+        "/ai-summary" => matches!(route, Route::AiSummaryView),
+        "/dev" => matches!(route, Route::Dev),
+        "/rss" => matches!(route, Route::Rss),
+        #[cfg(feature = "dev-pages")]
+        "/playground" => matches!(route, Route::Playground),
+        #[cfg(feature = "dev-pages")]
+        "/test" => matches!(route, Route::Test),
+        _ => false,
     };
 
     use_effect(move || {
@@ -123,10 +132,8 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                             let _ = l.remove_attribute("style");
                         }
                     });
-                    let _ = window_for_closure.set_timeout_with_callback_and_timeout_and_arguments_0(
-                        timeout.as_ref().unchecked_ref(),
-                        0,
-                    );
+                    let _ = window_for_closure
+                        .set_timeout_with_callback_and_timeout_and_arguments_0(timeout.as_ref().unchecked_ref(), 0);
                     timeout.forget();
                     was_stuck.set(true);
                 } else if !is_stuck && was_stuck.get() {
@@ -158,8 +165,8 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                 {nav_items.iter().map(|(href, label)| {
                     let active = is_active(href);
                     if *href == "/dev" {
-                        let mut open = sub_menu_open.clone();
-                        let mut left = sub_menu_left.clone();
+                        let mut open = sub_menu_open;
+                        let mut left = sub_menu_left;
                         rsx! {
                             div { class: "nav-item-with-sub",
                                 Link {

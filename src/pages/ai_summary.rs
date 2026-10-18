@@ -1,11 +1,11 @@
 //! AI 文章摘要 — 基于 TextRank 算法的提取式摘要
 //! 展示所有文章的 AI 自动摘要，支持点击跳转原文
 
+use crate::routes::Route;
+use crate::utils::summaries::{self, ArticleSummary};
+use crate::utils::title;
 use dioxus::prelude::*;
 use dioxus_router::prelude::use_navigator;
-use crate::routes::Route;
-use crate::utils::title;
-use crate::utils::summaries::{self, ArticleSummary};
 
 /// 社区颜色映射
 fn category_color(cat: &str) -> &'static str {
@@ -83,7 +83,6 @@ pub fn AiSummaryView() -> Element {
                                     class: "ai-summary-card",
                                     onclick: {
                                         let slug = s.slug.clone();
-                                        let go_post = go_post;
                                         move |_| go_post(slug.clone())
                                     },
                                     div { class: "ai-summary-card-header",

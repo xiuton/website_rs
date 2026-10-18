@@ -1,14 +1,14 @@
 use dioxus::prelude::*;
-use dioxus_router::prelude::{Link, use_route};
-use web_sys::UrlSearchParams;
+use dioxus_router::prelude::{use_route, Link};
 use std::collections::BTreeSet;
+use web_sys::UrlSearchParams;
 
+use crate::components::icons::{ChevronLeftIcon, ChevronRightIcon, TagIcon};
 use crate::models::BlogPost;
 use crate::routes::Route;
-use crate::BLOG_POSTS;
-use crate::utils::title;
 use crate::utils::storage;
-use crate::components::icons::{TagIcon, ChevronLeftIcon, ChevronRightIcon};
+use crate::utils::title;
+use crate::BLOG_POSTS;
 
 const ALL_CATEGORY: &str = "全部";
 
@@ -59,11 +59,7 @@ pub fn Home() -> Element {
                 }
                 let new_url = format!("/?{}", search_params.to_string());
                 if let Ok(history) = window.history() {
-                    let _ = history.replace_state_with_url(
-                        &wasm_bindgen::JsValue::NULL,
-                        "",
-                        Some(&new_url),
-                    );
+                    let _ = history.replace_state_with_url(&wasm_bindgen::JsValue::NULL, "", Some(&new_url));
                 }
             }
         }
@@ -90,9 +86,13 @@ pub fn Home() -> Element {
         let mut seen: BTreeSet<&str> = BTreeSet::new();
         let mut result: Vec<(&BlogPost, usize, &str, Vec<&str>)> = Vec::new();
         for post in all.iter() {
-            let series_key = if !post.series.is_empty() && !post.catalog.is_empty() { post.catalog } else { post.series };
+            let series_key = if !post.series.is_empty() && !post.catalog.is_empty() {
+                post.catalog
+            } else {
+                post.series
+            };
             if series_key.is_empty() {
-                let tags: Vec<&str> = post.tags.iter().copied().collect();
+                let tags: Vec<&str> = post.tags.to_vec();
                 result.push((post, 0, post.date, tags));
             } else if !seen.contains(series_key) {
                 seen.insert(series_key);
@@ -107,11 +107,7 @@ pub fn Home() -> Element {
                 // 入口章 = 排序最靠前的一章（顺序规则见 build_common.rs 的 sort_key）
                 let entry = *chapters
                     .iter()
-                    .min_by(|a, b| {
-                        a.sort_key
-                            .cmp(b.sort_key)
-                            .then_with(|| a.filename.cmp(&b.filename))
-                    })
+                    .min_by(|a, b| a.sort_key.cmp(b.sort_key).then_with(|| a.filename.cmp(b.filename)))
                     .unwrap();
                 let last_date = chapters.iter().map(|c| c.date).max().unwrap_or(entry.date);
                 // 合并所有文章的标签，去重
@@ -136,7 +132,9 @@ pub fn Home() -> Element {
         if cat == ALL_CATEGORY {
             display_posts.read().clone()
         } else {
-            display_posts.read().iter()
+            display_posts
+                .read()
+                .iter()
                 .filter(|(p, _, _, _)| p.category == cat)
                 .cloned()
                 .collect::<Vec<_>>()
@@ -145,7 +143,11 @@ pub fn Home() -> Element {
 
     let total_pages = use_memo(move || {
         let total = filtered_posts.read().len();
-        if total == 0 { 1 } else { ((total as f64) / (page_size() as f64)).ceil() as usize }
+        if total == 0 {
+            1
+        } else {
+            ((total as f64) / (page_size() as f64)).ceil() as usize
+        }
     });
 
     let current_page_posts = use_memo(move || {
@@ -219,16 +221,10 @@ pub fn Home() -> Element {
                                         }
                                         div { class: "preview-content",
                                             p { class: "preview-excerpt",
-                                                {if *chapter_count > 0 {
-                                                    if !post.series_summary.is_empty() {
-                                                        post.series_summary.to_string()
-                                                    } else {
-                                                        post.summary.to_string()
-                                                    }
-                                                } else if !post.summary.is_empty() {
-                                                    post.summary.to_string()
+                                                {if *chapter_count > 0 && !post.series_summary.is_empty() {
+                                                    post.series_summary.to_string()
                                                 } else {
-                                                    crate::utils::markdown::clean_markdown_excerpt(post.content, 150)
+                                                    post.summary.to_string()
                                                 }}
                                             }
                                         }

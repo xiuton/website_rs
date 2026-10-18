@@ -1,32 +1,35 @@
-// 字体预加载
+// ============================================================
+// 字体
+// ------------------------------------------------------------
+// 源文件保存在 assets/fonts/（不参与部署），静态目录里放的是
+// scripts/subset_fonts.py 按站内实际用字裁剪后的 woff2 子集。
+// 新增文章后若出现缺字（回退到系统字体），重跑一次该脚本即可。
+//
+// 注意：同一 family / weight / style 只允许定义一次。
+// 重复定义会让后一条覆盖前一条，从而丢掉 font-display: swap，
+// 首屏会退化成 FOIT（文字空白等待字体下载）。
+// ============================================================
+
 @font-face {
     font-family: 'MiSans';
-    src: url('/static/fonts/MiSans-Regular.otf') format('opentype');
+    src: url('/static/fonts/MiSans-subset.woff2') format('woff2');
     font-display: swap;
     font-weight: normal;
     font-style: normal;
 }
 
 @font-face {
-    font-family: 'JetBrainsMono';
-    src: url('/static/fonts/JetBrainsMonoNLNerdFont-Regular.ttf') format('truetype');
+    font-family: 'JetBrains Mono';
+    src: url('/static/fonts/JetBrainsMono-subset.woff2') format('woff2');
     font-display: swap;
     font-weight: normal;
     font-style: normal;
 }
 
-// 字体定义
 @font-face {
-  font-family: SmileySans;
-  src: url(./static/fonts/SmileySans-Oblique.otf)
-}
-
-@font-face {
-  font-family: MiSans;
-  src: url(./static/fonts/MiSans-Regular.otf)
-}
-
-@font-face {
-  font-family: JetBrains Mono;
-  src: url(./static/fonts/JetBrainsMonoNLNerdFont-Regular.ttf)
+    font-family: 'SmileySans';
+    src: url('/static/fonts/SmileySans-subset.woff2') format('woff2');
+    font-display: swap;
+    font-weight: normal;
+    font-style: normal;
 }

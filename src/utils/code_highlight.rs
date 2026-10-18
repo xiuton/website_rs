@@ -38,7 +38,8 @@ pub fn reapply_highlight() {
     let Some(body) = document.body() else { return };
 
     if let Ok(script) = document.create_element("script") {
-        script.set_text_content(Some(r#"
+        script.set_text_content(Some(
+            r#"
         function applyHighlight() {
             if (typeof hljs !== 'undefined') {
                 hljs.highlightAll();
@@ -47,7 +48,8 @@ pub fn reapply_highlight() {
             }
         }
         applyHighlight();
-    "#));
+    "#,
+        ));
         let _ = body.append_child(&script);
         let _ = body.remove_child(&script);
     }

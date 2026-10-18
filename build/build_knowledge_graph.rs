@@ -1,4 +1,4 @@
-﻿use crate::build_common::*;
+use crate::build_common::*;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -51,7 +51,7 @@ pub fn generate_knowledge_graph(posts: &[PostData]) {
         .map(|p| (p.slug.as_str(), node_index[&format!("article:{}", p.slug)]))
         .collect();
 
-    fn add_edge(adj: &mut Vec<Vec<(usize, f64)>>, a: usize, b: usize, w: f64) {
+    fn add_edge(adj: &mut [Vec<(usize, f64)>], a: usize, b: usize, w: f64) {
         adj[a].push((b, w));
         adj[b].push((a, w));
     }
@@ -60,11 +60,7 @@ pub fn generate_knowledge_graph(posts: &[PostData]) {
     {
         let mut tag_cooccur: HashMap<(usize, usize), f64> = HashMap::new();
         for post in posts {
-            let tag_idxs: Vec<usize> = post
-                .tags
-                .iter()
-                .map(|t| node_index[&format!("tag:{}", t)])
-                .collect();
+            let tag_idxs: Vec<usize> = post.tags.iter().map(|t| node_index[&format!("tag:{}", t)]).collect();
             for &ti in &tag_idxs {
                 for &tj in &tag_idxs {
                     if ti < tj {
@@ -129,20 +125,13 @@ pub fn generate_knowledge_graph(posts: &[PostData]) {
         }
 
         let np = posts.len() as f64;
-        let idf: HashMap<String, f64> = doc_freq
-            .iter()
-            .map(|(t, df)| (t.clone(), (np / df).ln() + 1.0))
-            .collect();
+        let idf: HashMap<String, f64> = doc_freq.iter().map(|(t, df)| (t.clone(), (np / df).ln() + 1.0)).collect();
 
         for i in 0..posts.len() {
             for j in (i + 1)..posts.len() {
                 let dot = doc_tokens[i]
                     .iter()
-                    .filter_map(|(t, c)| {
-                        doc_tokens[j]
-                            .get(t)
-                            .map(|cj| c * cj * idf.get(t).copied().unwrap_or(1.0))
-                    })
+                    .filter_map(|(t, c)| doc_tokens[j].get(t).map(|cj| c * cj * idf.get(t).copied().unwrap_or(1.0)))
                     .sum::<f64>();
 
                 let mag_i = doc_tokens[i]
@@ -156,11 +145,7 @@ pub fn generate_knowledge_graph(posts: &[PostData]) {
                     .sum::<f64>()
                     .sqrt();
 
-                let sim = if mag_i * mag_j > 1e-10 {
-                    dot / (mag_i * mag_j)
-                } else {
-                    0.0
-                };
+                let sim = if mag_i * mag_j > 1e-10 { dot / (mag_i * mag_j) } else { 0.0 };
 
                 if sim > 0.08 {
                     let ai = article_indices[posts[i].slug.as_str()];
@@ -179,14 +164,9 @@ pub fn generate_knowledge_graph(posts: &[PostData]) {
     let mut pr_new = vec![0.0; n];
 
     for _ in 0..max_iter {
-        let sink_sum: f64 = pr
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| adj[*i].is_empty())
-            .map(|(_, v)| v)
-            .sum();
+        let sink_sum: f64 = pr.iter().enumerate().filter(|(i, _)| adj[*i].is_empty()).map(|(_, v)| v).sum();
 
-        for i in 0..n {
+        for (i, slot) in pr_new.iter_mut().enumerate() {
             let mut rank = 0.0;
             for j in 0..n {
                 if adj[j].is_empty() {
@@ -200,7 +180,7 @@ pub fn generate_knowledge_graph(posts: &[PostData]) {
                     }
                 }
             }
-            pr_new[i] = (1.0 - damping) / n as f64 + damping * (rank + sink_sum / n as f64);
+            *slot = (1.0 - damping) / n as f64 + damping * (rank + sink_sum / n as f64);
         }
 
         let diff: f64 = pr.iter().zip(&pr_new).map(|(a, b)| (a - b).abs()).sum();
@@ -244,12 +224,15 @@ pub fn generate_knowledge_graph(posts: &[PostData]) {
             let node_id = &node_ids[node_idx];
             if node_idx != ai && node_id.starts_with("article:") {
                 let slug = &node_id[8..];
-                let reason = if adj[ai].iter().any(|(k, _)| *k == node_idx) { "内容相似" } else { "标签关联" };
+                let reason = if adj[ai].iter().any(|(k, _)| *k == node_idx) {
+                    "内容相似"
+                } else {
+                    "标签关联"
+                };
                 rel_arts.push((slug.to_string(), score, reason));
-            } else if node_id.starts_with("tag:") {
-                rel_tags.push((node_id[4..].to_string(), score));
-            } else if node_id.starts_with("category:") {
-                let cat = &node_id[9..];
+            } else if let Some(tag) = node_id.strip_prefix("tag:") {
+                rel_tags.push((tag.to_string(), score));
+            } else if let Some(cat) = node_id.strip_prefix("category:") {
                 if cat != post.category {
                     rel_cats.push((cat.to_string(), score));
                 }
@@ -270,8 +253,8 @@ pub fn generate_knowledge_graph(posts: &[PostData]) {
             for (idx, &c) in communities.iter().enumerate() {
                 if c == community_idx {
                     let nid = &node_ids[idx];
-                    if nid.starts_with("tag:") {
-                        *tag_counts.entry(&nid[4..]).or_insert(0) += 1;
+                    if let Some(tag) = nid.strip_prefix("tag:") {
+                        *tag_counts.entry(tag).or_insert(0) += 1;
                     }
                 }
             }
@@ -283,7 +266,9 @@ pub fn generate_knowledge_graph(posts: &[PostData]) {
                 .unwrap_or_else(|| format!("社区 {}", community_idx))
         };
 
-        if !first_article { json.push(','); }
+        if !first_article {
+            json.push(',');
+        }
         first_article = false;
 
         json.push_str(&format!("\n    \"{}\":{{", post.slug));
@@ -295,21 +280,27 @@ pub fn generate_knowledge_graph(posts: &[PostData]) {
 
         json.push_str("\"articles\":[");
         for (idx, (slug, score, reason)) in rel_arts.iter().enumerate() {
-            if idx > 0 { json.push(','); }
+            if idx > 0 {
+                json.push(',');
+            }
             json.push_str(&format!("{{\"slug\":\"{}\",\"score\":\"{:.4}\",\"reason\":\"{}\"}}", slug, score, reason));
         }
         json.push_str("],");
 
         json.push_str("\"tags\":[");
         for (idx, (name, score)) in rel_tags.iter().enumerate() {
-            if idx > 0 { json.push(','); }
+            if idx > 0 {
+                json.push(',');
+            }
             json.push_str(&format!("{{\"name\":\"{}\",\"score\":\"{:.4}\"}}", name, score));
         }
         json.push_str("],");
 
         json.push_str("\"categories\":[");
         for (idx, (name, score)) in rel_cats.iter().enumerate() {
-            if idx > 0 { json.push(','); }
+            if idx > 0 {
+                json.push(',');
+            }
             json.push_str(&format!("{{\"name\":\"{}\",\"score\":\"{:.4}\"}}", name, score));
         }
         json.push(']');
@@ -339,21 +330,27 @@ pub fn generate_knowledge_graph(posts: &[PostData]) {
 fn write_explore_group(json: &mut String, group: &ExploreGroup) {
     json.push_str("\"articles\":[");
     for (i, s) in group.articles.iter().enumerate() {
-        if i > 0 { json.push(','); }
+        if i > 0 {
+            json.push(',');
+        }
         json.push('"');
         json.push_str(s);
         json.push('"');
     }
     json.push_str("],\"tags\":[");
     for (i, s) in group.tags.iter().enumerate() {
-        if i > 0 { json.push(','); }
+        if i > 0 {
+            json.push(',');
+        }
         json.push('"');
         json.push_str(s);
         json.push('"');
     }
     json.push_str("],\"categories\":[");
     for (i, s) in group.categories.iter().enumerate() {
-        if i > 0 { json.push(','); }
+        if i > 0 {
+            json.push(',');
+        }
         json.push('"');
         json.push_str(s);
         json.push('"');
@@ -406,12 +403,12 @@ fn bfs_explore(
                 continue;
             }
             let node = &node_ids[i];
-            if node.starts_with("article:") {
-                articles.push(node[8..].to_string());
-            } else if node.starts_with("tag:") {
-                tags.push(node[4..].to_string());
-            } else if node.starts_with("category:") {
-                categories.push(node[9..].to_string());
+            if let Some(slug) = node.strip_prefix("article:") {
+                articles.push(slug.to_string());
+            } else if let Some(tag) = node.strip_prefix("tag:") {
+                tags.push(tag.to_string());
+            } else if let Some(cat) = node.strip_prefix("category:") {
+                categories.push(cat.to_string());
             }
         }
 

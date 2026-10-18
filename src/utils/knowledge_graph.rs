@@ -73,12 +73,8 @@ pub fn pct_str(s: &str) -> String {
     }
 }
 
-/// 加载知识图谱
+/// 加载知识图谱（会话级缓存，多页面复用同一份 JSON）
 pub async fn load_graph() -> Option<KnowledgeGraph> {
-    let resp = gloo_net::http::Request::get("/static/knowledge-graph.json")
-        .send()
-        .await
-        .ok()?;
-    let text = resp.text().await.ok()?;
+    let text = crate::utils::cache::fetch_text("/static/knowledge-graph.json").await?;
     serde_json::from_str(&text).ok()
 }

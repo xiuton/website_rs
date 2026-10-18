@@ -1,5 +1,5 @@
-use std::f64::consts::PI;
 use std::cell::RefCell;
+use std::f64::consts::PI;
 
 thread_local! {
     static RNG_STATE: RefCell<u64> = const { RefCell::new(42) };
@@ -170,26 +170,10 @@ mod tests {
         let circles = generate_circles(&config);
 
         for (i, circle) in circles.iter().enumerate() {
-            assert!(
-                circle.x - circle.radius - config.gap >= 0.0,
-                "Circle {} x out of bounds (left)",
-                i
-            );
-            assert!(
-                circle.x + circle.radius + config.gap <= config.width,
-                "Circle {} x out of bounds (right)",
-                i
-            );
-            assert!(
-                circle.y - circle.radius - config.gap >= 0.0,
-                "Circle {} y out of bounds (top)",
-                i
-            );
-            assert!(
-                circle.y + circle.radius + config.gap <= config.height,
-                "Circle {} y out of bounds (bottom)",
-                i
-            );
+            assert!(circle.x - circle.radius - config.gap >= 0.0, "Circle {} x out of bounds (left)", i);
+            assert!(circle.x + circle.radius + config.gap <= config.width, "Circle {} x out of bounds (right)", i);
+            assert!(circle.y - circle.radius - config.gap >= 0.0, "Circle {} y out of bounds (top)", i);
+            assert!(circle.y + circle.radius + config.gap <= config.height, "Circle {} y out of bounds (bottom)", i);
         }
     }
 

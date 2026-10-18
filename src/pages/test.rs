@@ -1,5 +1,5 @@
-use dioxus::prelude::*;
 use crate::utils::title;
+use dioxus::prelude::*;
 
 #[component]
 pub fn Test() -> Element {

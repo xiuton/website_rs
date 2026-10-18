@@ -1,9 +1,9 @@
-use dioxus::prelude::*;
-use crate::utils::title;
-use crate::utils::search::{SearchEngine, SearchResult, Suggestion, highlight_matches};
-use crate::utils::knowledge_graph::{self, KnowledgeGraph};
-use dioxus_router::prelude::use_navigator;
 use crate::routes::Route;
+use crate::utils::knowledge_graph::{self, KnowledgeGraph};
+use crate::utils::search::{highlight_matches, SearchEngine, SearchResult, Suggestion};
+use crate::utils::title;
+use dioxus::prelude::*;
+use dioxus_router::prelude::use_navigator;
 
 /// 创建一个延迟指定毫秒数的 Promise
 async fn delay(ms: i32) {
@@ -24,18 +24,20 @@ fn update_url(query: &str) {
     } else {
         format!("/search?q={}", js_sys::encode_uri_component(query))
     };
-    let _ = history.replace_state_with_url(
-        &wasm_bindgen::JsValue::NULL,
-        "",
-        Some(&new_url),
-    );
+    let _ = history.replace_state_with_url(&wasm_bindgen::JsValue::NULL, "", Some(&new_url));
 }
 
 /// 从 URL 中读取初始查询参数
 fn get_initial_query() -> String {
-    let Some(window) = web_sys::window() else { return String::new() };
-    let Ok(search) = window.location().search() else { return String::new() };
-    let Ok(params) = web_sys::UrlSearchParams::new_with_str(&search) else { return String::new() };
+    let Some(window) = web_sys::window() else {
+        return String::new();
+    };
+    let Ok(search) = window.location().search() else {
+        return String::new();
+    };
+    let Ok(params) = web_sys::UrlSearchParams::new_with_str(&search) else {
+        return String::new();
+    };
     params.get("q").unwrap_or_default()
 }
 
@@ -44,7 +46,7 @@ pub fn Search() -> Element {
     title::set_page_title("搜索 - 干徒");
 
     let index_loaded = use_signal(|| false);
-    let engine_ref = use_signal(|| SearchEngine::new());
+    let engine_ref = use_signal(SearchEngine::new);
     let mut kg_data = use_signal(|| Option::<KnowledgeGraph>::None);
 
     // 一次性加载搜索索引
@@ -52,16 +54,11 @@ pub fn Search() -> Element {
         spawn(async move {
             let mut engine_ref = engine_ref;
             let mut index_loaded = index_loaded;
-            let resp = gloo_net::http::Request::get("/static/search-index.json")
-                .send()
-                .await;
-            if let Ok(resp) = resp {
-                if let Ok(text) = resp.text().await {
-                    let mut e = SearchEngine::new();
-                    if e.load(&text).is_ok() {
-                        engine_ref.set(e);
-                        index_loaded.set(true);
-                    }
+            if let Some(text) = crate::utils::cache::fetch_text("/static/search-index.json").await {
+                let mut e = SearchEngine::new();
+                if e.load(&text).is_ok() {
+                    engine_ref.set(e);
+                    index_loaded.set(true);
                 }
             }
         });
@@ -80,40 +77,30 @@ pub fn Search() -> Element {
 
     // 加载语义索引（词共现 + 自动补全）
     let mut semantic_loaded = use_signal(|| false);
-    let mut engine_for_semantic = engine_ref.clone();
+    let mut engine_for_semantic = engine_ref;
     use_effect(move || {
         spawn(async move {
-            let resp = gloo_net::http::Request::get("/static/semantic.json")
-                .send()
-                .await;
-            if let Ok(resp) = resp {
-                if let Ok(text) = resp.text().await {
-                    engine_for_semantic.write().load_semantic(&text).ok();
-                    semantic_loaded.set(true);
-                }
+            if let Some(text) = crate::utils::cache::fetch_text("/static/semantic.json").await {
+                engine_for_semantic.write().load_semantic(&text).ok();
+                semantic_loaded.set(true);
             }
         });
     });
 
     // 加载 RAKE 关键词
     let mut rake_loaded = use_signal(|| false);
-    let mut engine_for_rake = engine_ref.clone();
+    let mut engine_for_rake = engine_ref;
     use_effect(move || {
         spawn(async move {
-            let resp = gloo_net::http::Request::get("/static/rake-keywords.json")
-                .send()
-                .await;
-            if let Ok(resp) = resp {
-                if let Ok(text) = resp.text().await {
-                    engine_for_rake.write().load_rake(&text).ok();
-                    rake_loaded.set(true);
-                }
+            if let Some(text) = crate::utils::cache::fetch_text("/static/rake-keywords.json").await {
+                engine_for_rake.write().load_rake(&text).ok();
+                rake_loaded.set(true);
             }
         });
     });
 
-    let mut query = use_signal(|| get_initial_query());
-    let mut results = use_signal(|| Vec::<SearchResult>::new());
+    let mut query = use_signal(get_initial_query);
+    let mut results = use_signal(Vec::<SearchResult>::new);
     let mut suggestions = use_signal(Vec::<Suggestion>::new);
     let mut show_suggestions = use_signal(|| false);
     // 标记用户刚点击了建议（非响应式使用：effect 只读不写，避免二次触发）
@@ -134,26 +121,32 @@ pub fn Search() -> Element {
         visible_count.set(PAGE_SIZE);
         spawn(async move {
             delay(300).await;
-            if query() != q { return; }
+            if query() != q {
+                return;
+            }
             if !index_loaded() {
                 let mut waited = 0;
                 while !index_loaded() && waited < 50 {
                     delay(100).await;
                     waited += 1;
-                    if query() != q { return; }
+                    if query() != q {
+                        return;
+                    }
                 }
             }
-            if !index_loaded() { return; }
+            if !index_loaded() {
+                return;
+            }
             let engine = engine_ref.read();
             results.set(engine.search(&q));
         });
     });
 
     // 自动补全
-    let engine_for_ac = engine_ref.clone();
+    let engine_for_ac = engine_ref;
     use_effect(move || {
         let q = query();
-        if q.is_empty() || q.len() < 1 {
+        if q.is_empty() || q.is_empty() {
             suggestions.set(Vec::new());
             show_suggestions.set(false);
             return;
@@ -165,8 +158,12 @@ pub fn Search() -> Element {
         }
         spawn(async move {
             delay(150).await;
-            if query() != q { return; }
-            if !semantic_loaded() { return; }
+            if query() != q {
+                return;
+            }
+            if !semantic_loaded() {
+                return;
+            }
             let engine = engine_for_ac.read();
             let ac = engine.autocomplete(&q);
             if !ac.is_empty() {
@@ -198,9 +195,11 @@ pub fn Search() -> Element {
     let hop2_titles: std::collections::HashMap<String, String> = explore
         .as_ref()
         .map(|e| {
-            e.hop2.articles.iter().filter_map(|s| {
-                engine.get_by_slug(s).map(|entry| (s.clone(), entry.title.clone()))
-            }).collect()
+            e.hop2
+                .articles
+                .iter()
+                .filter_map(|s| engine.get_by_slug(s).map(|entry| (s.clone(), entry.title.clone())))
+                .collect()
         })
         .unwrap_or_default();
     drop(engine);
@@ -310,7 +309,6 @@ pub fn Search() -> Element {
                         class: "search-kg-link",
                         onclick: {
                             let slugs: Vec<String> = result_list.iter().take(20).map(|r| r.slug.clone()).collect();
-                            let nav = nav.clone();
                             move |_| {
                                 let highlight = slugs.join(",");
                                 // 先导航到 KG 页面，再通过 replaceState 设置查询参数
@@ -341,7 +339,6 @@ pub fn Search() -> Element {
                         let summary = r.summary.clone();
                         let tags = r.tags.clone();
                         let category = r.category.clone();
-                        let nav = nav.clone();
                         let key = slug.clone();
                         let q = query_str.clone();
                         let score = r.score;
@@ -482,7 +479,6 @@ pub fn Search() -> Element {
                                         }
                                         div { class: "search-explore-links",
                                             {data.hop2.articles.iter().map(|s| {
-                                                let nav = nav.clone();
                                                 let slug = s.clone();
                                                 let title = hop2_titles.get(s).cloned().unwrap_or_else(|| s.clone());
                                                 rsx! {
