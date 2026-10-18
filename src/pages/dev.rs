@@ -1,17 +1,15 @@
 use crate::components::icons::{CloseIcon, FullscreenIcon, RefreshIcon};
+use crate::components::PageHead;
 use crate::utils::constants;
 use crate::utils::dev_helpers::{
     create_carousel_timer, create_delayed_hide_timer, fetch_and_set_random_image, load_background_wall_images,
     HIDE_BTN_DELAY_MS,
 };
-use crate::utils::title;
 use dioxus::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 #[component]
 pub fn Dev() -> Element {
-    title::set_page_title("开发 - 干徒");
-
     let img_url = use_signal(|| None::<String>);
     let is_background_mode = use_signal(|| false);
     let background_images = use_signal(Vec::new);
@@ -82,6 +80,11 @@ pub fn Dev() -> Element {
     });
 
     rsx! {
+        PageHead {
+            title: "开发".to_string(),
+            description: "开发者的实验页面。".to_string(),
+            canonical: "/dev".to_string(),
+        }
         div { class: "dev-container",
             div { class: "identification",
                 div { class: "content",

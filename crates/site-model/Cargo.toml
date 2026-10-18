@@ -1,0 +1,13 @@
+[package]
+name = "site-model"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# 构建脚本、预渲染工具与前端共享的数据契约。
+# 只依赖 serde，避免把 Dioxus 等重依赖带进构建工具。
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

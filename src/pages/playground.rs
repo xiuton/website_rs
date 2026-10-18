@@ -1,11 +1,14 @@
-use crate::utils::title;
+use crate::components::PageHead;
 use dioxus::prelude::*;
 
 #[component]
 pub fn Playground() -> Element {
-    title::set_page_title("操场 - 干徒");
-
     rsx! {
+        PageHead {
+            title: "操场".to_string(),
+            description: "Playground 实验场。".to_string(),
+            canonical: "/playground".to_string(),
+        }
         div {
             class: "playground-page",
             style: "background-image: url('/static/images/playground-bg.jpg');",

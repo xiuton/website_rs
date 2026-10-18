@@ -1,4 +1,4 @@
-use crate::build_common::*;
+use site_content::*;
 use std::path::Path;
 
 const SITE_URL: &str = "https://ganto.me";

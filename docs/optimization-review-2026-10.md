@@ -489,3 +489,35 @@ $j | ForEach-Object { [pscustomobject]@{slug=$_.slug; md=$_.content.Length; html
   - 文章页滚动前不请求 `search-index`/`embeddings`/`markov`；滚动到评论区后相关文章 5 条正常出现；点击「生成续写」才加载 markov 并成功输出
   - 搜索页输入前不请求任何索引；输入 `rust` 后 4 个索引才加载
   - 控制台无错误
+
+## 7.8 架构重构 Phase 1–5（2026-10-18）
+
+### 数据契约
+
+- 新增 `crates/site-model`：`PostMeta`、`PostsMeta`、`MarkovModel`、导航链接常量，serde 序列化。
+- 所有 JSON 落盘结构带 `schema_version`；预渲染读取时校验并告警。
+- `build_posts_json` 与 `build_markov` 改用 `serde_json`，删除手写 JSON 转义。
+- 前端 markov 直接复用 `site_model::{ArticleChain, MarkovModel}`，不再维护第三套结构。
+- `crates/site-model` 增加序列化 roundtrip 测试。
+
+### 构建拆分
+
+- 新增 `crates/site-content`：从 900 行的 `build/build_common.rs` 抽出 front matter、系列配置、slug、文本工具，附带 4 个单元测试。
+- 新增 `crates/site-data`：12 个 `build_*.rs` 生成器移出 build script，统一入口 `generate_all`；`build.rs` 只负责扫描文章、生成 `BLOG_POSTS` 和调用生成器。
+- `prerender` 从根 crate 的 bin 拆为独立 `apps/prerender`；Phase 3 后它依赖 `web-rs` 以复用真实页面组件。
+- **Phase 3**：`apps/prerender` 现在依赖 `web-rs`，用 `dioxus-ssr` + `MemoryHistory` 渲染真实 `Route`（文章页、系列页），把 SSR body 注入原先的 HTML shell；删除 `NAVBAR_TEMPLATE`/`FOOTER_HTML`/手写文章与系列模板，导航、页脚、系列目录与 SPA 共用组件。
+- **Phase 3 head**：新增 `components/head.rs` 的 `PageHead`，页面只声明 title/description/canonical；SSR 期间写入线程局部收集器，prerender 用收集结果生成 `<title>`、description、canonical、OG/Twitter。wasm 端同一组件通过 effect 更新 head，首页/关于/书签/搜索/AI 摘要/图谱/文章/系列/404/开发/测试/操场/圆形生成器均已迁移。
+- 宿主端 SSR 需要的兼容处理：`title` 模块在非 wasm 下替换为 no-op；`dark_mode`/`Footer` 的 `web_sys` 调用加 `cfg(target_arch = "wasm32")`；文章正文通过 `web_rs::ssr` 的线程局部桥注入。
+- **Phase 2**：新增 `tools/xtask`，统一 `fmt` / `check` / `build` / `serve` 入口；本地与 CI 共用同一套检查顺序。
+- **构建缓存**：`site-data` 的 build script 生成源码指纹，`generate_all` 结合文章内容 hash 判断是否复用上一轮产物；缓存戳写到 `OUT_DIR`，不会进入 `static/`/`dist`。
+- **Phase 4（部分）**：`utils::cache::fetch_typed` 同时缓存 JSON 文本与反序列化结果（`Rc<T>`），知识图谱、LDA、AI 摘要改为复用，避免每次进页面重复解析；AI 摘要页改用 `use_resource`，删除手写 loading/error signal + effect。
+- **Phase 5（部分）**：`knowledge_graph` 拆为 `mod.rs` / `force_graph.rs` / `canvas_renderer.rs`；`circle_generator` 拆为 `mod.rs` / `config.rs` / `render.rs` / `modal.rs`。CI 增加 SSR 导航/页脚/系列页断言。
+- **修复**：`trunk build` 偶尔把 autoreload 的 `{{__TRUNK_ADDRESS__}}` 占位符留在 `dist/index.html`，prerender 现在会剥离该脚本，CI 断言 index/404 不再包含占位符。
+- 预渲染 hook 的编译时间：Phase 2 后约 **3 秒**；Phase 3 接入 SSR 后约 **18–52 秒**（取决于缓存），仍明显低于原来的 1 分 45 秒。
+- 由于 hook 变快，Trunk 可能在 `.stage` 完成前就启动它；prerender 现在会轮询等待 `dist/.stage/index.html` 出现，避免竞态。
+
+### 仍待完成
+
+- 声明式 head：`PageHead` 已完成 SSR 收集与 wasm 端更新；其余开发页可继续迁移。
+- 前端数据层：AI 摘要、知识图谱、搜索页均已用 `use_resource`；搜索索引/语义/RAKE/图谱合并为一个按需资源。
+- `circle_generator` 页面主体仍较大，可继续按面板/状态拆分。

@@ -1,5 +1,5 @@
 use crate::components::icons::{BookmarkIcon, GitHubIcon, SearchIcon};
-use crate::utils::title;
+use crate::components::PageHead;
 use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
@@ -63,8 +63,6 @@ fn scroll_to_first_highlight() {
 
 #[component]
 pub fn Tags() -> Element {
-    title::set_page_title("书签 - 干徒");
-
     let bookmark_manager = use_signal(|| BOOKMARKS.clone());
     let mut search_text = use_signal(String::new);
     let mut search_query = use_signal(String::new); // 实际的搜索关键词
@@ -105,6 +103,11 @@ pub fn Tags() -> Element {
     });
 
     rsx! {
+        PageHead {
+            title: "书签".to_string(),
+            description: "收藏的站点、工具与阅读列表。".to_string(),
+            canonical: "/tags".to_string(),
+        }
         div { class: "bookmarks-container",
             div { role: "search", class: "search-bar",
                 div { class: "search-input-wrapper",

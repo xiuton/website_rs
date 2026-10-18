@@ -1,4 +1,5 @@
 use crate::components::icons::{BackArrowIcon, HomeIcon, ScrollTopIcon, TagIcon, WideModeIcon};
+use crate::components::PageHead;
 use crate::models::BlogPost;
 use crate::routes::Route;
 use crate::utils::knowledge_graph::{self, ArticleNode};
@@ -11,6 +12,7 @@ use dioxus::prelude::*;
 /// 预渲染页会把文章正文同时放进 `<template id="prerender-content">`。
 /// 首屏直接复用这份 HTML：无需再发请求，也不会出现「预渲染内容被清空 → 加载中」的闪跳。
 /// 客户端路由跳转（没有预渲染页）时返回 None，由调用方按需 fetch。
+#[cfg(target_arch = "wasm32")]
 fn take_prerendered_content(slug: &str) -> Option<String> {
     let document = web_sys::window()?.document()?;
     let template = document.get_element_by_id("prerender-content")?;
@@ -58,7 +60,10 @@ pub fn BlogPostView(slug: String) -> Element {
     // 首屏直接同步取预渲染模板里的正文，避免「先渲染加载中、再替换」的闪动；
     // 客户端路由跳转时才按需拉取构建期生成的 HTML 片段。
     // wasm 里因此不再需要打包全部文章正文，也不需要 comrak。
+    #[cfg(target_arch = "wasm32")]
     let initial_content = take_prerendered_content(&slug);
+    #[cfg(not(target_arch = "wasm32"))]
+    let initial_content = crate::ssr::take_content(&slug);
     let has_initial_content = initial_content.is_some();
     let mut content_html = use_signal(move || initial_content.unwrap_or_default());
     let mut content_loading = use_signal(|| !has_initial_content);
@@ -143,20 +148,16 @@ pub fn BlogPostView(slug: String) -> Element {
         spawn(async move {
             lda_data.set(None);
             if let Some(data) = topics::load_lda().await {
-                lda_data.set(Some(data));
+                lda_data.set(Some((*data).clone()));
             }
         });
     });
 
     use_effect(move || {
-        // 设置页面标题 + 恢复宽屏模式 + SEO meta
+        // 设置文章级结构化数据 + 恢复宽屏模式；标题/描述/canonical 由 PageHead 负责
         if let Some(post) = post() {
-            title::set_page_title(&format!("{} - 干徒", post.title));
-
             let description: String = post.summary.chars().take(160).collect();
             let post_url = format!("https://ganto.me/post/{}", post.slug);
-            title::set_seo(post.title, &description, &post_url);
-            // 文章级 BlogPosting 结构化数据
             title::set_article_jsonld(post.title, &description, &post_url, post.date, post.author, post.tags);
         }
         if post().is_some() {
@@ -207,6 +208,12 @@ pub fn BlogPostView(slug: String) -> Element {
     rsx! {
         div { class: "blog-container",
             if let Some(post) = post() {
+                PageHead {
+                    key: "{post.slug}",
+                    title: post.title.to_string(),
+                    description: post.summary.chars().take(160).collect::<String>(),
+                    canonical: format!("/post/{}", post.slug),
+                }
                 article {
                     class: if is_wide_mode() { "blog-post wide-mode" } else { "blog-post" },
                     aria_label: article_label.as_deref().unwrap_or("文章"),

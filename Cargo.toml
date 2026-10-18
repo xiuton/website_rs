@@ -4,7 +4,16 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = [".", "tools/font-subset", "tools/mini-html"]
+members = [
+    ".",
+    "crates/site-model",
+    "crates/site-content",
+    "crates/site-data",
+    "apps/prerender",
+    "tools/font-subset",
+    "tools/mini-html",
+    "tools/xtask",
+]
 resolver = "2"
 
 [features]
@@ -36,15 +45,14 @@ serde_json = "1.0.154"
 toml = "1.1.8"
 futures-channel = "0.3.34"
 gloo-net = "0.7.0"
+site-model = { path = "crates/site-model" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = "0.4.45"
 
 [build-dependencies]
-comrak = "0.56.0"
-regex = "1.13.1"
-toml = "1.1.8"
-mini-html = { path = "tools/mini-html" }
+site-content = { path = "crates/site-content" }
+site-data = { path = "crates/site-data" }
 
 [profile.release]
 opt-level = "z"

@@ -1,0 +1,16 @@
+[package]
+name = "site-data"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# 站点数据生成器：搜索索引、语义/嵌入、知识图谱、markov、LDA/RAKE、
+# RSS/Atom、sitemap 与按需文章 HTML。
+# 从 build.rs 抽离，便于独立测试与按内容 hash 缓存。
+[dependencies]
+comrak = "0.56.0"
+regex = "1.13.1"
+serde_json = "1"
+site-content = { path = "../site-content" }
+site-model = { path = "../site-model" }
+mini-html = { path = "../../tools/mini-html" }

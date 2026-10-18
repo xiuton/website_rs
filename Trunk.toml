@@ -33,4 +33,4 @@ ignore = ["dist"]
 [[hooks]]
 stage = "post_build"
 command = "cargo"
-command_arguments = ["run", "--release", "--bin", "prerender"]
+command_arguments = ["run", "--release", "-p", "prerender"]

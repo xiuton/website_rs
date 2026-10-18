@@ -1,4 +1,4 @@
-use crate::build_common::*;
+use site_content::*;
 use std::path::Path;
 
 /// YYYY-MM-DD → RFC 3339（Atom 1.0 要求）

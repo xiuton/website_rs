@@ -1,3 +1,6 @@
+//! 文章内容解析：front matter、目录配置、slug 分配、文本工具。
+//!
+//! 从 `build/build_common.rs` 抽出来，构建脚本与工具共享，并可独立做单元测试。
 use comrak::Options;
 use std::collections::HashMap;
 use std::fs;
@@ -1027,6 +1030,12 @@ pub struct Rng {
     state: u64,
 }
 
+impl Default for Rng {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Rng {
     pub fn new() -> Self {
         // 基于内存地址 + 当前时间做种子
@@ -1065,4 +1074,34 @@ pub fn escape_json_string(s: &str) -> String {
         }
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn derive_title_strips_order_prefix() {
+        assert_eq!(derive_title("01-hello_world"), "hello world");
+        assert_eq!(derive_title("hello-world"), "hello world");
+    }
+
+    #[test]
+    fn escape_json_handles_quotes_and_controls() {
+        assert_eq!(escape_json_string("a\"b\\c\nd\t"), "a\\\"b\\\\c\\nd\\t");
+    }
+
+    #[test]
+    fn truncate_utf8_safe_never_splits_chars() {
+        let text = "中文内容";
+        let truncated = truncate_utf8_safe(text, 4);
+        assert_eq!(truncated, "中");
+        assert!(text.starts_with(truncated));
+    }
+
+    #[test]
+    fn date_key_extracts_digits() {
+        assert_eq!(date_key("2024-05-11 12:00"), "20240511");
+        assert_eq!(date_key(""), "00000000");
+    }
 }

@@ -1,0 +1,11 @@
+[package]
+name = "site-content"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Markdown / front matter / 系列配置解析与文本工具。
+# 供 build.rs 与独立工具复用，脱离 build script 后可单元测试。
+[dependencies]
+comrak = "0.56.0"
+toml = "1.1.8"

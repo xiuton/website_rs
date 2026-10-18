@@ -1,6 +1,6 @@
+use crate::components::PageHead;
 use crate::models::BlogPost;
 use crate::routes::Route;
-use crate::utils::title;
 use crate::BLOG_POSTS;
 use dioxus::prelude::*;
 
@@ -16,11 +16,6 @@ pub fn SeriesView(slug: String) -> Element {
         .iter()
         .find(|p| p.slug == slug && !p.series.is_empty())
         .or_else(|| BLOG_POSTS.iter().find(|p| p.catalog == slug && !p.series.is_empty()));
-
-    let page_title = entry_post
-        .map(|e| format!("{} - 干徒", e.series))
-        .unwrap_or_else(|| "系列文档 - 干徒".to_string());
-    title::set_page_title(&page_title);
 
     let info: Option<(String, Vec<&'static BlogPost>, &'static BlogPost)> = entry_post.map(|entry| {
         let series = entry.series.to_string();
@@ -44,6 +39,12 @@ pub fn SeriesView(slug: String) -> Element {
     });
 
     rsx! {
+        PageHead {
+            key: "{slug}",
+            title: entry_post.map(|e| e.series.to_string()).unwrap_or_else(|| "系列文档".to_string()),
+            description: entry_post.map(|e| e.summary.to_string()).unwrap_or_default(),
+            canonical: format!("/series/{}", slug),
+        }
         div { class: "series-container",
             {match info {
                 None => rsx! {

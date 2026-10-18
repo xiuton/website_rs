@@ -1,43 +1,4 @@
-#[path = "build/build_atom.rs"]
-mod build_atom;
-#[path = "build/build_common.rs"]
-mod build_common;
-#[path = "build/build_embeddings.rs"]
-mod build_embeddings;
-#[path = "build/build_knowledge_graph.rs"]
-mod build_knowledge_graph;
-#[path = "build/build_lda.rs"]
-mod build_lda;
-#[path = "build/build_markov.rs"]
-mod build_markov;
-#[path = "build/build_posts_json.rs"]
-mod build_posts_json;
-#[path = "build/build_rake.rs"]
-mod build_rake;
-#[path = "build/build_rss.rs"]
-mod build_rss;
-#[path = "build/build_search.rs"]
-mod build_search;
-#[path = "build/build_semantic.rs"]
-mod build_semantic;
-#[path = "build/build_seo.rs"]
-mod build_seo;
-#[path = "build/build_summaries.rs"]
-mod build_summaries;
-
-use build_atom::generate_atom_feed;
-use build_common::*;
-use build_embeddings::generate_article_embeddings;
-use build_knowledge_graph::generate_knowledge_graph;
-use build_lda::generate_lda_topics;
-use build_markov::generate_markov_chain;
-use build_posts_json::generate_posts_json;
-use build_rake::generate_rake_keywords;
-use build_rss::generate_rss_feed;
-use build_search::generate_search_index;
-use build_semantic::generate_semantic_index;
-use build_seo::generate_sitemap;
-use build_summaries::generate_ai_summaries;
+use site_content::*;
 
 use std::collections::HashMap;
 use std::env;
@@ -46,8 +7,8 @@ use std::path::Path;
 
 fn main() {
     println!("cargo:rerun-if-changed=posts");
-    // build/ 下的生成逻辑改动也要触发重跑，否则会出现「代码改了、JSON 没变」
-    println!("cargo:rerun-if-changed=build");
+    // crates/ 下的生成逻辑改动也要触发重跑，否则会出现「代码改了、JSON 没变」
+    println!("cargo:rerun-if-changed=crates");
     println!("cargo:rerun-if-changed=build.rs");
 
     let out_dir = env::var_os("OUT_DIR").expect("OUT_DIR must be set");
@@ -71,10 +32,10 @@ fn main() {
     posts.sort_by(|a, b| b.date.cmp(&a.date));
 
     // front matter 没写 summary 时，构建期生成纯文本摘要作为兜底。
-    // 客户端不再需要为此运行 comrak（见 build_posts_json::excerpt_from_markdown）。
+    // 客户端不再需要为此运行 comrak（见 site_data::build_posts_json::excerpt_from_markdown）。
     for post in &mut posts {
         if post.summary.trim().is_empty() {
-            let excerpt = build_posts_json::excerpt_from_markdown(&post.content, 150);
+            let excerpt = site_data::build_posts_json::excerpt_from_markdown(&post.content, 150);
             post.summary = if excerpt.trim().is_empty() { post.series_summary.clone() } else { excerpt };
         }
     }
@@ -119,16 +80,5 @@ fn main() {
 
     fs::write(dest_path, output).expect("Failed to write blog posts");
 
-    generate_rss_feed(&posts, out_dir.to_str().unwrap());
-    generate_atom_feed(&posts, out_dir.to_str().unwrap());
-    generate_search_index(&posts);
-    generate_semantic_index(&posts);
-    generate_article_embeddings(&posts);
-    generate_knowledge_graph(&posts);
-    generate_ai_summaries(&posts);
-    generate_markov_chain(&posts);
-    generate_rake_keywords(&posts);
-    generate_lda_topics(&posts);
-    generate_sitemap(&posts);
-    generate_posts_json(&posts);
+    site_data::generate_all(&posts, out_dir.to_str().unwrap());
 }

@@ -60,7 +60,6 @@ impl LdaData {
 }
 
 /// 加载 LDA 主题数据（会话级缓存）
-pub async fn load_lda() -> Option<LdaData> {
-    let text = crate::utils::cache::fetch_text("/static/lda-topics.json").await?;
-    serde_json::from_str(&text).ok()
+pub async fn load_lda() -> Option<std::rc::Rc<LdaData>> {
+    crate::utils::cache::fetch_typed("/static/lda-topics.json").await
 }

@@ -1,9 +1,9 @@
 //! AI 文章摘要 — 基于 TextRank 算法的提取式摘要
 //! 展示所有文章的 AI 自动摘要，支持点击跳转原文
 
+use crate::components::PageHead;
 use crate::routes::Route;
-use crate::utils::summaries::{self, ArticleSummary};
-use crate::utils::title;
+use crate::utils::summaries;
 use dioxus::prelude::*;
 
 /// 社区颜色映射
@@ -27,33 +27,21 @@ fn category_color(cat: &str) -> &'static str {
 
 #[component]
 pub fn AiSummaryView() -> Element {
-    title::set_page_title("AI 摘要 - 干徒");
-
-    let mut summaries = use_signal(Vec::<ArticleSummary>::new);
-    let mut loading = use_signal(|| true);
-    let mut error_msg = use_signal(|| Option::<String>::None);
+    // use_resource 自带 loading/error 状态，不再手写 signal + effect。
+    // 底层 load_summaries 仍然走 typed cache，重复进入页面只解析一次。
+    let summaries_resource = use_resource(|| async { summaries::load_summaries().await });
     let nav = use_navigator();
-
-    use_effect(move || {
-        spawn(async move {
-            match summaries::load_summaries().await {
-                Some(list) => {
-                    summaries.set(list);
-                    loading.set(false);
-                }
-                None => {
-                    error_msg.set(Some("无法加载 AI 摘要数据，请稍后重试。".into()));
-                    loading.set(false);
-                }
-            }
-        });
-    });
 
     let go_post = move |slug: String| {
         nav.push(Route::BlogPostView { slug });
     };
 
     rsx! {
+        PageHead {
+            title: "AI 摘要".to_string(),
+            description: "基于 TextRank 的提取式文章摘要。".to_string(),
+            canonical: "/ai-summary".to_string(),
+        }
         div { class: "ai-summary-container",
             div { class: "ai-summary-header",
                 h1 { "AI 文章摘要" }
@@ -62,19 +50,21 @@ pub fn AiSummaryView() -> Element {
                 }
             }
 
-            if loading() {
-                div { class: "ai-summary-loading",
-                    div { class: "ai-summary-spinner" }
-                    p { "TextRank 正在分析文章..." }
-                }
-            } else if let Some(ref msg) = *error_msg.read() {
-                div { class: "ai-summary-error",
-                    p { "{msg}" }
-                }
-            } else {
-                div { class: "ai-summary-list",
-                    {
-                        summaries.read().iter().map(|s| {
+            {match &*summaries_resource.read() {
+                None => rsx! {
+                    div { class: "ai-summary-loading",
+                        div { class: "ai-summary-spinner" }
+                        p { "TextRank 正在分析文章..." }
+                    }
+                },
+                Some(None) => rsx! {
+                    div { class: "ai-summary-error",
+                        p { "无法加载 AI 摘要数据，请稍后重试。" }
+                    }
+                },
+                Some(Some(list)) => rsx! {
+                    div { class: "ai-summary-list",
+                        {list.iter().map(|s| {
                             let color = category_color(&s.category);
                             rsx! {
                                 div {
@@ -110,10 +100,10 @@ pub fn AiSummaryView() -> Element {
                                     div { class: "ai-summary-read-more", "阅读全文 →" }
                                 }
                             }
-                        })
+                        })}
                     }
-                }
-            }
+                },
+            }}
         }
     }
 }

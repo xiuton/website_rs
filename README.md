@@ -36,8 +36,8 @@
 | HTTP 客户端 | gloo-net（按需加载 `static/*.json` 与文章 HTML 片段） |
 | 路由 | dioxus-router 0.7.10（通过 dioxus 的 `router` feature 启用） |
 | 构建脚本 | `build.rs` 编译期解析博客文章 |
-| 数据生成 | `build/` 目录下多个 `build_*.rs` 模块（`posts-meta.json`、`post-html/`、rss、atom、搜索索引、摘要、SEO 文件等） |
-| 预渲染工具 | `src/bin/prerender.rs`（trunk 构建后生成文章静态页与 404.html） |
+| 数据生成 | `crates/site-data`（`posts-meta.json`、`post-html/`、rss、atom、搜索索引、摘要、SEO 文件等） |
+| 预渲染工具 | `apps/prerender`（Dioxus SSR 渲染文章/系列页并注入静态 HTML，trunk 构建后运行） |
 | 字体 | MiSans, JetBrains Mono, SmileySans（构建期按用字子集化为 woff2） |
 
 ## 环境要求
@@ -114,6 +114,15 @@ trunk build --release --no-default-features
 
 构建产物输出到 `dist/` 目录。
 
+统一任务入口（本地与 CI 同一套顺序）：
+
+```bash
+cargo xtask fmt      # cargo fmt --all
+cargo xtask check    # fmt 检查 + clippy + 测试
+cargo xtask build    # trunk release 构建（自动预渲染）
+cargo xtask serve    # trunk serve
+```
+
 > **数据文件是自动生成的**：`build.rs` 把 `posts/` 解析成
 > `static/posts-meta.json`、`static/post-html/<slug>.html`、`markov.json`、
 > `search-index.json`、RSS/Atom、sitemap 等文件，Trunk 再通过
@@ -141,7 +150,7 @@ integrity 摘要写进 `index.html`，但它热重载时会替换资源文件，
 需要单独重新生成文章静态页时（一般不需要）：
 
 ```bash
-cargo run --release --bin prerender
+cargo run --release -p prerender
 ```
 
 该命令为每篇文章生成 `dist/post/<slug>/index.html` 与系列目录页，并将 `dist/index.html`
@@ -373,15 +382,6 @@ slug_prefix = "rust-guide"
 ├── .github/
 │   └── workflows/
 │       └── build.yml        # GitHub Actions CI/CD（含 SEO 预渲染步骤）
-├── build/                   # 构建期数据生成模块（build.rs 调用）
-│   ├── build_common.rs      # 共享工具：扫描 posts、front matter 解析、_config.toml、slug 分配
-│   ├── build_posts_json.rs  # 生成 posts-meta.json 与 post-html/ 片段
-│   ├── build_rss.rs         # RSS 订阅
-│   ├── build_atom.rs        # Atom 订阅
-│   ├── build_search.rs      # 搜索索引
-│   ├── build_summaries.rs   # AI 摘要分类
-│   ├── build_seo.rs         # sitemap.xml 生成
-│   └── ...                  # 其余 build_*.rs 模块
 ├── data/                    # 应用数据
 │   └── bookmarks.toml       # 书签配置
 ├── docs/                    # 设计文档
@@ -397,10 +397,15 @@ slug_prefix = "rust-guide"
 │   │   ├── 00-学习计划.md     # 章节文件无 front matter，正文直接开始
 │   │   └── ...
 │   └── ...
+├── apps/
+│   └── prerender/           # 独立的文章静态预渲染工具（不依赖 Dioxus）
+├── crates/
+│   ├── site-model/          # 构建/预渲染/前端共享的数据契约（serde）
+│   ├── site-content/        # front matter、系列配置、slug、文本工具（可单测）
+│   └── site-data/           # 搜索/语义/图谱/markov/RSS/sitemap 生成器
 ├── src/
 │   ├── bin/
-│   │   ├── new.rs           # CLI 工具：新建博客文章
-│   │   └── prerender.rs     # CLI 工具：文章静态预渲染（SEO）
+│   │   └── new.rs           # CLI 工具：新建博客文章
 │   ├── assets/
 │   │   └── playground.css   # 操场页面专用样式
 │   ├── components/          # 可复用 UI 组件
@@ -410,7 +415,7 @@ slug_prefix = "rust-guide"
 │   │   ├── navbar.rs        # 导航栏（路由、主题切换）
 │   │   └── test_layout.rs   # 测试页面专用布局
 │   ├── models/
-│   │   └── mod.rs           # 数据模型：BlogPost, RuntimeBlogPost
+│   │   └── mod.rs           # 前端静态模型：BlogPost
 │   ├── pages/               # 页面组件（对应路由）
 │   │   ├── mod.rs
 │   │   ├── about.rs         # 关于页面

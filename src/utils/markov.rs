@@ -7,29 +7,11 @@
 //! ```
 //! `tokens` 是全局字典，转移只存 `u32` 下标，避免重复保存字符串。
 
-use serde::Deserialize;
 use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 
-/// 单篇文章的马尔可夫链数据
-#[derive(Debug, Clone, Deserialize)]
-pub struct ArticleChain {
-    /// 起始 token 对（token 字典下标）
-    #[serde(default)]
-    pub s: Vec<[u32; 2]>,
-    /// 转移表：`[[prev1, prev2], [[next, count], ...]]`
-    #[serde(default)]
-    pub c: Vec<([u32; 2], Vec<[u32; 2]>)>,
-}
-
-/// 整个 markov 模型：token 字典 + 各文章转移表
-#[derive(Debug, Clone, Deserialize)]
-pub struct MarkovModel {
-    #[serde(default)]
-    pub tokens: Vec<String>,
-    #[serde(default)]
-    pub articles: HashMap<String, ArticleChain>,
-}
+// 与构建脚本、预渲染工具共用同一份 schema
+pub use site_model::{ArticleChain, MarkovModel};
 
 /// 所有文章的马尔可夫链数据（slug → ArticleChain），保留旧名字方便调用方使用
 pub type MarkovData = MarkovModel;

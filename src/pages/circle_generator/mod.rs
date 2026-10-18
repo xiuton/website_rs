@@ -1,239 +1,24 @@
+//! 圆形生成器页面。
+
+mod config;
+mod modal;
+mod render;
+
+use config::{load_config, save_all_config, PageConfig};
+use modal::{ResizeModal, ResultModal};
+use render::{render_canvas, RenderConfig};
+
+use crate::components::PageHead;
 use crate::utils::circle_generator::{generate_circles, Circle, GenerationConfig};
-use crate::utils::{storage, title};
 use dioxus::prelude::*;
-use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 
 type AnimRc = std::rc::Rc<std::cell::RefCell<Option<wasm_bindgen::prelude::Closure<dyn FnMut()>>>>;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-struct PageConfig {
-    config_width: f64,
-    config_height: f64,
-    gap: f64,
-    min_radius: f64,
-    max_radius: f64,
-    picker_speed: f64,
-    anim_duration: f64,
-    dwell_time: f64,
-}
-
-impl Default for PageConfig {
-    fn default() -> Self {
-        Self {
-            config_width: 800.0,
-            config_height: 600.0,
-            gap: 10.0,
-            min_radius: 10.0,
-            max_radius: 60.0,
-            picker_speed: 200.0,
-            anim_duration: 60.0,
-            dwell_time: 100.0,
-        }
-    }
-}
-
-fn save_config(config: &PageConfig) {
-    if let Ok(json) = serde_json::to_string(config) {
-        storage::set_circle_generator_config(&json);
-    }
-}
-
-fn load_config() -> PageConfig {
-    if let Some(json) = storage::get_circle_generator_config() {
-        if let Ok(config) = serde_json::from_str(&json) {
-            return config;
-        }
-    }
-    PageConfig::default()
-}
-
-fn save_all_config(config: &PageConfig) {
-    save_config(config);
-}
-
-fn hsl_color(index: usize, total: usize, dark_mode: bool) -> String {
-    let hue = (index as f64 / total.max(1) as f64) * 360.0;
-    if dark_mode {
-        format!("hsl({}, 70%, 70%)", hue as u32)
-    } else {
-        format!("hsl({}, 65%, 60%)", hue as u32)
-    }
-}
-
-struct RenderConfig<'a> {
-    circles: &'a [Circle],
-    config_width: f64,
-    config_height: f64,
-    fullscreen: bool,
-    highlight: Option<usize>,
-    prev_highlight: Option<usize>,
-    mask_hole: Option<(f64, f64, f64)>,
-}
-
-fn render_canvas(cfg: &RenderConfig) {
-    render_canvas_inner(cfg)
-}
-
-fn render_canvas_inner(cfg: &RenderConfig) {
-    let Some(window) = web_sys::window() else { return };
-    let Some(document) = window.document() else { return };
-
-    let Some(canvas) = document
-        .get_element_by_id("circle-canvas")
-        .and_then(|el| el.dyn_into::<web_sys::HtmlCanvasElement>().ok())
-    else {
-        return;
-    };
-
-    let dpr = window.device_pixel_ratio();
-
-    let display_width = canvas.client_width() as f64;
-    let (final_w, final_h) = if cfg.fullscreen {
-        let dh = canvas.client_height() as f64;
-        canvas.set_width((display_width * dpr) as u32);
-        canvas.set_height((dh * dpr) as u32);
-        (display_width, dh)
-    } else {
-        let dh = display_width * cfg.config_height / cfg.config_width;
-        canvas.set_width((display_width * dpr) as u32);
-        canvas.set_height((dh * dpr) as u32);
-        (display_width, dh)
-    };
-
-    let Some(ctx) = canvas
-        .get_context("2d")
-        .ok()
-        .flatten()
-        .and_then(|ctx| ctx.dyn_into::<web_sys::CanvasRenderingContext2d>().ok())
-    else {
-        return;
-    };
-
-    let is_dark = document
-        .document_element()
-        .map(|el| el.matches(".dark").unwrap_or(false))
-        .unwrap_or(false);
-
-    let _ = ctx.set_transform(dpr, 0.0, 0.0, dpr, 0.0, 0.0);
-    ctx.clear_rect(0.0, 0.0, final_w, final_h);
-
-    let bg_color = if is_dark { "#1a1a1a" } else { "#f8f9fa" };
-    ctx.set_fill_style_str(bg_color);
-    ctx.fill_rect(0.0, 0.0, final_w, final_h);
-
-    let scale_x = final_w / cfg.config_width;
-    let scale_y = final_h / cfg.config_height;
-
-    for (i, circle) in cfg.circles.iter().enumerate() {
-        let color = hsl_color(i, cfg.circles.len(), is_dark);
-
-        let cx = circle.x * scale_x;
-        let cy = circle.y * scale_y;
-        let cr = circle.radius * scale_x;
-
-        ctx.begin_path();
-        let _ = ctx.arc(cx, cy, cr, 0.0, std::f64::consts::PI * 2.0);
-        ctx.set_fill_style_str(&color);
-        ctx.set_global_alpha(if is_dark { 0.6 } else { 0.5 });
-        ctx.fill();
-        ctx.set_global_alpha(1.0);
-        ctx.set_stroke_style_str(&color);
-        ctx.set_line_width(2.0);
-        ctx.stroke();
-
-        let text_color = if is_dark { "#ccc" } else { "#333" };
-        ctx.set_fill_style_str(text_color);
-        ctx.set_font("11px sans-serif");
-        ctx.set_text_align("center");
-        ctx.set_text_baseline("middle");
-        let _ = ctx.fill_text(&format!("{}", i + 1), cx, cy);
-    }
-
-    if let (Some(prev), Some(cur)) = (cfg.prev_highlight, cfg.highlight) {
-        if prev != cur {
-            if let (Some(pc), Some(cc)) = (cfg.circles.get(prev), cfg.circles.get(cur)) {
-                let px = pc.x * scale_x;
-                let py = pc.y * scale_y;
-                let cx2 = cc.x * scale_x;
-                let cy2 = cc.y * scale_y;
-
-                ctx.save();
-                ctx.set_stroke_style_str("#ffd700");
-                ctx.set_line_width(2.5);
-                ctx.set_global_alpha(0.5);
-                ctx.set_shadow_blur(12.0);
-                ctx.set_shadow_color("#ffd700");
-
-                let dash = js_sys::Array::new();
-                dash.push(&wasm_bindgen::JsValue::from_f64(6.0));
-                dash.push(&wasm_bindgen::JsValue::from_f64(4.0));
-                let _ = ctx.set_line_dash(&dash);
-
-                ctx.begin_path();
-                ctx.move_to(px, py);
-                ctx.line_to(cx2, cy2);
-                ctx.stroke();
-
-                ctx.set_shadow_blur(0.0);
-                ctx.set_global_alpha(1.0);
-                ctx.set_line_dash(&js_sys::Array::new()).ok();
-                ctx.restore();
-            }
-        }
-    }
-
-    let mask_pos = cfg.mask_hole.or_else(|| {
-        cfg.highlight.and_then(|idx| {
-            cfg.circles
-                .get(idx)
-                .map(|c| (c.x * scale_x, c.y * scale_y, c.radius * scale_x + 4.0))
-        })
-    });
-
-    if let Some((hole_cx, hole_cy, hole_cr)) = mask_pos {
-        ctx.save();
-        ctx.begin_path();
-        ctx.rect(0.0, 0.0, final_w, final_h);
-        let _ = ctx.arc_with_anticlockwise(hole_cx, hole_cy, hole_cr, 0.0, std::f64::consts::PI * 2.0, true);
-        ctx.clip();
-
-        ctx.set_fill_style_str(if is_dark { "rgba(0,0,0,0.55)" } else { "rgba(0,0,0,0.35)" });
-        ctx.fill_rect(0.0, 0.0, final_w, final_h);
-        ctx.restore();
-    }
-
-    if let Some(idx) = cfg.highlight {
-        if let Some(circle) = cfg.circles.get(idx) {
-            let cx = circle.x * scale_x;
-            let cy = circle.y * scale_y;
-            let cr = circle.radius * scale_x + 4.0;
-
-            ctx.begin_path();
-            let _ = ctx.arc(cx, cy, cr, 0.0, std::f64::consts::PI * 2.0);
-            ctx.set_fill_style_str("#ffd700");
-            ctx.set_global_alpha(0.9);
-            ctx.fill();
-            ctx.set_global_alpha(1.0);
-            ctx.set_stroke_style_str("#ff8c00");
-            ctx.set_line_width(4.0);
-            ctx.stroke();
-
-            ctx.set_fill_style_str(if is_dark { "#fff" } else { "#000" });
-            ctx.set_font("bold 14px sans-serif");
-            ctx.set_text_align("center");
-            ctx.set_text_baseline("middle");
-            let _ = ctx.fill_text(&format!("{}", idx + 1), cx, cy);
-        }
-    }
-}
-
 #[component]
 pub fn CircleGenerator() -> Element {
-    title::set_page_title("圆形生成器 - 干徒");
-
     let cfg = load_config();
     let mut circles = use_signal(Vec::<Circle>::new);
     let mut config_width = use_signal(|| cfg.config_width);
@@ -625,6 +410,11 @@ pub fn CircleGenerator() -> Element {
     }
 
     rsx! {
+        PageHead {
+            title: "圆形生成器".to_string(),
+            description: "圆形排布生成与挑选实验。".to_string(),
+            canonical: "/circle-generator".to_string(),
+        }
             div {
                 id: "circle-generator-page",
                 class: "circle-generator-page",
@@ -1249,88 +1039,24 @@ pub fn CircleGenerator() -> Element {
                 }
 
                 if show_modal() {
-                    div { class: "cg-modal-overlay",
-                        div { class: "cg-modal",
-                            div { class: "cg-modal-header",
-                                span { "选取结果" }
-                                button {
-                                    class: "cg-modal-close",
-                                    onclick: move |_| show_modal.set(false),
-                                    "\u{2716}"
-                                }
-                            }
-                            div { class: "cg-modal-body",
-                                {selected_circle().map(|(idx, circle)| {
-                                    rsx! {
-                                        div { class: "cg-result-info",
-                                            div { class: "cg-result-row",
-                                                span { class: "cg-result-label", "编号" }
-                                                span { class: "cg-result-value", "{idx + 1}" }
-                                            }
-                                            div { class: "cg-result-row",
-                                                span { class: "cg-result-label", "X 坐标" }
-                                                span { class: "cg-result-value", "{circle.x:.1}" }
-                                            }
-                                            div { class: "cg-result-row",
-                                                span { class: "cg-result-label", "Y 坐标" }
-                                                span { class: "cg-result-value", "{circle.y:.1}" }
-                                            }
-                                            div { class: "cg-result-row",
-                                                span { class: "cg-result-label", "半径" }
-                                                span { class: "cg-result-value", "{circle.radius:.1}" }
-                                            }
-                                        }
-                                    }
-                                })}
-                            }
-                            div { class: "cg-modal-footer",
-                                button {
-                                    class: "cg-btn",
-                                    onclick: move |_| show_modal.set(false),
-                                    "关闭"
-                                }
-                            }
-                        }
-                }
+                    ResultModal {
+                        selected: selected_circle(),
+                        on_close: move |_| show_modal.set(false),
+                    }
                 }
 
                 if resize_pending() {
-                    div { class: "cg-modal-overlay",
-                        div { class: "cg-modal cg-resize-modal",
-                            div { class: "cg-modal-header",
-                                span { "窗口大小已变化" }
-                                button {
-                                    class: "cg-modal-close",
-                                    onclick: move |_| resize_pending.set(false),
-                                    "\u{2716}"
-                                }
-                            }
-                            div { class: "cg-modal-body",
-                                div { class: "cg-resize-info",
-                                    span { "检测到浏览器窗口大小已变化，是否重新生成圆形以适配新尺寸？" }
-                                }
-                            }
-                            div { class: "cg-modal-footer",
-                                button {
-                                    class: "cg-btn",
-                                    onclick: move |_| resize_pending.set(false),
-                                    "取消"
-                                }
-                                button {
-                                    class: "cg-btn cg-btn-primary",
-                                    onclick: move |_| {
-                                        resize_pending.set(false);
-                                        let Some(window) = web_sys::window() else { return; };
-                                        let ww = window.inner_width().ok().and_then(|w| w.as_f64()).unwrap_or(0.0);
-                                        let wh = window.inner_height().ok().and_then(|h| h.as_f64()).unwrap_or(0.0);
-                                        config_width.set(ww);
-                                        config_height.set(wh);
-                                        generate();
-                                    },
-                                    "重新生成"
-                                }
-                            }
-                        }
+                    ResizeModal {
+                        on_close: move |_| resize_pending.set(false),
+                        on_regenerate: move |_| {
+                            resize_pending.set(false);
+                            let Some(window) = web_sys::window() else { return; };
+                            let ww = window.inner_width().ok().and_then(|w| w.as_f64()).unwrap_or(0.0);
+                            let wh = window.inner_height().ok().and_then(|h| h.as_f64()).unwrap_or(0.0);
+                            config_width.set(ww);
+                            config_height.set(wh);
+                            generate();
+                        },
                     }
                 }
             }

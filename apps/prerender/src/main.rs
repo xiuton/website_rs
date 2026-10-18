@@ -1,7 +1,7 @@
 //! 文章静态预渲染工具（SEO 优化）
 //!
 //! 在 `trunk build` 之后运行，用法：
-//!   cargo run --release --bin prerender
+//!   cargo run --release -p prerender
 //!
 //! 功能：
 //! 1. 读取 static/posts-meta.json（元数据）与 static/post-html/*.html（正文），为每篇文章生成
@@ -11,41 +11,59 @@
 
 #[cfg(not(target_arch = "wasm32"))]
 mod prerender_impl {
+    use dioxus::prelude::*;
+    use dioxus_history::{History, MemoryHistory};
+    use dioxus_router::components::HistoryProvider;
     use serde::Deserialize;
+    use site_model::{PostMeta, PostsMeta};
     use std::collections::BTreeSet;
     use std::fs;
-    use std::path::Path;
+    use std::ops::Deref;
+    use std::path::{Path, PathBuf};
+    use std::rc::Rc;
+    use std::time::Duration;
+
+    #[derive(Props, Clone, PartialEq)]
+    struct SsrAppProps {
+        at: String,
+    }
+
+    #[component]
+    fn SsrApp(props: SsrAppProps) -> Element {
+        rsx! {
+            HistoryProvider {
+                history: move |_| Rc::new(MemoryHistory::with_initial_path(props.at.clone())) as Rc<dyn History>,
+                Router::<web_rs::Route> {}
+            }
+        }
+    }
+
+    /// 用真实 Dioxus 组件渲染一个路由，供静态页复用，避免再维护一套手写 HTML。
+    fn render_route(path: &str) -> Result<String, String> {
+        let mut vdom = VirtualDom::new_with_props(SsrApp, SsrAppProps { at: path.to_string() });
+        vdom.rebuild_in_place();
+        Ok(dioxus_ssr::render(&vdom))
+    }
 
     const SITE: &str = "https://ganto.me";
     const OG_IMAGE: &str = "https://ganto.me/static/images/og-image.png";
     const DIST: &str = "dist";
 
+    /// 共享的 PostMeta + 从 post-html 读取的正文。
     #[derive(Deserialize)]
-    struct PostJson {
-        slug: String,
-        title: String,
-        date: String,
-        #[serde(default)]
-        author: String,
-        #[serde(default)]
-        tags: Vec<String>,
-        #[serde(default)]
-        summary: String,
-        #[serde(default)]
+    struct PostData {
+        #[serde(flatten)]
+        meta: PostMeta,
+        #[serde(skip)]
         content_html: String,
-        #[serde(default)]
-        series: String,
-        /// 章节序号：排序已改用 sort_key，这里仅保留字段以便对照调试
-        #[serde(default)]
-        #[allow(dead_code)]
-        order: i32,
-        /// 系列内排序键（build.rs 预计算：显式 order → 时间 → 标题）
-        #[serde(default)]
-        sort_key: String,
-        #[serde(default)]
-        filename: String,
-        #[serde(default)]
-        catalog: String,
+    }
+
+    impl Deref for PostData {
+        type Target = PostMeta;
+
+        fn deref(&self) -> &Self::Target {
+            &self.meta
+        }
     }
 
     /// HTML 属性/文本转义
@@ -164,7 +182,7 @@ mod prerender_impl {
     }
 
     /// 提取文章描述：优先 summary，否则从正文 HTML 取纯文本
-    fn extract_description(post: &PostJson) -> String {
+    fn extract_description(post: &PostData) -> String {
         let summary = post.summary.trim();
         if !summary.is_empty() {
             return summary.chars().take(160).collect();
@@ -183,55 +201,6 @@ mod prerender_impl {
         let text = text.split_whitespace().collect::<Vec<_>>().join(" ").trim().to_string();
         text.chars().take(160).collect()
     }
-
-    /// SPA 导航栏的静态 HTML（复用同一套 .navbar-* 样式类，外观与 SPA 完全一致）
-    /// 交互降级：sticky/涟漪依赖 JS 不可用；主题切换由下方内联脚本处理。
-    /// 链接列表来自 `web_rs::nav::PUBLIC_NAV_LINKS`，与 Dioxus 导航栏共用同一份数据。
-    const NAVBAR_TEMPLATE: &str = r#"<div class="navbar-content">
-    <div class="navbar-ui">
-        <div class="navbar-title-wrapper">
-            <h1 class="navbar-title">干徒</h1>
-            <div class="navbar-glow"></div>
-        </div>
-        <div class="navbar-subtitle">这很酷</div>
-    </div>
-</div>
-<div class="navbar-sticky-wrap">
-    <div class="navbar-links">
-        <!--NAV_LINKS-->
-        <a class="nav-icon-btn rss-toggle" href="/rss" title="RSS 订阅" aria-label="RSS 订阅">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"/></svg>
-        </a>
-        <button class="nav-icon-btn theme-toggle" id="prerender-theme-toggle" aria-label="切换主题" title="切换主题">
-            <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
-            <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="16" height="16" fill="currentColor"><path d="M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"/></svg>
-        </button>
-    </div>
-</div>"#;
-
-    /// 用共享链接数据填充导航栏模板
-    fn navbar_html() -> String {
-        let mut links = String::new();
-        for (href, label) in web_rs::nav::PUBLIC_NAV_LINKS {
-            if *href == "/dev" {
-                links.push_str(&format!(
-                    r#"<div class="nav-item-with-sub"><a class="nav-link" href="{href}">{label}</a><div class="nav-submenu"><a class="nav-sub-link" href="/circle-generator">圆形生成器</a></div></div>"#
-                ));
-            } else {
-                links.push_str(&format!(r#"<a class="nav-link" href="{href}">{label}</a>"#));
-            }
-        }
-        NAVBAR_TEMPLATE.replace("<!--NAV_LINKS-->", &links)
-    }
-
-    /// SPA 页脚的静态 HTML（复用 .footer-content 样式）
-    const FOOTER_HTML: &str = r#"<footer class="footer-content">
-    <div class="copyright">
-        <span>2019-2026 </span>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"/></svg>
-        <span> 干徒 / Ganto</span>
-    </div>
-</footer>"#;
 
     /// 主题初始化 + 静态页主题切换按钮（无涟漪动画）+ URL 规范化
     /// URL 规范化：去掉路径尾斜杠（刷新时静态服务器会 301 到带斜杠地址），
@@ -283,81 +252,15 @@ try{{
         )
     }
 
-    /// 生成系列章节导航 HTML（与 SPA 中的 .series-nav 结构一致）
-    fn series_nav_html(post: &PostJson, all_posts: &[PostJson]) -> String {
-        if post.series.is_empty() {
-            return String::new();
-        }
-        let mut chapters: Vec<&PostJson> = all_posts.iter().filter(|q| q.series == post.series).collect();
-        chapters.sort_by(|a, b| a.sort_key.cmp(&b.sort_key).then_with(|| a.filename.cmp(&b.filename)));
-        let idx = chapters.iter().position(|q| q.slug == post.slug).unwrap_or(0);
-        let total = chapters.len();
-
-        // 与 SPA 保持一致：目录页路径取首章的 catalog（为空则退回 slug）
-        let catalog = chapters
-            .first()
-            .map(|c| if c.catalog.is_empty() { c.slug.clone() } else { c.catalog.clone() })
-            .unwrap_or_default();
-
-        let mut list = String::new();
-        for (i, ch) in chapters.iter().enumerate() {
-            let active = i == idx;
-            let current_badge = if active {
-                "<span class=\"series-nav-item-now\">本篇</span>".to_string()
-            } else {
-                String::new()
-            };
-            list.push_str(&format!(
-                "<a class=\"series-nav-item{}\" href=\"/post/{}/\"><span class=\"series-nav-item-index\">{}</span><span class=\"series-nav-item-title\">{}</span>{}</a>",
-                if active { " active" } else { "" },
-                ch.slug,
-                i + 1,
-                esc(&ch.title),
-                current_badge,
-            ));
-        }
-
-        let prev_html = if idx > 0 {
-            let prev = chapters[idx - 1];
-            format!(
-                "<a class=\"series-nav-page prev\" href=\"/post/{}/\"><span class=\"series-nav-page-label\">上一篇</span><span class=\"series-nav-page-title\">{}</span></a>",
-                prev.slug,
-                esc(&prev.title),
-            )
-        } else {
-            "<span class=\"series-nav-page disabled\">已经是第一章</span>".to_string()
-        };
-
-        let next_html = if let Some(next) = chapters.get(idx + 1) {
-            format!(
-                "<a class=\"series-nav-page next\" href=\"/post/{}/\"><span class=\"series-nav-page-label\">下一篇</span><span class=\"series-nav-page-title\">{}</span></a>",
-                next.slug,
-                esc(&next.title),
-            )
-        } else {
-            "<span class=\"series-nav-page disabled\">已经是最后一章</span>".to_string()
-        };
-
-        format!(
-            "<div class=\"series-nav\"><div class=\"series-nav-actions\"><a class=\"series-nav-btn\" href=\"/series/{}/\">目录页</a></div><details class=\"series-nav-details\"><summary class=\"series-nav-summary\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"section-icon\"><path d=\"M4 19.5A2.5 2.5 0 0 1 6.5 17H20\"/><path d=\"M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z\"/></svg><div class=\"series-nav-heading\"><span class=\"series-nav-title\">{}</span><span class=\"series-nav-count\">共 {} 章</span></div><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"series-nav-chevron\"><path d=\"m6 9 6 6 6-6\"/></svg></summary><div class=\"series-nav-list\">{}</div></details><div class=\"series-nav-pager\">{}{}</div></div>",
-            esc(&catalog),
-            esc(&post.series),
-            total,
-            list,
-            prev_html,
-            next_html,
-        )
-    }
-
-    /// 生成单篇文章的预渲染 HTML
+    /// 生成单篇文章的预渲染 HTML（正文由 Dioxus SSR 渲染）
     fn render_page(
-        post: &PostJson,
-        all_posts: &[PostJson],
+        post: &PostData,
+        _all_posts: &[PostData],
         css: &str,
         preloads: &str,
         vars_style: &str,
         wasm_script: &str,
-    ) -> String {
+    ) -> Result<String, String> {
         let title = &post.title;
         let date: String = post.date.chars().take(10).collect();
         let author = if post.author.trim().is_empty() { "干徒" } else { &post.author };
@@ -365,13 +268,28 @@ try{{
         let url = format!("{}/post/{}", SITE, post.slug);
         let keywords = post.tags.join(", ");
 
-        let tag_html: String = post
-            .tags
-            .iter()
-            .map(|t| format!("<span class=\"blog-tag\">{}</span>", esc(t)))
-            .collect();
-
-        let series_html = series_nav_html(post, all_posts);
+        let content_html = strip_scripts(&post.content_html);
+        web_rs::ssr::set_content(&post.slug, &content_html);
+        web_rs::components::head::reset_ssr_head();
+        let ssr_html = render_route(&format!("/post/{}", post.slug))?;
+        let head = web_rs::components::head::take_ssr_head();
+        let page_title = head
+            .as_ref()
+            .map(|h| h.title.clone())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| title.to_string());
+        let page_desc = head
+            .as_ref()
+            .map(|h| h.description.clone())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| desc.clone());
+        let page_url = head
+            .as_ref()
+            .map(|h| h.canonical.clone())
+            .filter(|s| !s.is_empty())
+            .map(|s| if s.starts_with("http") { s } else { format!("{SITE}{s}") })
+            .unwrap_or_else(|| url.clone());
+        let article_clear_script = make_article_clear_script(&post.slug);
 
         let jsonld = format!(
             r#"{{"@context":"https://schema.org","@type":"BlogPosting","headline":{},"description":{},"url":{},"datePublished":{},"dateModified":{},"inLanguage":"zh-CN","image":{},"author":{{"@type":"Person","name":{}}},"keywords":{},"publisher":{{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}}}"#,
@@ -385,33 +303,30 @@ try{{
             json_escape(&keywords),
         );
 
-        let content_html = strip_scripts(&post.content_html);
-        let article_clear_script = make_article_clear_script(&post.slug);
-
-        format!(
+        Ok(format!(
             r#"<!DOCTYPE html>
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title} - 干徒</title>
-    <meta name="description" content="{desc}">
+    <title>{page_title} - 干徒</title>
+    <meta name="description" content="{page_desc}">
     <meta name="author" content="{author}">
     <meta name="keywords" content="{keywords}">
-    <link rel="canonical" href="{url}">
-    <meta property="og:title" content="{title} - 干徒">
-    <meta property="og:description" content="{desc}">
+    <link rel="canonical" href="{page_url}">
+    <meta property="og:title" content="{page_title} - 干徒">
+    <meta property="og:description" content="{page_desc}">
     <meta property="og:type" content="article">
-    <meta property="og:url" content="{url}">
+    <meta property="og:url" content="{page_url}">
     <meta property="og:site_name" content="干徒的博客">
     <meta property="og:locale" content="zh_CN">
     <meta property="og:image" content="{og_image}">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="{title} - 干徒">
+    <meta property="og:image:alt" content="{page_title} - 干徒">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="{title} - 干徒">
-    <meta name="twitter:description" content="{desc}">
+    <meta name="twitter:title" content="{page_title} - 干徒">
+    <meta name="twitter:description" content="{page_desc}">
     <meta name="twitter:image" content="{og_image}">
     <script type="application/ld+json">
 {jsonld}
@@ -422,8 +337,6 @@ try{{
 {vars_style}
     </style>
     <style>
-        .prerender-article {{ max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }}
-        .prerender-meta {{ display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }}
         .theme-toggle .icon-sun {{ display: none; }}
         .dark .theme-toggle .icon-sun {{ display: inline; }}
         .dark .theme-toggle .icon-moon {{ display: none; }}
@@ -433,63 +346,39 @@ try{{
     </script>
 </head>
 <body>
-    <div id="main">
-        <div class="app">
-{navbar}
-        <main class="main-content">
-            <article class="blog-post prerender-article">
-                <h1>{title}</h1>
-                <div class="prerender-meta">
-                    <span>{date}</span>
-                    <span>{author}</span>
-                </div>
-                <div class="blog-tags">{tag_html}</div>
-                <div class="blog-content">
-{content_html}
-                </div>
-                {series_html}
-            </article>
-        </main>
-{footer}
-        </div>
-    </div>
+    <div id="main">{ssr_html}</div>
 {article_clear_script}
 {wasm_script}
 </body>
 </html>
 "#,
-            title = esc(title),
-            desc = esc(&desc),
+            page_title = esc(&page_title),
+            page_desc = esc(&page_desc),
             author = esc(author),
             keywords = esc(&keywords),
-            url = url,
+            page_url = page_url,
             og_image = OG_IMAGE,
             jsonld = jsonld,
             css = css,
             preloads = preloads,
             vars_style = vars_style,
             theme_script = THEME_SCRIPT,
-            navbar = navbar_html(),
-            footer = FOOTER_HTML,
-            date = esc(&date),
-            tag_html = tag_html,
-            content_html = content_html,
             article_clear_script = article_clear_script,
-            series_html = series_html,
+            ssr_html = ssr_html,
             wasm_script = wasm_script,
-        )
+        ))
     }
 
     /// 生成系列（多章节文档）目录页的预渲染 HTML
     fn series_page_html(
-        entry: &PostJson,
-        chapters: &[&PostJson],
+        entry: &PostData,
+        chapters: &[&PostData],
         series_id: &str,
         css: &str,
         preloads: &str,
         vars_style: &str,
         wasm_script: &str,
-    ) -> String {
+    ) -> Result<String, String> {
         let total = chapters.len();
         let author = if entry.author.trim().is_empty() { "干徒" } else { &entry.author };
         let desc = if entry.summary.trim().is_empty() {
@@ -498,43 +387,48 @@ try{{
             entry.summary.clone()
         };
         let url = format!("{}/series/{}", SITE, series_id);
-        let first_slug = &chapters[0].slug;
-        let last_date = chapters.iter().map(|c| c.date.as_str()).max().unwrap_or(&entry.date);
+        web_rs::components::head::reset_ssr_head();
+        let ssr_html = render_route(&format!("/series/{series_id}"))?;
+        let head = web_rs::components::head::take_ssr_head();
+        let page_title = head
+            .as_ref()
+            .map(|h| h.title.clone())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| entry.series.clone());
+        let page_desc = head
+            .as_ref()
+            .map(|h| h.description.clone())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| desc.clone());
+        let page_url = head
+            .as_ref()
+            .map(|h| h.canonical.clone())
+            .filter(|s| !s.is_empty())
+            .map(|s| if s.starts_with("http") { s } else { format!("{SITE}{s}") })
+            .unwrap_or_else(|| url.clone());
 
-        let mut list = String::new();
-        for (i, ch) in chapters.iter().enumerate() {
-            list.push_str(&format!(
-                "<a class=\"series-chapter-card\" href=\"/post/{}/\"><span class=\"series-chapter-index\">{}</span><div class=\"series-chapter-body\"><h3 class=\"series-chapter-title\">{}</h3><p class=\"series-chapter-summary\">{}</p><span class=\"series-chapter-date\">{}</span></div></a>",
-                ch.slug,
-                i + 1,
-                esc(&ch.title),
-                if ch.summary.trim().is_empty() { String::new() } else { esc(&ch.summary) },
-                esc(&ch.date),
-            ));
-        }
-
-        format!(
+        Ok(format!(
             r#"<!DOCTYPE html>
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{series} - 干徒</title>
-    <meta name="description" content="{desc}">
+    <title>{page_title} - 干徒</title>
+    <meta name="description" content="{page_desc}">
     <meta name="author" content="{author}">
-    <link rel="canonical" href="{url}">
-    <meta property="og:title" content="{series} - 干徒">
-    <meta property="og:description" content="{desc}">
+    <link rel="canonical" href="{page_url}">
+    <meta property="og:title" content="{page_title} - 干徒">
+    <meta property="og:description" content="{page_desc}">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="{url}">
+    <meta property="og:url" content="{page_url}">
     <meta property="og:site_name" content="干徒的博客">
     <meta property="og:locale" content="zh_CN">
     <meta property="og:image" content="{og_image}">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="{series} - 干徒">
-    <meta name="twitter:description" content="{desc}">
+    <meta name="twitter:title" content="{page_title} - 干徒">
+    <meta name="twitter:description" content="{page_desc}">
     <link rel="stylesheet" href="{css}">
 {preloads}
     <style>
@@ -550,64 +444,64 @@ try{{
     </script>
 </head>
 <body>
-    <div id="main">
-        <div class="app">
-{navbar}
-        <main class="main-content">
-            <div class="series-container">
-                <div class="series-hero">
-                    <div class="series-hero-tag">系列文档</div>
-                    <h1 class="series-hero-title">{series}</h1>
-                    <p class="series-hero-desc">{desc}</p>
-                    <div class="series-hero-meta">
-                        <span>共 {total} 章</span>
-                        <span>作者：{author}</span>
-                        <span>最后更新：{last_date}</span>
-                    </div>
-                    <a class="series-start-btn" href="/post/{first_slug}/">开始阅读 →</a>
-                </div>
-                <div class="series-chapter-list">{list}</div>
-            </div>
-        </main>
-{footer}
-        </div>
-    </div>
+    <div id="main">{ssr_html}</div>
 {clear_script}
 {wasm_script}
 </body>
 </html>
 "#,
-            series = esc(&entry.series),
-            desc = esc(&desc),
+            page_title = esc(&page_title),
+            page_desc = esc(&page_desc),
             author = esc(author),
-            url = url,
+            page_url = page_url,
             og_image = OG_IMAGE,
             css = css,
             preloads = preloads,
             vars_style = vars_style,
             theme_script = THEME_SCRIPT,
-            navbar = navbar_html(),
-            footer = FOOTER_HTML,
-            total = total,
-            first_slug = first_slug,
-            last_date = esc(last_date),
-            list = list,
             clear_script = CLEAR_SCRIPT,
+            ssr_html = ssr_html,
             wasm_script = wasm_script,
-        )
+        ))
+    }
+
+    /// 移除 Trunk 注入的 autoreload WebSocket 脚本。
+    ///
+    /// `trunk build` 在部分缓存/热重载组合下会把 `{{__TRUNK_ADDRESS__}}`
+    /// 占位符原样留在 dist/index.html，生产环境会产生一条无意义的 WebSocket
+    /// 连接错误。预渲染阶段统一剔除。
+    fn strip_trunk_autoreload(html: &str) -> String {
+        let mut out = String::with_capacity(html.len());
+        let mut rest = html;
+        while let Some(start) = rest.find("<script") {
+            let Some(rel_end) = rest[start..].find("</script>") else {
+                break;
+            };
+            let end = start + rel_end + "</script>".len();
+            let block = &rest[start..end];
+            if block.contains(".well-known/trunk/ws") {
+                out.push_str(&rest[..start]);
+                rest = &rest[end..];
+            } else {
+                out.push_str(&rest[..end]);
+                rest = &rest[end..];
+            }
+        }
+        out.push_str(rest);
+        out
     }
 
     /// 给首页注入 `<noscript>` 文章列表与 ItemList JSON-LD。
     ///
     /// 只在 `/` 的 HTML 上做，SPA 渲染时 `<noscript>` 不显示，不影响交互；
     /// 未执行 JS 的爬虫仍能拿到最新文章的标题与链接。
-    fn inject_home_seo(index_html: &str, posts: &[PostJson]) -> String {
+    fn inject_home_seo(index_html: &str, posts: &[PostData]) -> String {
         const MARKER: &str = "id=\"noscript-posts\"";
         if index_html.contains(MARKER) {
             return index_html.to_string();
         }
 
-        let latest: Vec<&PostJson> = posts
+        let latest: Vec<&PostData> = posts
             .iter()
             .filter(|p| !p.slug.is_empty() && !p.title.is_empty())
             .take(20)
@@ -645,17 +539,38 @@ try{{
         index_html.replacen("</body>", &format!("{block}\n</body>"), 1)
     }
 
+    /// Trunk 的 post_build hook 可能在资源 staging 完成前就启动。
+    /// 现在 prerender 编译只要几秒，必须显式等待 `.stage/index.html` 出现。
+    fn wait_for_dist() -> Result<PathBuf, String> {
+        for _ in 0..600 {
+            let stage = Path::new("dist/.stage");
+            if stage.is_dir() {
+                return Ok(stage.to_path_buf());
+            }
+            if Path::new(DIST).join("index.html").is_file() {
+                return Ok(Path::new(DIST).to_path_buf());
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        Err("等待 dist/.stage 超时".to_string())
+    }
+
+    fn wait_for_index(dist: &Path) -> Result<(), String> {
+        let index = dist.join("index.html");
+        for _ in 0..600 {
+            if index.is_file() {
+                return Ok(());
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        Err(format!("等待 {} 超时", index.display()))
+    }
+
     pub fn run() -> Result<(), String> {
         // Trunk 的 post_build hook 在资源发布前触发：此时产物还在 dist/.stage/。
         // 写入 .stage 后由 Trunk 统一挪到 dist/，这样 hook 与手工执行都能正常工作。
-        let dist = if Path::new("dist/.stage").is_dir() {
-            Path::new("dist/.stage")
-        } else {
-            Path::new(DIST)
-        };
-        if !dist.is_dir() {
-            return Err(format!("dist directory not found: {}", DIST));
-        }
+        let dist = wait_for_dist()?;
+        wait_for_index(&dist)?;
 
         let index_path = dist.join("index.html");
         let index_html =
@@ -667,7 +582,19 @@ try{{
         let posts_path = Path::new("static").join("posts-meta.json");
         let posts_json =
             fs::read_to_string(&posts_path).map_err(|e| format!("读取 {} 失败: {e}", posts_path.display()))?;
-        let mut posts: Vec<PostJson> = serde_json::from_str(&posts_json).map_err(|e| e.to_string())?;
+        let posts_file: PostsMeta = serde_json::from_str(&posts_json).map_err(|e| e.to_string())?;
+        if posts_file.schema_version != site_model::SCHEMA_VERSION {
+            eprintln!(
+                "warning: posts-meta schema {} != expected {}",
+                posts_file.schema_version,
+                site_model::SCHEMA_VERSION
+            );
+        }
+        let mut posts: Vec<PostData> = posts_file
+            .posts
+            .into_iter()
+            .map(|meta| PostData { meta, content_html: String::new() })
+            .collect();
 
         let html_dir = Path::new("static").join("post-html");
         let mut missing_html = 0usize;
@@ -691,7 +618,7 @@ try{{
             }
             let out_dir = dist.join("post").join(&post.slug);
             fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
-            let page = render_page(post, &posts, &css, &preloads, &vars_style, &wasm_script);
+            let page = render_page(post, &posts, &css, &preloads, &vars_style, &wasm_script)?;
             fs::write(out_dir.join("index.html"), page).map_err(|e| e.to_string())?;
             count += 1;
         }
@@ -708,7 +635,7 @@ try{{
             if series_key.is_empty() || post.slug.is_empty() || !seen_series.insert(series_key.clone()) {
                 continue;
             }
-            let mut chapters: Vec<&PostJson> = posts
+            let mut chapters: Vec<&PostData> = posts
                 .iter()
                 .filter(|q| {
                     let q_key = if !q.series.is_empty() && !q.catalog.is_empty() {
@@ -724,14 +651,14 @@ try{{
             let series_id = series_key;
             let out_dir = dist.join("series").join(&series_id);
             fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
-            let page = series_page_html(entry, &chapters, &series_id, &css, &preloads, &vars_style, &wasm_script);
+            let page = series_page_html(entry, &chapters, &series_id, &css, &preloads, &vars_style, &wasm_script)?;
             fs::write(out_dir.join("index.html"), page).map_err(|e| e.to_string())?;
             series_count += 1;
         }
 
         // 首页 SEO：给 SPA 首页补一份 <noscript> 文章列表 + ItemList 结构化数据。
         // 这样禁用 JS 的爬虫/读者也能看到最新文章入口，同时不影响 SPA 渲染。
-        let index_with_seo = inject_home_seo(&index_html, &posts);
+        let index_with_seo = inject_home_seo(&strip_trunk_autoreload(&index_html), &posts);
         fs::write(&index_path, index_with_seo).map_err(|e| e.to_string())?;
 
         // GitHub Pages SPA 兜底：未知路径加载 404.html（内容与 index.html 一致）
@@ -747,6 +674,19 @@ try{{
 
         println!("[prerender] generated {} post pages + {} series pages + 404.html, css={}", count, series_count, css);
         Ok(())
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn ssr_about_uses_shared_layout() {
+            let html = render_route("/about").expect("render /about");
+            assert!(html.contains("navbar-content"));
+            assert!(html.contains("footer-content"));
+            assert!(html.contains("main-content"));
+        }
     }
 }
 

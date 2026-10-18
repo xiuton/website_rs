@@ -3,10 +3,10 @@ use std::collections::BTreeSet;
 use web_sys::UrlSearchParams;
 
 use crate::components::icons::{ChevronLeftIcon, ChevronRightIcon, TagIcon};
+use crate::components::PageHead;
 use crate::models::BlogPost;
 use crate::routes::Route;
 use crate::utils::storage;
-use crate::utils::title;
 use crate::BLOG_POSTS;
 
 const ALL_CATEGORY: &str = "全部";
@@ -25,8 +25,6 @@ fn get_page_size(size_from_url: Option<usize>) -> usize {
 pub fn Home() -> Element {
     let posts = use_signal(|| BLOG_POSTS.iter().collect::<Vec<&BlogPost>>());
     let mut selected_category = use_signal(|| ALL_CATEGORY.to_string());
-
-    title::set_page_title("首页 - 干徒");
 
     let mut current_page = use_signal(|| 1);
     let mut page_size = use_signal(|| 10);
@@ -157,6 +155,11 @@ pub fn Home() -> Element {
     });
 
     rsx! {
+        PageHead {
+            title: "首页".to_string(),
+            description: "干徒的博客：Rust、Web、AI 与工程实践。".to_string(),
+            canonical: "/".to_string(),
+        }
         div { class: "blog-container",
             div { class: "blog-list",
                 if !categories.is_empty() {

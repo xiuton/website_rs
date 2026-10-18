@@ -1,6 +1,7 @@
-use crate::build_common::*;
 use comrak::Options;
 use regex::Regex;
+use site_content::*;
+use site_model::{PostMeta, PostsMeta};
 use std::path::Path;
 
 fn markdown_to_html(markdown: &str) -> String {
@@ -118,6 +119,24 @@ fn legacy_posts_json_enabled() -> bool {
     matches!(std::env::var("WEBSITE_LEGACY_POSTS_JSON").as_deref(), Ok("1") | Ok("true"))
 }
 
+fn post_meta(post: &PostData) -> PostMeta {
+    PostMeta {
+        slug: post.slug.clone(),
+        title: post.title.clone(),
+        date: post.date.clone(),
+        author: post.author.clone(),
+        category: post.category.clone(),
+        tags: post.tags.clone(),
+        summary: post.summary.clone(),
+        series: post.series.clone(),
+        order: post.order,
+        sort_key: post.sort_key.clone(),
+        catalog: post.catalog.clone(),
+        filename: post.filename.clone(),
+        series_summary: post.series_summary.clone(),
+    }
+}
+
 pub fn generate_posts_json(posts: &[PostData]) {
     // 每篇文章一份 HTML 片段：SPA 按需加载，避免把全部正文塞进 wasm。
     // 先清空目录，防止已删除文章留下孤儿文件。
@@ -134,7 +153,8 @@ pub fn generate_posts_json(posts: &[PostData]) {
     let legacy = legacy_posts_json_enabled();
 
     if posts.is_empty() {
-        std::fs::write("static/posts-meta.json", "[]").expect("Failed to write posts meta");
+        let empty = serde_json::to_string(&PostsMeta::new(Vec::new())).expect("serialize empty posts meta");
+        std::fs::write("static/posts-meta.json", empty).expect("Failed to write posts meta");
         if legacy {
             std::fs::write("static/posts.json", "[]").expect("Failed to write posts json");
         } else {
@@ -143,7 +163,7 @@ pub fn generate_posts_json(posts: &[PostData]) {
         return;
     }
 
-    let mut meta_entries: Vec<String> = Vec::with_capacity(posts.len());
+    let mut meta_posts: Vec<PostMeta> = Vec::with_capacity(posts.len());
     let mut legacy_entries: Vec<String> = Vec::with_capacity(posts.len());
 
     for post in posts {
@@ -152,41 +172,10 @@ pub fn generate_posts_json(posts: &[PostData]) {
         std::fs::write(html_dir.join(format!("{file_name}.html")), &content_html)
             .unwrap_or_else(|e| panic!("写入 {file_name}.html 失败: {e}"));
 
-        let tags_json: Vec<String> = post.tags.iter().map(|t| format!(r#""{}""#, escape_json_string(t))).collect();
-
-        // 精简元数据：SPA / 预渲染只靠这些字段就能生成列表、目录页与相关推荐
-        meta_entries.push(format!(
-            r#"  {{
-    "slug": "{}",
-    "title": "{}",
-    "date": "{}",
-    "author": "{}",
-    "category": "{}",
-    "tags": [{}],
-    "summary": "{}",
-    "series": "{}",
-    "order": {},
-    "sort_key": "{}",
-    "catalog": "{}",
-    "filename": "{}",
-    "series_summary": "{}"
-  }}"#,
-            post.slug,
-            escape_json_string(&post.title),
-            post.date,
-            escape_json_string(&post.author),
-            escape_json_string(&post.category),
-            tags_json.join(", "),
-            escape_json_string(&post.summary),
-            escape_json_string(&post.series),
-            post.order,
-            escape_json_string(&post.sort_key),
-            escape_json_string(&post.catalog),
-            escape_json_string(&post.filename),
-            escape_json_string(&post.series_summary),
-        ));
+        meta_posts.push(post_meta(post));
 
         if legacy {
+            let tags_json: Vec<String> = post.tags.iter().map(|t| format!(r#""{}""#, escape_json_string(t))).collect();
             legacy_entries.push(format!(
                 r#"  {{
     "slug": "{}",
@@ -226,7 +215,7 @@ pub fn generate_posts_json(posts: &[PostData]) {
         }
     }
 
-    let meta_json = format!("[\n{}\n]\n", meta_entries.join(",\n"));
+    let meta_json = serde_json::to_string(&PostsMeta::new(meta_posts)).expect("serialize posts meta");
     std::fs::write("static/posts-meta.json", meta_json).expect("Failed to write posts meta");
 
     if legacy {

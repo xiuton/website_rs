@@ -1,0 +1,17 @@
+[package]
+name = "prerender"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# 静态预渲染工具：用 Dioxus SSR 渲染真实路由组件，再注入静态 HTML shell。
+# 依赖 web-rs 以复用 Navbar/Footer/文章/系列组件，避免再维护一套手写 HTML。
+[dependencies]
+dioxus = { version = "0.7.10", features = ["web", "router"] }
+dioxus-history = "0.7.10"
+dioxus-router = "0.7.10"
+dioxus-ssr = "0.7.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+site-model = { path = "../../crates/site-model" }
+web-rs = { path = "../.." }

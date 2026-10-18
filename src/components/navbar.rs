@@ -1,8 +1,18 @@
 use crate::components::icons::RssIcon;
 use crate::routes::Route;
 use dioxus::prelude::*;
+use std::cell::RefCell;
+use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+
+// 子菜单状态放在全局：document 点击监听器可能比 Navbar 组件活得更久
+// （例如从 TestLayout 跳到 Layout 时），不能捕获组件作用域的 Signal。
+static SUB_MENU_OPEN: GlobalSignal<bool> = Signal::global(|| false);
+static SUB_MENU_LEFT: GlobalSignal<f64> = Signal::global(|| 0.0);
+
+type ClickListener = (web_sys::Document, Closure<dyn FnMut(web_sys::Event)>);
+type ScrollListener = (web_sys::Window, Closure<dyn FnMut()>);
 
 #[component]
 pub fn Navbar(is_dark: Signal<bool>) -> Element {
@@ -62,31 +72,48 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
     };
 
     let route = use_route::<Route>();
-    let mut sub_menu_open = use_signal(|| false);
-    let sub_menu_left = use_signal(|| 0.0_f64);
 
-    // 点击空白处关闭子菜单
+    // 监听器在组件卸载时显式移除，避免跨布局导航后继续停留在 document/window 上。
+    let click_listener: Rc<RefCell<Option<ClickListener>>> = use_hook(|| Rc::new(RefCell::new(None)));
+    let scroll_listener: Rc<RefCell<Option<ScrollListener>>> = use_hook(|| Rc::new(RefCell::new(None)));
+    {
+        let click_listener = click_listener.clone();
+        let scroll_listener = scroll_listener.clone();
+        use_drop(move || {
+            if let Some((document, closure)) = click_listener.borrow_mut().take() {
+                let _ = document.remove_event_listener_with_callback("click", closure.as_ref().unchecked_ref());
+            }
+            if let Some((window, closure)) = scroll_listener.borrow_mut().take() {
+                let _ = window.remove_event_listener_with_callback("scroll", closure.as_ref().unchecked_ref());
+            }
+        });
+    }
+
+    // 点击空白处关闭子菜单（只安装一次）
     use_effect(move || {
-        if sub_menu_open() {
-            let window = web_sys::window().unwrap();
-            let document = window.document().unwrap();
-            let mut sub_open = sub_menu_open;
-            let closure = Closure::<dyn FnMut(_)>::new(move |e: web_sys::Event| {
-                let target = e.target().unwrap();
-                let el = target.dyn_ref::<web_sys::Element>();
-                if let Some(el) = el {
-                    if el.closest(".nav-sub-trigger").ok().flatten().is_none()
-                        && el.closest(".nav-submenu-popup").ok().flatten().is_none()
-                    {
-                        sub_open.set(false);
-                    }
-                }
-            });
-            document
-                .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
-                .unwrap();
-            closure.forget();
+        if click_listener.borrow().is_some() {
+            return;
         }
+        let window = web_sys::window().unwrap();
+        let document = window.document().unwrap();
+        let closure = Closure::<dyn FnMut(_)>::new(move |e: web_sys::Event| {
+            if !SUB_MENU_OPEN() {
+                return;
+            }
+            let target = e.target().unwrap();
+            let el = target.dyn_ref::<web_sys::Element>();
+            if let Some(el) = el {
+                if el.closest(".nav-sub-trigger").ok().flatten().is_none()
+                    && el.closest(".nav-submenu-popup").ok().flatten().is_none()
+                {
+                    *SUB_MENU_OPEN.write() = false;
+                }
+            }
+        });
+        document
+            .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
+            .unwrap();
+        *click_listener.borrow_mut() = Some((document, closure));
     });
 
     let is_active = move |href: &str| match href {
@@ -106,6 +133,9 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
     };
 
     use_effect(move || {
+        if scroll_listener.borrow().is_some() {
+            return;
+        }
         let window = web_sys::window().expect("Failed to get window");
         let document = window.document().expect("Failed to get document");
 
@@ -146,7 +176,7 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
         });
 
         let _ = window.add_event_listener_with_callback("scroll", scroll_closure.as_ref().unchecked_ref());
-        scroll_closure.forget();
+        *scroll_listener.borrow_mut() = Some((window, scroll_closure));
     });
 
     rsx! {
@@ -164,8 +194,6 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                 {nav_items.iter().map(|(href, label)| {
                     let active = is_active(href);
                     if *href == "/dev" {
-                        let mut open = sub_menu_open;
-                        let mut left = sub_menu_left;
                         rsx! {
                             div { class: "nav-item-with-sub",
                                 Link {
@@ -177,7 +205,7 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                                     class: "nav-sub-trigger",
                                     onclick: move |e: Event<MouseData>| {
                                         e.stop_propagation();
-                                        let will_open = !open();
+                                        let will_open = !SUB_MENU_OPEN();
                                         if will_open {
                                             let win = web_sys::window().unwrap();
                                             let doc = win.document().unwrap();
@@ -185,11 +213,11 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                                                 if let Some(wrap) = doc.query_selector(".navbar-sticky-wrap").ok().flatten() {
                                                     let wrap_rect = wrap.get_bounding_client_rect();
                                                     let item_rect = item.get_bounding_client_rect();
-                                                    left.set(item_rect.left() - wrap_rect.left());
+                                                    *SUB_MENU_LEFT.write() = item_rect.left() - wrap_rect.left();
                                                 }
                                             }
                                         }
-                                        open.set(will_open);
+                                        *SUB_MENU_OPEN.write() = will_open;
                                     },
                                     svg {
                                         width: "10",
@@ -256,14 +284,14 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                     }}
                 }
             }
-            if sub_menu_open() {
+            if SUB_MENU_OPEN() {
                 div {
                     class: "nav-submenu-popup",
-                    style: format!("left:{}px", sub_menu_left()),
+                    style: format!("left:{}px", SUB_MENU_LEFT()),
                     Link {
                         to: Route::CircleGenerator,
                         class: "nav-sub-link",
-                        onclick: move |_| sub_menu_open.set(false),
+                        onclick: move |_| *SUB_MENU_OPEN.write() = false,
                         "圆形生成器"
                     }
                 }

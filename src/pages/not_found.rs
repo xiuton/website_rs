@@ -1,14 +1,17 @@
+use crate::components::PageHead;
 use crate::routes::Route;
-use crate::utils::title;
 use dioxus::prelude::*;
 
 #[component]
 pub fn NotFound(route: Vec<String>) -> Element {
     let route_str = route.join("/");
 
-    title::set_page_title("404 - 页面未找到");
-
     rsx! {
+        PageHead {
+            title: "页面未找到".to_string(),
+            description: "请求的页面不存在。".to_string(),
+            canonical: "/404".to_string(),
+        }
         div { class: "not-found",
             div { class: "not-found-content",
                 // 404 Icon

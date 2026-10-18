@@ -2,10 +2,14 @@ use dioxus::prelude::*;
 
 #[component]
 pub fn Footer() -> Element {
+    #[cfg(target_arch = "wasm32")]
     let is_ganto_domain = web_sys::window()
         .and_then(|window| window.location().host().ok())
         .unwrap_or_default()
         .contains("ganto.cn");
+    // SSR 页面是 ganto.me，不显示备案信息
+    #[cfg(not(target_arch = "wasm32"))]
+    let is_ganto_domain = false;
 
     rsx! {
         footer { class: "footer-content",

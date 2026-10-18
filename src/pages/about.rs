@@ -1,12 +1,15 @@
 use crate::components::icons::{EmailIcon, GitHubIcon};
-use crate::utils::title;
+use crate::components::PageHead;
 use dioxus::prelude::*;
 
 #[component]
 pub fn About() -> Element {
-    title::set_page_title("关于 - 干徒");
-
     rsx! {
+        PageHead {
+            title: "关于".to_string(),
+            description: "关于干徒：Rust、Web、AI 与工程实践。".to_string(),
+            canonical: "/about".to_string(),
+        }
         div { class: "about-container",
             // 个人介绍部分
             section { class: "about-section intro-section",

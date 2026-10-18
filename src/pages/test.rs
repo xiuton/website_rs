@@ -1,4 +1,4 @@
-use crate::utils::title;
+use crate::components::PageHead;
 use dioxus::prelude::*;
 
 #[component]
@@ -9,9 +9,12 @@ pub fn Test() -> Element {
     let mut is_checked = use_signal(|| false);
     let mut slider_value = use_signal(|| 50.0);
 
-    title::set_page_title("测试页面 - 干徒");
-
     rsx! {
+        PageHead {
+            title: "测试页面".to_string(),
+            description: "组件与交互测试页面。".to_string(),
+            canonical: "/test".to_string(),
+        }
         div { class: "test-container",
             h1 { class: "test-title", "🧪 测试页面" }
             p { class: "test-description", "这是一个用于测试各种功能和组件的页面" }

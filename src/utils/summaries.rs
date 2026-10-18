@@ -15,7 +15,6 @@ pub struct ArticleSummary {
 }
 
 /// 加载 AI 摘要列表（会话级缓存）
-pub async fn load_summaries() -> Option<Vec<ArticleSummary>> {
-    let text = crate::utils::cache::fetch_text("/static/summaries.json").await?;
-    serde_json::from_str(&text).ok()
+pub async fn load_summaries() -> Option<std::rc::Rc<Vec<ArticleSummary>>> {
+    crate::utils::cache::fetch_typed("/static/summaries.json").await
 }

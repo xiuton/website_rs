@@ -1,4 +1,5 @@
-use crate::build_common::*;
+use site_content::*;
+use site_model::{ArticleChain, MarkovModel};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
@@ -6,18 +7,16 @@ type Pair = (u32, u32);
 type ChainMap = BTreeMap<Pair, HashMap<u32, u32>>;
 type ChainEntry = (Pair, Vec<(u32, u32)>);
 
-/// 生成紧凑格式的 markov 模型：
-///
-/// ```json
-/// {"tokens":["a","b"],"articles":{"slug":{"s":[[0,1]],"c":[[[0,1],[[2,3]]]]}}}
-/// ```
+/// 生成紧凑格式的 markov 模型（序列化由 serde 负责）：
 ///
 /// - token 只存一份字典，转移里全部用 `u32` 下标，避免重复存字符串
-/// - 相比旧的 `"token||token": {"next": count}` 结构体积明显更小
+/// - 只保留出现 ≥2 次的转移，模型体积比原始 trigram 小一个数量级
 pub fn generate_markov_chain(posts: &[PostData]) {
     if posts.is_empty() {
         let dest = Path::new("static/markov.json");
-        std::fs::write(dest, r#"{"tokens":[],"articles":{}}"#).expect("Failed to write markov json");
+        let model = MarkovModel::new(Vec::new(), HashMap::new());
+        let json = serde_json::to_string(&model).expect("serialize empty markov model");
+        std::fs::write(dest, json).expect("Failed to write markov json");
         return;
     }
 
@@ -34,7 +33,7 @@ pub fn generate_markov_chain(posts: &[PostData]) {
     let token_ids: HashMap<&str, u32> =
         tokens.iter().enumerate().map(|(i, token)| (token.as_str(), i as u32)).collect();
 
-    let mut entries: Vec<String> = Vec::new();
+    let mut articles: HashMap<String, ArticleChain> = HashMap::new();
 
     for (post, raw_tokens) in &tokenized {
         if raw_tokens.len() < 10 {
@@ -70,31 +69,22 @@ pub fn generate_markov_chain(posts: &[PostData]) {
         }
         // 起点从存活 key 中取，最多 8 个
         let starters: Vec<[u32; 2]> = chain_entries.iter().take(8).map(|((a, b), _)| [*a, *b]).collect();
-
-        let starters_json: Vec<String> = starters.iter().map(|pair| format!("[{},{}]", pair[0], pair[1])).collect();
-        let chain_json: Vec<String> = chain_entries
-            .iter()
-            .map(|((a, b), nexts)| {
-                let nexts_json: Vec<String> = nexts.iter().map(|(token, count)| format!("[{token},{count}]")).collect();
-                format!("[[{a},{b}],[{}]]", nexts_json.join(","))
-            })
+        let chain: Vec<([u32; 2], Vec<[u32; 2]>)> = chain_entries
+            .into_iter()
+            .map(|((a, b), nexts)| ([a, b], nexts.into_iter().map(|(token, count)| [token, count]).collect()))
             .collect();
 
-        entries.push(format!(
-            r#""{}":{{"s":[{}],"c":[{}]}}"#,
-            escape_json_string(&post.slug),
-            starters_json.join(","),
-            chain_json.join(",")
-        ));
+        articles.insert(post.slug.clone(), ArticleChain { s: starters, c: chain });
     }
 
-    let tokens_json: Vec<String> = tokens
-        .iter()
-        .map(|token| format!("\"{}\"", escape_json_string(token)))
-        .collect();
-    let json = format!(r#"{{"tokens":[{}],"articles":{{{}}}}}"#, tokens_json.join(","), entries.join(","));
-
+    let model = MarkovModel::new(tokens, articles);
+    let json = serde_json::to_string(&model).expect("serialize markov model");
     let dest = Path::new("static/markov.json");
     std::fs::write(dest, &json).expect("Failed to write markov json");
-    println!("markov.json written: {} articles, {} tokens, {} KB", entries.len(), tokens.len(), json.len() / 1024);
+    println!(
+        "markov.json written: {} articles, {} tokens, {} KB",
+        model.articles.len(),
+        model.tokens.len(),
+        json.len() / 1024
+    );
 }

@@ -1,4 +1,4 @@
-use crate::build_common::*;
+use site_content::*;
 use std::path::Path;
 
 fn format_rfc2822(date_str: &str) -> String {

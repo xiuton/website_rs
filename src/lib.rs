@@ -4,6 +4,7 @@ pub mod models;
 pub mod nav;
 pub mod pages;
 pub mod routes;
+pub mod ssr;
 pub mod utils;
 
 pub use app::App;

@@ -52,6 +52,9 @@ jobs:
     - name: Clippy (mini-html)
       run: cargo clippy -p mini-html --all-targets -- -D warnings
 
+    - name: Clippy (prerender)
+      run: cargo clippy -p prerender --all-targets -- -D warnings
+
     - name: Check font tool
       run: cargo check -p font-subset
 
@@ -69,7 +72,15 @@ jobs:
         test "$(find dist/post -name index.html | wc -l)" -gt 0
         grep -q 'class="blog-content"' dist/post/*/index.html
         grep -q "id='prerender-content'" dist/post/*/index.html
+        # SSR 复用 SPA 组件：页面必须包含导航/页脚，而不是手写模板
+        grep -q 'navbar-content' dist/post/*/index.html
+        grep -q 'footer-content' dist/post/*/index.html
+        test -d dist/series
+        grep -q 'series-chapter-card' dist/series/*/index.html
         grep -q 'id="noscript-posts"' dist/index.html
+        # 生产页面不应带 Trunk autoreload 占位符
+        ! grep -q '__TRUNK_ADDRESS__' dist/index.html
+        ! grep -q '__TRUNK_ADDRESS__' dist/404.html
         test ! -f dist/static/posts-meta.json
         echo "prerendered: $(find dist/post -name index.html | wc -l) pages"
 

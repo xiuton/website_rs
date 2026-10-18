@@ -1,7 +1,7 @@
+use crate::components::PageHead;
 use crate::routes::Route;
 use crate::utils::knowledge_graph::{self, KnowledgeGraph};
 use crate::utils::search::{highlight_matches, SearchEngine, SearchResult, Suggestion};
-use crate::utils::title;
 use dioxus::prelude::*;
 
 /// 创建一个延迟指定毫秒数的 Promise
@@ -40,78 +40,41 @@ fn get_initial_query() -> String {
     params.get("q").unwrap_or_default()
 }
 
+/// 搜索页一次性需要的全部数据。
+struct SearchData {
+    engine: SearchEngine,
+    graph: Option<std::rc::Rc<KnowledgeGraph>>,
+}
+
+/// 索引 + 语义 + RAKE + 知识图谱；底层走 cache 的文本缓存。
+async fn load_search_data() -> Option<SearchData> {
+    let index = crate::utils::cache::fetch_text("/static/search-index.json").await?;
+    let mut engine = SearchEngine::new();
+    engine.load(&index).ok()?;
+
+    if let Some(semantic) = crate::utils::cache::fetch_text("/static/semantic.json").await {
+        engine.load_semantic(&semantic).ok();
+    }
+    if let Some(rake) = crate::utils::cache::fetch_text("/static/rake-keywords.json").await {
+        engine.load_rake(&rake).ok();
+    }
+
+    let graph = knowledge_graph::load_graph().await;
+    Some(SearchData { engine, graph })
+}
+
 #[component]
 pub fn Search() -> Element {
-    title::set_page_title("搜索 - 干徒");
-
-    let index_loaded = use_signal(|| false);
-    let engine_ref = use_signal(SearchEngine::new);
-    let mut kg_data = use_signal(|| Option::<KnowledgeGraph>::None);
-
-    // 搜索数据按需加载：页面打开时（尤其带 autofocus）不预取几百 KB 索引，
-    // 只有用户真正输入（或 URL 自带 q）后才开始加载。
+    // 搜索数据按需加载：只有用户真正输入（或 URL 自带 q）后才开始加载。
     let mut activated = use_signal(|| !get_initial_query().is_empty());
-
-    // 一次性加载搜索索引
-    use_effect(move || {
-        if !activated() {
-            return;
-        }
-        spawn(async move {
-            let mut engine_ref = engine_ref;
-            let mut index_loaded = index_loaded;
-            if let Some(text) = crate::utils::cache::fetch_text("/static/search-index.json").await {
-                let mut e = SearchEngine::new();
-                if e.load(&text).is_ok() {
-                    engine_ref.set(e);
-                    index_loaded.set(true);
-                }
+    let search_data = use_resource(move || {
+        let enabled = activated();
+        async move {
+            if !enabled {
+                return None;
             }
-        });
-    });
-
-    // 加载知识图谱
-    let mut kg_data_loaded = use_signal(|| false);
-    use_effect(move || {
-        if !activated() {
-            return;
+            load_search_data().await
         }
-        spawn(async move {
-            if let Some(graph) = knowledge_graph::load_graph().await {
-                kg_data.set(Some(graph));
-                kg_data_loaded.set(true);
-            }
-        });
-    });
-
-    // 加载语义索引（词共现 + 自动补全）
-    let mut semantic_loaded = use_signal(|| false);
-    let mut engine_for_semantic = engine_ref;
-    use_effect(move || {
-        if !activated() {
-            return;
-        }
-        spawn(async move {
-            if let Some(text) = crate::utils::cache::fetch_text("/static/semantic.json").await {
-                engine_for_semantic.write().load_semantic(&text).ok();
-                semantic_loaded.set(true);
-            }
-        });
-    });
-
-    // 加载 RAKE 关键词
-    let mut rake_loaded = use_signal(|| false);
-    let mut engine_for_rake = engine_ref;
-    use_effect(move || {
-        if !activated() {
-            return;
-        }
-        spawn(async move {
-            if let Some(text) = crate::utils::cache::fetch_text("/static/rake-keywords.json").await {
-                engine_for_rake.write().load_rake(&text).ok();
-                rake_loaded.set(true);
-            }
-        });
     });
 
     let mut query = use_signal(get_initial_query);
@@ -139,9 +102,9 @@ pub fn Search() -> Element {
             if query() != q {
                 return;
             }
-            if !index_loaded() {
+            if search_data.read().is_none() {
                 let mut waited = 0;
-                while !index_loaded() && waited < 50 {
+                while search_data.read().is_none() && waited < 50 {
                     delay(100).await;
                     waited += 1;
                     if query() != q {
@@ -149,16 +112,14 @@ pub fn Search() -> Element {
                     }
                 }
             }
-            if !index_loaded() {
-                return;
+            let data = search_data.read();
+            if let Some(Some(data)) = &*data {
+                results.set(data.engine.search(&q));
             }
-            let engine = engine_ref.read();
-            results.set(engine.search(&q));
         });
     });
 
     // 自动补全
-    let engine_for_ac = engine_ref;
     use_effect(move || {
         let q = query();
         if q.is_empty() || q.is_empty() {
@@ -176,11 +137,11 @@ pub fn Search() -> Element {
             if query() != q {
                 return;
             }
-            if !semantic_loaded() {
+            let data = search_data.read();
+            let Some(Some(data)) = &*data else {
                 return;
-            }
-            let engine = engine_for_ac.read();
-            let ac = engine.autocomplete(&q);
+            };
+            let ac = data.engine.autocomplete(&q);
             if !ac.is_empty() {
                 suggestions.set(ac);
                 show_suggestions.set(true);
@@ -193,33 +154,40 @@ pub fn Search() -> Element {
     let nav = use_navigator();
     let result_list = results.read().clone();
     let result_count = result_list.len();
-    let is_loaded = index_loaded();
     let query_str = query.read().clone();
 
     // 预计算探索式导航数据（在 RSX 外，避免 Dioxus 宏解析冲突）
+    let data_guard = search_data.read();
+    let data = match &*data_guard {
+        Some(Some(data)) => Some(data),
+        _ => None,
+    };
+    let is_loaded = data.is_some();
+    let loading_index = activated() && !is_loaded;
     let top_slug = result_list.first().map(|r: &SearchResult| r.slug.clone());
-    let kg_ref = kg_data.read();
-    let explore = match (&top_slug, kg_ref.as_ref()) {
+    let explore = match (&top_slug, data.and_then(|d| d.graph.as_deref())) {
         (Some(slug), Some(kg)) => kg.articles.get(slug).map(|n| n.explore_data.clone()),
         _ => None,
     };
-    drop(kg_ref);
 
     // 预计算 hop2 文章 slug → title 映射
-    let engine = engine_ref.read();
-    let hop2_titles: std::collections::HashMap<String, String> = explore
-        .as_ref()
-        .map(|e| {
-            e.hop2
-                .articles
-                .iter()
-                .filter_map(|s| engine.get_by_slug(s).map(|entry| (s.clone(), entry.title.clone())))
-                .collect()
-        })
-        .unwrap_or_default();
-    drop(engine);
+    let hop2_titles: std::collections::HashMap<String, String> = match (&explore, data) {
+        (Some(e), Some(data)) => e
+            .hop2
+            .articles
+            .iter()
+            .filter_map(|s| data.engine.get_by_slug(s).map(|entry| (s.clone(), entry.title.clone())))
+            .collect(),
+        _ => std::collections::HashMap::new(),
+    };
+    drop(data_guard);
 
     rsx! {
+        PageHead {
+            title: "搜索".to_string(),
+            description: "搜索文章、标签与系列文档。".to_string(),
+            canonical: "/search".to_string(),
+        }
         div { class: "search-container",
             // ── 搜索栏（核心焦点）─
             div { class: "search-hero",
@@ -307,8 +275,9 @@ pub fn Search() -> Element {
                 }
             }
 
-            // 加载 / 无结果状态
-            if !is_loaded && query_str.is_empty() {
+            // 只有真正触发加载（输入/URL 带 q）时才显示 loading；
+            // 刚进入空搜索页应展示「输入关键词开始搜索」。
+            if loading_index && query_str.is_empty() {
                 div { class: "search-status",
                     div { class: "search-status-spinner" }
                     span { "正在加载搜索索引..." }
@@ -552,7 +521,7 @@ pub fn Search() -> Element {
             }
 
             // ── 初始状态 ──
-            if is_loaded && query_str.is_empty() {
+            if !loading_index && query_str.is_empty() {
                 div { class: "search-empty search-empty--initial",
                     svg {
                         width: "56", height: "56", view_box: "0 0 24 24",

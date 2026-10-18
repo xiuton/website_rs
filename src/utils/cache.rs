@@ -7,11 +7,15 @@
 //! 同时给所有静态数据 URL 带上 `BUILD_ID`，文章更新后浏览器不会继续使用旧索引
 //! （静态托管对 `/static/*.json` 没有文件名指纹）。
 
+use serde::de::DeserializeOwned;
+use std::any::Any;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 thread_local! {
     static TEXT_CACHE: RefCell<HashMap<String, String>> = RefCell::new(HashMap::new());
+    static TYPED_CACHE: RefCell<HashMap<String, Rc<dyn Any>>> = RefCell::new(HashMap::new());
 }
 
 /// 给静态资源 URL 追加构建指纹（已带查询串时用 `&` 连接）。
@@ -38,4 +42,27 @@ pub async fn fetch_text(path: &str) -> Option<String> {
         cache.borrow_mut().insert(url, text.clone());
     });
     Some(text)
+}
+
+/// 带缓存的 GET + 反序列化。同一会话内只解析一次。
+///
+/// 返回 `Rc<T>` 而不是 `T`，避免每次进页面都深拷贝大索引；
+/// 调用方通过 `Deref` 仍可按 `&T` 使用。
+pub async fn fetch_typed<T: DeserializeOwned + 'static>(path: &str) -> Option<Rc<T>> {
+    let url = versioned(path);
+
+    if let Some(cached) =
+        TYPED_CACHE.with(|cache| cache.borrow().get(&url).cloned().and_then(|value| value.downcast::<T>().ok()))
+    {
+        return Some(cached);
+    }
+
+    let text = fetch_text(path).await?;
+    let value = serde_json::from_str::<T>(&text).ok()?;
+    let value = Rc::new(value);
+
+    TYPED_CACHE.with(|cache| {
+        cache.borrow_mut().insert(url, value.clone());
+    });
+    Some(value)
 }

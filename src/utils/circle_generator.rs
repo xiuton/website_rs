@@ -24,7 +24,7 @@ fn random_in_range(min: f64, max: f64) -> f64 {
     min + (random_f64() * (max - min))
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Circle {
     pub x: f64,
     pub y: f64,

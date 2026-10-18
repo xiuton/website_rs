@@ -9,5 +9,9 @@ pub mod markov;
 pub mod search;
 pub mod storage;
 pub mod summaries;
+#[cfg(target_arch = "wasm32")]
+pub mod title;
+#[cfg(not(target_arch = "wasm32"))]
+#[path = "title_ssr.rs"]
 pub mod title;
 pub mod topics;

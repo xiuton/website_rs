@@ -74,7 +74,6 @@ pub fn pct_str(s: &str) -> String {
 }
 
 /// 加载知识图谱（会话级缓存，多页面复用同一份 JSON）
-pub async fn load_graph() -> Option<KnowledgeGraph> {
-    let text = crate::utils::cache::fetch_text("/static/knowledge-graph.json").await?;
-    serde_json::from_str(&text).ok()
+pub async fn load_graph() -> Option<std::rc::Rc<KnowledgeGraph>> {
+    crate::utils::cache::fetch_typed("/static/knowledge-graph.json").await
 }
