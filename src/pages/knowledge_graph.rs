@@ -2,7 +2,6 @@
 //! 展示所有文章的关联关系，支持拖拽、缩放、点击跳转
 
 use dioxus::prelude::*;
-use dioxus_router::prelude::use_navigator;
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::rc::Rc;

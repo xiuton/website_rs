@@ -367,13 +367,13 @@ $j | ForEach-Object { [pscustomobject]@{slug=$_.slug; md=$_.content.Length; html
 | P1-3 CI | ✅ | 固定 Trunk 0.21.14；`Swatinem/rust-cache`；fmt/clippy/test 门禁；`--no-default-features` |
 | P2-1 渲染统一 | ✅ | 渲染只在构建期发生一次，预渲染页与 SPA 使用同一份 HTML |
 | P2-2 导航单一来源 | ✅ | 新增 `src/nav.rs`，Dioxus 导航栏与 prerender 共用链接数据（页脚仍为静态 HTML） |
-| P2-3 文件拆分 | ✅（部分） | `blog_post` 拆为 `mod.rs` / `markov.rs` / `related.rs`；`build_common`、`circle_generator` 未拆 |
+| P2-3 文件拆分 | ✅（部分） | `blog_post` 拆为 `mod.rs` / `markov.rs` / `related.rs` / `series_nav.rs`；`build_common`、`circle_generator` 未拆 |
 | P2-4 数据层缓存 | ✅ | 新增 `utils/cache.rs`，静态 JSON 会话级缓存 + `BUILD_ID` 版本号 |
 | P2-5 潜在 panic | ✅ | `summary[..160]` 改为 `chars().take(160)` |
 | P2-6 小程序 HTML 消毒 | ✅ | 新增 `tools/mini-html`（lol_html 解析器）替换 20+ 条正则；含 5 个单元测试 |
 | P2-7 静态 JSON 指纹 | ✅ | `cache::versioned()` 统一追加 `?v=BUILD_ID` |
 | P2-8 首页预渲染 | ✅ | prerender 向 `dist/index.html` 注入 `<noscript>` 最新文章列表 + ItemList JSON-LD |
-| P2-9 依赖大版本升级 | ⏸️ 未做 | Dioxus 0.6→0.7 是迁移项目，建议单独分支，不混在性能改动里 |
+| P2-9 依赖大版本升级 | ✅（部分） | Dioxus 0.6.3 → 0.7.10 已完成（见 7.5）；comrak / gloo-net 仍未升级 |
 
 ## 7.3 新增/变更的构建约定
 
@@ -405,3 +405,21 @@ $j | ForEach-Object { [pscustomobject]@{slug=$_.slug; md=$_.content.Length; html
 > 说明：CFF/OTF 字体的子集化试过 `fontcull`、`oxifont-subset`，它们只重排字形编号、CFF 表本身并未缩小（输出仍有 4–5 MB）；最终选用 `allsorts`，它能把 MiSans 的 SFNT 从 6.3 MB 裁到 296 KB。
 >
 > `tools/` 是独立 workspace 成员，只在需要时手动运行，不参与站点 wasm 构建；CI 测试使用 `--exclude font-subset` 避免额外编译。
+
+## 7.5 Dioxus 0.7 迁移（2026-10-18）
+
+依赖从 `dioxus 0.6.3` 升级到 `0.7.10`，路由仍由 `router` feature 提供。
+
+| 变化 | 处理方式 |
+|---|---|
+| `dioxus_router::prelude` 不再存在 | 删除全部该导入，统一使用 `dioxus::prelude::*`（0.7 的 prelude 已包含 `Link` / `Outlet` / `use_route` / `use_navigator` / `Routable`） |
+| Hook 必须在组件顶层无条件调用 | 原 `blog_post` 在 `Option::map` 闭包里调用 `use_signal` 实现章节折叠，抽成独立组件 [SeriesNav](../src/pages/blog_post/series_nav.rs) |
+| 渲染期写信号 | `PreviewTags` 原先在 render 中比较 slug 并 `set` 信号；改为调用处加 `key: "{post.slug}"`，让组件按文章重建 |
+| `IntoDynNode` 不再接受 `&&str` | 迭代渲染统一解引用：`{ *label }`、`{ *tag }`、`{ *last_date }` |
+| 版本与产物 | wasm 1,216 KB → **1,146 KB**（gzip 480 KB → **463 KB**） |
+
+验证：
+
+- `cargo fmt --check`、`cargo clippy`（wasm + host）、`cargo test --workspace --exclude font-subset` 全部通过
+- `trunk build --release --no-default-features` 成功，93 篇文章页 + 2 个系列页 + 404 正常生成
+- 用 headless Chrome 实际访问 `/`、`/post/20201222/`、`/search`、`/tags`、`/series/rust-llm`、`/circle-generator`、`/about`、404，SPA 均正常挂载，控制台无错误（`/tags` 只有一条外部 favicon 404）

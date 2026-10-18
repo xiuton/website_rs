@@ -1,7 +1,6 @@
 use crate::components::icons::RssIcon;
 use crate::routes::Route;
 use dioxus::prelude::*;
-use dioxus_router::prelude::Link;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
@@ -172,7 +171,7 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                                 Link {
                                     to: *href,
                                     class: if active { "nav-link nav-active" } else { "nav-link" },
-                                    { label }
+                                    { *label }
                                 }
                                 button {
                                     class: "nav-sub-trigger",
@@ -211,7 +210,7 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                             Link {
                                 to: *href,
                                 class: if active { "nav-link nav-active" } else { "nav-link" },
-                                { label }
+                                { *label }
                             }
                         }
                     }

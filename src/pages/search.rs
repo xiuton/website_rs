@@ -3,7 +3,6 @@ use crate::utils::knowledge_graph::{self, KnowledgeGraph};
 use crate::utils::search::{highlight_matches, SearchEngine, SearchResult, Suggestion};
 use crate::utils::title;
 use dioxus::prelude::*;
-use dioxus_router::prelude::use_navigator;
 
 /// 创建一个延迟指定毫秒数的 Promise
 async fn delay(ms: i32) {

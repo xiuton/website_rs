@@ -1,5 +1,4 @@
 use dioxus::prelude::*;
-use dioxus_router::prelude::{use_route, Link};
 use std::collections::BTreeSet;
 use web_sys::UrlSearchParams;
 
@@ -216,7 +215,7 @@ pub fn Home() -> Element {
                                             }
                                         }
                                         div { class: "preview-meta",
-                                            span { class: "preview-date", {last_date} }
+                                            span { class: "preview-date", { *last_date } }
                                             span { class: "preview-author", {post.author} }
                                         }
                                         div { class: "preview-content",
@@ -230,7 +229,7 @@ pub fn Home() -> Element {
                                         }
                                     }
                                     // 标签放在卡片链接之外：否则「+N / 收起」的点击会被链接吞掉而直接跳转
-                                    PreviewTags { slug: post.slug.to_string(), tags: merged_tags.clone() }
+                                    PreviewTags { key: "{post.slug}", slug: post.slug.to_string(), tags: merged_tags.clone() }
                                 }
                             }
                         })}
@@ -293,13 +292,6 @@ pub fn Home() -> Element {
 #[component]
 fn PreviewTags(slug: String, tags: Vec<&'static str>) -> Element {
     let mut expanded = use_signal(|| false);
-    // 组件实例按列表位置复用：换页/筛选后位置上的文章可能变了，
-    // 这里检测 slug 变化并复位，避免上一篇的「已展开」串到另一张卡片
-    let mut last_slug = use_signal(|| slug.clone());
-    if *last_slug.peek() != slug {
-        last_slug.set(slug.clone());
-        expanded.set(false);
-    }
     let hidden_count = tags.len().saturating_sub(TAGS_COLLAPSED_MAX);
     let is_expanded = expanded();
 

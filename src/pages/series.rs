@@ -3,7 +3,6 @@ use crate::routes::Route;
 use crate::utils::title;
 use crate::BLOG_POSTS;
 use dioxus::prelude::*;
-use dioxus_router::prelude::Link;
 
 /// 系列（多章节文档）目录页
 /// 路由：/series/:slug —— slug 为系列的目录标识（文件夹名，即 catalog 字段），

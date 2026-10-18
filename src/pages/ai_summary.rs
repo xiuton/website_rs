@@ -5,7 +5,6 @@ use crate::routes::Route;
 use crate::utils::summaries::{self, ArticleSummary};
 use crate::utils::title;
 use dioxus::prelude::*;
-use dioxus_router::prelude::use_navigator;
 
 /// 社区颜色映射
 fn category_color(cat: &str) -> &'static str {

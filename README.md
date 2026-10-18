@@ -26,7 +26,7 @@
 
 | 类别 | 技术 |
 |------|------|
-| 框架 | [Dioxus 0.6.3](https://dioxuslabs.com/) |
+| 框架 | [Dioxus 0.7.10](https://dioxuslabs.com/) |
 | 语言 | Rust (edition 2021) |
 | 编译目标 | wasm32-unknown-unknown |
 | 构建工具 | [Trunk 0.21](https://trunkrs.dev/) |
@@ -34,7 +34,7 @@
 | Markdown 渲染 | [comrak](https://docs.rs/comrak) (GFM 兼容) |
 | 代码高亮 | [highlight.js 11](https://highlightjs.org/) |
 | HTTP 客户端 | gloo-net（按需加载 `static/*.json` 与文章 HTML 片段） |
-| 路由 | dioxus-router 0.6.3 |
+| 路由 | dioxus-router 0.7.10（通过 dioxus 的 `router` feature 启用） |
 | 构建脚本 | `build.rs` 编译期解析博客文章 |
 | 数据生成 | `build/` 目录下多个 `build_*.rs` 模块（`posts-meta.json`、`post-html/`、rss、atom、搜索索引、摘要、SEO 文件等） |
 | 预渲染工具 | `src/bin/prerender.rs`（trunk 构建后生成文章静态页与 404.html） |
@@ -475,7 +475,7 @@ slug_prefix = "rust-guide"
 
 ```toml
 [dependencies]
-dioxus = { version = "0.6.3", features = ["web", "router"] }
+dioxus = { version = "0.7.10", features = ["web", "router"] }
 wasm-bindgen = "0.2.89"
 wasm-bindgen-futures = "0.4.39"
 web-sys = "0.3.66"          # DOM / Storage / History / Canvas

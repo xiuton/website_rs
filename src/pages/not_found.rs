@@ -1,7 +1,6 @@
 use crate::routes::Route;
 use crate::utils::title;
 use dioxus::prelude::*;
-use dioxus_router::prelude::Link;
 
 #[component]
 pub fn NotFound(route: Vec<String>) -> Element {

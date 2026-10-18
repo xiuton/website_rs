@@ -2,7 +2,6 @@ use super::{Footer, Navbar};
 use crate::routes::Route;
 use crate::utils::{dark_mode, title};
 use dioxus::prelude::*;
-use dioxus_router::prelude::Outlet;
 
 #[component]
 pub fn Layout() -> Element {
