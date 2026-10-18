@@ -470,7 +470,7 @@ $j | ForEach-Object { [pscustomobject]@{slug=$_.slug; md=$_.content.Length; html
 | 文章页下方数据 | 相关文章/图谱/LDA/embeddings 由 `.details-sentinel` 的 `onvisible` 触发 | 文章页初始 JSON 85 KB gz → **0**，滚动后加载 |
 | SmileySans 子集 | 字体工具按 `/dev` 页字符单独裁剪 | 327 KB → **44.6 KB** |
 | markov 紧凑格式 | 全局 token 字典 + `u32` 下标 + 扁平数组；只保留出现 ≥2 次的转移 | 4,323 KB → **986 KB**（gzip 1,332 → **253 KB**，-81%） |
-| highlight 按需 | 仅正文含 `<pre>` 时初始化/重跑 | 无代码文章少 40 KB gz |
+| highlight 按需 | 仅正文含 `<pre>` 时初始化/重跑；语言文件改为站内自托管，`jsonc/vue/tsx/jsx/toml/csv/wgsl` 用别名，修复 cdnjs 404 导致的 ORB 拦截 | 无代码文章少 40 KB gz |
 | `posts-meta` | 预渲染后从 `dist/` 删除 | -10 KB gz |
 | CI | wasm 预算收紧到 600 KB；新增 `cargo check -p font-subset`；校验新模板脚本 | 防回归 |
 

@@ -564,6 +564,10 @@ trunk build --release --no-default-features
 
 博客文章使用 highlight.js 渲染代码块，支持切换主题：
 
+> highlight.js 本体与按需加载的语言文件都放在 `static/highlight/` 下，由站点自己提供。
+> 不依赖 CDN，避免 cdnjs 缺少某个语言文件时返回 404 HTML 被浏览器 ORB 拦截
+> （例如 `jsonc` 在 highlight.js 11.9 里并不存在，现在通过别名映射到 `json`）。
+
 **浅色主题：** github、atom-one-light、vs、solarized-light、xcode
 
 **深色主题：** atom-one-dark、vs2015、monokai、dracula、solarized-dark、night-owl、tokyo-night-dark、github-dark
