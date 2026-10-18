@@ -476,24 +476,24 @@ slug_prefix = "rust-guide"
 ```toml
 [dependencies]
 dioxus = { version = "0.7.10", features = ["web", "router"] }
-wasm-bindgen = "0.2.89"
-wasm-bindgen-futures = "0.4.39"
-web-sys = "0.3.66"          # DOM / Storage / History / Canvas
-js-sys = "0.3.66"           # Promise 等（异步延时等）
+wasm-bindgen = "0.2.129"
+wasm-bindgen-futures = "0.4.79"
+web-sys = "0.3.106"          # DOM / Storage / History / Canvas
+js-sys = "0.3.106"           # Promise 等（异步延时等）
 serde = "1.0"               # 序列化
 serde_json = "1.0"          # 解析 static/*.json 等预生成数据
-toml = "0.8.8"              # 书签配置解析
-gloo-net = "0.5.0"          # 浏览器端 HTTP 请求
-futures-channel = "0.3.30"
+toml = "1.1.8"              # 书签配置解析
+gloo-net = "0.7.0"          # 浏览器端 HTTP 请求
+futures-channel = "0.3.34"
 console_error_panic_hook = "0.1.7"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = "0.4"              # 仅 CLI 工具（new / prerender）用
 
 [build-dependencies]
-comrak = "0.20.0"           # 构建期 Markdown → HTML（wasm 中已不再包含）
-regex = "1.11.0"
-toml = "0.8.8"              # 解析 _config.toml 配置文件
+comrak = "0.56.0"           # 构建期 Markdown → HTML（wasm 中已不再包含）
+regex = "1.13.1"
+toml = "1.1.8"              # 解析 _config.toml 配置文件
 mini-html = { path = "tools/mini-html" }  # 小程序 HTML 转换（lol_html）
 ```
 

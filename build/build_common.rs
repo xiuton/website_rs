@@ -1,4 +1,4 @@
-use comrak::ComrakOptions;
+use comrak::Options;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -450,7 +450,7 @@ fn escape_html_code(html: &str) -> String {
 
 /// Markdown → HTML，代码块内 < > & 自动转义
 pub fn md_to_html(md: &str) -> String {
-    let mut options = ComrakOptions::default();
+    let mut options = Options::default();
     options.extension.table = true;
     options.extension.strikethrough = true;
     options.extension.tasklist = true;

@@ -14,9 +14,9 @@ dev-pages = []
 [dependencies]
 dioxus = { version = "0.7.10", features = ["web", "router"] }
 console_error_panic_hook = "0.1.7"
-wasm-bindgen = "0.2.89"
-wasm-bindgen-futures = "0.4.39"
-web-sys = { version = "0.3.66", features = [
+wasm-bindgen = "0.2.129"
+wasm-bindgen-futures = "0.4.79"
+web-sys = { version = "0.3.106", features = [
     "Document",
     "Element",
     "HtmlElement",
@@ -30,20 +30,20 @@ web-sys = { version = "0.3.66", features = [
     "HtmlCanvasElement",
     "CanvasRenderingContext2d",
     ] }
-js-sys = "0.3.66"
-serde = { version = "1.0.195", features = ["derive"] }
-serde_json = "1.0.111"
-toml = "0.8.8"
-futures-channel = "0.3.30"
-gloo-net = "0.5.0"
+js-sys = "0.3.106"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+toml = "1.1.8"
+futures-channel = "0.3.34"
+gloo-net = "0.7.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-chrono = "0.4.31"
+chrono = "0.4.45"
 
 [build-dependencies]
-comrak = "0.20.0"
-regex = "1.11.0"
-toml = "0.8.8"
+comrak = "0.56.0"
+regex = "1.13.1"
+toml = "1.1.8"
 mini-html = { path = "tools/mini-html" }
 
 [profile.release]

@@ -286,9 +286,9 @@ post.summary.chars().take(160).collect::<String>()
 
 `prerender` 只生成 `/post/*` 和 `/series/*`。首页、`/tags`、`/search`、`/knowledge-graph` 仍是空壳 HTML，爬虫/社交预览拿不到内容。至少把首页列表（最近 N 篇）预渲染出来。
 
-### P2-9 依赖升级（长期，不必现在做）
+### P2-9 依赖升级（已完成，见 7.5 / 7.6）
 
-`dioxus 0.6.3` → 0.7 是较大的迁移（router 合并进主 crate、渲染 API 变化）；`comrak 0.20` 已落后多个版本；`gloo-net 0.5` → 0.6。建议单独开分支做，不要和性能优化混在一个 PR。
+Dioxus 已迁移到 0.7.10；comrak、gloo-net、toml、wasm-bindgen 等其余依赖也已升级到当前最新稳定版，破坏性变更与验证结果见 7.6。
 
 ---
 
@@ -343,8 +343,8 @@ $j | ForEach-Object { [pscustomobject]@{slug=$_.slug; md=$_.content.Length; html
 
 | 指标 | 优化前 | 优化后 | 变化 |
 |---|---:|---:|---:|
-| wasm 原始 | 3,706 KB | 1,216 KB | **-67%** |
-| wasm gzip | 1,298 KB | 480 KB | **-63%** |
+| wasm 原始 | 3,706 KB | 1,116 KB | **-70%** |
+| wasm gzip | 1,298 KB | 445 KB | **-66%** |
 | 字体资源合计 | 10,407 KB | 598 KB | **-94%** |
 | `posts.json` | 5,986 KB | 0（拆为 55 KB meta + 1.8 MB 按需 HTML） | 部署 -6 MB |
 | 文章页首访（gzip，含字体） | ≈ 8.4–9.6 MB | ≈ 0.9 MB | **-89%** |
@@ -373,7 +373,7 @@ $j | ForEach-Object { [pscustomobject]@{slug=$_.slug; md=$_.content.Length; html
 | P2-6 小程序 HTML 消毒 | ✅ | 新增 `tools/mini-html`（lol_html 解析器）替换 20+ 条正则；含 5 个单元测试 |
 | P2-7 静态 JSON 指纹 | ✅ | `cache::versioned()` 统一追加 `?v=BUILD_ID` |
 | P2-8 首页预渲染 | ✅ | prerender 向 `dist/index.html` 注入 `<noscript>` 最新文章列表 + ItemList JSON-LD |
-| P2-9 依赖大版本升级 | ✅（部分） | Dioxus 0.6.3 → 0.7.10 已完成（见 7.5）；comrak / gloo-net 仍未升级 |
+| P2-9 依赖大版本升级 | ✅ | Dioxus 0.6.3 → 0.7.10；comrak / gloo-net / toml / wasm-bindgen 等全部升级（见 7.5、7.6） |
 
 ## 7.3 新增/变更的构建约定
 
@@ -423,3 +423,39 @@ $j | ForEach-Object { [pscustomobject]@{slug=$_.slug; md=$_.content.Length; html
 - `cargo fmt --check`、`cargo clippy`（wasm + host）、`cargo test --workspace --exclude font-subset` 全部通过
 - `trunk build --release --no-default-features` 成功，93 篇文章页 + 2 个系列页 + 404 正常生成
 - 用 headless Chrome 实际访问 `/`、`/post/20201222/`、`/search`、`/tags`、`/series/rust-llm`、`/circle-generator`、`/about`、404，SPA 均正常挂载，控制台无错误（`/tags` 只有一条外部 favicon 404）
+
+## 7.6 其余依赖升级（2026-10-18）
+
+除 Dioxus 外，其余依赖也统一升级到当前最新稳定版：
+
+| 依赖 | 旧版本 | 新版本 |
+|---|---|---|
+| `wasm-bindgen` | 0.2.89 | **0.2.129** |
+| `wasm-bindgen-futures` | 0.4.39 | **0.4.79** |
+| `web-sys` / `js-sys` | 0.3.66 | **0.3.106** |
+| `serde` | 1.0.195 | **1.0.229** |
+| `serde_json` | 1.0.111 | **1.0.154** |
+| `toml` | 0.8.8 | **1.1.8** |
+| `futures-channel` | 0.3.30 | **0.3.34** |
+| `gloo-net` | 0.5.0 | **0.7.0** |
+| `chrono` | 0.4.31 | **0.4.45** |
+| `comrak`（构建期） | 0.20.0 | **0.56.0** |
+| `regex`（构建期） | 1.11.0 | **1.13.1** |
+
+实际需要改代码的只有 comrak：
+
+| 旧 API | 新 API |
+|---|---|
+| `ComrakOptions` | `Options`（`extension` / `parse` / `render` 三段式） |
+| `extension.tagfilter` | 0.56 已移除该扩展，删除对应设置 |
+| `extension.header_ids = Some(prefix)` | `extension.header_id_prefix = Some(prefix)` |
+| `render.unsafe_` | `render.r#unsafe` |
+
+`toml 1.x`、`gloo-net 0.7`、`wasm-bindgen 0.2.129` 在现有用法下无需改动。
+
+验证结果：
+
+- fmt / clippy（wasm + host）/ 测试（12 + 5）全部通过
+- `trunk build --release --no-default-features` 成功，93 篇文章页 + 2 个系列页 + 404
+- wasm 1,146 KB → **1,116 KB**（gzip 463 KB → **445 KB**）
+- 通过 CDP 检查渲染后的 DOM：首页 10 张卡片、文章页 markov/相关推荐/导航均存在，控制台无错误

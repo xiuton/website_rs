@@ -1,20 +1,19 @@
 use crate::build_common::*;
-use comrak::ComrakOptions;
+use comrak::Options;
 use regex::Regex;
 use std::path::Path;
 
 fn markdown_to_html(markdown: &str) -> String {
-    let mut options = ComrakOptions::default();
+    let mut options = Options::default();
     options.extension.autolink = true;
     options.extension.strikethrough = true;
-    options.extension.tagfilter = true;
     options.extension.table = true;
     options.extension.tasklist = true;
     options.extension.superscript = true;
-    options.extension.header_ids = Some(String::from("user-content-"));
+    options.extension.header_id_prefix = Some(String::from("user-content-"));
     options.extension.footnotes = true;
     options.extension.description_lists = true;
-    options.render.unsafe_ = true;
+    options.render.r#unsafe = true;
     comrak::markdown_to_html(markdown, &options)
 }
 
@@ -96,17 +95,16 @@ pub fn excerpt_from_markdown(markdown: &str, max_chars: usize) -> String {
 }
 
 fn markdown_to_mini_program_html(markdown: &str) -> String {
-    let mut options = ComrakOptions::default();
+    let mut options = Options::default();
     options.extension.autolink = true;
     options.extension.strikethrough = true;
-    options.extension.tagfilter = true;
     options.extension.table = true;
     options.extension.tasklist = true;
     options.extension.superscript = true;
-    options.extension.header_ids = None;
+    options.extension.header_id_prefix = None;
     options.extension.footnotes = false;
     options.extension.description_lists = false;
-    options.render.unsafe_ = false;
+    options.render.r#unsafe = false;
     let html = comrak::markdown_to_html(markdown, &options);
     // 标签改写交给 tools/mini-html（lol_html 解析器），不再用正则拼接
     mini_html::sanitize_for_mini_program(&html)
