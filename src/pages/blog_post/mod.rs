@@ -1,11 +1,11 @@
-use crate::components::icons::{BackArrowIcon, HomeIcon, ScrollTopIcon, TagIcon, WideModeIcon};
-use crate::components::PageHead;
+use crate::components::icons::TagIcon;
+use crate::components::{PageHead, BLOG_WIDE_MODE};
 use crate::models::BlogPost;
 use crate::routes::Route;
 use crate::utils::knowledge_graph::{self, ArticleNode};
 use crate::utils::search::SearchEngine;
 use crate::utils::topics::{self, LdaData};
-use crate::utils::{code_highlight, storage, title};
+use crate::utils::{code_highlight, title};
 use crate::BLOG_POSTS;
 use dioxus::prelude::*;
 
@@ -45,8 +45,6 @@ pub fn BlogPostView(slug: String) -> Element {
             }
         }
     });
-
-    let mut is_wide_mode = use_signal(|| false);
 
     // 正文下方的推荐/主题/图谱数据在滚动到可见区域后再加载，
     // 避免和正文、字体争抢首屏带宽。
@@ -154,14 +152,11 @@ pub fn BlogPostView(slug: String) -> Element {
     });
 
     use_effect(move || {
-        // 设置文章级结构化数据 + 恢复宽屏模式；标题/描述/canonical 由 PageHead 负责
+        // 设置文章级结构化数据；宽屏状态由全局工具栏初始化
         if let Some(post) = post() {
             let description: String = post.summary.chars().take(160).collect();
             let post_url = format!("https://ganto.me/post/{}", post.slug);
             title::set_article_jsonld(post.title, &description, &post_url, post.date, post.author, post.tags);
-        }
-        if post().is_some() {
-            is_wide_mode.set(storage::get_blog_wide_mode());
         }
     });
 
@@ -215,51 +210,8 @@ pub fn BlogPostView(slug: String) -> Element {
                     canonical: format!("/post/{}", post.slug),
                 }
                 article {
-                    class: if is_wide_mode() { "blog-post wide-mode" } else { "blog-post" },
+                    class: if BLOG_WIDE_MODE() { "blog-post wide-mode" } else { "blog-post" },
                     aria_label: article_label.as_deref().unwrap_or("文章"),
-                    div { class: "blog-nav",
-                        button {
-                            class: "back-button",
-                            aria_label: "后退",
-                            onclick: move |_| {
-                                if let Some(window) = web_sys::window() {
-                                    if let Ok(history) = window.history() {
-                                    let _ = history.back();
-                                }
-                                }
-                            },
-                            BackArrowIcon {}
-                        }
-                        Link {
-                            to: Route::Home,
-                            class: "back-button",
-                            aria_label: "首页",
-                            HomeIcon {}
-                        }
-                        span { class: "nav-divider" }
-                        button {
-                            class: "function-button",
-                            aria_label: "回顶部",
-                            onclick: move |_| {
-                                if let Some(window) = web_sys::window() {
-                                window.scroll_to_with_x_and_y(0.0, 0.0);
-                            }
-                            },
-                            ScrollTopIcon {}
-                        }
-                        button {
-                            class: if is_wide_mode() { "function-button active" } else { "function-button" },
-                            aria_label: if is_wide_mode() { "关闭宽屏" } else { "宽屏模式" },
-                            onclick: move |_| {
-                                let new_mode = !is_wide_mode();
-                                is_wide_mode.set(new_mode);
-                                storage::set_blog_wide_mode(new_mode);
-                            },
-                            {
-                                rsx! { WideModeIcon {} }
-                            }
-                        }
-                    }
                     div { class: "blog-title-wrapper",
                         div { class: "blog-title",
                             h2 { {post.title} }

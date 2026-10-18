@@ -1,4 +1,4 @@
-use super::{Footer, Navbar};
+use super::{FloatingToolbar, Footer, Navbar};
 use crate::routes::Route;
 use crate::utils::{dark_mode, title};
 use dioxus::prelude::*;
@@ -25,6 +25,7 @@ pub fn Layout() -> Element {
             main { class: "main-content", id: "main-content",
                 Outlet::<Route> {}
             }
+            FloatingToolbar {}
             Footer {}
         }
     }

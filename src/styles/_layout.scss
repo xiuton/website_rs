@@ -3346,3 +3346,126 @@ html.dark::view-transition-new(root) {
         }
     }
 }
+
+// ============================================================
+// 全局悬浮工具栏（文章、首页、搜索、系列等共用）
+// ============================================================
+.floating-toolbar {
+  position: fixed;
+  right: max(1rem, calc((100vw - 700px) / 2 - 3rem));
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.3rem;
+  background: rgba(var(--bg-primary-rgb), 0.88);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+
+  &.wide {
+    right: max(1rem, calc((100vw - 1200px) / 2 - 3rem));
+  }
+
+  .tool-btn {
+    width: 2.35rem;
+    height: 2.35rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-tertiary);
+    text-decoration: none;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+
+    svg {
+      width: 1.15rem;
+      height: 1.15rem;
+    }
+
+    &:hover {
+      background: var(--accent-soft);
+      color: var(--accent-text);
+    }
+
+    &.active {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.25);
+    }
+
+    &::after {
+      content: attr(aria-label);
+      position: absolute;
+      right: calc(100% + 0.65rem);
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 0.25rem 0.6rem;
+      border-radius: var(--radius-sm);
+      background: var(--text-primary);
+      color: var(--text-color-anti);
+      font-size: 0.72rem;
+      font-weight: 500;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+
+    &:hover::after {
+      opacity: 1;
+    }
+  }
+
+  .tool-divider {
+    width: 1.25rem;
+    height: 1px;
+    background: var(--border-subtle);
+    margin: 0.2rem auto;
+  }
+
+  @include mobile {
+    right: 1rem;
+    left: 1rem;
+    top: auto;
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    transform: none;
+    width: fit-content;
+    margin: 0 auto;
+    flex-direction: row;
+    justify-content: center;
+    padding: 0.2rem;
+
+    &.wide {
+      right: 1rem;
+    }
+
+    .tool-btn {
+      width: 2rem;
+      height: 2rem;
+
+      svg {
+        width: 1rem;
+        height: 1rem;
+      }
+
+      &::after {
+        display: none;
+      }
+    }
+
+    .tool-divider {
+      width: 1px;
+      height: 1rem;
+      margin: auto 0.2rem;
+    }
+  }
+}

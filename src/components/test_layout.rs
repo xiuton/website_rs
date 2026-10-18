@@ -1,3 +1,4 @@
+use crate::components::FloatingToolbar;
 use crate::routes::Route;
 use dioxus::prelude::*;
 
@@ -13,6 +14,7 @@ pub fn TestLayout() -> Element {
                 }
             }
             Outlet::<Route> {}
+            FloatingToolbar {}
         }
     }
 }
