@@ -1721,6 +1721,31 @@
           line-height: 1.75;
           font-size: 1rem;
 
+          // 深色模式下正文适当放大、增加行距与字距，降低长文阅读疲劳
+          html.dark & {
+            font-size: 1.02rem;
+            line-height: 1.85;
+            letter-spacing: 0.012em;
+
+            h1, h2, h3, h4, h5, h6 {
+              color: #f2efe8;
+            }
+
+            p, li {
+              color: var(--text-primary);
+            }
+
+            strong {
+              color: #f7f4ee;
+              font-weight: 600;
+            }
+
+            blockquote {
+              background: rgba(var(--accent-rgb), 0.07);
+              color: var(--text-secondary);
+            }
+          }
+
           h1, h2, h3, h4, h5, h6 {
             color: var(--text-primary);
             line-height: 1.35;
@@ -1789,7 +1814,9 @@
             border: 1px solid var(--border-subtle);
 
             html.dark & {
-              background: #242424;
+              background: var(--code-inline-bg);
+              color: var(--code-inline-text);
+              border-color: var(--border-default);
             }
           }
 

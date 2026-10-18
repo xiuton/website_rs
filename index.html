@@ -102,36 +102,8 @@
     <link data-trunk rel="copy-file" href="netlify.toml" data-optional />
     <link data-trunk rel="copy-file" href="static/favicon.svg" data-optional />
     <style>
-        :root {
-            --bg-base: #f8f4ed;
-            --bg-elevated: #fdfbf7;
-            --bg-subtle: #f0ebe0;
-            --text-primary: #3e3327;
-            --text-secondary: #7a6c5a;
-            --text-tertiary: #a49480;
-            --border-default: #e0d6c5;
-            --border-subtle: #ede4d5;
-            --accent: #6a9b50;
-            --accent-rgb: 106, 155, 80;
-            --accent-soft: rgba(106, 155, 80, 0.1);
-            --radius-sm: 6px;
-            --radius-md: 10px;
-            --radius-lg: 14px;
-            --radius-full: 999px;
-        }
-        .dark {
-            --bg-base: #1b1612;
-            --bg-elevated: #241e19;
-            --bg-subtle: #2d2620;
-            --text-primary: #ede4d6;
-            --text-secondary: #b0a290;
-            --text-tertiary: #7d7060;
-            --border-default: #3a3229;
-            --border-subtle: #2a241f;
-            --accent: #78b860;
-            --accent-rgb: 120, 184, 96;
-            --accent-soft: rgba(120, 184, 96, 0.12);
-        }
+        /* 主题变量统一由 src/styles/_theme.scss 生成的外部 styles.css 提供，
+           这里不再复制一份，避免深色/浅色 token 两处漂移。 */
         #main-skeleton { transition: opacity 0.2s ease; }
         #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
         .sk-page { display: none; }
