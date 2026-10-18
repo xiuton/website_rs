@@ -9,6 +9,8 @@ on:
 env:
   # 固定版本，避免上游 latest 变化导致构建漂移
   TRUNK_VERSION: "0.21.14"
+  # 生产构建：让 prerender 清理 dev 专用静态资源
+  WEBSITE_PROD: "1"
 
 jobs:
   build:
@@ -50,6 +52,9 @@ jobs:
     - name: Clippy (mini-html)
       run: cargo clippy -p mini-html --all-targets -- -D warnings
 
+    - name: Check font tool
+      run: cargo check -p font-subset
+
     - name: Unit tests
       run: cargo test --workspace --exclude font-subset
 
@@ -60,19 +65,20 @@ jobs:
 
     - name: Verify prerendered pages
       run: |
-        test -f dist/static/posts-meta.json
         test -d dist/post
         test "$(find dist/post -name index.html | wc -l)" -gt 0
-        grep -q 'id="prerender-content"' dist/post/*/index.html || (echo "post page missing content template" && exit 1)
-        grep -q 'id="noscript-posts"' dist/index.html || (echo "home page missing noscript SEO block" && exit 1)
+        grep -q 'class="blog-content"' dist/post/*/index.html
+        grep -q "id='prerender-content'" dist/post/*/index.html
+        grep -q 'id="noscript-posts"' dist/index.html
+        test ! -f dist/static/posts-meta.json
         echo "prerendered: $(find dist/post -name index.html | wc -l) pages"
 
-    # 体积预算：防止后续改动把 wasm 又吹大（当前约 490 KB gzip）
+    # 体积预算：防止后续改动把 wasm 又吹大（当前约 450 KB gzip）
     - name: Bundle size budget
       run: |
         wasm_bytes=$(gzip -c dist/*.wasm | wc -c)
         echo "wasm gzip: ${wasm_bytes} bytes"
-        test "$wasm_bytes" -lt 900000
+        test "$wasm_bytes" -lt 600000
 
     - name: Deploy to GitHub Pages
       if: github.event_name == 'push'

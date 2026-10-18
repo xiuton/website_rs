@@ -259,6 +259,30 @@ mod prerender_impl {
     const CLEAR_SCRIPT: &str = r#"<script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
 try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
 
+    /// 文章页专用：先把可见正文搬进 `<template>` 供 SPA 复用，再清空 #main。
+    ///
+    /// 这样 HTML 里只保留一份正文：爬虫/禁用 JS 时看到可见的 `.blog-content`，
+    /// SPA 启动时从 template 同步取用，不需要重新请求正文。
+    fn make_article_clear_script(slug: &str) -> String {
+        format!(
+            r#"<script>/* 把预渲染正文交给 SPA 后清空 #main，避免重复渲染 */
+try{{
+  var main=document.getElementById('main');
+  var content=main?main.querySelector('.blog-content'):null;
+  if(content){{
+    var t=document.createElement('template');
+    t.id='prerender-content';
+    t.setAttribute('data-slug', {slug});
+    t.innerHTML=content.innerHTML;
+    document.body.appendChild(t);
+  }}
+  if(main) main.innerHTML='';
+}}catch(e){{}}
+</script>"#,
+            slug = json_escape(slug)
+        )
+    }
+
     /// 生成系列章节导航 HTML（与 SPA 中的 .series-nav 结构一致）
     fn series_nav_html(post: &PostJson, all_posts: &[PostJson]) -> String {
         if post.series.is_empty() {
@@ -362,9 +386,7 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
         );
 
         let content_html = strip_scripts(&post.content_html);
-        // 把正文同时存进 <template>：SPA 启动时直接取用，避免「清空预渲染内容 → 再 fetch」的闪跳。
-        let content_template =
-            format!("<template id=\"prerender-content\" data-slug=\"{}\">{}</template>", esc(&post.slug), content_html);
+        let article_clear_script = make_article_clear_script(&post.slug);
 
         format!(
             r#"<!DOCTYPE html>
@@ -431,8 +453,7 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
 {footer}
         </div>
     </div>
-{content_template}
-{clear_script}
+{article_clear_script}
 {wasm_script}
 </body>
 </html>
@@ -453,9 +474,8 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
             date = esc(&date),
             tag_html = tag_html,
             content_html = content_html,
-            content_template = content_template,
+            article_clear_script = article_clear_script,
             series_html = series_html,
-            clear_script = CLEAR_SCRIPT,
             wasm_script = wasm_script,
         )
     }
@@ -716,6 +736,14 @@ try{document.getElementById('main').innerHTML='';}catch(e){}</script>"#;
 
         // GitHub Pages SPA 兜底：未知路径加载 404.html（内容与 index.html 一致）
         fs::copy(&index_path, dist.join("404.html")).map_err(|e| e.to_string())?;
+
+        // posts-meta 仅供构建期使用，SPA / 预渲染都不需要它，避免无谓部署
+        let _ = fs::remove_file(dist.join("static").join("posts-meta.json"));
+
+        // 生产构建不包含 Playground，dev 专用背景图无需发布
+        if std::env::var("WEBSITE_PROD").as_deref() == Ok("1") {
+            let _ = fs::remove_file(dist.join("static").join("images").join("playground-bg.jpg"));
+        }
 
         println!("[prerender] generated {} post pages + {} series pages + 404.html, css={}", count, series_count, css);
         Ok(())

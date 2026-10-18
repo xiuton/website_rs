@@ -48,8 +48,15 @@ pub fn Search() -> Element {
     let engine_ref = use_signal(SearchEngine::new);
     let mut kg_data = use_signal(|| Option::<KnowledgeGraph>::None);
 
+    // 搜索数据按需加载：页面打开时（尤其带 autofocus）不预取几百 KB 索引，
+    // 只有用户真正输入（或 URL 自带 q）后才开始加载。
+    let mut activated = use_signal(|| !get_initial_query().is_empty());
+
     // 一次性加载搜索索引
     use_effect(move || {
+        if !activated() {
+            return;
+        }
         spawn(async move {
             let mut engine_ref = engine_ref;
             let mut index_loaded = index_loaded;
@@ -66,6 +73,9 @@ pub fn Search() -> Element {
     // 加载知识图谱
     let mut kg_data_loaded = use_signal(|| false);
     use_effect(move || {
+        if !activated() {
+            return;
+        }
         spawn(async move {
             if let Some(graph) = knowledge_graph::load_graph().await {
                 kg_data.set(Some(graph));
@@ -78,6 +88,9 @@ pub fn Search() -> Element {
     let mut semantic_loaded = use_signal(|| false);
     let mut engine_for_semantic = engine_ref;
     use_effect(move || {
+        if !activated() {
+            return;
+        }
         spawn(async move {
             if let Some(text) = crate::utils::cache::fetch_text("/static/semantic.json").await {
                 engine_for_semantic.write().load_semantic(&text).ok();
@@ -90,6 +103,9 @@ pub fn Search() -> Element {
     let mut rake_loaded = use_signal(|| false);
     let mut engine_for_rake = engine_ref;
     use_effect(move || {
+        if !activated() {
+            return;
+        }
         spawn(async move {
             if let Some(text) = crate::utils::cache::fetch_text("/static/rake-keywords.json").await {
                 engine_for_rake.write().load_rake(&text).ok();
@@ -223,7 +239,11 @@ pub fn Search() -> Element {
                         placeholder: "输入关键词搜索文章...",
                         aria_label: "搜索文章",
                         autofocus: true,
-                        oninput: move |evt| { suggestion_clicked.set(false); query.set(evt.data.value()); },
+                        oninput: move |evt| {
+                            activated.set(true);
+                            suggestion_clicked.set(false);
+                            query.set(evt.data.value());
+                        },
                         onfocus: move |_| {
                             suggestion_clicked.set(false);
                             // 重新触发自动补全 effect

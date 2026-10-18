@@ -31,7 +31,7 @@ pub(super) fn MarkovContinuation(slug: String) -> Element {
         spawn(async move {
             match crate::utils::markov::load_markov().await {
                 Ok(data) => {
-                    if data.contains_key(&slug) {
+                    if data.articles.contains_key(&slug) {
                         let gen = crate::utils::markov::MarkovGenerator::new(data);
                         let text = gen.generate(&slug, Some(""), 300);
                         gen_signal.set(Some(gen));

@@ -343,15 +343,15 @@ $j | ForEach-Object { [pscustomobject]@{slug=$_.slug; md=$_.content.Length; html
 
 | 指标 | 优化前 | 优化后 | 变化 |
 |---|---:|---:|---:|
-| wasm 原始 | 3,706 KB | 1,116 KB | **-70%** |
-| wasm gzip | 1,298 KB | 445 KB | **-66%** |
-| 字体资源合计 | 10,407 KB | 598 KB | **-94%** |
-| `posts.json` | 5,986 KB | 0（拆为 55 KB meta + 1.8 MB 按需 HTML） | 部署 -6 MB |
-| 文章页首访（gzip，含字体） | ≈ 8.4–9.6 MB | ≈ 0.9 MB | **-89%** |
-| 首页首访（gzip，含字体） | ≈ 6.8 MB | ≈ 0.76 MB | **-89%** |
-| `dist/` 总大小 | 27.8 MB | 16.7 MB | -40% |
+| wasm 原始 | 3,706 KB | 1,125 KB | **-70%** |
+| wasm gzip | 1,298 KB | 449 KB | **-65%** |
+| 字体资源合计 | 10,407 KB | 315 KB | **-97%** |
+| `posts.json` | 5,986 KB | 0（拆为 meta + 按需 HTML） | 部署 -6 MB |
+| 文章页首访（gzip，含字体） | ≈ 8.4–9.6 MB | ≈ 0.78 MB | **-91%** |
+| 首页首访（gzip，含字体） | ≈ 6.8 MB | ≈ 0.74 MB | **-89%** |
+| `dist/` 总大小 | 27.8 MB | 10.68 MB | **-62%** |
 | 文章页挂载时下载的 markov | 1,435 KB（每次） | 0（点击才加载） | -100% |
-| `markov.json` 体积 | 4,628 KB | 4,323 KB | -7% |
+| `markov.json` 体积 | 4,628 KB | 986 KB | **-79%** |
 
 ## 7.2 各项落地情况
 
@@ -459,3 +459,33 @@ $j | ForEach-Object { [pscustomobject]@{slug=$_.slug; md=$_.content.Length; html
 - `trunk build --release --no-default-features` 成功，93 篇文章页 + 2 个系列页 + 404
 - wasm 1,146 KB → **1,116 KB**（gzip 463 KB → **445 KB**）
 - 通过 CDP 检查渲染后的 DOM：首页 10 张卡片、文章页 markov/相关推荐/导航均存在，控制台无错误
+
+## 7.7 第三轮：按需加载与资源瘦身（2026-10-18）
+
+| 事项 | 实现 | 效果 |
+|---|---|---|
+| 预渲染正文去重 | 服务端不再输出 `<template>`，改为页面脚本从可见的 `.blog-content` 提取后清空 `#main` | `dist/post/` 5.6 MB → **3.73 MB**，单页 61.7 → 41.1 KB |
+| 未使用图片 | 删除无引用的 `Snipaste_*.png`；`img.png` 766 KB → `playground-bg.jpg` **64 KB**，且生产构建不发布 | 部署 -1.0 MB |
+| 搜索页按需加载 | 索引/语义/RAKE/图谱改到用户首次输入后再加载（URL 自带 `q` 时立即加载） | 搜索页初始 JSON 232 KB gz → **0** |
+| 文章页下方数据 | 相关文章/图谱/LDA/embeddings 由 `.details-sentinel` 的 `onvisible` 触发 | 文章页初始 JSON 85 KB gz → **0**，滚动后加载 |
+| SmileySans 子集 | 字体工具按 `/dev` 页字符单独裁剪 | 327 KB → **44.6 KB** |
+| markov 紧凑格式 | 全局 token 字典 + `u32` 下标 + 扁平数组；只保留出现 ≥2 次的转移 | 4,323 KB → **986 KB**（gzip 1,332 → **253 KB**，-81%） |
+| highlight 按需 | 仅正文含 `<pre>` 时初始化/重跑 | 无代码文章少 40 KB gz |
+| `posts-meta` | 预渲染后从 `dist/` 删除 | -10 KB gz |
+| CI | wasm 预算收紧到 600 KB；新增 `cargo check -p font-subset`；校验新模板脚本 | 防回归 |
+
+最终产物：
+
+- wasm **1,125 KB / 449 KB gz**
+- 字体合计 **315 KB**（MiSans 258 / JetBrains 13 / SmileySans 45）
+- markov **986 KB / 253 KB gz**
+- `dist/` **10.68 MB**（上一轮 17.15 MB）
+
+验证：
+
+- fmt / clippy（wasm + host）/ 测试（12 + 5）通过
+- `trunk build --release --no-default-features` 成功，93 篇文章页 + 2 个系列页 + 404
+- 用 CDP 实测：
+  - 文章页滚动前不请求 `search-index`/`embeddings`/`markov`；滚动到评论区后相关文章 5 条正常出现；点击「生成续写」才加载 markov 并成功输出
+  - 搜索页输入前不请求任何索引；输入 `rust` 后 4 个索引才加载
+  - 控制台无错误

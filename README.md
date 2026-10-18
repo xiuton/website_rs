@@ -110,6 +110,7 @@ trunk build --release --no-default-features
 
 `--no-default-features` 会去掉仅开发环境需要的 Playground / Test 页面；
 本地开发直接 `trunk serve`（默认带上 `dev-pages`）。
+生产构建可额外设置 `WEBSITE_PROD=1`，让预渲染阶段移除 Playground 专用背景图（CI 已设置）。
 
 构建产物输出到 `dist/` 目录。
 
@@ -125,8 +126,9 @@ trunk build --release --no-default-features
 
 **关于字体：** 部署目录里只放 `cargo run -p font-subset` 生成的 woff2 子集
 （原始字体在 `assets/fonts/`，不参与部署）。子集化完全由 Rust 实现
-（allsorts + woofwoof），不依赖 Python/fonttools。新增文章后如果出现个别缺字
-（回退到系统字体），重跑一次该命令即可。
+（allsorts + woofwoof），不依赖 Python/fonttools。SmileySans 只被 `/dev` 页使用，
+因此按该页字符单独裁剪；新增文章后如果出现个别缺字（回退到系统字体），
+重跑一次该命令即可。
 
 **关于 wasm-opt：** `index.html` 里设置了 `data-wasm-opt="z"`，Trunk 会自动下载并使用
 binaryen 压缩 Wasm；如果本机没有网络，可临时改回 `data-wasm-opt="0"` 跳过该步骤。
@@ -442,9 +444,10 @@ slug_prefix = "rust-guide"
 │   │   ├── JetBrainsMono-subset.woff2
 │   │   └── SmileySans-subset.woff2
 │   ├── post-html/           # 每篇文章的 HTML 片段（SPA 按需加载）
-│   ├── posts-meta.json      # 文章元数据（预渲染 / 列表用）
+│   ├── posts-meta.json      # 文章元数据（仅构建期用，不进入 dist）
 │   ├── images/              # 通用图片
-│   │   └── og-image.png     # 社交分享图（1200×630）
+│   │   ├── og-image.png     # 社交分享图（1200×630）
+│   │   └── playground-bg.jpg # Playground 背景（生产构建会移除）
 │   ├── robots.txt           # 爬虫协议（指向 sitemap.xml）
 │   └── favicon.svg          # 网站图标
 ├── .gitignore

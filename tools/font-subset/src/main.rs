@@ -27,10 +27,12 @@ const TEXT_EXTENSIONS: &[&str] = &["md", "rs", "scss", "css", "html", "toml", "t
 /// 递归扫描时需要跳过的目录（构建产物、依赖、字体源文件）。
 const SKIP_DIRS: &[&str] = &["target", "dist", "node_modules", ".git", "assets", "static"];
 
-const FONTS: &[(&str, &str)] = &[
-    ("MiSans-Regular.otf", "MiSans-subset.woff2"),
-    ("JetBrainsMonoNLNerdFont-Regular.ttf", "JetBrainsMono-subset.woff2"),
-    ("SmileySans-Oblique.otf", "SmileySans-subset.woff2"),
+/// (源文件, 输出文件, 是否使用全站字符集)
+/// SmileySans 只用于 `/dev` 页，按全站字符裁剪会白白多出几百 KB。
+const FONTS: &[(&str, &str, bool)] = &[
+    ("MiSans-Regular.otf", "MiSans-subset.woff2", true),
+    ("JetBrainsMonoNLNerdFont-Regular.ttf", "JetBrainsMono-subset.woff2", true),
+    ("SmileySans-Oblique.otf", "SmileySans-subset.woff2", false),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -39,8 +41,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let output_dir = root.join("static").join("fonts");
     fs::create_dir_all(&output_dir)?;
 
-    let mut chars: HashSet<char> = BASE_CHARS.chars().collect();
-    chars.extend((0x20u32..=0x7E).filter_map(char::from_u32));
+    let mut chars = base_chars();
 
     let mut scanned = 0usize;
     for dir in ["posts", "src"] {
@@ -52,11 +53,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    // dev 页专用字体只需要 dev.rs 里出现的字符
+    let mut dev_chars = base_chars();
+    collect_from_file(&root.join("src/pages/dev.rs"), &mut dev_chars)?;
+
     println!("collected {} unique characters from {} files", chars.len(), scanned);
 
     let codepoints: BTreeSet<char> = chars.iter().copied().collect();
+    let dev_codepoints: BTreeSet<char> = dev_chars.iter().copied().collect();
 
-    for (input, output) in FONTS {
+    for (input, output, use_site_charset) in FONTS {
         let input_path = source_dir.join(input);
         let output_path = output_dir.join(output);
         let data = fs::read(&input_path).map_err(|e| format!("读取 {} 失败: {e}", input_path.display()))?;
@@ -72,8 +78,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let face =
             ttf_parser::Face::parse(&data, 0).map_err(|e| format!("读取 {} 字形表失败: {e}", input_path.display()))?;
 
-        // .notdef 必须保留，其余只保留站点实际用到的字符；glyph id 不能重复。
-        let mut glyph_ids: Vec<u16> = codepoints
+        // .notdef 必须保留，其余只保留实际用到的字符；glyph id 不能重复。
+        let selected = if *use_site_charset { &codepoints } else { &dev_codepoints };
+        let mut glyph_ids: Vec<u16> = selected
             .iter()
             .filter_map(|c| face.glyph_index(*c))
             .map(|g| g.0)
@@ -130,6 +137,12 @@ fn project_root() -> Result<PathBuf, Box<dyn Error>> {
         .and_then(Path::parent)
         .map(Path::to_path_buf)
         .ok_or_else(|| "无法定位项目根目录".into())
+}
+
+fn base_chars() -> HashSet<char> {
+    let mut chars: HashSet<char> = BASE_CHARS.chars().collect();
+    chars.extend((0x20u32..=0x7E).filter_map(char::from_u32));
+    chars
 }
 
 fn collect_from_dir(dir: &Path, chars: &mut HashSet<char>) -> Result<usize, Box<dyn Error>> {

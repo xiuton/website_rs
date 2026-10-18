@@ -1,5 +1,11 @@
 //! 马尔可夫链文本生成器
-//! 基于 trigram 模型，在 build.rs 预计算，前端直接加载使用
+//! 基于 trigram 模型，在 build.rs 预计算成紧凑格式，前端直接加载使用。
+//!
+//! 模型格式（`static/markov.json`）：
+//! ```json
+//! {"tokens":["a","b"],"articles":{"slug":{"s":[[0,1]],"c":[[[0,1],[[2,3]]]]}}}
+//! ```
+//! `tokens` 是全局字典，转移只存 `u32` 下标，避免重复保存字符串。
 
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -8,14 +14,25 @@ use wasm_bindgen::prelude::*;
 /// 单篇文章的马尔可夫链数据
 #[derive(Debug, Clone, Deserialize)]
 pub struct ArticleChain {
-    /// 起始 token 对（"tok1||tok2"）
-    pub s: Vec<String>,
-    /// 转移概率链：key="prev1||prev2" → {next_token: count}
-    pub c: HashMap<String, HashMap<String, u32>>,
+    /// 起始 token 对（token 字典下标）
+    #[serde(default)]
+    pub s: Vec<[u32; 2]>,
+    /// 转移表：`[[prev1, prev2], [[next, count], ...]]`
+    #[serde(default)]
+    pub c: Vec<([u32; 2], Vec<[u32; 2]>)>,
 }
 
-/// 所有文章的马尔可夫链数据（slug → ArticleChain）
-pub type MarkovData = HashMap<String, ArticleChain>;
+/// 整个 markov 模型：token 字典 + 各文章转移表
+#[derive(Debug, Clone, Deserialize)]
+pub struct MarkovModel {
+    #[serde(default)]
+    pub tokens: Vec<String>,
+    #[serde(default)]
+    pub articles: HashMap<String, ArticleChain>,
+}
+
+/// 所有文章的马尔可夫链数据（slug → ArticleChain），保留旧名字方便调用方使用
+pub type MarkovData = MarkovModel;
 
 /// 加载 markov.json
 ///
@@ -115,12 +132,33 @@ fn is_disallowed(token: &str) -> bool {
 /// 马尔可夫链生成器
 #[derive(Debug, Clone)]
 pub struct MarkovGenerator {
-    data: MarkovData,
+    tokens: Vec<String>,
+    token_ids: HashMap<String, u32>,
+    articles: HashMap<String, HashMap<[u32; 2], Vec<[u32; 2]>>>,
+    starters: HashMap<String, Vec<[u32; 2]>>,
 }
 
 impl MarkovGenerator {
-    pub fn new(data: MarkovData) -> Self {
-        Self { data }
+    pub fn new(model: MarkovData) -> Self {
+        let token_ids: HashMap<String, u32> = model
+            .tokens
+            .iter()
+            .enumerate()
+            .map(|(i, token)| (token.clone(), i as u32))
+            .collect();
+
+        let mut articles = HashMap::with_capacity(model.articles.len());
+        let mut starters = HashMap::with_capacity(model.articles.len());
+        for (slug, chain) in model.articles {
+            let mut map = HashMap::with_capacity(chain.c.len());
+            for (key, nexts) in chain.c {
+                map.insert(key, nexts);
+            }
+            starters.insert(slug.clone(), chain.s);
+            articles.insert(slug, map);
+        }
+
+        Self { tokens: model.tokens, token_ids, articles, starters }
     }
 
     /// 使用指定文章的马尔可夫链生成续写文本
@@ -128,122 +166,107 @@ impl MarkovGenerator {
     /// - `seed`: 可选的种子文本（将从中提取起始 token 对）
     /// - `max_tokens`: 最多生成的 token 数
     pub fn generate(&self, slug: &str, seed: Option<&str>, max_tokens: usize) -> String {
-        let chain = match self.data.get(slug) {
-            Some(c) => c,
-            // 文章没有模型时从所有文章随机选一个种子
-            None => return String::new(),
+        let Some(chain) = self.articles.get(slug) else {
+            return String::new();
         };
-
-        if chain.c.is_empty() || chain.s.is_empty() {
+        let Some(starters) = self.starters.get(slug) else {
+            return String::new();
+        };
+        if chain.is_empty() || starters.is_empty() {
             return String::new();
         }
 
-        // 确定起始 token 对
-        let start_pair = if let Some(seed_text) = seed {
-            self.find_seed_pair(seed_text, chain)
-        } else {
-            None
+        let start_pair = seed
+            .and_then(|text| self.find_seed_pair(text, chain))
+            .or_else(|| self.pick_starter(starters));
+        let Some((mut prev1, mut prev2)) = start_pair else {
+            return String::new();
         };
 
-        let (mut prev1, mut prev2) = match start_pair.clone().or_else(|| {
-            // 从 starters 中随机选一个（跳过含语法符号的起始对）
-            let mut attempts = 0;
-            loop {
-                let idx = (js_sys::Math::random() * chain.s.len() as f64) as usize;
-                let pair = &chain.s[idx.min(chain.s.len() - 1)];
-                if let Some(p) = Self::split_pair(pair) {
-                    if !is_disallowed(&p.0) && !is_disallowed(&p.1) {
-                        break Some(p);
-                    }
-                }
-                attempts += 1;
-                if attempts > 20 {
-                    break Self::split_pair(pair);
-                }
-            }
-        }) {
-            Some(p) => p,
-            None => return String::new(),
-        };
-
-        let mut output_tokens: Vec<String> = if start_pair.is_some() {
-            Vec::new()
-        } else if !is_disallowed(&prev1) && !is_disallowed(&prev2) {
-            vec![prev1.clone(), prev2.clone()]
-        } else {
-            Vec::new()
-        };
+        // 与旧实现一致：从起始 token 对开始拼接
+        let mut output_tokens: Vec<u32> = vec![prev1, prev2];
 
         let mut skipped = 0;
         for _ in 0..(max_tokens * 2) {
             if output_tokens.len() >= max_tokens {
                 break;
             }
-            let key = format!("{}||{}", prev1, prev2);
-            let nexts = match chain.c.get(&key) {
-                Some(n) => n,
-                None => break,
+            let Some(nexts) = chain.get(&[prev1, prev2]) else {
+                break;
+            };
+            let Some(next) = self.weighted_pick(nexts) else {
+                break;
             };
 
-            let next = self.weighted_pick(nexts);
-            match next {
-                Some(token) => {
-                    if is_disallowed(&token) {
-                        skipped += 1;
-                        if skipped > 20 {
-                            break;
-                        }
-                        continue;
-                    }
-                    output_tokens.push(token.clone());
-                    prev1 = prev2;
-                    prev2 = token;
+            if is_disallowed(self.token_str(next)) {
+                skipped += 1;
+                if skipped > 20 {
+                    break;
                 }
-                None => break,
+                continue;
             }
+
+            output_tokens.push(next);
+            prev1 = prev2;
+            prev2 = next;
         }
 
-        output_tokens.concat()
+        output_tokens.iter().map(|id| self.token_str(*id)).collect::<String>()
+    }
+
+    fn token_str(&self, id: u32) -> &str {
+        self.tokens.get(id as usize).map(String::as_str).unwrap_or("")
     }
 
     /// 从种子文本中找匹配的起始 token 对
-    fn find_seed_pair(&self, seed: &str, chain: &ArticleChain) -> Option<(String, String)> {
+    fn find_seed_pair(&self, seed: &str, chain: &HashMap<[u32; 2], Vec<[u32; 2]>>) -> Option<(u32, u32)> {
         let tokens = tokenize_seed(seed);
         if tokens.len() < 2 {
             return None;
         }
         // 从末尾开始找匹配
         for i in (1..tokens.len()).rev() {
-            let key = format!("{}||{}", tokens[i - 1], tokens[i]);
-            if chain.c.contains_key(&key) || chain.s.contains(&key) {
-                return Some((tokens[i - 1].clone(), tokens[i].clone()));
+            let (Some(&a), Some(&b)) = (self.token_ids.get(&tokens[i - 1]), self.token_ids.get(&tokens[i])) else {
+                continue;
+            };
+            if chain.contains_key(&[a, b]) {
+                return Some((a, b));
             }
         }
         None
     }
 
-    fn split_pair(pair: &str) -> Option<(String, String)> {
-        let mut parts = pair.splitn(2, "||");
-        let a = parts.next()?.to_string();
-        let b = parts.next()?.to_string();
+    fn pick_starter(&self, starters: &[[u32; 2]]) -> Option<(u32, u32)> {
+        if starters.is_empty() {
+            return None;
+        }
+        // 尝试若干次，尽量跳过以 markdown 符号开头的起始对
+        for _ in 0..20 {
+            let idx = (js_sys::Math::random() * starters.len() as f64) as usize;
+            let [a, b] = starters[idx.min(starters.len() - 1)];
+            if !is_disallowed(self.token_str(a)) && !is_disallowed(self.token_str(b)) {
+                return Some((a, b));
+            }
+        }
+        let [a, b] = starters[0];
         Some((a, b))
     }
 
     /// 加权随机选择 next token
-    fn weighted_pick(&self, nexts: &HashMap<String, u32>) -> Option<String> {
-        let total: u32 = nexts.values().sum();
+    fn weighted_pick(&self, nexts: &[[u32; 2]]) -> Option<u32> {
+        let total: u32 = nexts.iter().map(|pair| pair[1]).sum();
         if total == 0 {
             return None;
         }
         let r = js_sys::Math::random() * total as f64;
         let mut acc = 0.0_f64;
-        for (token, count) in nexts {
-            acc += *count as f64;
+        for pair in nexts {
+            acc += pair[1] as f64;
             if r < acc {
-                return Some(token.clone());
+                return Some(pair[0]);
             }
         }
-        nexts.keys().next().cloned()
+        nexts.first().map(|pair| pair[0])
     }
 }
 

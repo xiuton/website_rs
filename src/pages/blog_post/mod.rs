@@ -46,6 +46,10 @@ pub fn BlogPostView(slug: String) -> Element {
 
     let mut is_wide_mode = use_signal(|| false);
 
+    // 正文下方的推荐/主题/图谱数据在滚动到可见区域后再加载，
+    // 避免和正文、字体争抢首屏带宽。
+    let mut details_visible = use_signal(|| false);
+
     let post = use_memo(move || {
         let s = current_slug();
         BLOG_POSTS.iter().find(|p| p.slug == s)
@@ -91,6 +95,9 @@ pub fn BlogPostView(slug: String) -> Element {
     let mut related_results = use_signal(Vec::<(String, String, String)>::new);
 
     use_effect(move || {
+        if !details_visible() {
+            return;
+        }
         let slug = current_slug();
         spawn(async move {
             related_results.set(Vec::new());
@@ -112,6 +119,9 @@ pub fn BlogPostView(slug: String) -> Element {
     let mut article_node = use_signal(|| Option::<ArticleNode>::None);
 
     use_effect(move || {
+        if !details_visible() {
+            return;
+        }
         let slug = current_slug();
         spawn(async move {
             article_node.set(None);
@@ -127,6 +137,9 @@ pub fn BlogPostView(slug: String) -> Element {
     let mut lda_data = use_signal(|| Option::<LdaData>::None);
 
     use_effect(move || {
+        if !details_visible() {
+            return;
+        }
         spawn(async move {
             lda_data.set(None);
             if let Some(data) = topics::load_lda().await {
@@ -152,13 +165,16 @@ pub fn BlogPostView(slug: String) -> Element {
     });
 
     use_effect(move || {
-        code_highlight::init_highlight();
+        // 只有正文包含代码块时才加载 highlight.js（约 40 KB gzip）
+        if content_html().contains("<pre") {
+            code_highlight::init_highlight();
+        }
     });
 
     use_effect(move || {
-        // 依赖 content_html：正文加载/切换后重新高亮代码块
-        let _ = content_html();
-        if post().is_some() {
+        // 只有正文包含代码块时才重新高亮，避免无代码时反复轮询 hljs
+        let html = content_html();
+        if post().is_some() && html.contains("<pre") {
             code_highlight::reapply_highlight();
         }
     });
@@ -273,6 +289,16 @@ pub fn BlogPostView(slug: String) -> Element {
                             }
                         })}
                     }
+                    // 滚动到这里才加载下方的推荐/主题/图谱数据
+                    div {
+                        class: "details-sentinel",
+                        style: "height:1px;",
+                        onvisible: move |evt| {
+                            if evt.is_intersecting().unwrap_or(false) {
+                                details_visible.set(true);
+                            }
+                        },
+                    }
                     // 相关文章推荐（关键词匹配）
                     {(!related_results.read().is_empty()).then(|| rsx! {
                         div { class: "related-articles",
@@ -313,7 +339,7 @@ pub fn BlogPostView(slug: String) -> Element {
                     // 马尔可夫链 AI 续写（紧挨文章正文底部）
                     MarkovContinuation { slug: post_slug.clone() }
                     // 相关文章推荐（语义相似度）
-                    RelatedArticles { slug: post_slug.clone() }
+                    RelatedArticles { slug: post_slug.clone(), visible: details_visible }
                     // 主题雷达图
                     {lda_data.read().as_ref().map(|lda| {
                         let topics = lda.article_topics(&post_slug, 6);

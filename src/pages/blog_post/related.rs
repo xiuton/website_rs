@@ -14,12 +14,12 @@ struct RelatedEntry {
 
 /// 相关文章推荐组件（基于 TF-IDF 余弦相似度）
 #[component]
-pub(super) fn RelatedArticles(slug: String) -> Element {
+pub(super) fn RelatedArticles(slug: String, visible: Signal<bool>) -> Element {
     let mut loaded = use_signal(|| false);
     let mut related = use_signal(Vec::<(String, f64)>::new);
 
     use_effect(move || {
-        if *loaded.read() {
+        if !visible() || *loaded.read() {
             return;
         }
         let s = slug.clone();

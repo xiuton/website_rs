@@ -8,7 +8,7 @@ pub fn Playground() -> Element {
     rsx! {
         div {
             class: "playground-page",
-            style: "background-image: url('/static/images/img.png');",
+            style: "background-image: url('/static/images/playground-bg.jpg');",
 
             // Glass gallery container
             div {
