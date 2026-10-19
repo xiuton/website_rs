@@ -1,0 +1,643 @@
+<h1 id="user-content-第-25-课kv-cache--让逐-token-生成不再重复计算">第 25 课：KV Cache —— 让逐 token 生成不再重复计算<a href="#第-25-课kv-cache--让逐-token-生成不再重复计算" aria-label="Link to heading '第 25 课：KV Cache —— 让逐 token 生成不再重复计算'" data-heading-content="第 25 课：KV Cache —— 让逐 token 生成不再重复计算" class="anchor"></a></h1>
+<blockquote>
+<p>代码位置：<a href="../src/attention.rs">src/attention.rs</a>（<code>KVCache</code> / <code>MultiHeadAttention</code>）
+代码位置：<a href="../src/model.rs">src/model.rs</a>（<code>Transformer::forward</code> / <code>forward_core</code>）
+代码位置：<a href="../src/sample.rs">src/sample.rs</a>（<code>generate</code>）
+演示入口：<a href="../src/main.rs">src/main.rs</a>（演示 3：生成 1 / 生成 2 / 生成 3）</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>推理时为什么&quot;历史 token 的 K/V&quot;会被一遍遍重复计算？</li>
+<li><code>KVCache</code> 的数据结构长什么样？<code>append</code> / <code>seq_len</code> / <code>positions_seen</code> 各做了什么？</li>
+<li>cache 模式与全量模式在 <code>generate</code> 里的流程有什么不同（首次 vs 之后每步）？</li>
+<li>用了缓存之后，为什么生成的概率分布和全量模式<strong>完全一样</strong>？</li>
+<li>生成长度超过 <code>block_size</code> 之后，缓存靠什么继续生成下去？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-问题为什么历史-kv-会被重复计算">2. 问题：为什么历史 K/V 会被重复计算<a href="#2-问题为什么历史-kv-会被重复计算" aria-label="Link to heading '2. 问题：为什么历史 K/V 会被重复计算'" data-heading-content="2. 问题：为什么历史 K/V 会被重复计算" class="anchor"></a></h2>
+<p>生成是<strong>逐 token</strong>的：每产生一个新 token，都要把它拼到上下文末尾，再前向一次，从输出的 logits 里采样下一个 token。</p>
+<p>全量模式（<code>--no-kv-cache</code>，即 <code>KvOpts::enable = false</code> 的分支）每步都把<strong>整个上下文</strong>重新喂给模型：</p>
+<pre><code class="language-plaintext">第 1 步：输入 [t0]               → 前向 1 个位置
+第 2 步：输入 [t0, t1]           → 前向 2 个位置
+第 3 步：输入 [t0, t1, t2]       → 前向 3 个位置
+...
+第 T 步：输入 [t0, t1, ..., tT]  → 前向 T 个位置
+</code></pre>
+<p>关键观察：<strong>第 k 步算出来的前 k-1 个位置的 K/V，和第 k-1 步算出来的一模一样</strong>——推理时权重冻结、输入前缀相同，同一个 Linear 层（<code>c_k</code>、<code>c_v</code>）对相同输入必然给出相同输出。</p>
+<p>既然如此，为什么要重算？直接记住不就好了？这就是 KV Cache 的动机：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>全量模式（每步重算）</th>
+<th>KV Cache 模式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>每步前向的位置数</td>
+<td>T（整个上下文，越来越大）</td>
+<td>只有新来的 1 个位置</td>
+</tr>
+<tr>
+<td>K/V 的计算量</td>
+<td>O(T)，累计 O(T²)</td>
+<td>每个位置只算一次，累计 O(T)</td>
+</tr>
+<tr>
+<td>额外内存</td>
+<td>无</td>
+<td>存所有历史 K/V（O(T·D)）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>注意：<strong>只有 K 和 V 需要缓存，Q 不用</strong>。因为预测&quot;下一个 token&quot;只关心新位置上的注意力输出，而它只需要新位置的 Q 去和所有历史位置的 K、V 做注意力。历史位置自己的注意力输出（以及它们的 Q）在生成中根本用不上。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-3-kvcache-的结构">3. KVCache 的结构<a href="#3-kvcache-的结构" aria-label="Link to heading '3. KVCache 的结构'" data-heading-content="3. KVCache 的结构" class="anchor"></a></h2>
+<p><code>src/attention.rs</code> 里的定义：</p>
+<pre><code class="language-rust">pub struct KVCache {
+    k: KvBlock,    // f32（Shared&lt;Buffer&gt;，行优先 [1, T, D] 展平）或量化块（int8/int4）
+    v: KvBlock,
+    len: usize,    // 当前**保留**的位置数 T（滑动窗口下不会超过 window）
+    seen: usize,   // 累计喂进来的位置总数，只增不减（RoPE 绝对位置基准）
+    window: usize, // 保留上限；0 = 不丢弃
+    sink: usize,   // 永久保留的最前面若干位置（Attention Sink / StreamingLLM）
+    d: usize,      // 隐藏维 D（MLA 模式下是 kv_lora_rank），第一次 append 时确定
+    latent: bool,  // MLA 模式：只有 lat 一条流，`v` 保持为空
+}
+
+// 存储块二选一（对外只暴露&quot;读成 f32 / 追加行 / 丢最前行&quot;）
+enum KvBlock {
+    F32(Shared&lt;Buffer&gt;),   // 未量化：Buffer::F32
+    Quant(QMatrix),        // 量化：K 逐通道定标、V 逐 token 定标（第 33 课）
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>k</code> / <code>v</code></td>
+<td><code>KvBlock</code></td>
+<td>该层<strong>保留</strong>的 Key / Value，行优先展平成 <code>[1, T, D]</code>；未量化时底层是 <code>Shared&lt;Buffer&gt;</code>，开了 <code>--kv-bits</code> 则是整数码 + scale</td>
+</tr>
+<tr>
+<td><code>len</code></td>
+<td><code>usize</code></td>
+<td>当前保留的位置数 T（不再靠 <code>shape()[1]</code> 反推）</td>
+</tr>
+<tr>
+<td><code>seen</code></td>
+<td><code>usize</code></td>
+<td>累计喂进来的位置数，<strong>只增不减</strong>；新 token 的 RoPE 绝对位置基准（第 8 节）</td>
+</tr>
+<tr>
+<td><code>window</code></td>
+<td><code>usize</code></td>
+<td>保留上限，超出就丢中间那些旧行（最前面的 <code>sink</code> 行除外）；<code>0</code> = 不丢弃</td>
+</tr>
+<tr>
+<td><code>sink</code></td>
+<td><code>usize</code></td>
+<td>丢弃时跳过最前面的 <code>sink</code> 行（<code>--kv-sink</code>），必须 <code>&lt; window</code></td>
+</tr>
+<tr>
+<td><code>d</code></td>
+<td><code>usize</code></td>
+<td>隐藏维 D，第一次 <code>append</code> 时从 <code>k.shape()[2]</code> 确定</td>
+</tr>
+<tr>
+<td><code>latent</code></td>
+<td><code>bool</code></td>
+<td>MLA 模式（<code>kv_lora_rank &gt; 0</code>）下缓存只存一份 latent，见第 23 / 50 课</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>为什么不用 <code>Option&lt;Tensor&gt;</code> 直接存张量？因为推理时&quot;追加一个新位置&quot;如果走「取旧数据 → 拼新数据 → 重新包成张量」，
+每步都要把整段历史复制一遍，T 步累计 O(T²) 拷贝。把缓冲放进 <code>Shared</code>（<code>Arc&lt;Mutex&gt;</code>）里就地 <code>extend</code>，
+历史数据一次都不用动。<code>Shared</code> 是为了让 <code>Transformer::forward</code> 这类只读者也能共享同一块缓存。</p>
+</blockquote>
+<p>注意：<strong>每个注意力层各有一个 <code>KVCache</code></strong>。<code>Transformer::new_kv_cache</code> 返回 <code>Vec&lt;KVCache&gt;</code>，长度 = <code>n_layer</code>，每个都带上 <code>block_size</code> 大小的滑动窗口；需要 Attention Sink 或缓存量化时用 <code>new_kv_cache_with(sink, bits)</code>：</p>
+<pre><code class="language-rust">pub fn new_kv_cache(&amp;self) -&gt; Vec&lt;KVCache&gt; {
+    self.new_kv_cache_with(0, None)      // 无 sink、不量化
+}
+// new_kv_cache_with：window = cfg.block_size，MLA 配置自动改用 KVCache::new_latent
+</code></pre>
+<h3 id="user-content-31-append把新-kv-追加到缓存尾部并丢弃超窗的中间旧行">3.1 append：把新 K/V 追加到缓存尾部，并丢弃超窗的中间旧行<a href="#31-append把新-kv-追加到缓存尾部并丢弃超窗的中间旧行" aria-label="Link to heading '3.1 append：把新 K/V 追加到缓存尾部，并丢弃超窗的中间旧行'" data-heading-content="3.1 append：把新 K/V 追加到缓存尾部，并丢弃超窗的中间旧行" class="anchor"></a></h3>
+<pre><code class="language-rust">pub fn append(&amp;mut self, k: &amp;Tensor, v: &amp;Tensor) {
+    assert_eq!(k.shape(), v.shape(), &quot;K/V 形状必须一致&quot;);
+    assert_eq!(k.rank(), 3, &quot;K/V 必须为 3D [1, T, D]，实际 {:?}&quot;, k.shape());
+    let t = k.shape()[1];
+    let d = k.shape()[2];
+    self.d = d;                       // 首次确定，之后不允许中途改变
+    self.k.push(&amp;k.data_ref(), t, d); // 只追加新块（量化时顺带编码）
+    self.v.push(&amp;v.data_ref(), t, d);
+    self.len += t;
+    self.seen += t;
+    // 滑动窗口：丢掉中间那些旧行，让 len 回到 window。
+    // 丢的行是 [sink, len - (window - sink))：最前面的 sink 个（Attention Sink）
+    // 与最近的 window - sink 个都保留。
+    if self.window &gt; 0 &amp;&amp; self.len &gt; self.window {
+        let drop = self.len - self.window;
+        self.k.drop_front_from(self.sink, drop, self.d);
+        self.v.drop_front_from(self.sink, drop, self.d);
+        self.len = self.window;
+    }
+}
+</code></pre>
+<p>做的事：</p>
+<ol>
+<li>校验 K/V 形状一致且是 3D、batch = 1（MLA 模式下则改用 <code>append_latent</code>，见第 23 / 50 课）；</li>
+<li>把新 K/V 追加到各自的存储块末尾——<strong>历史数据原地不动</strong>（未量化时就是 <code>Vec&lt;f32&gt;</code> 上的 <code>extend</code>）；</li>
+<li><code>len</code> 与 <code>seen</code> 各加上本次新增的位置数；</li>
+<li>超过窗口时丢掉中间那 <code>(len - window)</code> 行（保留最前面的 <code>sink</code> 行与最近的若干行），是一次 memmove，不是 O(T²) 的拷贝链。</li>
+</ol>
+<blockquote>
+<p>反面教材（本项目<strong>曾经</strong>的写法）：把缓存存成 <code>Option&lt;Tensor&gt;</code>，每次 append 时
+「取旧数据 → <code>all.extend(cur.data())</code> → 重新包成张量」——每步都把整段历史复制一遍，
+T 步累计 O(T²) 拷贝。改成在缓冲上就地 <code>extend</code> 后，历史数据一次都不用动。</p>
+</blockquote>
+<blockquote>
+<p>细节：<code>cur</code> 在推理模式下形状是 <code>[1, 1, D]</code>（只算 1 个新位置），所以 <code>len</code> / <code>seen</code> 每次 +1，
+<code>d</code> 从 <code>k.shape()[2]</code> 取。纯数据追加，推理时无梯度，所以没有走任何 autograd 路径。</p>
+</blockquote>
+<h3 id="user-content-32-seq_len--positions_seen--window--k--v">3.2 seq_len / positions_seen / window / k() / v()<a href="#32-seq_len--positions_seen--window--k--v" aria-label="Link to heading '3.2 seq_len / positions_seen / window / k() / v()'" data-heading-content="3.2 seq_len / positions_seen / window / k() / v()" class="anchor"></a></h3>
+<pre><code class="language-rust">/// 当前保留的位置数（= 注意力里 K/V 的序列长度）
+pub fn seq_len(&amp;self) -&gt; usize { self.len }
+
+/// 累计喂进来的位置总数：新 token 的 RoPE 绝对位置基准（滑动窗口下与 `seq_len` 不同）
+pub fn positions_seen(&amp;self) -&gt; usize { self.seen }
+
+/// 保留上限（0 = 不丢弃）
+pub fn window(&amp;self) -&gt; usize { self.window }
+
+/// 返回完整缓存张量 [1, T, D]（注意力打分需要读全量历史，这里克隆一次）
+pub fn k(&amp;self) -&gt; Tensor {
+    Tensor::from_vec(self.k.borrow().clone(), vec![1, self.len, self.d])
+}
+// v() 同理
+</code></pre>
+<ul>
+<li><code>seq_len()</code> 返回<strong>保留</strong>的位置数。它是注意力里 K/V 的序列长度，也是 <code>generate</code> 判断&quot;首次前向&quot;的依据。</li>
+<li><code>positions_seen()</code> 返回<strong>累计喂进来</strong>的位置数，只增不减。它是 RoPE 的绝对位置基准（第 8 节），在滑动窗口生效后 <code>positions_seen &gt; seq_len</code>。</li>
+<li><code>k()</code> / <code>v()</code> 把缓存包装成 <code>[1, T, D]</code> 张量供注意力打分使用。<strong>未量化时是零拷贝</strong>：
+直接共享 <code>Shared&lt;Buffer&gt;</code> 句柄（<code>Tensor::shared</code>），历史数据不再每步克隆一次；
+量化缓存要读回 f32，所以这一步会反量化出一份 <code>Vec&lt;f32&gt;</code>（&quot;量化布局直接打分&quot;需要改编
+flash 内核 / 反向重算 / GPU 常驻三处，属于后续优化）。</li>
+</ul>
+<hr />
+<h2 id="user-content-4-multiheadattention-怎么用缓存">4. MultiHeadAttention 怎么用缓存<a href="#4-multiheadattention-怎么用缓存" aria-label="Link to heading '4. MultiHeadAttention 怎么用缓存'" data-heading-content="4. MultiHeadAttention 怎么用缓存" class="anchor"></a></h2>
+<p><code>MultiHeadAttention::forward</code> 中与缓存相关的部分：</p>
+<pre><code class="language-rust">// 1. 投影得到 Q、K、V（Linear 输出是 2D [B*T, D]，恢复成 3D）
+let q = self.c_q.forward(x).reshape(vec![b, t, d]); // [B, T, D]
+let kv_dim = self.n_kv_head * head_dim;
+let k = self.c_k.forward(x).reshape(vec![b, t, kv_dim]); // [B, T, kv_dim]
+let v = self.c_v.forward(x).reshape(vec![b, t, kv_dim]);
+
+// 2. RoPE：Q/K 按 head_dim 旋转（GQA 时 K 只有 n_kv_head 个头）；
+//    旋转发生在 append 之前，所以缓存里存的是&quot;已旋转的 K&quot;，历史位置直接复用、不再重算
+let mut positions = Vec::with_capacity(b * t);
+for _ in 0..b {
+    positions.extend(base..base + t);
+}
+let (q, k) = q
+    .reshape(vec![b * t, d])
+    .rotary_pair(&amp;k.reshape(vec![b * t, kv_dim]), &amp;positions, head_dim, &amp;self.rope);
+let (q, k) = (q.reshape(vec![b, t, d]), k.reshape(vec![b, t, kv_dim]));
+
+// 3. KV cache：把本次新算的 K/V 追加到缓存（超窗自动丢中间那些旧行），再取回保留的全部历史
+let (k, v) = match kv_cache {
+    Some(cache) =&gt; {
+        cache.append(&amp;k, &amp;v);
+        (cache.k(), cache.v()) // [1, seq_len, kv_dim]
+    }
+    None =&gt; (k, v),
+};
+let t_total = k.shape()[1];
+</code></pre>
+<p>变化只有一处：<strong>K、V 变长</strong>，Q 保持 <code>[B, T, D]</code> 不动：</p>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>无缓存</th>
+<th>有缓存（推理）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>q</code></td>
+<td><code>[B, T, D]</code></td>
+<td><code>[B, 1, D]</code>（只算新位置）</td>
+</tr>
+<tr>
+<td><code>k</code></td>
+<td><code>[B, T, kv_dim]</code></td>
+<td><code>[B, t_total, kv_dim]</code> = 新 <code>[B,1,kv_dim]</code> 追加到缓存后的结果</td>
+</tr>
+<tr>
+<td><code>v</code></td>
+<td><code>[B, T, kv_dim]</code></td>
+<td><code>[B, t_total, kv_dim]</code></td>
+</tr>
+<tr>
+<td><code>t_total</code></td>
+<td>= T</td>
+<td>= <code>cache.seq_len()</code>（本项目每次 +1，封顶窗口大小）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>kv_dim = n_kv_head × head_dim</code>（第 23 课 GQA）：<code>n_kv_head == n_head</code> 时就是标准 MHA 的 <code>D</code>。</p>
+</blockquote>
+<p>后续的拆头、注意力分数、softmax 等代码<strong>一行都不用改</strong>，因为它们是按 <code>t_total</code> 写的通用代码：</p>
+<ul>
+<li>拆头时 k/v 用 <code>t_total</code> 做 reshape（<code>vec![b, t_total, self.n_kv_head, head_dim]</code>；GQA 下 <strong>不再物化 <code>repeat_kv</code></strong>——<code>flash_attention</code> 的 CPU 分块核按 Q 头 <code>hh / n_rep</code> 核内索引共享的 KV 头），q 仍用 <code>t</code>；</li>
+<li>打分、加掩码、softmax、加权求和整体由 <code>Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32)</code> 一个融合算子完成，形状 <code>[B*H, t, head_dim]</code>。</li>
+</ul>
+<p>这就是 KV Cache 优雅的地方：<strong>模型代码零侵入，只把&quot;输入 K/V 的来源&quot;从&quot;当场算&quot;换成&quot;缓存里取&quot;</strong>。</p>
+<hr />
+<h2 id="user-content-5-位置与掩码seen-作为-rope-基准">5. 位置与掩码：<code>seen</code> 作为 RoPE 基准<a href="#5-位置与掩码seen-作为-rope-基准" aria-label="Link to heading '5. 位置与掩码：seen 作为 RoPE 基准'" data-heading-content="5. 位置与掩码：seen 作为 RoPE 基准" class="anchor"></a></h2>
+<p>推理模式下，新 token 的位置不再是&quot;窗口内的第 j 个&quot;，而是&quot;全局的第 seen + j 个&quot;。<code>forward_core</code> 里这样算（<code>src/model.rs</code>）：</p>
+<pre><code class="language-rust">// RoPE 的基准是**绝对位置**：新 token 的绝对位置 = 累计已喂入的位置数 + 窗口内下标 j
+let (seen, window) = kv_cache
+    .as_ref()
+    .and_then(|c| c.first())
+    .map(|k| (k.positions_seen(), k.window()))
+    .unwrap_or((0, 0));
+let base = seen;
+
+// 因果掩码（**条件物化**）：CPU 分块核在核内屏蔽（query i 只算
+// j &lt;= visible_before + i），逐算子路径同样不必物化 —— 只有 GPU 常驻 /
+// 整叠 / probe 路径要真实 [t, t_total] buffer，且只在「GPU 可用 + 无 KV cache +
+// base == 0」时才在这里物化一次供全栈共享；其余情况传 None，由算子自己兜底。
+assert!(window == 0 || t &lt;= window, &quot;单次前向的 token 数（{t}）不能超过 KV cache 窗口（{window}）&quot;);
+let t_total = if window == 0 { seen + t } else { (seen + t).min(window) };
+// 缓存里位于&quot;本次新增的第一个 token&quot;左侧（含自身）的位置数
+let visible_before = t_total - t;
+// 只有「gpu feature + GPU 可用 + 无 KV cache + base == 0」时才真的物化这张掩码，
+// 其余情况传 None：CPU 分块核靠 visible_before 在核内屏蔽，GPU 路径需要时自己兜底
+let mask: Option&lt;Tensor&gt; = 需要真实掩码
+    .then(|| Tensor::from_vec(crate::tensor::causal_mask_data(t, t_total), vec![t, t_total]));
+</code></pre>
+<p><code>causal_mask_data(t, t_total)</code> 填的就是 <code>j &gt; i + visible_before</code> 的位置为 <code>-inf</code>：</p>
+<p>它有两个用途。</p>
+<p><strong>用途 ①：传给注意力内部的 RoPE</strong>（<code>src/attention.rs</code>）。位置序列在这里生成，<code>rotary_pair</code> 据此旋转 Q/K：</p>
+<pre><code class="language-rust">let mut positions = Vec::with_capacity(b * t);
+for _ in 0..b {
+    positions.extend(base..base + t);
+}
+</code></pre>
+<p><strong>用途 ②：构造因果掩码</strong>（上面的代码，<strong>只在需要真实掩码 buffer 时才物化</strong>）。注意掩码宽度是&quot;本次前向之后缓存里会有多少行&quot;，而不是 <code>seen + t</code> 这个朴素值——滑动窗口打开时，超过 <code>window</code> 的部分会立刻被丢掉，掩码必须与之对齐，否则会对着不存在的列求和。CPU 分块核不物化掩码，但它用的 <code>visible_before</code>（= <code>t_total - t</code>）与这张掩码逐位等价。</p>
+<table>
+<thead>
+<tr>
+<th>量</th>
+<th>全量模式（无缓存）</th>
+<th>缓存模式（不超窗）</th>
+<th>缓存模式（本轮触发滑动）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>位置编码行号</td>
+<td><code>j</code>（0..t）</td>
+<td><code>seen + j</code></td>
+<td><code>seen + j</code>（继续递增）</td>
+</tr>
+<tr>
+<td>掩码总宽 <code>t_total</code></td>
+<td><code>t</code></td>
+<td><code>seen + t</code></td>
+<td><code>window</code></td>
+</tr>
+<tr>
+<td><code>visible_before</code></td>
+<td>0</td>
+<td><code>seen</code></td>
+<td><code>window - t</code></td>
+</tr>
+<tr>
+<td>掩码规则</td>
+<td><code>j &gt; i</code> 禁止</td>
+<td><code>j &gt; i + seen</code> 禁止</td>
+<td><code>j &gt; i + (window - t)</code> 禁止</td>
+</tr>
+<tr>
+<td>每行 query 能看多远</td>
+<td>自己及之前全部</td>
+<td>自己及之前全部</td>
+<td>最多 <code>window</code> 个 key</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>为什么掩码的下界是 <code>visible_before</code>：新 token 在全局序列里的下标从 <code>seen</code> 开始（<code>i=0</code> 对应全局 <code>seen</code>），所以它能看全局 <code>0..=seen</code>（全是缓存里的历史）+ 自己，不能看 <code>seen+1</code> 之后（未来）。这和全量模式的因果性完全一致。</p>
+<p>触发滑动时，缓存里最老的行已经是对应&quot;全局 <code>seen + t - window</code>&quot;的那一行，所以可看的起点整体右移。</p>
+</blockquote>
+<p>训练时 <code>kv_cache</code> 传 <code>None</code>，<code>base = 0</code>，掩码退化成标准的 <code>j &gt; i</code>——因为训练时权重每步都在变、历史 K/V 没有复用价值，缓存反而白占内存。</p>
+<hr />
+<h2 id="user-content-6-generatecache-模式-vs-全量模式的流程对比">6. generate：cache 模式 vs 全量模式的流程对比<a href="#6-generatecache-模式-vs-全量模式的流程对比" aria-label="Link to heading '6. generate：cache 模式 vs 全量模式的流程对比'" data-heading-content="6. generate：cache 模式 vs 全量模式的流程对比" class="anchor"></a></h2>
+<p><code>src/sample.rs</code> 的 <code>generate</code>：</p>
+<pre><code class="language-rust">let block_size = model.cfg.block_size;
+let mut ids = tokenizer.encode(prompt);
+if ids.is_empty() { ids.push(0); }                             // 空 prompt 兜底
+let mut cache = kv.build(model);                               // 只有用 cache 才分配（KvOpts::enable = false 时是 None）
+
+for _ in 0..max_new {
+    // 只保留最近的 block_size 个 token（两种模式都必须遵守的上下文上限）
+    let start = ids.len().saturating_sub(block_size);
+    let ctx = &amp;ids[start..];
+
+    // 推理不需要反向：no_grad 下不挂计算图、不分配梯度缓冲
+    let logits = crate::tensor::no_grad(|| {
+        if let Some(c) = cache.as_mut() {
+            // 首次：缓存为空，把整个 prompt 喂进去（顺便填充缓存）
+            // 之后：每步只前向最新 1 个 token，历史 K/V 从缓存取
+            if c[0].seq_len() == 0 {
+                model.forward(ctx, 1, ctx.len(), Some(c), false)
+            } else {
+                model.forward(&amp;ids[ids.len() - 1..], 1, 1, Some(c), false)
+            }
+        } else {
+            // 全量模式：每次把整个上下文重新算一遍（慢，但没有 cache 内存）
+            model.forward(ctx, 1, ctx.len(), None, false)
+        }
+    });
+
+    // 取最后一个位置的 logits
+    let v = model.cfg.vocab_size;
+    let n = logits.numel();
+    let last_row = &amp;logits.data()[n - v..];
+    // 重复惩罚的回看窗口（见第 15 课第 7 节）；窗口 0 = 不惩罚
+    let recent = if opts.repetition_window == 0 {
+        &amp;[][..]
+    } else {
+        &amp;ids[ids.len().saturating_sub(opts.repetition_window)..]
+    };
+    let next = sample_token(last_row, opts, recent, rng);
+    ids.push(next);
+}
+</code></pre>
+<p>两种模式逐项对比：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>全量模式（无缓存）</th>
+<th>KV cache 模式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>首次前向</td>
+<td><code>forward(ctx, 1, ctx.len(), None, false)</code></td>
+<td><code>forward(ctx, 1, ctx.len(), Some(c), false)</code>：同样前向整个 prompt，但<strong>把每层 K/V 顺手存进缓存</strong></td>
+</tr>
+<tr>
+<td>之后每步</td>
+<td><code>forward(ctx, 1, ctx.len(), None, false)</code>：整个上下文（截断到最近 32 个）重算</td>
+<td><code>forward(&amp;ids[ids.len()-1..], 1, 1, Some(c), false)</code>：<strong>只喂最后一个 token</strong>，K/V 从缓存取</td>
+</tr>
+<tr>
+<td>上下文处理</td>
+<td>每步 <code>ids.len().saturating_sub(block_size)</code> 截断，窗口滑到最近 32 个</td>
+<td>缓存在 <code>append</code> 里自己丢中间旧行（第 8 节），每步 +1 行</td>
+</tr>
+<tr>
+<td>停止条件</td>
+<td>生成满 <code>max_new</code> 个</td>
+<td>生成满 <code>max_new</code> 个（缓存容量不再是上限）</td>
+</tr>
+<tr>
+<td>每次前向的位置数</td>
+<td>32（封顶后固定）</td>
+<td>首次 prompt 长度，之后恒为 1</td>
+</tr>
+<tr>
+<td>生成 80 个新 token 的累计前向位置数</td>
+<td>441 + 32×59 = 2329（前 21 步按 11..31 递增）</td>
+<td>11 + 79 = 90</td>
+</tr>
+</tbody>
+</table>
+<p>用流程图看 demo 的生成 1 / 生成 2（prompt = &quot;Once upon a&quot;，11 个 token，max_new=80，block_size=32）：</p>
+<pre><code class="language-plaintext">cache 模式：                             全量模式：
+───────────                             ───────────
+第 1 步：前向 [&quot;Once upon a&quot;(11个)]     第 1 步：前向 [&quot;Once upon a&quot;(11个)]
+         ↓ 填充缓存（11 个位置）                   ↓ 结果只取最后一行，丢弃其余
+         采样出第 1 个新 token
+第 2 步：前向 [最新 1 个]               第 2 步：前向 [&quot;Once upon a&quot; + 1个]（12 个）
+         ↓ 缓存 = 12 个位置                      ↓ 又从头算了一遍 11 个历史 K/V
+第 3 步：前向 [最新 1 个]               第 3 步：前向 [13 个]
+         ↓ 缓存 = 13 个位置                      ↓ 重复劳动越来越多
+...                                    ...
+第 22 步：前向 [最新 1 个]              第 22 步：前向 [窗口内 32 个]
+         ↓ 缓存 = 32 个位置（封顶）              ↓ 从这里起每步都是固定 32 个位置
+第 23 步：前向 [最新 1 个]              第 23 步：前向 [窗口内 32 个]
+         ↓ 缓存仍 32 行，seen = 33              ↓ 窗口整体右移一格
+         （丢弃全局位置 0，位置编码继续用 33）
+...
+第 80 步：缓存仍 32 行，两种模式都生成满 80 个新 token
+</code></pre>
+<blockquote>
+<p>取 logits 的细节：<code>generate</code> 只取输出张量的<strong>最后一行</strong>（<code>logits.data()[n - v..]</code>，v = vocab_size）。全量模式算了一整段序列，但生成只需要最后一个位置的预测——前半部分的计算全部是&quot;浪费&quot;；缓存模式干脆只算最后一行需要的东西，正是这种浪费的反面。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-7-为什么输出分布不变">7. 为什么输出分布不变<a href="#7-为什么输出分布不变" aria-label="Link to heading '7. 为什么输出分布不变'" data-heading-content="7. 为什么输出分布不变" class="anchor"></a></h2>
+<p><strong>在窗口内</strong>这是严格结论，分三步：</p>
+<ol>
+<li><strong>K/V 值相同</strong>：推理时权重冻结。缓存里存的 K/V，与全量模式下同一批输入算出来的 K/V，数值<strong>逐位相同</strong>（都是同一份代码算的，缓存模式下也确实一次都没重算过）。</li>
+<li><strong>注意力计算相同</strong>：新位置的注意力输出 = <code>softmax(Q_k·Kᵀ/√d + mask) · V</code>。其中 K、V 是&quot;全部历史&quot;（缓存模式从缓存取、全量模式当场算），数值相同；Q 是新位置的投影，也相同。</li>
+<li><strong>softmax 结果相同</strong>：mask 规则一致（第 5 节已证），同一组分数经过同样的 softmax → 同样的概率分布 → 同样的采样分布。</li>
+</ol>
+<p>用一句话概括：<strong>缓存只是把&quot;这次算完就扔&quot;的中间结果留了下来，计算路径和数值一个都没变，所以分布必然不变。</strong></p>
+<p>demo 现在<strong>自己做这个验证</strong>（<code>src/cmd/experiments.rs</code>）：同 prompt、同种子、生成长度控制在窗口内，两种模式必须逐 token 完全相等。</p>
+<pre><code class="language-rust">println!(
+    &quot;\n  窗口内等价自检（prompt {prompt_len} + 新 {in_window} = {} ≤ block_size {}）：\
+     缓存模式与全量模式逐 token {}&quot;,
+    prompt_len + in_window,
+    model.cfg.block_size,
+    if a == b { &quot;完全一致 ✓&quot; } else { &quot;不一致 ✗&quot; }
+);
+</code></pre>
+<blockquote>
+<p>两次生成必须用<strong>相同 prompt + 相同种子</strong>（demo 里都是 <code>&quot;Once upon a&quot;</code> 和 <code>Rng::new(2024)</code>）。早先的 demo 用了两个不同 prompt（&quot;Once upon a&quot; vs &quot;The fox&quot;）再共用同一个 rng 序列，两段输出不同只是采样不同，<strong>证明不了任何事</strong>，属于反面教材。</p>
+<p>为什么要把生成长度<strong>控制在窗口内</strong>才做严格断言？因为一旦触发滑动窗口，&quot;增量推理&quot;与&quot;截断重算&quot;就<strong>不是同一个函数</strong>了（下一节给出证明与反例），此时两者不相等不是 bug，而是推理语义的正常结果。窗口内的严格相等由 <code>sample::tests::test_kv_cache_generate_matches_full</code> 守住，窗口外的机制等价由 <code>model::tests::test_kv_cache_sliding_window_matches_full_window_forward</code> 守住。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-8-滑动窗口超出-block_size-之后继续生成">8. 滑动窗口：超出 block_size 之后继续生成<a href="#8-滑动窗口超出-block_size-之后继续生成" aria-label="Link to heading '8. 滑动窗口：超出 block_size 之后继续生成'" data-heading-content="8. 滑动窗口：超出 block_size 之后继续生成" class="anchor"></a></h2>
+<p>早期实现里 <code>generate</code> 会在缓存填满时 <code>break</code>，导致同一个 prompt 加不加 KV cache 会得到<strong>长度不同</strong>的输出（而且当时只能靠一行 <code>[warn]</code> 提示，用户依然会困惑）。现在缓存自带滑动窗口，这个问题从根上消失了：<strong>生成长度只由 <code>max_new</code> 决定，与缓存容量无关</strong>。</p>
+<p>机制全在 <code>KVCache::append</code>（第 3.1 节）与 <code>forward_core</code>（第 5 节）里：</p>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>append</code></td>
+<td><code>len</code> 超过 <code>window</code> 时丢掉中间那 <code>(len - window)</code> 行；<code>sink &gt; 0</code> 时最前面的 <code>sink</code> 行永久保留</td>
+</tr>
+<tr>
+<td><code>seq_len()</code></td>
+<td>封顶在 <code>window</code>（注意力里 K/V 的序列长度就是它）</td>
+</tr>
+<tr>
+<td><code>positions_seen()</code></td>
+<td><strong>继续累加</strong>，不受窗口影响（RoPE 的绝对位置基准）</td>
+</tr>
+<tr>
+<td><code>forward_core</code></td>
+<td>掩码宽度取 <code>min(seen + t, window)</code>，与丢弃后的实际行数对齐</td>
+</tr>
+</tbody>
+</table>
+<p>以 <code>block_size = 32</code>、prompt 11 个 token 为例，缓存长度随生成步数变化：</p>
+<table>
+<thead>
+<tr>
+<th>迭代</th>
+<th>前向内容</th>
+<th><code>seq_len()</code></th>
+<th><code>positions_seen()</code></th>
+<th>采样出新 token</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>第 1 步</td>
+<td>整个 prompt（11 个）</td>
+<td>11</td>
+<td>11</td>
+<td>第 1 个</td>
+</tr>
+<tr>
+<td>第 2 步</td>
+<td>最新 1 个</td>
+<td>12</td>
+<td>12</td>
+<td>第 2 个</td>
+</tr>
+<tr>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr>
+<td>第 22 步</td>
+<td>最新 1 个</td>
+<td>32</td>
+<td>32</td>
+<td>第 22 个</td>
+</tr>
+<tr>
+<td>第 23 步</td>
+<td>最新 1 个</td>
+<td><strong>32</strong>（丢掉全局位置 0）</td>
+<td><strong>33</strong></td>
+<td>第 23 个</td>
+</tr>
+<tr>
+<td>第 80 步</td>
+<td>最新 1 个</td>
+<td>32</td>
+<td>90</td>
+<td>第 80 个</td>
+</tr>
+</tbody>
+</table>
+<p>两个计数器必须分开，原因在 RoPE：<strong>缓存里存的是已旋转的 K</strong>，每条 K 都带着它产生时的绝对位置。如果为了&quot;把窗口下标重新编号成 0..32&quot;而改动位置基准，就得把缓存里每一行重新旋转一遍——那是每步 O(T) 的额外工作，正好把缓存省下的计算量又还回去。让绝对位置一路递增、缓存行原地不动，是唯一自洽的做法；而 RoPE 打分只依赖<strong>相对距离</strong>，同一 query 与同一 key 之间的相对距离在两种编号下完全一致，所以递增编号不会改变任何分数。</p>
+<h3 id="user-content-窗口外两条路径为什么不再逐位相等">窗口外两条路径为什么不再逐位相等<a href="#窗口外两条路径为什么不再逐位相等" aria-label="Link to heading '窗口外两条路径为什么不再逐位相等'" data-heading-content="窗口外两条路径为什么不再逐位相等" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>层数</th>
+<th>增量（缓存 + 滑动窗口） vs 截断重算</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 层</td>
+<td><strong>严格等价</strong></td>
+<td>第 0 层的 K/V 只由 token 嵌入决定、与上下文无关，两条路径看到的是同一组 K/V，只差一个整体位置平移（RoPE 打分只依赖相对距离）</td>
+</tr>
+<tr>
+<td>≥ 2 层</td>
+<td>不相等，且<strong>不是 bug</strong></td>
+<td>增量路径里位置 p 的第 l 层 K/V 是 p 当时算出来的（当时能看到它自己的完整窗口）；&quot;截断重算&quot;会把窗口内每个位置在第 0 层可见的上下文一并砍掉，深层 K/V 随之不同</td>
+</tr>
+</tbody>
+</table>
+<p>最后一行值得强调：<strong>带 KV cache 的增量推理才是真实 LLM 的标准推断语义</strong>（所有生产级推理引擎都是这么跑的），&quot;截断重算&quot;只是全量前向在上下文超限时的一种近似。所以两条路径在窗口外不相等时，以增量路径为准。这也正是 demo 把严格等价断言限制在窗口内的原因。</p>
+<p>单层下的严格等价由 <code>model::tests::test_kv_cache_sliding_window_matches_full_window_forward</code> 验证：<code>block_size = 8</code>、序列长度 24（滑动 2 次），断言缓存增量推理与&quot;只取最近 8 个 token 全量前向&quot;的最后一行 logits 偏差 &lt; 1e-3。</p>
+<h3 id="user-content-与真实长上下文方案的关系">与真实长上下文方案的关系<a href="#与真实长上下文方案的关系" aria-label="Link to heading '与真实长上下文方案的关系'" data-heading-content="与真实长上下文方案的关系" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>思路</th>
+<th>本项目</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sliding Window Attention（Mistral）</td>
+<td>只让 query 看最近 W 个 token，缓存只保留 W 行</td>
+<td><strong>已实现</strong>，就是本节这套 <code>window</code></td>
+</tr>
+<tr>
+<td>Attention Sink / StreamingLLM</td>
+<td>滑动窗口之外<strong>永远保留最前面几行</strong>（首 token 是注意力的&quot;锚点&quot;，丢了会让整条分布失稳）</td>
+<td><strong>已实现</strong>：<code>KvCacheOpts::sink</code>（丢弃时跳过最前面的 <code>sink</code> 行），CLI 开关 <code>--kv-sink</code></td>
+</tr>
+<tr>
+<td>KV cache 量化（KIVI 等）</td>
+<td>把缓存的 K/V 压到 int8/int4，显存换精度</td>
+<td><strong>已实现</strong>：K 逐通道、V 逐 token 的 int8/int4 缓存（CLI 开关 <code>--kv-bits</code>），原理见第 33 课</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="user-content-9-小结与下一课">9. 小结与下一课<a href="#9-小结与下一课" aria-label="Link to heading '9. 小结与下一课'" data-heading-content="9. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li>逐 token 生成时，历史位置的 K/V 每步都在被重复计算——全量模式累计 O(T²)，这是 KV Cache 要消灭的浪费</li>
+<li><code>KVCache</code> = 每层一份的 <code>Vec&lt;f32&gt;</code> 缓存（行优先展平的 <code>[1, T, D]</code>，外加 <code>len</code> / <code>seen</code> / <code>window</code> / <code>d</code>），
+<code>append</code> 就地 extend（不复制历史）+ 超窗丢掉中间那些旧行（<code>sink</code> 行保留），<code>seq_len</code> 读保留行数、<code>positions_seen</code> 读累计位置数</li>
+<li><code>MultiHeadAttention</code> 用缓存后只有 K/V 变长，Q 只算新位置，后续代码零改动；<code>Transformer::forward_core</code> 用 <code>seen</code> 修正位置编码、并用 <code>min(seen + t, window)</code> 定掩码宽度</li>
+<li>流程对比：首次前向整个 prompt 填缓存 → 之后每步只前向 1 个 token；全量模式则是每步重算整个窗口</li>
+<li>分布不变的原因：缓存里的 K/V 与全量模式算出的数值相同，注意力、softmax 计算路径一致；demo 用<strong>同 prompt + 同种子</strong>自验证，单元测试守住&quot;窗口内逐 token 相同&quot;</li>
+<li>滑动窗口让生成长度不再受缓存容量限制：<code>seq_len</code> 封顶 <code>window</code>、<code>positions_seen</code> 继续累加，缓存里存的是已旋转的 K，绝对位置递增才能避免每步重旋转整段缓存</li>
+<li>窗口外&quot;增量推理&quot;与&quot;截断重算&quot;不是同一个函数（单层严格等价、多层不等价且以增量路径为准），这是标准推理语义，不是实现缺陷</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li><strong>在窗口内验证&quot;完全相等&quot;</strong>：demo 的窗口内自检已经是 <code>a == b</code> 的严格比较，把它换成 <code>assert_eq!</code>、再把 prompt 与 <code>max_new</code> 调到刚好占满窗口（11 + 21 = 32），确认仍然相等——边界值最容易暴露 off-by-one。</li>
+<li><strong>打印两个计数器</strong>：在 <code>MultiHeadAttention::forward</code> 的 <code>cache.append</code> 之后加一行 <code>println!(&quot;seq_len = {}, seen = {}&quot;, cache.seq_len(), cache.positions_seen());</code>，跑 demo 的生成 2，观察 <code>seq_len</code> 到第 22 步封顶在 32 之后不再增长，而 <code>positions_seen</code> 一路涨到 90（11 个 prompt token + 79 次增量前向）。</li>
+<li><strong>关掉滑动窗口看后果</strong>：把 <code>Transformer::new_kv_cache</code> 里的 <code>window</code> 改成 <code>0</code>（不丢弃），重新跑 demo 的生成 2——缓存长度会一路上涨到 90，模型被迫在 RoPE 外推区（训练只见过 <code>0..32</code>）做注意力，生成质量会明显劣化。这是&quot;窗口不是可选项&quot;最直观的证据。</li>
+<li><strong>对比计算量</strong>：对 <code>block_size=32</code>、prompt 11、<code>max_new=80</code>，按第 6 节的表分别估算两种模式累计前向的位置数，再和 demo 里两种模式的实测耗时比一比。</li>
+<li><strong>（进阶）Attention Sink 与量化的叠加</strong>：sink 已实现在 <code>KvCacheOpts::sink</code>（CLI <code>--kv-sink</code>），
+缓存量化已实现在 <code>--kv-bits</code>。把两个开关一起打开跑长文本生成，对比&quot;只开 sink&quot;&quot;只量化&quot;&quot;都开&quot;
+三种配置下首 token 附近的分布稳定性——sink 抗的是&quot;锚点丢失&quot;，量化引入的是数值噪声，两者叠加会不会互相放大。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="26-%E6%B7%B7%E5%90%88%E7%B2%BE%E5%BA%A6%E8%AE%AD%E7%BB%83.md">第 26 课 混合精度训练（AMP）</a> —— 前向/反向用半精度加速、主权重留 FP32 保底，再用动态损失缩放把 FP16 下溢的小梯度捞回来。</p>
+</blockquote>

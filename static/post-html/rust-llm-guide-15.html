@@ -1,0 +1,496 @@
+<h1 id="user-content-第-15-课推理与采样--让模型创造性地生成">第 15 课：推理与采样 —— 让模型&quot;创造性&quot;地生成<a href="#第-15-课推理与采样--让模型创造性地生成" aria-label="Link to heading '第 15 课：推理与采样 —— 让模型&quot;创造性&quot;地生成'" data-heading-content="第 15 课：推理与采样 —— 让模型&quot;创造性&quot;地生成" class="anchor"></a></h1>
+<blockquote>
+<p>代码位置：<a href="../src/sample.rs">src/sample.rs</a>
+模型接口：<a href="../src/model.rs">src/model.rs</a>
+演示入口：<a href="../src/main.rs">src/main.rs</a></p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>模型输出的 logits 是分数，怎么变成真正的文本？</li>
+<li>为什么&quot;每次都选概率最大的 token&quot;（argmax）效果很差？</li>
+<li>temperature、top-k、top-p 分别解决了什么问题？它们在代码里怎么实现？</li>
+<li>模型为什么会卡在&quot;太太太太太太……&quot;出不来？重复惩罚（repetition penalty）是怎么打断它的？</li>
+<li><code>generate</code> 生成一句文本时，每步发生了什么？KV cache 模式和全量模式有什么不同？</li>
+<li>生成到哪里停？&quot;模型自己收了尾&quot;和&quot;被 <code>max_new</code> 截断&quot;怎么区分，为什么这个区分很重要？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-生成的基本流程">2. 生成的基本流程<a href="#2-生成的基本流程" aria-label="Link to heading '2. 生成的基本流程'" data-heading-content="2. 生成的基本流程" class="anchor"></a></h2>
+<p>训练完成后（第 13-14 课），模型已经学会了&quot;给前缀，预测下一个 token&quot;。生成文本就是把这件事<strong>反复做</strong>：</p>
+<pre><code class="language-plaintext">&quot;Once upon a&quot;
+   │ 前向：model.forward(ctx, 1, T, ...)
+   ▼
+logits（每个 token 一个分数，未归一化）
+   │ 采样：sample_token(logits, opts, recent, rng)   // opts = T/top-k/top-p/重复惩罚
+   ▼
+下一个 token id
+   │ 拼回上下文
+   ▼
+&quot;Once upon a time&quot; → 再前向 → 再采样 → …… 直到 max_new 个 token
+</code></pre>
+<p>关键在于中间那一步：<strong>logits 是分数，不是文本</strong>。怎么从分数里选 token，决定了生成质量。</p>
+<h2 id="user-content-3-为什么不能直接-argmax">3. 为什么不能直接 argmax<a href="#3-为什么不能直接-argmax" aria-label="Link to heading '3. 为什么不能直接 argmax'" data-heading-content="3. 为什么不能直接 argmax" class="anchor"></a></h2>
+<p>最朴素的想法：把 logits 做 softmax 变成概率，然后<strong>永远选概率最大的</strong>（这就是贪心解码 / argmax）。它的毛病很典型：</p>
+<table>
+<thead>
+<tr>
+<th>现象</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>重复、呆板</td>
+<td>一旦某个 token 概率最高，之后每一步都会倾向选它，陷入 &quot;the the the the...&quot; 的死循环</td>
+</tr>
+<tr>
+<td>毫无惊喜</td>
+<td>概率第二、第三的候选被完全无视，模型&quot;不敢&quot;走任何低概率但合理的路</td>
+</tr>
+<tr>
+<td>容易跑偏</td>
+<td>一步选错（概率 0.4 的次优解可能是对的），后续全部跟着错，且无法回头</td>
+</tr>
+</tbody>
+</table>
+<p>大模型的真实需求是&quot;<strong>在合理的候选里随机一点</strong>&quot;：既不能完全确定（呆板），也不能完全乱来（胡言乱语）。于是有了下面四个旋钮。</p>
+<h2 id="user-content-4-temperature调节分布的锐度">4. temperature：调节分布的&quot;锐度&quot;<a href="#4-temperature调节分布的锐度" aria-label="Link to heading '4. temperature：调节分布的&quot;锐度&quot;'" data-heading-content="4. temperature：调节分布的&quot;锐度&quot;" class="anchor"></a></h2>
+<p>softmax 的公式，引入温度 T 后：</p>
+<pre><code class="language-plaintext">pᵢ = exp(zᵢ / T) / Σⱼ exp(zⱼ / T)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>T 的取值</th>
+<th>效果</th>
+<th>直觉</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T &lt; 1（如 0.8）</td>
+<td>分数差距被放大，分布更&quot;尖&quot;</td>
+<td>更确定、更保守、更连贯</td>
+</tr>
+<tr>
+<td>T = 1</td>
+<td>标准 softmax</td>
+<td>默认</td>
+</tr>
+<tr>
+<td>T &gt; 1（如 1.5）</td>
+<td>分数差距被压缩，分布更&quot;平&quot;</td>
+<td>更随机、更有创造力、更易出错</td>
+</tr>
+</tbody>
+</table>
+<p>代码（<a href="../src/sample.rs">src/sample.rs</a> <code>sample_token</code> 第 2 步，排在重复惩罚之后）：</p>
+<pre><code class="language-rust">let inv_temp = 1.0 / opts.temperature.max(1e-5);   // 1e-5 是温度下限，防止 0 除
+for l in penalized.iter_mut() {
+    *l *= inv_temp;
+}
+</code></pre>
+<p>数值例子：logits = <code>[1.0, 2.0, 0.5, 0.1]</code>（词表 4 个 token）：</p>
+<table>
+<thead>
+<tr>
+<th>温度</th>
+<th>scaled</th>
+<th>softmax 概率</th>
+<th>token 1 概率</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T = 0.5</td>
+<td>[2.0, 4.0, 1.0, 0.2]</td>
+<td>[0.11, <strong>0.83</strong>, 0.04, 0.02]</td>
+<td>0.83（更&quot;确定&quot;）</td>
+</tr>
+<tr>
+<td>T = 1.0</td>
+<td>[1.0, 2.0, 0.5, 0.1]</td>
+<td>[0.21, <strong>0.57</strong>, 0.13, 0.09]</td>
+<td>0.57</td>
+</tr>
+<tr>
+<td>T = 2.0</td>
+<td>[0.5, 1.0, 0.25, 0.05]</td>
+<td>[0.25, <strong>0.41</strong>, 0.19, 0.16]</td>
+<td>0.41（更&quot;随机&quot;）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="user-content-5-top-k只在前-k-个里选">5. top-k：只在前 k 个里选<a href="#5-top-k只在前-k-个里选" aria-label="Link to heading '5. top-k：只在前 k 个里选'" data-heading-content="5. top-k：只在前 k 个里选" class="anchor"></a></h2>
+<p>思想：分数排最后的那些 token 本来就是&quot;凑数&quot;的，干脆把它们从候选里删掉，只在前 k 个里分配概率。</p>
+<p>代码（<code>sample_token</code> 第 3-4 步：先按分数从高到低排序，再截断）：</p>
+<pre><code class="language-rust">let mut items: Vec&lt;(usize, f32)&gt; = penalized.iter().enumerate().map(|(i, &amp;v)| (i, v)).collect();
+items.sort_by(|a, b| b.1.partial_cmp(&amp;a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+if opts.top_k &gt; 0 &amp;&amp; items.len() &gt; opts.top_k {
+    items.truncate(opts.top_k);   // top_k = 0 表示不启用
+}
+</code></pre>
+<h2 id="user-content-6-top-pnucleus按累积概率截断">6. top-p（nucleus）：按累积概率截断<a href="#6-top-pnucleus按累积概率截断" aria-label="Link to heading '6. top-p（nucleus）：按累积概率截断'" data-heading-content="6. top-p（nucleus）：按累积概率截断" class="anchor"></a></h2>
+<p>思想：不看&quot;固定个数&quot;，而是<strong>从高到低累加概率，直到累积概率达到 p</strong>，把后面的全部丢掉。候选集合大小随分布自动变化——分布集中时集合小，分布分散时集合大。</p>
+<p>代码（<code>sample_token</code> 第 5-6 步：先 softmax 得到概率，再按累积概率截断）：</p>
+<pre><code class="language-rust">// 5. softmax 得到概率（减最大值防溢出）
+let max = items.iter().map(|(_, v)| *v).fold(f32::NEG_INFINITY, f32::max);
+let mut probs: Vec&lt;f32&gt; = items.iter().map(|(_, v)| (*v - max).exp()).collect();
+let sum: f32 = probs.iter().sum();
+for p in probs.iter_mut() { *p /= sum; }
+
+// 6. top-p：从高到低累加概率，直到超过 p，后面的全部丢弃
+if opts.top_p &lt; 1.0 {
+    let mut cum = 0.0;
+    let mut keep = items.len();
+    for (i, p) in probs.iter().enumerate() {
+        cum += p;
+        if cum &gt;= opts.top_p { keep = i + 1; break; }
+    }
+    items.truncate(keep);   // 丢掉尾部
+    probs.truncate(keep);
+    let s: f32 = probs.iter().sum();
+    for p in probs.iter_mut() { *p /= s; }   // 重新归一化
+}
+</code></pre>
+<p>沿用上面的例子（T=1.0，概率 [0.21, 0.57, 0.13, 0.09]，已按分数排序）：</p>
+<pre><code class="language-plaintext">top_p = 0.9：
+  0.57  → 累计 0.57（&lt; 0.9 继续）
+  0.21  → 累计 0.78（&lt; 0.9 继续）
+  0.13  → 累计 0.91（≥ 0.9 停）→ 保留前 3 个，丢弃第 4 个
+</code></pre>
+<blockquote>
+<p>相比 top-k 的&quot;一刀切固定个数&quot;，top-p 更聪明：概率分布尖的时候只留 1-2 个候选，平的时候留一堆。实践中 top-k 和 top-p 经常<strong>一起开</strong>（本项目演示里就是 <code>top_k=10, top_p=0.9</code> 同时启用）。</p>
+</blockquote>
+<h2 id="user-content-7-重复惩罚打断自我强化的重复循环">7. 重复惩罚：打断自我强化的重复循环<a href="#7-重复惩罚打断自我强化的重复循环" aria-label="Link to heading '7. 重复惩罚：打断自我强化的重复循环'" data-heading-content="7. 重复惩罚：打断自我强化的重复循环" class="anchor"></a></h2>
+<p>temperature / top-k / top-p 都只做一件事：<strong>截断分布再抽样</strong>。它们对&quot;分布长什么样&quot;没有发言权，所以治不了下面这种病：</p>
+<pre><code class="language-plaintext">我们？&quot;与他的了。”么？&quot;&quot;寶玉道：“的呢人的說的說了他笑笑道:&quot;你說我。“么。么，
+寶玉我．我要吃著著玉了了， 這老太太太太太太太太太太太太太太太太太太太太太太太太
+太太太太太太太太太太太太太太太太太太太太太太太太太太太太太太太太太太太太太太太……
+</code></pre>
+<p>（这是一个真实小模型的输出，训练了 4000 步、验证 ppl 619。）</p>
+<p><strong>为什么会卡住</strong>：一旦上下文里出现&quot;太&quot;，注意力就让&quot;太&quot;成为&quot;下一个 token 最可能是太&quot;的证据，于是&quot;太&quot;的概率被推到很高；采样又选了&quot;太&quot;，上下文里就有两个&quot;太&quot;，证据更强……这是个<strong>正反馈</strong>。top-k=40 也没用——循环里的&quot;太&quot;永远在 top-1，截断只是把跳出去的那 39 个候选划掉。</p>
+<p><strong>怎么治</strong>：给&quot;最近出现过的 token&quot;记账，把它们本轮的 logit 压低，这就是 <strong>repetition penalty</strong>：</p>
+<pre><code class="language-rust">// 正值除以系数、负值乘以系数 —— 两种情况下数值都变小，因此更难被抽中
+for &amp;id in recent {
+    if let Some(l) = penalized.get_mut(id) {
+        *l = if *l &gt; 0.0 {
+            *l / opts.repetition_penalty
+        } else {
+            *l * opts.repetition_penalty
+        };
+    }
+}
+</code></pre>
+<p>两个细节值得留意：</p>
+<ol>
+<li><strong>正负要分开处理</strong>。logit 是实数，可能是负的。直接乘 <code>1/系数</code> 会把负 logit 变得更接近 0（= 概率变大），正好反向；所以正值除、负值乘，方向才都是&quot;压低&quot;。</li>
+<li><strong>作用位置在 temperature 之前</strong>。惩罚先改原始 logit，再统一做 temperature 缩放——这与 HuggingFace 的处理器顺序一致（<code>RepetitionPenaltyLogitsProcessor</code> 属于 logits processor，跑在 warper 之前）。</li>
+</ol>
+<p>回看窗口 <code>repetition_window</code> 是另一个旋钮：只看最近 N 个 token（本项目默认 64）。窗口太小的毛病是&quot;刚说过的还罚不罚&quot;管不住；太大则会把&quot;的&quot;&quot;了&quot;这类高频虚词也一起压掉，句子反而散架——所以窗口和系数都不是越大越好，<code>1.05~1.3</code> + <code>64~128</code> 是常见区间。</p>
+<p><strong>实测对照</strong>（同一 prompt、&quot;我们&quot;，同一种子，只改 <code>--repetition-penalty</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>输出</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>1.0</code>（关闭）</td>
+<td><code>我们？&quot;与他的了。”么？&quot;&quot;寶玉道：“的呢人的說的說了他笑笑道:&quot;你說我。“么。么， 他才也什么不寶玉我．我要吃著著玉了了， 這老太太太太太太太太太太太太……</code></td>
+</tr>
+<tr>
+<td><code>1.1</code>（默认）</td>
+<td><code>我们？&quot;寶玉笑道：么了。么好了我也說了這那話說，又不干著他來了．二爺呢，我就睡著說，我沒好的，我還叫什么要了他是寶玉來呢， 這的的和我你們去了。</code></td>
+</tr>
+</tbody>
+</table>
+<p>惩罚不负责让内容变对（那是模型规模和训练量的事），它只负责<strong>别让模型卡死在一个字上</strong>。区别在于：前者是坏掉了，后者是&quot;很笨但没有坏&quot;。</p>
+<h2 id="user-content-8-汇总sample_token-的完整七步">8. 汇总：sample_token 的完整七步<a href="#8-汇总sample_token-的完整七步" aria-label="Link to heading '8. 汇总：sample_token 的完整七步'" data-heading-content="8. 汇总：sample_token 的完整七步" class="anchor"></a></h2>
+<p><a href="../src/sample.rs">src/sample.rs</a> 的 <code>sample_token</code> 把上面所有招数串起来：</p>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>做什么</th>
+<th>对应代码</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>UTF-8 约束：屏蔽&quot;半个汉字&quot;的 token（只对字节级 BPE）</td>
+<td><code>mask_illegal_utf8(...)</code>（见 <a href="08-BPE%E5%88%86%E8%AF%8D%E5%99%A8.md">第 8 课 7.1</a>）</td>
+</tr>
+<tr>
+<td>1</td>
+<td>重复惩罚：压低最近出现过的 token</td>
+<td><code>*l / opts.repetition_penalty</code>（或 <code>*l * ...</code>）</td>
+</tr>
+<tr>
+<td>2</td>
+<td>除以 temperature 缩放</td>
+<td><code>*l *= 1.0 / opts.temperature.max(1e-5)</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>按分数从高到低排序</td>
+<td><code>items.sort_by(...)</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>top-k 截断（k&gt;0 时）</td>
+<td><code>items.truncate(opts.top_k)</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>softmax 转概率（减最大值防溢出）</td>
+<td><code>(*v - max).exp()</code> 再归一化</td>
+</tr>
+<tr>
+<td>6</td>
+<td>top-p 按累积概率截断并重新归一化</td>
+<td><code>cum &gt;= opts.top_p</code> 时 <code>truncate</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>按概率随机采样</td>
+<td><code>rng.next_f32()</code> 做轮盘赌</td>
+</tr>
+</tbody>
+</table>
+<p>第 7 步的&quot;轮盘赌&quot;采样：</p>
+<pre><code class="language-rust">let mut u = rng.next_f32();          // 均匀随机数 [0, 1)
+for (i, p) in probs.iter().enumerate() {
+    if u &lt; *p { return items[i].0; } // 落进第 i 段的概率 = pᵢ
+    u -= p;                          // 没落进就减去这段，继续往后看
+}
+items.last().map(|(i, _)| *i).unwrap_or(0)
+</code></pre>
+<p>数学上：选到 token i 的概率正好等于 pᵢ。这保证了——概率高的 token 被选中的机会大，但概率低的也有机会被选中，这就是&quot;随机性&quot;的来源。</p>
+<blockquote>
+<p>第 0 步在 <code>sample_token</code> <strong>之前</strong>（由 <code>generate</code> / <code>beam_search</code> 调用）完成，只把候选里&quot;会拼出非法 UTF-8&quot;的 token 置为 <code>-inf</code>，本质是缩小候选集后重新归一化，不改变上面七步的顺序与算法。原因与实现见 <a href="08-BPE%E5%88%86%E8%AF%8D%E5%99%A8.md">第 8 课 7.1</a>。</p>
+</blockquote>
+<h2 id="user-content-9-generate一步一步生成整句文本">9. generate：一步一步生成整句文本<a href="#9-generate一步一步生成整句文本" aria-label="Link to heading '9. generate：一步一步生成整句文本'" data-heading-content="9. generate：一步一步生成整句文本" class="anchor"></a></h2>
+<p>全量模式（无 KV cache）的流程，<a href="../src/sample.rs">src/sample.rs</a>：</p>
+<pre><code class="language-rust">let block_size = model.cfg.block_size;
+let mut ids = tokenizer.encode(prompt);        // 起始文本 → id 序列
+if ids.is_empty() {
+    ids.push(0);   // 空 prompt：先喂一个 token，避免 0 长度上下文导致下标下溢
+}
+// 仅在使用 KV cache 时才分配缓存，全量模式不浪费内存
+let mut cache = kv.build(model);   // KvOpts::enable = false 时是 None
+
+for _ in 0..max_new {
+    let start = ids.len().saturating_sub(block_size);   // 只保留最近 block_size 个
+    let ctx = &amp;ids[start..];
+
+    // 推理不需要反向：no_grad 下不挂计算图、不分配梯度缓冲
+    let logits = crate::tensor::no_grad(|| {
+        if let Some(c) = cache.as_mut() {
+            if c[0].seq_len() == 0 {
+                model.forward(ctx, 1, ctx.len(), Some(c), false)      // 首次：喂整个 prompt
+            } else {
+                model.forward(&amp;ids[ids.len() - 1..], 1, 1, Some(c), false)  // 之后：只算最新 1 个
+            }
+        } else {
+            model.forward(ctx, 1, ctx.len(), None, false)   // 全量：每次重算整个上下文
+        }
+    });
+
+    let v = model.cfg.vocab_size;
+    let n = logits.numel();
+    let last_row = &amp;logits.data()[n - v..];      // 取最后一个位置的 logits
+    // 重复惩罚的回看窗口在这里截好再交给 sample_token（窗口 0 = 不惩罚）
+    let recent = if opts.repetition_window == 0 {
+        &amp;[][..]
+    } else {
+        &amp;ids[ids.len().saturating_sub(opts.repetition_window)..]
+    };
+    let next = sample_token(last_row, opts, recent, rng);
+    ids.push(next);                              // 拼回上下文，进入下一轮
+}
+
+tokenizer.decode(&amp;ids)                           // id 序列 → 文本
+</code></pre>
+<blockquote>
+<p>采样参数打包在 <code>SampleOpts { temperature, top_k, top_p, repetition_penalty, repetition_window }</code> 里，
+而不是一长串函数入参——<code>generate</code> 的参数本来就多，再加两个标量会到 11 个。</p>
+</blockquote>
+<blockquote>
+<p><code>model.forward</code> 的最后一个参数是 <code>training</code>：推理时传 <code>false</code>，不做 dropout。</p>
+</blockquote>
+<p>逐步拆解：</p>
+<ol>
+<li><strong>编码</strong>：<code>tokenizer.encode(prompt)</code> 把起始文本变成 id 序列。</li>
+<li><strong>截断上下文</strong>：<code>ctx = ids[ids.len() - block_size ..]</code>，上下文超过 <code>block_size</code> 时只保留最近的一段——模型&quot;记不住&quot;更早的历史。</li>
+<li><strong>前向拿 logits</strong>：全量模式下每次都把整个 <code>ctx</code> 重新算一遍（慢，但无需额外内存）。</li>
+<li><strong>取最后一个位置</strong>：前向输出形状是 <code>[B*T, vocab_size]</code>，这里 B=1，最后一个位置即 <code>data[n-v..]</code>，它对应&quot;基于当前全部上下文预测的下一个 token&quot;。</li>
+<li><strong>采样并拼接</strong>：<code>sample_token</code> 选出一个 id，<code>ids.push(next)</code>，进入下一轮。</li>
+<li><strong>解码</strong>：循环结束后 <code>tokenizer.decode(&amp;ids)</code> 把整条序列还原成文本（包含 prompt 和生成的部分）。</li>
+</ol>
+<h3 id="user-content-91-收尾三种结束原因">9.1 收尾：三种结束原因<a href="#91-收尾三种结束原因" aria-label="Link to heading '9.1 收尾：三种结束原因'" data-heading-content="9.1 收尾：三种结束原因" class="anchor"></a></h3>
+<p>上面那段循环只会在跑满 <code>max_new</code> 时停，真实的 <code>generate</code> 有三个结束条件：</p>
+<table>
+<thead>
+<tr>
+<th>结束条件</th>
+<th>对应 <code>StopReason</code></th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>采到 EOS</td>
+<td><code>Eos</code></td>
+<td>正常收尾。SFT 训练时每段回答都以 EOS 结尾（第 39 课 5.3），模型学会了&quot;说完了&quot;</td>
+</tr>
+<tr>
+<td>命中停止标记</td>
+<td><code>StopMark(&amp;'static str)</code></td>
+<td><code>SampleOpts::stop</code> 里的任意字符串出现在<strong>生成段</strong>里就停，结果不含该标记</td>
+</tr>
+<tr>
+<td>跑满 <code>max_new</code></td>
+<td><code>MaxNew</code></td>
+<td>截断，<strong>没有</strong>收尾——这一轮的输出是一段半截话</td>
+</tr>
+</tbody>
+</table>
+<p><code>generate</code> 只返回文本，需要区分&quot;说了什么&quot;和&quot;为什么停&quot;时用 <code>generate_with_reason</code>，
+它返回 <code>GenOutput { text, generated, reason }</code>（<code>src/sample.rs</code>）：</p>
+<ul>
+<li><code>text</code> 是 <code>prompt + 生成段</code>，<code>generated</code> 只有生成段。调用方不用再按 <code>prompt.len()</code> 的
+<strong>字节</strong>偏移去切全文——那个偏移在 decode 后会错位（一个 token 可能只覆盖半个汉字）。</li>
+<li><strong>停止标记只在 <code>generated</code> 里找</strong>：prompt 里本来就可能含有模板标记（SFT 模板里每轮都有
+<code>用户：</code>），在全文里找会<strong>第一步就命中</strong>、一个字都不生成。这个坑有单测盯着。</li>
+<li>EOS 的检查在最前面：它一出现就当轮结束，不再往后采。</li>
+</ul>
+<p>这个信息不是装饰：<code>chat</code> 把它写进每一轮日志（<code>（收尾：采到 EOS）</code>），空输出时则打印
+<code>[本轮无输出] …</code>。空白的生成段和&quot;程序根本没跑&quot;在终端上是同一行空白，不给原因就无从判断；
+而且&quot;采到 EOS&quot;与&quot;被 <code>--max-new</code> 截断&quot;的回答<strong>写进历史的方式不同</strong>（后者不写回，见第 39 课第 7 节）。</p>
+<h2 id="user-content-10-超出-block_size截断-vs-滑动窗口">10. 超出 block_size：截断 vs 滑动窗口<a href="#10-超出-block_size截断-vs-滑动窗口" aria-label="Link to heading '10. 超出 block_size：截断 vs 滑动窗口'" data-heading-content="10. 超出 block_size：截断 vs 滑动窗口" class="anchor"></a></h2>
+<p>KV cache（第 25 课详解）的思路：生成第 N 个 token 时，前 N-1 个 token 的 K/V 不需要重算，缓存起来每步只算最新的 1 个 token，大幅加速推理。它唯一的限制是&quot;看不到比窗口更早的内容&quot;，但<strong>不会因此提前停止生成</strong>：</p>
+<pre><code class="language-rust">// 全量模式：每步都从 ids 里重新取最近 block_size 个 token 当上下文
+let start = ids.len().saturating_sub(block_size);
+let ctx = &amp;ids[start..];
+
+// KV cache 模式：首次喂整个 prompt 填满缓存，之后每步只喂最新 1 个 token；
+// 缓存装不下时由 `KVCache::append` 自己丢掉最旧的行（滑动窗口）
+if c[0].seq_len() == 0 {
+    model.forward(ctx, 1, ctx.len(), Some(c), false)
+} else {
+    model.forward(&amp;ids[ids.len() - 1..], 1, 1, Some(c), false)
+}
+</code></pre>
+<blockquote>
+<p>早期实现里是&quot;缓存填满就 <code>break</code>&quot;（<code>if cache[0].seq_len() &gt;= block_size { break; }</code>），于是同一个 prompt 加不加 <code>--no-kv-cache</code> 生成的<strong>长度都不一样</strong>。现在改为滑动窗口，这个坑从根上消失了：<strong>生成长度只由 <code>max_new</code> 决定，与缓存容量无关</strong>（第 25 课第 8 节）。</p>
+</blockquote>
+<p>两种模式对&quot;超长上下文&quot;的处理对比：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>上下文超过 block_size 时</th>
+<th>代价</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>全量（<code>--no-kv-cache</code>）</td>
+<td>每次把 <code>ctx</code> 截断到最近 block_size 个 token，可以无限生成</td>
+<td>每步都要重算整个上下文，慢</td>
+</tr>
+<tr>
+<td>KV cache（默认）</td>
+<td>缓存的滑动窗口自动丢弃最旧的行，同样可以无限生成</td>
+<td>超出窗口的内容滑出模型视野（相当于被遗忘），位置编码继续按绝对位置递增</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>两种模式都能一直生成到 <code>max_new</code> 用完，生成长度不再受上下文窗口限制——第 25 课第 8 节讲了滑动窗口是怎么做到这一点的。</p>
+<p><code>cmd/experiments.rs</code> 的 demo 里，生成 1（全量）和生成 2（KV cache）用<strong>同一个 prompt + 同一个种子</strong>；此外还会做一次&quot;窗口内等价自检&quot;：把 prompt + 生成控制在 <code>block_size</code> 以内，两次输出必须<strong>逐 token 完全相等</strong>，这才是&quot;cache 只改计算方式、不改生成分布&quot;的验证。注意不能像早先那样给两次生成传不同 prompt（&quot;Once upon a&quot; vs &quot;The fox&quot;），那样输出不同只是采样不同，什么都证明不了。</p>
+<p>超出窗口后两条路径不再逐位相等：增量推理里每个位置当时能看到自己的完整窗口，而&quot;截断重算&quot;会把窗口内各位置在浅层可见的上下文一并砍掉。带 KV cache 的增量推理才是标准推断语义（第 25 课第 8 节有完整论证）。</p>
+</blockquote>
+<h2 id="user-content-11-参数怎么配一个经验表">11. 参数怎么配：一个经验表<a href="#11-参数怎么配一个经验表" aria-label="Link to heading '11. 参数怎么配：一个经验表'" data-heading-content="11. 参数怎么配：一个经验表" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>temperature</th>
+<th>top-k</th>
+<th>top-p</th>
+<th>repetition-penalty</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>要求准确、连贯（代码、摘要）</td>
+<td>0.2 ~ 0.7</td>
+<td>小（5~20）</td>
+<td>0.8 ~ 0.9</td>
+<td>1.0 ~ 1.05</td>
+</tr>
+<tr>
+<td>通用对话</td>
+<td>0.7 ~ 0.9</td>
+<td>30~50</td>
+<td>0.9 ~ 0.95</td>
+<td>1.1（默认）</td>
+</tr>
+<tr>
+<td>创意写作、头脑风暴</td>
+<td>0.9 ~ 1.2</td>
+<td>大或关闭</td>
+<td>0.95 ~ 1.0</td>
+<td>1.05 ~ 1.15</td>
+</tr>
+<tr>
+<td>小模型长文本（容易卡循环）</td>
+<td>0.8 ~ 1.0</td>
+<td>40~100</td>
+<td>0.9 ~ 0.95</td>
+<td>1.15 ~ 1.3</td>
+</tr>
+</tbody>
+</table>
+<p><code>cmd/experiments.rs</code> 里的演示配置：<code>temperature=0.8, top_k=10, top_p=0.9, repetition_penalty=1.1</code>，是一个偏保守、够通顺的组合。</p>
+<blockquote>
+<p>一个直观规律：<strong>temperature 越高越需要重复惩罚</strong>。高温让分布更平、更容易抽到尾部 token，也更容易一头扎进重复循环；反过来，低温 + 小 top-k 本身就很少重复，惩罚加过头反而会让本该重复的字（如&quot;太太&quot;）被强行拆开。</p>
+</blockquote>
+<h2 id="user-content-12-拓展与延伸阅读">12. 拓展与延伸阅读<a href="#12-拓展与延伸阅读" aria-label="Link to heading '12. 拓展与延伸阅读'" data-heading-content="12. 拓展与延伸阅读" class="anchor"></a></h2>
+<ul>
+<li>Beam Search：算法原理、与采样的对比、<code>--beam</code> / <code>--length-penalty</code> 参数见<a href="30-Beam-Search.md">第 30 课 Beam Search</a>；CLI 集成方式见<a href="39-%E5%B7%A5%E7%A8%8B%E5%8C%96%E5%AE%8C%E5%96%84.md">第 39 课 工程化完善</a>第 8 节。</li>
+<li>交互式对话（<code>chat</code> 子命令、历史裁剪、收尾原因与写回策略）见<a href="39-%E5%B7%A5%E7%A8%8B%E5%8C%96%E5%AE%8C%E5%96%84.md">第 39 课 工程化完善</a>第 7 节——本课 9.1 节的收尾原因正是它判断&quot;这轮回答要不要写回历史&quot;的依据。</li>
+</ul>
+<h2 id="user-content-13-小结与下一课">13. 小结与下一课<a href="#13-小结与下一课" aria-label="Link to heading '13. 小结与下一课'" data-heading-content="13. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li>生成 = 前向拿 logits → 采样选 token → 拼回上下文 → 循环</li>
+<li><strong>argmax 不可取</strong>：必然重复、呆板、无法回头</li>
+<li>四个旋钮：<strong>重复惩罚</strong>压低刚出现过的 token、<strong>temperature</strong> 调分布锐度、<strong>top-k</strong> 按个数截断、<strong>top-p</strong> 按累积概率截断，最后按概率随机采样</li>
+<li><code>sample_token</code> 七步：重复惩罚 → 缩放 → 排序 → top-k → softmax → top-p → 轮盘赌</li>
+<li>重复惩罚是唯一能治&quot;自我强化重复循环&quot;的旋钮：top-k/top-p 只截断分布，管不了分布本身长什么样</li>
+<li><code>generate</code> 全量模式每步重算上下文并按 <code>block_size</code> 截断；KV cache 模式每步只算 1 个 token，超窗时滑动窗口丢掉最旧的位置——两者都能一直生成到 <code>max_new</code>，不存在&quot;超限即停&quot;</li>
+<li>收尾有三种：<strong>采到 EOS</strong>（正常）、<strong>命中停止标记</strong>（兜底）、<strong>跑满 <code>max_new</code></strong>（截断，没收尾）；
+<code>generate_with_reason</code> 把收尾原因和&quot;本轮新生成的部分&quot;一起交出来，<code>chat</code> 靠它把空输出解释清楚</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li>把 <code>generate</code> 的 <code>temperature</code> 分别改成 0.1 和 2.0 跑一遍，观察输出从&quot;复读机&quot;到&quot;胡言乱语&quot;的变化。</li>
+<li>把 <code>top_k</code> 改成 1（等价于只在概率最高 token 附近贪心）再跑，观察重复现象。</li>
+<li>把 <code>top_p</code> 改成 1.0（关闭）但保留 <code>top_k=10</code>，对比输出差异。</li>
+<li>在 <code>sample_token</code> 的轮盘赌循环里打印每次的 <code>u</code> 和命中的 token，手动验证&quot;命中概率 ≈ pᵢ&quot;。</li>
+<li>用足够长的 prompt（超过 <code>block_size</code>，如 40 个字符）分别跑 <code>--no-kv-cache</code> 和默认模式：两者生成长度应当一致（滑动窗口的功劳），再看输出从第几个 token 起开始分岔。</li>
+<li>固定 <code>--seed</code>，把 <code>--repetition-penalty</code> 从 1.0 逐步调到 2.0，观察输出从&quot;卡死重复&quot;→&quot;正常但笨&quot;→&quot;句子散架&quot;的整条曲线，体会系数并非越大越好。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="16-%E8%AE%AD%E7%BB%83%E5%B0%8FTransformer.md">第 16 课 训练小 Transformer</a> —— 把所有零件拼起来，训练一个小 Transformer 并生成有意义的长文本</p>
+</blockquote>

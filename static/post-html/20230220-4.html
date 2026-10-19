@@ -1,0 +1,27 @@
+<h1 id="user-content-防抖函数">防抖函数<a href="#防抖函数" aria-label="Link to heading '防抖函数'" data-heading-content="防抖函数" class="anchor"></a></h1>
+<p>防抖函数</p>
+<h2 id="user-content-封装">封装<a href="#封装" aria-label="Link to heading '封装'" data-heading-content="封装" class="anchor"></a></h2>
+<pre><code class="language-js">// 防抖函数的封装
+export default function debounce(func, delay){
+  let timer = null
+  return function () {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() =&gt; {
+      func.apply()
+    }, delay)
+  }
+}
+
+</code></pre>
+<h2 id="user-content-使用">使用<a href="#使用" aria-label="Link to heading '使用'" data-heading-content="使用" class="anchor"></a></h2>
+<pre><code class="language-jsx">getHomeDataList = debounce(() =&gt; {
+  getHomeData()
+    .then(res =&gt; {
+      console.log(res)
+    })
+    .catch(err =&gt; {
+      console.error(err)
+    })
+}, 500)
+
+</code></pre>

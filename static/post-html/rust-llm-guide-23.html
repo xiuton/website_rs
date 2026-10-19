@@ -1,0 +1,214 @@
+<h1 id="user-content-第-23-课gqa-分组查询注意力--推理时省显存的利器">第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器<a href="#第-23-课gqa-分组查询注意力--推理时省显存的利器" aria-label="Link to heading '第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器'" data-heading-content="第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器" class="anchor"></a></h1>
+<blockquote>
+<p>代码位置：<a href="../src/attention.rs">src/attention.rs</a>（<code>MultiHeadAttention</code> 支持 <code>n_kv_head</code>）</p>
+<p>配置开关：<code>config/config.json</code> → <code>model.n_kv_head: 2</code>（示例值；仓库当前 <code>config/config.json</code> 里是 <code>0</code> = 标准 MHA，需手动改为 <code>2</code> 才能启用 GQA）</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>标准多头注意力（MHA）的 KV Cache 为什么在推理时是瓶颈？</li>
+<li>GQA 是怎么通过&quot;共享 K/V 头&quot;来减少 KV Cache 的？</li>
+<li>MHA、GQA、MQA 三者的关系是什么？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-kv-cache-回顾第-25-课">2. KV Cache 回顾（第 25 课）<a href="#2-kv-cache-回顾第-25-课" aria-label="Link to heading '2. KV Cache 回顾（第 25 课）'" data-heading-content="2. KV Cache 回顾（第 25 课）" class="anchor"></a></h2>
+<p>推理时每生成一个新 token 都要用到之前所有 token 的 K 和 V，标准 MHA 每个头都有自己独立的 K 和 V，
+于是缓存大小是：</p>
+<pre><code class="language-text">KV Cache 大小 = 2 * n_layer * n_head * T * head_dim * sizeof(f32)
+</code></pre>
+<p>例如 LLaMA-7B（n_layer=32, n_head=32, head_dim=128, T=2048）：</p>
+<pre><code class="language-text">2 * 32 * 32 * 2048 * 128 * 4B = 2GB
+</code></pre>
+<p>这 2GB 全部是 K/V 缓存，推理时必须常驻显存——本课只关心&quot;省多少份&quot;，
+缓存本身的结构、<code>append</code> / 滑动窗口 / Attention Sink 等细节<strong>归属课是 <a href="25-KV-Cache.md">第 25 课 KV Cache</a></strong>，这里不再展开。</p>
+<hr />
+<h2 id="user-content-3-gqa-的核心思想">3. GQA 的核心思想<a href="#3-gqa-的核心思想" aria-label="Link to heading '3. GQA 的核心思想'" data-heading-content="3. GQA 的核心思想" class="anchor"></a></h2>
+<p><strong>问题</strong>：每个 Q 头都需要独立的 K/V 吗？</p>
+<p>研究发现，训练好的 MHA 模型中，很多 K/V 头的输出高度相似（冗余）。</p>
+<p><strong>解决</strong>：让多个 Q 头共享同一组 K/V 头。</p>
+<pre><code class="language-plaintext">MHA:  8 个 Q 头，8 个 K/V 头    → KV Cache = 8 份
+GQA:  8 个 Q 头，2 个 K/V 头    → KV Cache = 2 份（省 4 倍！）
+MQA:  8 个 Q 头，1 个 K/V 头    → KV Cache = 1 份（省 8 倍！）
+</code></pre>
+<h3 id="user-content-31-三者的关系">3.1 三者的关系<a href="#31-三者的关系" aria-label="Link to heading '3.1 三者的关系'" data-heading-content="3.1 三者的关系" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>Q 头数</th>
+<th>K/V 头数</th>
+<th>关系</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MHA</td>
+<td>n_head</td>
+<td>n_head</td>
+<td>每头独立</td>
+</tr>
+<tr>
+<td>GQA</td>
+<td>n_head</td>
+<td>n_kv_head</td>
+<td>多个 Q 共享一组 KV</td>
+</tr>
+<tr>
+<td>MQA</td>
+<td>n_head</td>
+<td>1</td>
+<td>所有 Q 共享一组 KV</td>
+</tr>
+</tbody>
+</table>
+<p>GQA 是 MHA 和 MQA 的<strong>折中</strong>：比 MQA 效果好（保留了多样性），比 MHA 省显存。</p>
+<hr />
+<h2 id="user-content-4-实现细节">4. 实现细节<a href="#4-实现细节" aria-label="Link to heading '4. 实现细节'" data-heading-content="4. 实现细节" class="anchor"></a></h2>
+<h3 id="user-content-41-kv-投影维度变化">4.1 K/V 投影维度变化<a href="#41-kv-投影维度变化" aria-label="Link to heading '4.1 K/V 投影维度变化'" data-heading-content="4.1 K/V 投影维度变化" class="anchor"></a></h3>
+<pre><code class="language-plaintext">MHA:  c_k = Linear(n_embd, n_embd)        # n_head * head_dim
+GQA:  c_k = Linear(n_embd, n_kv_head * head_dim)   # 更小！
+</code></pre>
+<h3 id="user-content-42-共享头核内索引不物化">4.2 共享头（核内索引，不物化）<a href="#42-共享头核内索引不物化" aria-label="Link to heading '4.2 共享头（核内索引，不物化）'" data-heading-content="4.2 共享头（核内索引，不物化）" class="anchor"></a></h3>
+<p>GQA 前向时，Q 有 <code>n_head</code> 个头、K/V 只有 <code>n_kv_head</code> 个头。早期实现先用 <code>repeat_kv</code>
+把每个 KV 头复制 <code>n_rep = n_head / n_kv_head</code> 次再算注意力；现在<strong>不再物化</strong>：
+<code>flash_attention</code> 的 CPU 分块核按 Q 头 <code>hh / n_rep</code> 直接索引共享的 KV 头
+（GPU 路径在算子入口核外展开），省掉整块拷贝与反向的跨副本求和节点。</p>
+<pre><code class="language-plaintext">Q 头 hh → KV 头 hh / n_rep   （核内索引，零物化）
+</code></pre>
+<h3 id="user-content-43-计算流程">4.3 计算流程<a href="#43-计算流程" aria-label="Link to heading '4.3 计算流程'" data-heading-content="4.3 计算流程" class="anchor"></a></h3>
+<pre><code class="language-plaintext">Q: [B, T, n_head, head_dim] → 拆头 [B*n_head, T, head_dim]
+K: [B, T, n_kv_head, head_dim] → 拆头 [B*n_kv_head, T, head_dim]   # 不复制！
+V: [B, T, n_kv_head, head_dim] → 拆头 [B*n_kv_head, T, head_dim]   # 不复制！
+flash_attention 内部：Q 头 hh 按 hh / n_rep 取共享 KV 头计算
+</code></pre>
+<hr />
+<h2 id="user-content-5-推理时的显存节省">5. 推理时的显存节省<a href="#5-推理时的显存节省" aria-label="Link to heading '5. 推理时的显存节省'" data-heading-content="5. 推理时的显存节省" class="anchor"></a></h2>
+<pre><code class="language-plaintext">MHA KV Cache = 2 * n_layer * n_head * T * head_dim
+GQA KV Cache = 2 * n_layer * n_kv_head * T * head_dim
+节省比例    = n_head / n_kv_head
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>n_head</th>
+<th>n_kv_head</th>
+<th>KV Cache 节省</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LLaMA-2 7B</td>
+<td>32</td>
+<td>32</td>
+<td>1×（标准 MHA）</td>
+</tr>
+<tr>
+<td>LLaMA-2 70B</td>
+<td>64</td>
+<td>8</td>
+<td>8×</td>
+</tr>
+<tr>
+<td>Mistral 7B</td>
+<td>32</td>
+<td>8</td>
+<td>4×</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="user-content-6-延伸mla-低秩压缩-kv-cachedeepseek-v2v3">6. 延伸：MLA 低秩压缩 KV Cache（DeepSeek-V2/V3）<a href="#6-延伸mla-低秩压缩-kv-cachedeepseek-v2v3" aria-label="Link to heading '6. 延伸：MLA 低秩压缩 KV Cache（DeepSeek-V2/V3）'" data-heading-content="6. 延伸：MLA 低秩压缩 KV Cache（DeepSeek-V2/V3）" class="anchor"></a></h2>
+<blockquote>
+<p><strong>已落地代码</strong>：<a href="../src/attention.rs"><code>src/attention.rs</code></a> 的 <code>MultiHeadAttention</code>
+（<code>kv_lora_rank &gt; 0</code> 时走 <code>forward_mla</code>）+ <code>KVCache::new_latent</code> / <code>append_latent</code> /
+<code>positions</code>。配置开关：<code>model.kv_lora_rank</code>（默认 <code>0</code> = 关闭）。</p>
+</blockquote>
+<h3 id="user-content-61-gqa-之后为什么还要-mla">6.1 GQA 之后，为什么还要 MLA<a href="#61-gqa-之后为什么还要-mla" aria-label="Link to heading '6.1 GQA 之后，为什么还要 MLA'" data-heading-content="6.1 GQA 之后，为什么还要 MLA" class="anchor"></a></h3>
+<p>GQA 的思路是&quot;<strong>少存几份</strong>&quot;：让多个 Q 头共享 K/V 头，缓存缩小 <code>n_head / n_kv_head</code> 倍。</p>
+<p>MLA（Multi-head Latent Attention）换了个方向：&quot;<strong>每份压扁</strong>&quot;——K 和 V 不再各自从输入
+投影，而是先压到一份低秩 latent，再从 latent 升维出来：</p>
+<pre><code class="language-text">    GQA:   x ──c_k──&gt; K ┐                       缓存：K、V 两份
+           x ──c_v──&gt; V ┘
+
+    MLA:   x ──c_kv──&gt; c (r 维)  ─┬─c_k──&gt; K   缓存：只有 c
+                                  └─c_v──&gt; V
+</code></pre>
+<p>两种思路可以叠加（MLA 里同样有 <code>n_kv_head</code>），但收益来源不同：GQA 省的是&quot;份数&quot;，
+MLA 省的是&quot;每份的体积&quot;。</p>
+<h3 id="user-content-62-省了多少">6.2 省了多少<a href="#62-省了多少" aria-label="Link to heading '6.2 省了多少'" data-heading-content="6.2 省了多少" class="anchor"></a></h3>
+<pre><code class="language-text">MHA/GQA 缓存 = 2 * n_layer * T * n_kv_head * head_dim * 4 字节
+MLA   缓存 =     n_layer * T * kv_lora_rank          * 4 字节
+</code></pre>
+<p>DeepSeek-V2：<code>kv_lora_rank = 512</code>，对比 <code>n_kv_head × head_dim = 128 × 192</code>，
+缓存小了约 96 倍。长上下文下 KV Cache 常常比权重还大，这一项直接决定能开多长的上下文。</p>
+<h3 id="user-content-63-代价写在明处算力换显存">6.3 代价写在明处：算力换显存<a href="#63-代价写在明处算力换显存" aria-label="Link to heading '6.3 代价写在明处：算力换显存'" data-heading-content="6.3 代价写在明处：算力换显存" class="anchor"></a></h3>
+<p>普通注意力每次只算<strong>新 token</strong> 的 K/V；MLA 每次推理都要把<strong>整段 latent 升维回 K/V</strong>
+（<code>forward_mla</code> 第 3 步是全量 <code>c_k</code>/<code>c_v</code> 投影）。省的是显存，付的是算力——
+这不是&quot;免费的压缩&quot;，而是一个明确的取舍。</p>
+<h3 id="user-content-64-本实现的取舍教学版">6.4 本实现的取舍（教学版）<a href="#64-本实现的取舍教学版" aria-label="Link to heading '6.4 本实现的取舍（教学版）'" data-heading-content="6.4 本实现的取舍（教学版）" class="anchor"></a></h3>
+<ul>
+<li><strong>保留论文的核心</strong>：KV 联合低秩压缩 + 缓存只存 latent。</li>
+<li><strong>decoupled RoPE 单独成课</strong>：论文把 Q/K 的 rope 子维单独拎出来只对那部分旋转，
+让压缩后的 latent 不必带位置信息。本课（第 23 课）的 MLA 是<strong>最简形态</strong>——让 RoPE 作用在完整的
+<code>head_dim</code> 上，因此缓存里的 latent 是<strong>未旋转</strong>的，靠 <code>KVCache::positions</code> 每步按各自绝对位置补旋
+（滑动窗口丢行后位置并不连续，所以必须存每个位置的绝对下标）。
+效果上的差别：压缩率略低、每步多一次旋转（<code>T</code> 行的 <code>O(T·d)</code> 计算，与升维同量级）。
+<strong>论文式的完整版（decoupled RoPE + <code>W_UK</code>/<code>W_UV</code> 权重吸收）已在第 50 课落地</strong>：
+开 <code>model.mla_rope_dim &gt; 0</code>（<code>head_dim = hd_nope + hd_rope</code>，只转后 <code>hd_rope</code> 维、
+<code>k_rope</code> 由输入直接投影）与 <code>model.mla_absorb = true</code>（解码在 <code>r + n_head·hd_rope</code> 维 latent 空间完成、
+K/V 不物化），详见 <a href="50-MLA%E8%A7%A3%E8%80%A6RoPE%E4%B8%8E%E6%9D%83%E9%87%8D%E5%90%B8%E6%94%B6.md">第 50 课</a>。</li>
+</ul>
+<h3 id="user-content-65-配置与约束">6.5 配置与约束<a href="#65-配置与约束" aria-label="Link to heading '6.5 配置与约束'" data-heading-content="6.5 配置与约束" class="anchor"></a></h3>
+<pre><code class="language-json">{
+  &quot;model&quot;: {
+    &quot;n_head&quot;: 8,
+    &quot;n_kv_head&quot;: 2,
+    &quot;kv_lora_rank&quot;: 32
+  }
+}
+</code></pre>
+<ul>
+<li><code>kv_lora_rank: 0</code> 或不设 = 普通 MHA / GQA（行为与加 MLA 之前<strong>逐位一致</strong>，
+包括初始化消耗的随机数顺序）。</li>
+<li><strong>约束</strong>：<code>kv_lora_rank</code> 必须<strong>小于</strong> <code>n_kv_head × head_dim</code>，否则谈不上压缩（构造时断言）。</li>
+<li>MLA 模型必须配 MLA 模式的缓存：<code>Transformer::new_kv_cache</code> 会按配置自动选
+<code>KVCache::new_latent</code>，前向里也会断言缓存类型匹配。</li>
+<li>MLA 的压缩投影 <code>c_kv</code> <strong>不挂 LoRA 适配器</strong>：它同时供给 K 和 V 两条路，低秩增量在那里
+既破坏&quot;压缩&quot;的口径，也没有现成的社区做法；要调 MLA 的 KV 表示，直接调
+<code>kv_lora_rank</code> 重训更干净。</li>
+</ul>
+<hr />
+<h2 id="user-content-7-配置示例">7. 配置示例<a href="#7-配置示例" aria-label="Link to heading '7. 配置示例'" data-heading-content="7. 配置示例" class="anchor"></a></h2>
+<pre><code class="language-json">{
+  &quot;model&quot;: {
+    &quot;n_head&quot;: 8,
+    &quot;n_kv_head&quot;: 2
+  }
+}
+</code></pre>
+<p><code>n_kv_head: 0</code> 或不设 = 标准 MHA（n_kv_head = n_head）。</p>
+<p><strong>约束</strong>：<code>n_head</code> 必须能被 <code>n_kv_head</code> 整除。</p>
+<p>启用 MLA 时另加 <code>kv_lora_rank</code>（见 6.5 节）。</p>
+<hr />
+<h2 id="user-content-8-小结与下一课">8. 小结与下一课<a href="#8-小结与下一课" aria-label="Link to heading '8. 小结与下一课'" data-heading-content="8. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li>GQA = 多个 Q 头共享一组 K/V 头，是 MHA 和 MQA 的折中</li>
+<li>KV Cache 缩小 <code>n_head / n_kv_head</code> 倍，推理显存大幅降低</li>
+<li>训练时几乎不影响效果（LLaMA 2 验证）</li>
+<li>实现：K/V 投影维度变小 + flash_attention 核内按 <code>hh / n_rep</code> 索引共享头（零物化）</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li><strong>扫 <code>n_kv_head</code></strong>：把 <code>config/config.json</code> 的 <code>model.n_kv_head</code> 在 <code>1 / 2 / 4 / 8</code>（配合 <code>n_head = 8</code>）各训一遍，对比 loss 与推理显存——<code>1</code> 就是 MQA，看它与 GQA 的差距。</li>
+<li><strong>确认零物化</strong>：在 <code>flash_attention</code> 的 CPU 分块核里加一行计数，确认 <code>n_rep &gt; 1</code> 时按 <code>hh / n_rep</code> 索引共享头、而不是先 <code>repeat_kv</code> 复制一份。</li>
+<li><strong>验整除约束</strong>：把 <code>n_kv_head</code> 设成不整除 <code>n_head</code> 的值（如 <code>n_head = 8</code>、<code>n_kv_head = 3</code>），确认构造时直接断言失败而不是静默算错。</li>
+<li><strong>算一遍 KV Cache 的字节数</strong>：用第 5 节的三行公式，按本仓库的实际 <code>n_layer</code> / <code>n_head</code> / <code>block_size</code> 估算 MHA 与 GQA 的缓存字节数，和进程实际驻留对比。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="24-Flash-Attention.md">第 24 课 Flash Attention</a> —— GQA 省的是缓存的&quot;份数&quot;，下一课解决注意力打分矩阵本身的显存与 IO 瓶颈。</p>
+</blockquote>

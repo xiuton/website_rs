@@ -1,0 +1,520 @@
+<h1 id="user-content-第-11-课位置编码与归一化--让序列带上位置感">第 11 课：位置编码与归一化 —— 让序列带上&quot;位置感&quot;<a href="#第-11-课位置编码与归一化--让序列带上位置感" aria-label="Link to heading '第 11 课：位置编码与归一化 —— 让序列带上&quot;位置感&quot;'" data-heading-content="第 11 课：位置编码与归一化 —— 让序列带上&quot;位置感&quot;" class="anchor"></a></h1>
+<blockquote>
+<p>代码位置：<a href="../src/model.rs">src/model.rs</a>（<code>TransformerBlock</code> 里的残差连接）
+代码位置：<a href="../src/layers.rs">src/layers.rs</a>（<code>LayerNorm</code>）
+演示入口：<a href="../src/main.rs">src/main.rs</a></p>
+<p>⚠️ <strong>历史说明</strong>：本课实现的正弦位置编码（<code>sinusoidal_positions</code> / <code>pos_emb</code>）已在<strong>第 20 课被 RoPE 取代</strong>——
+当前 <code>src/model.rs</code> 里不再有 <code>pos_emb</code> 字段，位置信息由注意力内部旋转 Q/K 提供。
+本节仍是必读的：LayerNorm 与残差连接至今原样在模型里，且&quot;位置编码要解决什么问题&quot;是理解 RoPE 的前提。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>注意力机制天生&quot;看不见位置&quot;，为什么？怎么补救？</li>
+<li>正弦位置编码的公式 <code>PE(pos, 2i) = sin(pos / 10000^(2i/d))</code> 到底在算什么？</li>
+<li>LayerNorm 是怎么把数据&quot;拉回&quot;标准分布的？它和 BatchNorm 有什么区别？</li>
+<li>残差连接为什么能让我们放心地把网络加深？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-为什么需要位置编码">2. 为什么需要位置编码<a href="#2-为什么需要位置编码" aria-label="Link to heading '2. 为什么需要位置编码'" data-heading-content="2. 为什么需要位置编码" class="anchor"></a></h2>
+<p>先回忆第 9-10 课的注意力公式：</p>
+<pre><code class="language-plaintext">scores = (Q · Kᵀ) / √d_k      # Q、K 由每个 token 的内容算出来
+attn   = softmax(scores)
+out    = attn · V
+</code></pre>
+<p>注意：<strong>Q、K、V 全部只由 token 的内容（embedding）计算而来</strong>。点积 <code>q·k</code> 衡量的是&quot;两个 token 的内容有多相关&quot;，
+跟&quot;它们相隔多远、谁在前谁在后&quot;没有任何关系。</p>
+<p>这带来一个致命问题：<strong>注意力是&quot;排列不变&quot;（permutation invariant）的</strong>。看一个例子：</p>
+<table>
+<thead>
+<tr>
+<th>输入序列</th>
+<th>模型看到的相关性</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&quot;猫 追 狗&quot;</td>
+<td>&quot;猫&quot;↔&quot;狗&quot;</td>
+</tr>
+<tr>
+<td>&quot;狗 追 猫&quot;</td>
+<td>&quot;猫&quot;↔&quot;狗&quot;</td>
+</tr>
+</tbody>
+</table>
+<p>两个句子语义完全相反，但注意力打分一模一样（因为每个词的内容没变）。如果模型只看注意力，
+它永远分不清&quot;猫追狗&quot;和&quot;狗追猫&quot;。</p>
+<blockquote>
+<p>通俗理解：注意力是个&quot;走神的学生&quot;，它只知道&quot;这两个词好像有关&quot;，但不知道&quot;谁在左、谁在右&quot;。
+语言是<strong>顺序敏感</strong>的，所以必须把位置信息塞进去。</p>
+</blockquote>
+<p><strong>解决方案</strong>：给每个位置的 token embedding <strong>加上一个位置向量</strong>：</p>
+<pre><code class="language-plaintext">x = token_embedding + position_embedding
+</code></pre>
+<p>位置向量就是&quot;第 0 个位置长什么样、第 1 个位置长什么样……&quot;的一组向量。加上之后，同一个词在不同位置就有了不同的表示。</p>
+<hr />
+<h2 id="user-content-3-正弦位置编码">3. 正弦位置编码<a href="#3-正弦位置编码" aria-label="Link to heading '3. 正弦位置编码'" data-heading-content="3. 正弦位置编码" class="anchor"></a></h2>
+<h3 id="user-content-31-公式">3.1 公式<a href="#31-公式" aria-label="Link to heading '3.1 公式'" data-heading-content="3.1 公式" class="anchor"></a></h3>
+<p>原版 Transformer 论文（Attention Is All You Need）提出用<strong>不同频率的正弦波</strong>来编码位置：</p>
+<pre><code class="language-plaintext">PE(pos, 2i)   = sin(pos / 10000^(2i/d))
+PE(pos, 2i+1) = cos(pos / 10000^(2i/d))
+</code></pre>
+<ul>
+<li><code>pos</code>：位置（0, 1, 2, ...）</li>
+<li><code>i</code>：embedding 里的维度下标（0, 1, 2, ..., d-1）</li>
+<li><code>d</code>：embedding 维度（我们的模型里就是 <code>n_embd</code>）</li>
+</ul>
+<p>位置 <code>pos</code> 的向量长这样：</p>
+<pre><code class="language-plaintext">pos_emb[pos] = [ sin(pos/1), cos(pos/1), sin(pos/10000^(2/d)), cos(pos/10000^(2/d)), ... ]
+                  └── i=0 ──┘  └── i=1 ──┘      └── i=2 ──┘       └── i=3 ──┘
+</code></pre>
+<p><strong>关键点</strong>：维度下标 <code>i</code> 越小，频率越高（波形越密）；<code>i</code> 越大，频率越低（波形越平缓）。
+也就是说，编码向量的&quot;前半段&quot;负责记录精细的相对位置，&quot;后半段&quot;负责记录大致的绝对位置。</p>
+<h3 id="user-content-32-手算一个例子">3.2 手算一个例子<a href="#32-手算一个例子" aria-label="Link to heading '3.2 手算一个例子'" data-heading-content="3.2 手算一个例子" class="anchor"></a></h3>
+<p>设 <code>d = 4</code>，即每个位置只有 4 个维度（i = 0, 1, 2, 3）：</p>
+<table>
+<thead>
+<tr>
+<th>pos</th>
+<th>2i=0：sin(pos/1)</th>
+<th>2i=1：cos(pos/1)</th>
+<th>2i=2：sin(pos/100)</th>
+<th>2i=3：cos(pos/100)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>sin(0) = 0</td>
+<td>cos(0) = 1</td>
+<td>sin(0) = 0</td>
+<td>cos(0) = 1</td>
+</tr>
+<tr>
+<td>1</td>
+<td>sin(1) ≈ 0.841</td>
+<td>cos(1) ≈ 0.540</td>
+<td>sin(0.01) ≈ 0.010</td>
+<td>cos(0.01) ≈ 1.000</td>
+</tr>
+<tr>
+<td>2</td>
+<td>sin(2) ≈ 0.909</td>
+<td>cos(2) ≈ -0.416</td>
+<td>sin(0.02) ≈ 0.020</td>
+<td>cos(0.02) ≈ 1.000</td>
+</tr>
+<tr>
+<td>3</td>
+<td>sin(3) ≈ 0.141</td>
+<td>cos(3) ≈ -0.990</td>
+<td>sin(0.03) ≈ 0.030</td>
+<td>cos(0.03) ≈ 1.000</td>
+</tr>
+</tbody>
+</table>
+<p>可以看到：i = 0/1 的波形变化剧烈（区分相邻位置），i = 2/3 的波形几乎不动（区分远距离）。</p>
+<h3 id="user-content-33-为什么选正弦波">3.3 为什么选正弦波<a href="#33-为什么选正弦波" aria-label="Link to heading '3.3 为什么选正弦波'" data-heading-content="3.3 为什么选正弦波" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>性质</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>每个位置的向量都不同</td>
+<td><code>pos</code> 不同，三角函数取值就不同，模型能区分位置</td>
+</tr>
+<tr>
+<td>相对位置可&quot;计算&quot;</td>
+<td>利用三角恒等式，<code>PE(pos+k)</code> 可以表示为 <code>PE(pos)</code> 的线性组合，模型容易学到&quot;相对距离&quot;的概念</td>
+</tr>
+<tr>
+<td>值域固定</td>
+<td>所有值都在 [-1, 1]，加到 embedding 上不会把数值范围撑爆</td>
+</tr>
+<tr>
+<td>不需要学习</td>
+<td>位置编码是<strong>固定的常数</strong>，不用训练就能用；而且序列再长也能&quot;算&quot;出来（外推性）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-34-对应代码">3.4 对应代码<a href="#34-对应代码" aria-label="Link to heading '3.4 对应代码'" data-heading-content="3.4 对应代码" class="anchor"></a></h3>
+<blockquote>
+<p>⚠️ 以下函数已从代码库中删除（被 RoPE 取代），仅供理解原理。</p>
+</blockquote>
+<pre><code class="language-rust">/// 正弦位置编码（第 11 课，已删除）
+///
+/// PE(pos, 2i)   = sin(pos / 10000^(2i/D))
+/// PE(pos, 2i+1) = cos(pos / 10000^(2i/D))
+fn sinusoidal_positions(max_len: usize, d: usize) -&gt; Vec&lt;f32&gt; {
+    let mut data = vec![0.0f32; max_len * d];
+    for pos in 0..max_len {
+        for i in 0..d {
+            let freq = 10000f32.powf((2 * (i / 2)) as f32 / d as f32);
+            let angle = pos as f32 / freq;
+            data[pos * d + i] = if i % 2 == 0 { angle.sin() } else { angle.cos() };
+        }
+    }
+    data
+}
+</code></pre>
+<p>逐行对照公式：</p>
+<table>
+<thead>
+<tr>
+<th>代码</th>
+<th>对应公式</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>10000f32.powf((2 * (i / 2)) as f32 / d as f32)</code></td>
+<td><code>10000^(2i/d)</code></td>
+<td>注意这里的 <code>2i</code> 指<strong>偶数维下标</strong>。因为 <code>i / 2</code> 是整数除法，当 <code>i=2</code> 和 <code>i=3</code> 时 <code>i/2</code> 都等于 1，所以下标 2 和 3 共享同一个频率——这正是公式里 <code>(2i, 2i+1)</code> 一对维度用同一个 <code>10000^(2i/d)</code> 的做法</td>
+</tr>
+<tr>
+<td><code>let angle = pos as f32 / freq;</code></td>
+<td><code>pos / 10000^(2i/d)</code></td>
+<td>把位置除以频率，得到角度</td>
+</tr>
+<tr>
+<td><code>if i % 2 == 0 { angle.sin() } else { angle.cos() }</code></td>
+<td><code>PE(pos, 2i) = sin(...)</code>、<code>PE(pos, 2i+1) = cos(...)</code></td>
+<td>偶数维用 sin，奇数维用 cos</td>
+</tr>
+</tbody>
+</table>
+<p>在 <code>Transformer::new</code> 里把它变成一个 <code>[block_size, n_embd]</code> 的张量存起来：</p>
+<pre><code class="language-rust">let pos_emb = Tensor::from_vec(
+    sinusoidal_positions(cfg.block_size, cfg.n_embd),
+    vec![cfg.block_size, cfg.n_embd],
+);
+</code></pre>
+<p><code>Transformer</code> 结构体里它的类型是普通 <code>Tensor</code> 而不是 <code>Tensor::param(...)</code>：</p>
+<pre><code class="language-rust">pos_emb: Tensor, // 正弦位置编码 [block_size, D]（常数，不参与训练）
+</code></pre>
+<blockquote>
+<p>它不在 <code>parameters()</code> 里，反向传播时不会产生梯度——<strong>位置编码是常数</strong>，这正是正弦编码对比&quot;可学习位置编码&quot;的一大优点。</p>
+</blockquote>
+<h3 id="user-content-35-怎么用加到-token-embedding-上">3.5 怎么用：加到 token embedding 上<a href="#35-怎么用加到-token-embedding-上" aria-label="Link to heading '3.5 怎么用：加到 token embedding 上'" data-heading-content="3.5 怎么用：加到 token embedding 上" class="anchor"></a></h3>
+<p>在 <code>Transformer::forward</code> 里，用 <code>gather_rows</code> 按位置取行，再和 token embedding 相加：</p>
+<pre><code class="language-rust">// 1. token embedding
+let tok = self.tok_emb.forward(idx).reshape(vec![b, t, d]);
+// 2. 位置编码：KV cache 推理时，当前位置从缓存长度开始
+let pos_emb = self.pos_emb.gather_rows(&amp;positions).reshape(vec![b, t, d]);
+let x = tok.add(&amp;pos_emb);
+</code></pre>
+<p><code>x</code> 的每个元素 = 词的语义（token embedding）+ 词的位置（pos embedding），后续所有层都在这个&quot;带位置信息&quot;的表示上工作。</p>
+<hr />
+<h2 id="user-content-4-layernorm层归一化">4. LayerNorm：层归一化<a href="#4-layernorm层归一化" aria-label="Link to heading '4. LayerNorm：层归一化'" data-heading-content="4. LayerNorm：层归一化" class="anchor"></a></h2>
+<h3 id="user-content-41-公式">4.1 公式<a href="#41-公式" aria-label="Link to heading '4.1 公式'" data-heading-content="4.1 公式" class="anchor"></a></h3>
+<p>LayerNorm 对<strong>最后一维</strong>（每个样本自己）做归一化，再缩放平移：</p>
+<pre><code class="language-plaintext">y = (x - μ) / √(σ² + ε) · γ + β
+</code></pre>
+<ul>
+<li><code>μ</code>：x 在最后一维上的均值</li>
+<li><code>σ²</code>：x 在最后一维上的方差</li>
+<li><code>ε</code>：一个极小的数（防除零，我们的代码里用 <code>1e-5</code>）</li>
+<li><code>γ</code>（gamma）、<code>β</code>（beta）：<strong>可学习的参数</strong>，初始 γ=1、β=0</li>
+</ul>
+<p>直觉：先把每个样本拉成&quot;均值 0、方差 1&quot;的标准分布（稳定数值范围），再让模型<strong>自己决定</strong>要不要缩放平移回去（恢复表达能力）。</p>
+<h3 id="user-content-42-对应代码逐行拆解">4.2 对应代码逐行拆解<a href="#42-对应代码逐行拆解" aria-label="Link to heading '4.2 对应代码逐行拆解'" data-heading-content="4.2 对应代码逐行拆解" class="anchor"></a></h3>
+<p><code>src/layers.rs</code> 里的结构体定义与构造：</p>
+<pre><code class="language-rust">pub struct LayerNorm {
+    pub gamma: Tensor, // [d] 可学习缩放
+    pub beta: Tensor,  // [d] 可学习平移
+    pub eps: f32,
+}
+
+impl LayerNorm {
+    pub fn new(d: usize, eps: f32) -&gt; Self {
+        LayerNorm {
+            gamma: Tensor::param(vec![1.0; d], vec![d]),
+            beta: Tensor::param(vec![0.0; d], vec![d]),
+            eps,
+        }
+    }
+
+    pub fn forward(&amp;self, x: &amp;Tensor) -&gt; Tensor {
+        // 融合实现（一个算子完成 11 个基础算子的前向+反向），见 Tensor::layernorm
+        x.layernorm(&amp;self.gamma, &amp;self.beta, self.eps)
+    }
+}
+</code></pre>
+<p><code>forward</code> 的实际实现只有一行：调用融合算子 <code>Tensor::layernorm</code>（<code>src/tensor.rs</code>），一次算完归一化的前向与反向。</p>
+<blockquote>
+<p><strong>原理示意（等价的分步展开，非源码）</strong>：融合算子内部做的正是下面这 5 步，展开写只是为了对照公式；当前源码里已经没有这段分步代码了。</p>
+</blockquote>
+<pre><code class="language-rust">let d = x.shape()[x.rank() - 1];
+// 均值 μ：[..., 1]（保持维度，方便广播）
+let mean = x.sum_last_dim().mul_scalar(1.0 / d as f32);
+// 中心化
+let centered = x.sub(&amp;mean);
+// 方差 σ²：中心化后平方再取均值
+let var = centered
+    .mul(&amp;centered)
+    .sum_last_dim()
+    .mul_scalar(1.0 / d as f32);
+// 归一化
+let norm = centered.div(&amp;var.add_scalar(self.eps).sqrt());
+// 缩放平移（γ、β 是 [d]，广播到 [..., d]）
+norm.mul(&amp;self.gamma).add(&amp;self.beta)
+</code></pre>
+<p>公式 ↔ 分步展开对照表（对应融合算子内部的等价实现）：</p>
+<table>
+<thead>
+<tr>
+<th>公式步骤</th>
+<th>Rust 代码</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>μ = mean(x)</code></td>
+<td><code>x.sum_last_dim().mul_scalar(1.0 / d as f32)</code></td>
+<td>第 1 课学的 <code>sum_last_dim</code> 把最后一维求和，结果形状是 <code>[..., 1]</code>（最后一位变成 1，<strong>维度没有消失</strong>），再除以 <code>d</code> 就是均值。保持 <code>[..., 1]</code> 是为了后面能和 <code>[..., d]</code> 直接广播相减</td>
+</tr>
+<tr>
+<td><code>x - μ</code></td>
+<td><code>x.sub(&amp;mean)</code></td>
+<td>中心化：减去均值</td>
+</tr>
+<tr>
+<td><code>σ² = mean((x-μ)²)</code></td>
+<td><code>centered.mul(&amp;centered).sum_last_dim().mul_scalar(1.0 / d as f32)</code></td>
+<td>先逐元素平方，再 <code>sum_last_dim</code> 求和、除以 <code>d</code></td>
+</tr>
+<tr>
+<td><code>√(σ² + ε)</code></td>
+<td><code>var.add_scalar(self.eps).sqrt()</code></td>
+<td>加一个小数防除零，再开方</td>
+</tr>
+<tr>
+<td><code>(x-μ) / √(σ²+ε)</code></td>
+<td><code>centered.div(&amp;...)</code></td>
+<td>归一化</td>
+</tr>
+<tr>
+<td><code>· γ + β</code></td>
+<td><code>norm.mul(&amp;self.gamma).add(&amp;self.beta)</code></td>
+<td>可学习缩放平移；<code>gamma</code>、<code>beta</code> 形状是 <code>[d]</code>，广播到 <code>[..., d]</code></td>
+</tr>
+</tbody>
+</table>
+<p>注意一个细节：均值、方差是用 <code>sum_last_dim</code> 求的，所以归一化是<strong>逐样本、逐序列位置</strong>独立进行的——
+对输入 <code>[B, T, D]</code> 来说，就是沿着最后一维 <code>D</code> 归一把每个 <code>B×T</code> 的&quot;行&quot;。</p>
+<h3 id="user-content-43-layernorm-vs-batchnorm">4.3 LayerNorm vs BatchNorm<a href="#43-layernorm-vs-batchnorm" aria-label="Link to heading '4.3 LayerNorm vs BatchNorm'" data-heading-content="4.3 LayerNorm vs BatchNorm" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>对比项</th>
+<th>LayerNorm（我们用这个）</th>
+<th>BatchNorm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>对哪个维度归一化</td>
+<td>最后一维（每个样本自己）</td>
+<td>特征维（跨 batch 的所有样本）</td>
+</tr>
+<tr>
+<td>依赖 batch 吗</td>
+<td>不依赖，batch size=1 也能用</td>
+<td>依赖，batch 太小会不准</td>
+</tr>
+<tr>
+<td>训练/推理行为</td>
+<td>完全一致，公式不变</td>
+<td>推理时用训练期累积的统计量</td>
+</tr>
+<tr>
+<td>需要&quot;当前 batch&quot;统计量吗</td>
+<td>不需要</td>
+<td>需要（还要额外维护 running mean/var）</td>
+</tr>
+<tr>
+<td>适合场景</td>
+<td>NLP / Transformer（序列长度、batch 多变）</td>
+<td>CV / CNN（固定尺寸图像）</td>
+</tr>
+<tr>
+<td>对 Transformer 的意义</td>
+<td>因果掩码下不同位置长度不同，逐位置归一化天然合适</td>
+<td>长度不一很难处理</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>记忆口诀：<strong>LayerNorm 归一化&quot;每一行&quot;，BatchNorm 归一化&quot;每一列&quot;。</strong>
+Transformer 选 LayerNorm 还有一个重要原因：它不引入&quot;batch 内样本之间的相互依赖&quot;，行为可预测、实现简单（公式就 5 步）。</p>
+</blockquote>
+<h3 id="user-content-44-在模型里用在哪">4.4 在模型里用在哪<a href="#44-在模型里用在哪" aria-label="Link to heading '4.4 在模型里用在哪'" data-heading-content="4.4 在模型里用在哪" class="anchor"></a></h3>
+<p><code>TransformerBlock</code> 里有两个（<code>ln1</code> 在注意力前、<code>ln2</code> 在 MLP 前），模型末尾还有一个 <code>ln_f</code>：</p>
+<pre><code class="language-rust">// TransformerBlock::new（src/model.rs）
+ln1: NormLayer::new(cfg.n_embd, cfg.rms_eps, cfg.use_rmsnorm),
+ln2: NormLayer::new(cfg.n_embd, cfg.rms_eps, cfg.use_rmsnorm),
+// Transformer::new（src/model.rs）
+ln_f: NormLayer::new(n_embd, cfg.rms_eps, cfg.use_rmsnorm),
+</code></pre>
+<p>注意类型是 <code>NormLayer</code> 而不是 <code>LayerNorm</code>：它是&quot;<code>LayerNorm</code> / <code>RMSNorm</code> 二选一&quot;的枚举（<code>src/layers.rs</code>），由配置 <code>cfg.use_rmsnorm</code> 决定用哪一种（默认 <code>true</code> 即 RMSNorm；改回 <code>false</code> 才是本课讲的 LayerNorm，见第 21 课）。三个归一化层都在<strong>层的最前面</strong>（pre-norm 结构，下一课细讲），<code>eps</code> 取自配置 <code>model.rms_eps</code>（默认 <code>LN_EPS = 1e-5</code>，<code>src/model.rs</code>；HF 的 Qwen2 用 <code>1e-6</code>，所以它被开成了字段）。</p>
+<hr />
+<h2 id="user-content-5-残差连接residual-connection">5. 残差连接（Residual Connection）<a href="#5-残差连接residual-connection" aria-label="Link to heading '5. 残差连接（Residual Connection）'" data-heading-content="5. 残差连接（Residual Connection）" class="anchor"></a></h2>
+<h3 id="user-content-51-公式与直觉">5.1 公式与直觉<a href="#51-公式与直觉" aria-label="Link to heading '5.1 公式与直觉'" data-heading-content="5.1 公式与直觉" class="anchor"></a></h3>
+<p>残差连接就是在子层的输出上<strong>加上输入本身</strong>：</p>
+<pre><code class="language-plaintext">y = x + F(x)
+</code></pre>
+<p>其中 <code>F(x)</code> 是任意子层（注意力、MLP……）。直觉上，<code>F(x)</code> 只负责&quot;学一个增量/修正&quot;，而 <code>x</code> 这条&quot;高速公路&quot;原封不动地把信息送到下一层。</p>
+<h3 id="user-content-52-为什么解决梯度消失">5.2 为什么解决梯度消失<a href="#52-为什么解决梯度消失" aria-label="Link to heading '5.2 为什么解决梯度消失'" data-heading-content="5.2 为什么解决梯度消失" class="anchor"></a></h3>
+<p>先回忆反向传播：梯度从 loss 一层层往回传，<strong>每过一层就要乘一次该层的导数</strong>。如果网络有 N 层，梯度大概要被乘 N 次：</p>
+<pre><code class="language-plaintext">∂loss/∂x₀ = ∂loss/∂xₙ · ∂xₙ/∂xₙ₋₁ · ... · ∂x₁/∂x₀
+</code></pre>
+<p>如果每层的导数都小于 1（比如常见激活函数的导数 ≤ 1），乘几十层后梯度指数级衰减，几乎变成 0——<strong>前面的层根本学不到东西</strong>，这就是&quot;梯度消失&quot;。</p>
+<p>有了残差连接，情况完全不同。<code>y = x + F(x)</code> 对 x 求导：</p>
+<pre><code class="language-plaintext">∂y/∂x = 1 + ∂F/∂x
+</code></pre>
+<ul>
+<li>多出来的那个 <code>1</code> 是恒等映射的导数，<strong>永远在</strong>。</li>
+<li>反向传播时梯度传过残差块，至少保留一份&quot;原样拷贝&quot;：</li>
+</ul>
+<pre><code class="language-plaintext">∂loss/∂x = ∂loss/∂y · (1 + ∂F/∂x) = ∂loss/∂y + ∂loss/∂y · ∂F/∂x
+</code></pre>
+<p>不管 <code>F</code> 的导数多小，梯度里始终有一个 <code>∂loss/∂y</code> 直接传回上一层，不会衰减成 0。</p>
+<h3 id="user-content-53-为什么能加深网络">5.3 为什么能加深网络<a href="#53-为什么能加深网络" aria-label="Link to heading '5.3 为什么能加深网络'" data-heading-content="5.3 为什么能加深网络" class="anchor"></a></h3>
+<ul>
+<li>对<strong>梯度</strong>：恒等映射让深层的梯度能&quot;直达&quot;浅层，解决了训练困难。</li>
+<li>对<strong>信息</strong>：每一层都能&quot;无损地&quot;跳过不需要的变换。即使某个子层学不到有用的东西，模型也可以把它当成恒等映射（<code>F(x) ≈ 0</code>），至少不劣化，所以我们可以放心堆很多层。</li>
+</ul>
+<blockquote>
+<p>一句话：<strong>残差连接 = 梯度的高速公路 + 信息的保险丝。</strong></p>
+</blockquote>
+<h3 id="user-content-54-对应代码">5.4 对应代码<a href="#54-对应代码" aria-label="Link to heading '5.4 对应代码'" data-heading-content="5.4 对应代码" class="anchor"></a></h3>
+<p><code>TransformerBlock::forward</code> 里残差连接就两处 <code>add</code>：</p>
+<pre><code class="language-rust">fn forward(
+    &amp;self,
+    x: &amp;Tensor,
+    mask: Option&lt;&amp;Tensor&gt;,
+    kv_cache: Option&lt;&amp;mut KVCache&gt;,
+    base: usize,     // KV cache 推理时的位置偏移（训练 = 0，第 25 课）
+    training: bool,  // 是否训练模式（影响 dropout）
+) -&gt; Tensor {
+    // 注意力子层 + 残差连接
+    let h = self.attn.forward(&amp;self.ln1.forward(x), mask, kv_cache, base);
+    let h = if self.dropout &gt; 0.0 { h.dropout(self.dropout, training) } else { h };
+    let x = x.add(&amp;h);   // ← 残差连接 ①：x + Attention(LN(x))
+    // 前馈子层 + 残差连接
+    let h = self.ln2.forward(&amp;x);
+    let h = self.ffn.forward(&amp;h);   // Ffn：稠密 MLP（GELU 或 SwiGLU）或 MoE
+    let h = if self.dropout &gt; 0.0 { h.dropout(self.dropout, training) } else { h };
+    x.add(&amp;h)            // ← 残差连接 ②：x + MLP(LN(x))
+}
+</code></pre>
+<blockquote>
+<p>前馈子层的字段是 <code>ffn: Ffn</code>（内部再选&quot;稠密 MLP（GELU 或 SwiGLU）&quot;或第 32 课的 MoE），源码里<strong>没有</strong> <code>mlp_linear1</code> / <code>mlp_linear2</code> 这两个字段。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>子层</th>
+<th>公式</th>
+<th>代码</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>注意力块</td>
+<td><code>x + Attention(LayerNorm(x))</code></td>
+<td><code>let x = x.add(&amp;h);</code></td>
+</tr>
+<tr>
+<td>前馈块</td>
+<td><code>x + MLP(LayerNorm(x))</code></td>
+<td><code>x.add(&amp;h)</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-55-和-layernorm-的组合pre-norm">5.5 和 LayerNorm 的组合：pre-norm<a href="#55-和-layernorm-的组合pre-norm" aria-label="Link to heading '5.5 和 LayerNorm 的组合：pre-norm'" data-heading-content="5.5 和 LayerNorm 的组合：pre-norm" class="anchor"></a></h3>
+<p>注意到顺序是 <strong>先 LayerNorm、再子层、最后加残差</strong>（<code>LN → 子层 → +</code>），这叫 <strong>pre-norm</strong>（归一化在子层前）。对比早期 Transformer 的 post-norm（<code>子层 → + → LN</code>）：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>pre-norm（经典风格，我们用这个）</th>
+<th>post-norm（原版 Transformer）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>残差路径上的数据</td>
+<td>直接是&quot;干净&quot;的 x，不做归一化</td>
+<td>每层都过 LN，数值被反复缩放</td>
+</tr>
+<tr>
+<td>梯度传播</td>
+<td>恒等路径无干扰，更稳</td>
+<td>更容易出现训练不稳</td>
+</tr>
+<tr>
+<td>深层堆叠</td>
+<td>更容易训练（现代 LLM深度更大也能训）</td>
+<td>需要 warmup 等技巧</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="user-content-6-三者如何协作">6. 三者如何协作<a href="#6-三者如何协作" aria-label="Link to heading '6. 三者如何协作'" data-heading-content="6. 三者如何协作" class="anchor"></a></h2>
+<p>一个 Transformer Block 里，位置编码负责&quot;把位置信息喂进来&quot;，LayerNorm 负责&quot;稳住数值分布&quot;，残差连接负责&quot;让梯度和信息畅通无阻&quot;：</p>
+<pre><code class="language-plaintext">x (带位置编码的 embedding)
+ │
+ ├─ 残差①： x + Attention( LN1(x) )        ← LN 归一化 → 注意力找相关性 → 加回原 x
+ │
+ └─ 残差②： x + MLP( LN2(x) )              ← LN 归一化 → MLP 加工信息 → 加回原 x
+ │
+ └─ 送到下一层
+</code></pre>
+<hr />
+<h2 id="user-content-7-小结与下一课">7. 小结与下一课<a href="#7-小结与下一课" aria-label="Link to heading '7. 小结与下一课'" data-heading-content="7. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li>
+<p>注意力是<strong>位置盲</strong>的，必须把位置信息加进输入 → 正弦位置编码 <code>PE(pos,2i)=sin(pos/10000^(2i/d))</code></p>
+</li>
+<li>
+<p>正弦编码用不同频率的波形区分位置，是<strong>常数</strong>（不参与训练），实现就一个双重循环</p>
+</li>
+<li>
+<p>LayerNorm 对最后一维做 <code>y=(x-μ)/√(σ²+ε)·γ+β</code>，用 <code>sum_last_dim</code> 求均值方差，γ/β 可学习</p>
+</li>
+<li>
+<p>LayerNorm 与 BatchNorm 的核心区别：<strong>归一行 vs 归一系列</strong>，NLP 用前者</p>
+</li>
+<li>
+<p>残差连接 <code>y = x + F(x)</code> 让梯度里永远保留一份 <code>∂loss/∂y</code>，解决梯度消失、支持深网络</p>
+</li>
+<li>
+<p>pre-norm（LN → 子层 → 残差）是现代 LLM的标准结构</p>
+</li>
+<li>
+<p>（本课的正弦位置编码在第 20 课被 RoPE 取代，见 <a href="20-RoPE%E6%97%8B%E8%BD%AC%E4%BD%8D%E7%BD%AE%E7%BC%96%E7%A0%81.md">20-RoPE旋转位置编码.md</a>；LayerNorm 与残差连接保留至今。）</p>
+</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li><strong>手算 LayerNorm</strong>：对向量 <code>x = [1.0, 2.0, 3.0, 4.0]</code>，手算 μ、σ²、（σ²+ε）开方后的归一化结果（ε=1e-5），再用 <code>src/layers.rs</code> 里的 <code>LayerNorm::new(4, 1e-5)</code>（γ=1、β=0 时）跑一遍对比，应该完全一致。</li>
+<li><strong>改频率基数</strong>：把 <code>sinusoidal_positions</code> 里的 <code>10000</code> 改成 <code>10</code> 或 <code>1000000</code>，想想会怎样？（提示：<code>10</code> 让所有频率都变高、位置区分更&quot;拥挤&quot;；<code>1000000</code> 让波形几乎不动。跑训练对比 loss 曲线。）</li>
+<li><strong>去掉残差</strong>：把 <code>TransformerBlock::forward</code> 里的 <code>x.add(&amp;h)</code> 改成直接 <code>h</code>（两个子层都改），跑训练观察 loss 是否下降明显变慢——亲身感受梯度消失。</li>
+<li><strong>思考</strong>：位置编码为什么是&quot;加&quot;而不是&quot;拼接&quot;（concat）？（提示：加法让每个维度只&quot;混入&quot;一个位置信号，且不改变维度数；拼接会让维度翻倍、参数爆炸。）</li>
+<li><strong>思考</strong>：LayerNorm 里为什么用 <code>sum_last_dim</code> 求均值而不是 <code>sum</code>？如果 <code>sum</code> 把所有元素加一起会怎样？</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="12-%E5%AE%8C%E6%95%B4Transformer%E6%A8%A1%E5%9E%8B.md">第 12 课 完整 Transformer 模型</a> —— 把这些积木全部拼起来，组成完整的 Transformer 模型！</p>
+</blockquote>

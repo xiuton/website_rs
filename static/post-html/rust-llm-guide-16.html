@@ -1,0 +1,571 @@
+<h1 id="user-content-第-16-课训练小-transformer--看-loss-从-130-降到-016">第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16<a href="#第-16-课训练小-transformer--看-loss-从-130-降到-016" aria-label="Link to heading '第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16'" data-heading-content="第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16" class="anchor"></a></h1>
+<blockquote>
+<p>代码位置：<a href="../src/cmd/experiments.rs">src/cmd/experiments.rs</a>（<code>demo_transformer</code>）
+代码位置：<a href="../src/train.rs">src/train.rs</a>（<code>train_transformer</code> / <code>LRScheduler</code> / <code>clip_grad_norm</code>）
+代码位置：<a href="../src/data.rs">src/data.rs</a>（<code>CORPUS</code> / <code>DataLoader</code>）
+代码位置：<a href="../src/sample.rs">src/sample.rs</a>（<code>generate</code> / <code>sample_token</code>）</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li><code>demo_transformer</code> 从数据到生成文本，完整流程分哪几步？</li>
+<li>只有 669 个字符的小语料，训练日志里的 <code>step / lr / loss / tok/s</code> 四列怎么读？</li>
+<li>日志里为什么看不到 warmup 段？lr 从 <code>0.002945</code> 一路衰减到 <code>0.000300</code> 是怎么来的？</li>
+<li>temperature、top-k、top-p 三个参数是怎么配合采样的？</li>
+<li>为什么 loss 已经降到 0.16，模型输出的文本依然只是&quot;像样&quot;而不是&quot;正确&quot;？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-训练全景demo_transformer-做了什么">2. 训练全景：demo_transformer 做了什么<a href="#2-训练全景demo_transformer-做了什么" aria-label="Link to heading '2. 训练全景：demo_transformer 做了什么'" data-heading-content="2. 训练全景：demo_transformer 做了什么" class="anchor"></a></h2>
+<p><code>src/cmd/experiments.rs</code> 的演示 3（第 12-21 课）是本节的主角：</p>
+<pre><code class="language-rust">fn demo_transformer() {
+    println!(&quot;=== 演示 3：训练小 Transformer 并生成文本 ===&quot;);
+
+    let mut rng = Rng::new(1234);
+    let tokenizer = Tokenizer::char(CORPUS);
+    let vocab_size = tokenizer.vocab_size();
+    println!(&quot;  语料 {} 字符，字符词表 {} 个&quot;, CORPUS.len(), vocab_size);
+
+    let model = Transformer::new(TransformerConfig::tiny(vocab_size), &amp;mut rng);
+
+    // 训练（第 13、17-18 课：训练循环 + AdamW + warmup/cosine 调度）
+    let loader = DataLoader::new(CORPUS, &amp;tokenizer, model.cfg.block_size, 8);
+    let tcfg = config::TrainConfig {
+        seed: 42,
+        batch_size: 8,
+        steps: 600,
+        max_lr: 3e-3,
+        warmup_steps: 50,
+        eval_every: 100,
+        log_file: None, // 演示不落盘
+        ..config::TrainConfig::default()
+    };
+    train::train_transformer(&amp;model, &amp;tokenizer, &amp;loader, &amp;tcfg, None, None, &amp;mut rng);
+
+    // 生成 1（无 cache）：全量前向用滑动窗口，可以生成超过 block_size 的长文本
+    // 三次生成共用同一套采样参数（含重复惩罚），否则差异分不清是 cache 还是采样造成的
+    let opts = SampleOpts {
+        top_k: 10,
+        repetition_penalty: 1.1,
+        repetition_window: 64,
+        ..SampleOpts::default()
+    };
+    println!(&quot;\n  —— 生成 1（prompt=Once upon a, 无 KV cache，全量前向）——&quot;);
+    let mut rng_full = Rng::new(2024);
+    let out_full = generate(&amp;model, &amp;tokenizer, &quot;Once upon a&quot;, 80, &amp;opts, KvOpts::off(), &amp;mut rng_full);
+    println!(&quot;  {out_full}&quot;);
+
+    // 生成 2（带 KV cache，第 25 课）：**必须用同一个 prompt 和同一个种子**，否则两次输出
+    // 不同只是采样不同，证明不了 cache 的正确性。
+    // 缓存带滑动窗口（第 25 课第 8 节），生成长度同样不受缓存容量限制，不会提前停。
+    println!(&quot;\n  —— 生成 2（同 prompt、同种子，带 KV cache）——&quot;);
+    let mut rng_kv = Rng::new(2024);
+    let out_kv = generate(&amp;model, &amp;tokenizer, &quot;Once upon a&quot;, 80, &amp;opts, KvOpts::on(0, None), &amp;mut rng_kv);
+    println!(&quot;  {out_kv}&quot;);
+    println!(
+        &quot;\n  KV cache 带滑动窗口，生成长度不再受缓存容量限制：两种模式都生成满 80 个 token —— {}&quot;,
+        if out_kv.chars().count() == out_full.chars().count() {
+            &quot;一致 ✓&quot;
+        } else {
+            &quot;不一致 ✗&quot;
+        }
+    );
+
+    // 窗口内的严格等价自检（第 25 课第 7 节）：prompt + 新 token 不超 `block_size` 时，
+    // 缓存里存的 K/V 与全量重算逐位相同，两条路径必须**逐 token 完全相等**。
+    //
+    // 超出窗口后两条路径本就不等价，也不是 bug：增量推理里每个位置当时能看到自己的完整窗口，
+    // 而&quot;截断重算&quot;会把窗口内各位置在浅层可见的上下文一并砍掉，深层 K/V 随之不同。
+    // 带 KV cache 的推理才是真实 LLM 的标准推断语义，所以这里只在窗口内做严格断言。
+    let prompt_len = tokenizer.encode(&quot;Once upon a&quot;).len();
+    let in_window = model.cfg.block_size.saturating_sub(prompt_len);
+    let mut rng_a = Rng::new(2024);
+    let a = generate(&amp;model, &amp;tokenizer, &quot;Once upon a&quot;, in_window, &amp;opts, KvOpts::off(), &amp;mut rng_a);
+    let mut rng_b = Rng::new(2024);
+    let b = generate(&amp;model, &amp;tokenizer, &quot;Once upon a&quot;, in_window, &amp;opts, KvOpts::on(0, None), &amp;mut rng_b);
+    println!(
+        &quot;\n  窗口内等价自检（prompt {prompt_len} + 新 {in_window} = {} ≤ block_size {}）：\
+         缓存模式与全量模式逐 token {}&quot;,
+        prompt_len + in_window,
+        model.cfg.block_size,
+        if a == b { &quot;完全一致 ✓&quot; } else { &quot;不一致 ✗&quot; }
+    );
+    if a != b {
+        println!(&quot;    全量：{a}\n    缓存：{b}&quot;);
+    }
+
+    // 生成 3：换一个训练语料里没出现过的开头，观察小模型的真实水平（第 16 课第 7 节）。
+    // 用全量前向，这样输出的毛病都归模型自己，不被缓存路径的任何细节搅混。
+    println!(&quot;\n  —— 生成 3（prompt=The fox，换开头看泛化）——&quot;);
+    let mut rng_fox = Rng::new(2024);
+    let out_fox = generate(&amp;model, &amp;tokenizer, &quot;The fox&quot;, 80, &amp;opts, KvOpts::off(), &amp;mut rng_fox);
+    println!(&quot;  {out_fox}&quot;);
+}
+</code></pre>
+<p>整个流程可以拆成 5 步：</p>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>代码</th>
+<th>做了什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. 分词</td>
+<td><code>Tokenizer::char(CORPUS)</code></td>
+<td>扫描语料，得到 38 个 token 的词表（35 个字符 + BOS / EOS / PAD 三个特殊 token）</td>
+</tr>
+<tr>
+<td>2. 建模型</td>
+<td><code>Transformer::new(TransformerConfig::tiny(vocab_size), &amp;mut rng)</code></td>
+<td>用 tiny 配置（n_embd=64、n_head=4、n_layer=2、block_size=32、RMSNorm、SwiGLU）初始化模型</td>
+</tr>
+<tr>
+<td>3. 造数据</td>
+<td><code>DataLoader::new(CORPUS, &amp;tokenizer, model.cfg.block_size, 8)</code></td>
+<td>把 669 字符的语料切成 671 个 token（每篇文档首尾各加 BOS / EOS），按 block_size=32 切块、batch_size=8</td>
+</tr>
+<tr>
+<td>4. 训练</td>
+<td><code>train_transformer(&amp;model, &amp;tokenizer, &amp;loader, &amp;tcfg, None, None, ...)</code></td>
+<td>600 步，峰值学习率 3e-3，前 50 步 warmup，每 100 步打印一次（其余参数取 <code>TrainConfig::default()</code>）</td>
+</tr>
+<tr>
+<td>5. 生成</td>
+<td><code>generate(&amp;model, &amp;tokenizer, &quot;Once upon a&quot;, 80, &amp;opts, KvOpts::off(), &amp;mut rng)</code></td>
+<td>给定开头，最多续写 80 个字符（采样参数打包在 <code>opts: SampleOpts</code> 里，KV cache 开关在 <code>KvOpts</code> 里）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>注意：训练用的是字符级分词器，所以&quot;1 个字符 = 1 个 token&quot;，669 字符的语料编码后是 671 个 token（首尾各有 BOS / EOS）。这让后面的数字（32、80）可以直接按&quot;字符数&quot;理解。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-3-数据669-字符的小语料">3. 数据：669 字符的小语料<a href="#3-数据669-字符的小语料" aria-label="Link to heading '3. 数据：669 字符的小语料'" data-heading-content="3. 数据：669 字符的小语料" class="anchor"></a></h2>
+<p><code>src/data.rs</code> 里内置了一篇英文小故事（狐狸 Red 找金钥匙）：</p>
+<pre><code class="language-rust">pub const CORPUS: &amp;str = &quot;\
+Once upon a time in a small village, there lived a curious little fox named Red. \
+Every morning, Red would wake up early and explore the forest. ...&quot;;
+</code></pre>
+<p>训练数据是<strong>自监督</strong>的：输入 x 是一段 32 个 token 的序列，标签 y 是 x 右移一位——每个位置都预测&quot;下一个字符是谁&quot;，文本自己就是标签，不需要人工标注。</p>
+<p><code>DataLoader::sample_batch</code> 每次随机选 8 个起点，各截 33 个 token（前 32 个作 x，后 32 个作 y）。它本身只有几行，把区间交给 <code>sample_region</code>，切窗口的双循环在 <code>sample_region</code> 里：</p>
+<pre><code class="language-rust">fn sample_batch(&amp;self, rng: &amp;mut Rng) -&gt; (Vec&lt;usize&gt;, Vec&lt;usize&gt;, Option&lt;Vec&lt;bool&gt;&gt;) {
+    let (x, y) = self.sample_region(rng, 0, self.val_start, &quot;训练&quot;); // val_start = tokens.len()（整段都是训练数据）
+    (x, y, None)   // 第三个值是 SFT 的 loss 掩码，预训练不需要
+}
+
+fn sample_region(&amp;self, rng: &amp;mut Rng, lo: usize, hi: usize, tag: &amp;str) -&gt; (Vec&lt;usize&gt;, Vec&lt;usize&gt;) {
+    assert!(hi &gt; lo + self.block_size, &quot;{tag}区数据不足，无法采样&quot;);
+    // 起点上界是 hi - block_size：窗口要取到 tokens[start + block_size]（`y` 右移一位）
+    let max_start = hi - lo - self.block_size;
+    let mut x = Vec::with_capacity(self.batch_size * self.block_size);
+    let mut y = Vec::with_capacity(self.batch_size * self.block_size);
+    for _ in 0..self.batch_size {
+        let start = lo + rng.choice(max_start);
+        for j in 0..self.block_size {
+            x.push(self.tokens[start + j]);
+            y.push(self.tokens[start + j + 1]);
+        }
+    }
+    (x, y)
+}
+</code></pre>
+<p>关键点：</p>
+<ul>
+<li><strong>随机采样而非顺序扫描</strong>：每次 <code>sample_batch</code> 都在语料里随机挑起点。语料只有 671 token，但 600 步 × 8 个 batch 会反复&quot;看到&quot;语料的不同片段（有些片段会被重复看，有的可能一次都没被抽到）——小语料训练天然就是&quot;背课文&quot;。</li>
+<li>返回的 x、y 都是 <code>[B*T] = [8×32] = [256]</code> 的展平数组，正好满足 <code>Transformer::forward(idx, b=8, t=32, kv_cache, training)</code> 的输入要求（训练时 <code>kv_cache</code> 传 <code>None</code>、<code>training</code> 传 <code>true</code>）。</li>
+</ul>
+<hr />
+<h2 id="user-content-4-超参数一览">4. 超参数一览<a href="#4-超参数一览" aria-label="Link to heading '4. 超参数一览'" data-heading-content="4. 超参数一览" class="anchor"></a></h2>
+<p><code>train_transformer</code> 的调用参数与 <code>TransformerConfig::tiny</code> 汇总：</p>
+<table>
+<thead>
+<tr>
+<th>超参数</th>
+<th>值</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>steps</code></td>
+<td>600</td>
+<td>总训练步数</td>
+</tr>
+<tr>
+<td><code>batch_size</code></td>
+<td>8</td>
+<td>每步采样 8 条序列（每条 32 token）</td>
+</tr>
+<tr>
+<td><code>block_size</code></td>
+<td>32</td>
+<td>最大上下文长度，来自 <code>TransformerConfig::tiny</code></td>
+</tr>
+<tr>
+<td><code>max_lr</code></td>
+<td>3e-3</td>
+<td>学习率峰值</td>
+</tr>
+<tr>
+<td><code>warmup_steps</code></td>
+<td>50</td>
+<td>前 50 步学习率从 0 线性爬升到峰值</td>
+</tr>
+<tr>
+<td><code>min_lr</code></td>
+<td>3e-4</td>
+<td>cosine 衰减的终点，作为第 4 个参数传给 <code>LRScheduler::new</code>（demo 用 <code>TrainConfig::default()</code> 的值，恰好是 max_lr × 0.1）</td>
+</tr>
+<tr>
+<td><code>weight_decay</code></td>
+<td>0.01</td>
+<td>AdamW 的权重衰减（第 17 课）</td>
+</tr>
+<tr>
+<td><code>grad_clip</code>（梯度裁剪）</td>
+<td>1.0</td>
+<td>梯度范数上限，取自 <code>TrainConfig::default()</code>（demo 没覆盖）</td>
+</tr>
+<tr>
+<td><code>eval_every</code></td>
+<td>100</td>
+<td>每 100 步打印一次日志</td>
+</tr>
+</tbody>
+</table>
+<p>模型参数量：<code>train_transformer</code> 开头会打印一行&quot;开始训练&quot;（真实数字就在其中）：</p>
+<pre><code class="language-plaintext">开始训练：char（vocab=38）模型参数 135488 | 语料 671 tokens（训练 671 / 验证 0）| batch=8 block=32
+</code></pre>
+<p>按第 12 课的方法验证一下：词表 V=38（35 个字符 + BOS / EOS / PAD，不是 100）时，</p>
+<table>
+<thead>
+<tr>
+<th>组成</th>
+<th>计算</th>
+<th>参数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tok_emb</code></td>
+<td>38 × 64</td>
+<td>2432</td>
+</tr>
+<tr>
+<td>每层 Block</td>
+<td>ln1 64（RMSNorm 只有 γ）+ attn 16640（c_q/c_k/c_v/c_proj 各 64×64+64）+ ln2 64 + SwiGLU FFN 49728（w_gate/w_up 各 64×256+256、w_down 256×64+64）</td>
+<td>66496</td>
+</tr>
+<tr>
+<td><code>ln_f</code></td>
+<td>64</td>
+<td>64</td>
+</tr>
+<tr>
+<td>输出头</td>
+<td>权重绑定（复用 <code>tok_emb</code> 转置，无独立 lm_head 参数）</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>总计 <strong>2432 + 2×66496 + 64 = 135488</strong> ✓（<code>n_kv_head=0</code> 走标准 MHA，Q/K/V 同宽；SwiGLU 的隐藏维 <code>swiglu_hidden(64) = 256</code>）。约 13.5 万参数，CPU 上几十秒就能跑完整个 demo。</p>
+<hr />
+<h2 id="user-content-5-真实训练日志解读">5. 真实训练日志解读<a href="#5-真实训练日志解读" aria-label="Link to heading '5. 真实训练日志解读'" data-heading-content="5. 真实训练日志解读" class="anchor"></a></h2>
+<p>运行 <code>cargo run --release -- demo</code>，演示 3 会打印（这是<strong>真实运行输出</strong>，不是编的）：</p>
+<pre><code class="language-plaintext">=== 演示 3：训练小 Transformer 并生成文本 ===
+  语料 669 字符，字符词表 38 个
+开始训练：char（vocab=38）模型参数 135488 | 语料 671 tokens（训练 671 / 验证 0）| batch=8 block=32
+[info] AMP 已启用：初始 scale = 2^16 = 65536，每 2000 次无溢出翻倍，溢出则跳过本步并把 scale 减半（梯度裁剪前会反缩放回真实尺度）
+step   100 | lr 0.002945 | loss 1.3001 | 1564 tok/s
+step   200 | lr 0.002534 | loss 0.3962 | 1747 tok/s
+step   300 | lr 0.001842 | loss 0.2236 | 1973 tok/s
+step   400 | lr 0.001089 | loss 0.2401 | 2175 tok/s
+step   500 | lr 0.000514 | loss 0.1552 | 2353 tok/s
+step   600 | lr 0.000300 | loss 0.1586 | 2459 tok/s
+</code></pre>
+<blockquote>
+<p>日志按 5 秒节流还会插入 <code>[train] step 53/600 | loss … | grad … | lr … | … st/s | … tok/s | …</code> 形式的进度行，
+上面只摘了每 100 步的评估行。<code>loss</code> 与 <code>lr</code> 因为固定种子（<code>seed = 42</code>）可复现，<code>tok/s</code> 随机器而变。
+那个 <code>[info] AMP 已启用</code> 来自 <code>TrainConfig::default()</code> 的 <code>amp = true</code>（第 26 课）：loss 先乘动态 <code>scale</code> 再反向，
+更新前检查溢出并反缩放。<code>scale</code> 恒为 2 的幂，f32 下乘除是精确的指数移位，所以开不开 AMP 的 loss 逐位相同。</p>
+</blockquote>
+<h3 id="user-content-51-四列日志分别是什么">5.1 四列日志分别是什么<a href="#51-四列日志分别是什么" aria-label="Link to heading '5.1 四列日志分别是什么'" data-heading-content="5.1 四列日志分别是什么" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>列</th>
+<th>含义</th>
+<th>从哪来</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>step</code></td>
+<td>训练步数（从 1 开始数，日志显示 100、200、…、600）</td>
+<td><code>train_transformer</code> 打印的是 <code>step + 1</code></td>
+</tr>
+<tr>
+<td><code>lr</code></td>
+<td>打印时刻 <code>scheduler</code> 里的学习率</td>
+<td><code>scheduler.lr()</code>，且是在本步 <code>scheduler.step()</code> <strong>之后</strong>读取的（<code>src/train.rs</code> 的进度行与评估行都在更新后打印）——即&quot;下一步要用&quot;的 lr，不是本步已用的 <code>cur_lr</code></td>
+</tr>
+<tr>
+<td><code>loss</code></td>
+<td>本步 batch 的平均交叉熵</td>
+<td><code>forward_loss(&amp;model, &amp;x, &amp;y, b, t, accum_window(step, accum, cfg.steps))</code>（内部调用 <code>cross_entropy_loss</code>，返回的是未缩放的原始 loss）</td>
+</tr>
+<tr>
+<td><code>tok/s</code></td>
+<td>训练吞吐：已处理 token 数 ÷ 已耗时</td>
+<td><code>tps = steps_done × batch_size × block_size / elapsed</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>demo 没有验证集，所以日志里没有 <code>val</code> / <code>ppl</code> 两列；有验证集时 <code>train_transformer</code> 还会打印 <code>val {:.4} (ppl {:.1})</code>。</p>
+</blockquote>
+<p><code>train_transformer</code> 的循环分两档：<strong>每步</strong>做「采样 → 前向+损失 → 反向」；「裁剪 → 更新 → 清零 → 调度器前进」只在<strong>每个累积窗口结束时</strong>执行一次（<code>accum_steps = 1</code> 时才是每步一次，demo 就是这种默认情况）。日志打印也在累积窗口结束时，另有每 <code>eval_every</code> 步的评估：</p>
+<pre><code class="language-rust">for step in start_step..cfg.steps {
+    let (x, y) = loader.sample_batch(rng);                  // 1. 采样 batch（每步）
+    let loss = forward_loss(&amp;model, &amp;x, &amp;y, b, t,
+                            accum_window(step, accum, cfg.steps)); // 2. 前向 + 交叉熵（每步）
+    loss.backward();                                        // 3. 反向（每步，梯度累加到现有梯度上）
+
+    // 4~6 只在累积窗口结束时执行；最后一步即使不满 accum 也强制收尾
+    if (step + 1) % accum == 0 || step + 1 == cfg.steps {
+        clip_grad_norm(&amp;params, cfg.grad_clip);             // 4. 梯度裁剪
+        let cur_lr = scheduler.lr();                        // 5. 取当前步 lr 喂给优化器
+        opt.lr = cur_lr;
+        opt.step();                                         //    更新参数
+        opt.zero_grad();                                    // 6. 清零梯度
+        scheduler.step();                                   //    调度器前进（只在真正更新后递增）
+        // 进度日志（实际实现每 5 秒最多打印一次，格式见上文日志；这里是精简写法）
+        // 打印的是 scheduler.step() **之后**的 lr，即&quot;下一步要用&quot;的值；step 打印 step + 1
+        println!(&quot;step {:&gt;5} | lr {:.6} | loss {:.4} | {:.0} tok/s&quot;, step + 1, scheduler.lr(), loss.item(), tps);
+    }
+
+    // 每 eval_every 步（或最后一步）：评估 + 存 checkpoint
+    if (step + 1) % cfg.eval_every == 0 || step + 1 == cfg.steps { /* ... */ }
+}
+</code></pre>
+<h3 id="user-content-52-loss130--016-说明了什么">5.2 loss：1.30 → 0.16 说明了什么<a href="#52-loss130--016-说明了什么" aria-label="Link to heading '5.2 loss：1.30 → 0.16 说明了什么'" data-heading-content="5.2 loss：1.30 → 0.16 说明了什么" class="anchor"></a></h3>
+<ul>
+<li><strong>第一个打印点 1.30</strong>：日志只在 <code>step 100、200、…</code> 打印（<code>eval_every = 100</code>）。随机初始化时模型对 38 个 token 基本&quot;一视同仁&quot;，理论下界是均匀分布的交叉熵 <code>ln(38) ≈ 3.64</code>；训练 100 步后降到 1.30，说明已经开始学习。</li>
+<li><strong>先快后慢</strong>：step 100→300 loss 从 1.30 掉到 0.22（降了约 83%），step 300→600 只在 0.16～0.24 之间小幅摆动。这是训练曲线的典型形态——早期梯度大、方向明确，后期接近收敛、只能精雕细琢。</li>
+<li><strong>相邻打印点会上下跳</strong>：评估 loss 是<strong>单个 batch</strong> 的平均（不是整份语料），所以 step 400 的 0.2401 比 step 300 的 0.2236 略高是正常的统计波动，不代表模型变差。</li>
+<li><strong>终点 0.16</strong>：交叉熵 0.16 意味着模型给&quot;正确下一个字符&quot;的平均概率约为 <code>exp(-0.16) ≈ 0.85</code>。对一篇 669 字符的&quot;课文&quot;来说，模型已经相当好地&quot;背&quot;下了其中的统计规律。</li>
+</ul>
+<h3 id="user-content-53-warmup-阶段为什么日志里看不到">5.3 warmup 阶段：为什么日志里看不到<a href="#53-warmup-阶段为什么日志里看不到" aria-label="Link to heading '5.3 warmup 阶段：为什么日志里看不到'" data-heading-content="5.3 warmup 阶段：为什么日志里看不到" class="anchor"></a></h3>
+<p><code>LRScheduler</code> 的规则（<code>src/train.rs</code>）：</p>
+<pre><code class="language-rust">pub fn lr(&amp;self) -&gt; f32 {
+    if self.step &lt; self.warmup_steps {
+        // 线性 warmup
+        self.max_lr * (self.step as f32 + 1.0) / self.warmup_steps.max(1) as f32
+    } else {
+        // cosine 衰减
+        let progress = (self.step - self.warmup_steps) as f32
+            / (self.total_steps - self.warmup_steps).max(1) as f32;
+        let progress = progress.min(1.0);
+        let cosine = 0.5 * (1.0 + (std::f32::consts::PI * progress).cos());
+        self.min_lr + (self.max_lr - self.min_lr) * cosine
+    }
+}
+</code></pre>
+<p>warmup 就是前 50 步让学习率<strong>线性爬升</strong>：</p>
+<pre><code class="language-plaintext">lr(step) = max_lr × (step + 1) / warmup_steps     （step &lt; 50 时）
+</code></pre>
+<p>代入 <code>max_lr = 0.003</code>、<code>warmup_steps = 50</code>：</p>
+<table>
+<thead>
+<tr>
+<th>scheduler.step（= 日志里的 step）</th>
+<th>计算</th>
+<th>lr</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0（真正用于第 1 步更新）</td>
+<td>0.003 × 1 / 50</td>
+<td>0.00006</td>
+</tr>
+<tr>
+<td>1</td>
+<td>0.003 × 2 / 50</td>
+<td>0.00012</td>
+</tr>
+<tr>
+<td>25</td>
+<td>0.003 × 26 / 50</td>
+<td>0.00156</td>
+</tr>
+<tr>
+<td>49</td>
+<td>0.003 × 50 / 50</td>
+<td>0.003（warmup 段峰值）</td>
+</tr>
+<tr>
+<td>50（<code>step &lt; warmup_steps</code> 不再成立，切到 cosine 分支）</td>
+<td>progress = 0 → cosine = 1</td>
+<td>0.003</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>注意：demo 的 <code>eval_every = 100</code>，warmup 段（step 0-49）<strong>没有打印点</strong>，所以真实日志里看不到 0.00006 起步的爬升。
+把 <code>eval_every</code> 改成 10，就能看到 step 10/20/30/40 的 lr = <code>0.00066 → 0.00126 → 0.00186 → 0.00246</code>
+（每步增加 <code>0.003/50 = 0.00006</code>，10 步就是 0.0006）。</p>
+<p>为什么要 warmup？训练刚开始时参数是随机值，梯度方向噪声大、量级不可控。如果一上来就用 0.003 的大步长，很容易把参数&quot;推飞&quot;（loss 直接变成 NaN）。先用小步长稳住方向，再逐渐加力，是现代 LLM 训练的标准做法。</p>
+</blockquote>
+<h3 id="user-content-54-cosine-衰减从峰值平滑降回-min_lr">5.4 cosine 衰减：从峰值平滑降回 min_lr<a href="#54-cosine-衰减从峰值平滑降回-min_lr" aria-label="Link to heading '5.4 cosine 衰减：从峰值平滑降回 min_lr'" data-heading-content="5.4 cosine 衰减：从峰值平滑降回 min_lr" class="anchor"></a></h3>
+<p>第 50 步之后走 cosine 曲线，从 <code>max_lr = 0.003</code> 平滑降到 <code>min_lr = 0.0003</code>（<code>config::TrainConfig::default()</code>
+里恰好等于 <code>max_lr × 0.1</code>，但 <code>train_transformer</code> 并不做这个换算，直接用 <code>cfg.min_lr</code>）：</p>
+<pre><code class="language-plaintext">lr = min_lr + (max_lr - min_lr) × 0.5 × (1 + cos(π × progress))
+progress = (step - 50) / (600 - 50)，超过 1 就截断到 1
+</code></pre>
+<p>验证日志里的两个数字（日志里的 <code>lr</code> 读的是 <code>scheduler.step()</code> <strong>之后</strong>的值，所以 <code>scheduler</code> 计数就等于日志的 step 号）：</p>
+<ul>
+<li><code>step 100</code>：scheduler 计数 = 100，<code>progress = (100-50)/550 ≈ 0.0909</code>，<code>cosine ≈ 0.9595</code>，<code>lr = 0.0003 + 0.0027×0.9595 ≈ 0.002945</code> ✓</li>
+<li><code>step 600</code>：scheduler 计数 = 600，<code>progress = (600-50)/550 = 1</code>，<code>cosine = 0</code>，<code>lr = min_lr = 0.000300</code> ✓</li>
+</ul>
+<p>学习率全程曲线：</p>
+<pre><code class="language-plaintext">lr
+│
+0.003 ┤        ╭╮
+      │       ╭╯ ╰╮
+0.002 ┤      ╭╯    ╰╮
+      │     ╭╯      ╰╮
+0.001 ┤    ╭╯        ╰╮
+      │   ╭╯          ╰╮
+0.0003┤──╯             ╰────── (min_lr)
+      └──┬────┬────┬────┬────→ step
+         0   100  200  300  400  500  600
+         └warmup(50步)┘└─── cosine 衰减 ───┘
+</code></pre>
+<p>后期的&quot;小步慢走&quot;是为了在 loss 接近收敛时不震荡、精细地落到更优的参数点。</p>
+<hr />
+<h2 id="user-content-6-生成文本与采样参数">6. 生成文本与采样参数<a href="#6-生成文本与采样参数" aria-label="Link to heading '6. 生成文本与采样参数'" data-heading-content="6. 生成文本与采样参数" class="anchor"></a></h2>
+<p>训练 600 步后调用 <code>generate</code>（<code>src/sample.rs</code>），采样参数打包成 <code>SampleOpts { temperature: 0.8, top_k: 10, top_p: 0.9, repetition_penalty: 1.1, repetition_window: 64 }</code>（demo 里显式覆盖 <code>top_k</code>、<code>repetition_penalty</code>、<code>repetition_window</code>，其余取默认值；三次生成共用同一套参数，差异才只能归因于缓存）。</p>
+<p><code>sample_token</code> 内部的 7 步采样管线：</p>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>代码</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. 重复惩罚</td>
+<td>最近出现过的 token：正 logit 除以系数、负 logit 乘以系数</td>
+<td>压低刚说过的字，防止卡在&quot;太太太太……&quot;</td>
+</tr>
+<tr>
+<td>2. 温度缩放</td>
+<td><code>*l *= 1.0 / opts.temperature.max(1e-5)</code></td>
+<td>除以 0.8：logits 变大 → softmax 更&quot;锐利&quot;，更敢选高概率 token</td>
+</tr>
+<tr>
+<td>3. 排序</td>
+<td><code>items.sort_by(...)</code></td>
+<td>按分数从高到低排</td>
+</tr>
+<tr>
+<td>4. top-k</td>
+<td><code>items.truncate(opts.top_k)</code></td>
+<td>只留前 10 个</td>
+</tr>
+<tr>
+<td>5. softmax</td>
+<td><code>(*v - max).exp()</code> 再归一化</td>
+<td>把截断后的分数变成概率</td>
+</tr>
+<tr>
+<td>6. top-p</td>
+<td>累积概率到 0.9 截断</td>
+<td>进一步砍掉长尾低概率 token，再归一化</td>
+</tr>
+<tr>
+<td>7. 抽样</td>
+<td><code>rng.next_f32()</code> 按概率累积选取</td>
+<td>有随机性地选一个 token</td>
+</tr>
+</tbody>
+</table>
+<p>真实生成结果（<code>cargo run --release -- demo</code> 原样输出）：</p>
+<pre><code class="language-plaintext">  —— 生成 1（prompt=Once upon a, 无 KV cache，全量前向）——
+  Once upon a time in a small village, there lived a curious litth., F was, Rere w.ni F re He
+
+  —— 生成 2（同 prompt、同种子，带 KV cache）——
+  Once upon a time in a small village, there lived a curious litt. Fradtlereom Red Redexcopat
+
+  KV cache 带滑动窗口，生成长度不再受缓存容量限制：两种模式都生成满 80 个 token —— 一致 ✓
+
+  窗口内等价自检（prompt 11 + 新 21 = 32 ≤ block_size 32）：缓存模式与全量模式逐 token 完全一致 ✓
+
+  —— 生成 3（prompt=The fox，换开头看泛化）——
+  The fox st. He loved to watch the birds fly and the rivers flow. OneWhe He,re diseriy f
+</code></pre>
+<p>读这段输出：</p>
+<ul>
+<li><strong>生成 1 vs 生成 2 是严格对照</strong>：同一个 prompt、同一个种子（<code>Rng::new(2024)</code>），只切换 <code>KvOpts::off()</code> 与 <code>KvOpts::on(0, None)</code>。两段都是 80 个 token 长——早期实现里 <code>generate</code> 一旦把缓存填满 <code>block_size</code> 就 <code>break</code>，加不加 cache 会得到<strong>长度不同</strong>的输出；现在缓存自带滑动窗口（第 25 课第 8 节），生成长度只由 <code>max_new</code> 决定，与缓存容量无关。两段开头一大段逐字符相同，之后才分叉：出窗以后&quot;增量推理&quot;与&quot;截断重算&quot;本来就不是同一个函数（第 25 课第 8 节有证明与反例），这不是 bug。</li>
+<li><strong>窗口内等价自检才是严格证据</strong>：把 <code>max_new</code> 压到 <code>block_size - prompt</code>（11 + 21 = 32），两种模式必须<strong>逐 token 完全相等</strong>——缓存里存的就是同一批 K/V，注意力与采样路径一个数都没变，所以分布必然相同。超过窗口后只断言&quot;长度一致&quot;，因为那时两条路径的语义已经不同。</li>
+<li><strong>生成 3 才暴露真实水平</strong>：换一个语料里没出现过的开头，&quot;The fox st. He loved to watch...&quot; 语法不通、词都拼不成（生成 3 也走全量前向，不涉及缓存，所以这些毛病全是模型自己的）。</li>
+</ul>
+<hr />
+<h2 id="user-content-7-为什么小模型输出只是像样而非正确">7. 为什么小模型输出只是&quot;像样&quot;而非&quot;正确&quot;<a href="#7-为什么小模型输出只是像样而非正确" aria-label="Link to heading '7. 为什么小模型输出只是&quot;像样&quot;而非&quot;正确&quot;'" data-heading-content="7. 为什么小模型输出只是&quot;像样&quot;而非&quot;正确&quot;" class="anchor"></a></h2>
+<p>四个层面叠加，缺一不可：</p>
+<table>
+<thead>
+<tr>
+<th>原因</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>语料太小</strong></td>
+<td>只有 669 字符、单一故事。模型只能&quot;背&quot;这篇课文里的统计规律，从未见过通用英语，谈不上泛化</td>
+</tr>
+<tr>
+<td><strong>模型太小</strong></td>
+<td>13.5 万参数 vs 真实 LLM 的数十亿～万亿参数。容量只够记住局部 n-gram 统计（&quot;Red&quot; 后常跟动词、名词前常有 the），装不下真正的语法规则</td>
+</tr>
+<tr>
+<td><strong>训练不足</strong></td>
+<td>600 步后 loss 仍为 0.16（正确概率约 85%），还没收敛到 0。模型对很多位置仍&quot;没把握&quot;</td>
+</tr>
+<tr>
+<td><strong>采样带随机性</strong></td>
+<td>temperature=0.8 + top-k/top-p 是有意引入随机性。即使模型 100% 会预测 &quot;world&quot;，采样也可能选到 &quot;wold&quot;——这是&quot;创造性&quot;的代价</td>
+</tr>
+</tbody>
+</table>
+<p>用一句话总结：<strong>&quot;像样&quot;来自学到了语料的高频统计规律；&quot;不正确&quot;来自语料/模型/训练都不足以学到完整语法，再加上采样本身的随机性。</strong> 想要更&quot;正确&quot;，方向是加大语料、加大模型、多训几步（后面第 19、20、21 课还会继续优化），但永远不可能在 669 字符上学出真正的英语——这也侧面说明了为什么现代 LLM 需要 TB 级数据和千亿参数。</p>
+<hr />
+<h2 id="user-content-8-小结与下一课">8. 小结与下一课<a href="#8-小结与下一课" aria-label="Link to heading '8. 小结与下一课'" data-heading-content="8. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li><code>demo_transformer</code> 五步走：分词 → 建模型 → 造数据 → <code>train_transformer</code> 训练 600 步 → <code>generate</code> 采样生成</li>
+<li>数据是自监督的：x 是 32 个 token，y 是 x 右移一位，预测&quot;下一个字符&quot;</li>
+<li>真实日志：loss <code>1.30 → 0.16</code>，前 300 步降得最快（后期在 0.16～0.24 之间摆动，因为评估 loss 只取单个 batch）；lr 从 <code>0.002945</code> 一路 cosine 衰减到 <code>0.000300</code>（warmup 段因 <code>eval_every=100</code> 没有打印点）</li>
+<li>生成用 <code>temperature=0.8 + top-k=10 + top-p=0.9 + 重复惩罚 1.1</code>：先缩放、再截断、再按概率随机抽样</li>
+<li>小模型输出&quot;像样而非正确&quot;：语料太小、模型太小、训练不足、采样随机，四者叠加</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li><strong>改种子观察差异</strong>：把 <code>demo_transformer</code> 里 <code>Rng::new(1234)</code> 改成别的数字（如 42），重新 <code>cargo run --release -- demo</code>。loss 曲线和生成文本都会变——思考：为什么损失曲线也会变？（提示：采样 batch 的随机起点变了）</li>
+<li><strong>改 warmup</strong>：把 <code>train_transformer</code> 的 <code>warmup_steps</code> 从 50 改成 5 和 500，分别跑一次，对比前 100 步的 loss。体会&quot;warmup 太短容易起飞、太长浪费步数&quot;。</li>
+<li><strong>改生成参数</strong>：把 <code>generate</code> 的 <code>temperature</code> 改成 0.2 和 1.5 各跑一次。观察文本变得更&quot;死板/重复&quot;还是更&quot;发散/乱&quot;。</li>
+<li><strong>数 token</strong>：验证第 5.3 节末尾的 cosine 验算——打印 <code>scheduler.lr()</code> 在 step 100、600 的计算过程，对照日志里的 <code>0.002945</code> 和 <code>0.000300</code>。</li>
+<li><strong>思考</strong>：loss 从 1.30 降到 0.16，但为什么不能说&quot;模型学会了英语&quot;？模型&quot;学会&quot;的到底是什么？</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="17-AdamW%E4%BC%98%E5%8C%96%E5%99%A8.md">第 17 课 AdamW 优化器</a> —— 换掉朴素的 SGD，给优化器装上&quot;动量 + 自适应步长 + 权重衰减&quot;——AdamW。</p>
+</blockquote>

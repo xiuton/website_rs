@@ -1,0 +1,330 @@
+<h1 id="user-content-第-10-课多头注意力--让模型多角度看世界">第 10 课：多头注意力 —— 让模型&quot;多角度&quot;看世界<a href="#第-10-课多头注意力--让模型多角度看世界" aria-label="Link to heading '第 10 课：多头注意力 —— 让模型&quot;多角度&quot;看世界'" data-heading-content="第 10 课：多头注意力 —— 让模型&quot;多角度&quot;看世界" class="anchor"></a></h1>
+<blockquote>
+<p>代码位置：<a href="../src/attention.rs">src/attention.rs</a>（<code>MultiHeadAttention</code> 结构 + <code>forward</code>）
+底层算子：<a href="../src/tensor.rs">src/tensor.rs</a>（<code>reshape</code> / <code>permute</code> / <code>flash_attention</code>）
+RoPE 算子：<a href="../src/rope.rs">src/rope.rs</a>（<code>rotary_pair</code>）</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>为什么&quot;一个头&quot;不够？多个头到底多学到了什么？</li>
+<li>拆头为什么是 reshape → permute → reshape 三步，不能一步到位？</li>
+<li>合并头之后为什么还要一个输出投影 <code>c_proj</code>？</li>
+<li><code>MultiHeadAttention::forward</code> 的 8 步，每一步形状怎么变？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-动机一个头只能学一种相关性">2. 动机：一个头只能学一种&quot;相关性&quot;<a href="#2-动机一个头只能学一种相关性" aria-label="Link to heading '2. 动机：一个头只能学一种&quot;相关性&quot;'" data-heading-content="2. 动机：一个头只能学一种&quot;相关性&quot;" class="anchor"></a></h2>
+<p>第 9 课的注意力，一个查询位置对所有键算一组权重——它只能表达<strong>一种</strong>&quot;谁和谁相关&quot;的模式。</p>
+<p>但文本里的相关性是<strong>多种多样</strong>的：</p>
+<ul>
+<li>相邻词之间的语法依存（&quot;红 的 苹果&quot;）</li>
+<li>指代关系（&quot;它&quot; 指谁？）</li>
+<li>全局语义（某个主题词反复出现）</li>
+</ul>
+<p>一个头顾不过来。<strong>多头</strong>的思路：把 D 维空间切成 H 份，每份独立算注意力，让不同头学到不同模式，最后再合并。</p>
+<table>
+<thead>
+<tr>
+<th>头</th>
+<th>可能学到的模式（示意，非真实数据）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>头 0</td>
+<td>紧邻的前一个 token（位置关系）</td>
+</tr>
+<tr>
+<td>头 1</td>
+<td>句法角色（主语-动词-宾语）</td>
+</tr>
+<tr>
+<td>头 2</td>
+<td>指代消解（代词 ↔ 名词）</td>
+</tr>
+<tr>
+<td>头 3</td>
+<td>全局主题词</td>
+</tr>
+</tbody>
+</table>
+<p>数学形式：</p>
+<pre><code class="language-plaintext">MultiHead(Q, K, V) = Concat(head_1, ..., head_H) · W_O
+head_i = Attention(Q·W_i^Q, K·W_i^K, V·W_i^V)
+</code></pre>
+<hr />
+<h2 id="user-content-3-结构一览">3. 结构一览<a href="#3-结构一览" aria-label="Link to heading '3. 结构一览'" data-heading-content="3. 结构一览" class="anchor"></a></h2>
+<pre><code class="language-rust">pub struct MultiHeadAttention {
+    pub c_q: Linear,      // [D, D]
+    pub c_k: Linear,      // [D, kv_dim]，kv_dim = n_kv_head * head_dim
+    pub c_v: Linear,      // [D, kv_dim]
+    pub c_proj: Linear,   // [D, D] 输出投影
+    pub n_head: usize,
+    pub n_kv_head: usize, // GQA：K/V 的头数（= n_head 时就是标准 MHA）
+    n_rep: usize,         // n_head / n_kv_head（私有字段）
+}
+</code></pre>
+<p>数据流：</p>
+<pre><code class="language-plaintext">x → c_q / c_k / c_v 投影 → 拆头 → 每头各自算注意力 → 合并 → c_proj → 输出
+</code></pre>
+<p><code>n_head</code> 来自配置 <code>TransformerConfig::tiny</code>：n_embd = 64，n_head = 4 → <strong>head_dim = 64 / 4 = 16</strong>。
+（<code>head_dim</code> 也可以显式写在配置里：<code>model.head_dim</code>，此时必须满足 <code>n_head × head_dim == n_embd</code>，
+构造时就会断言；<code>0</code> = 按 <code>n_embd / n_head</code> 推，是历史默认行为。）</p>
+<hr />
+<h2 id="user-content-4-拆头reshape--permute--reshape">4. 拆头：reshape + permute + reshape<a href="#4-拆头reshape--permute--reshape" aria-label="Link to heading '4. 拆头：reshape + permute + reshape'" data-heading-content="4. 拆头：reshape + permute + reshape" class="anchor"></a></h2>
+<pre><code class="language-rust">// 3. 拆头：[B, T, D] -&gt; [B*H, T, head_dim]
+//    （先 reshape 出 H 维，再 permute 把 H 提到第 2 维）
+let q = q
+    .reshape(vec![b, t, self.n_head, head_dim])   // [B,T,D] -&gt; [B,T,H,head_dim]
+    .permute(&amp;[0, 2, 1, 3])                       // -&gt; [B,H,T,head_dim]
+    .reshape(vec![b * self.n_head, t, head_dim]); // -&gt; [B*H,T,head_dim]
+</code></pre>
+<h3 id="user-content-41-为什么不能直接-reshape-成-bh-t-head_dim">4.1 为什么不能直接 reshape 成 [B*H, T, head_dim]？<a href="#41-为什么不能直接-reshape-成-bh-t-head_dim" aria-label="Link to heading '4.1 为什么不能直接 reshape 成 [B*H, T, head_dim]？'" data-heading-content="4.1 为什么不能直接 reshape 成 [B*H, T, head_dim]？" class="anchor"></a></h3>
+<p>关键在<strong>内存布局</strong>。以 D=8、H=2、head_dim=4、单个 token 为例，x 最后一维的数据排列是：</p>
+<pre><code class="language-plaintext">[ 头0的4维 | 头1的4维 ]     ← 头 0 在前、头 1 在后（行优先存储）
+</code></pre>
+<ul>
+<li><code>reshape([B, T, H, head_dim])</code>：只是重新解释数据，<strong>头 0 / 头 1 依然按块排列</strong> ✓</li>
+<li>但如果<strong>跳过 permute 直接 reshape 成 [B*H, T, head_dim]</strong>，B 维会按 <code>b0-t0-h0, b0-t0-h1, b0-t1-h0, ...</code> 的顺序切片——同一个 token 的多个头被混进 T 维，完全错乱 ✗</li>
+</ul>
+<p>所以必须先 <code>permute(&amp;[0, 2, 1, 3])</code> 把&quot;头&quot;维提到第 2 维（H 排在 T 前面），让<strong>每个 (b, h) 的数据在内存里连成一块</strong>，再 reshape 成 [B*H, T, head_dim]，才能保证每个&quot;批&quot;恰好是一个头。</p>
+<blockquote>
+<p>实现细节（strides 视图版）：<code>permute</code> 是零拷贝视图（只换 strides，不搬数据），紧随其后的 <code>reshape</code> 检测到非连续输入才把它 <code>contiguous()</code> 物化——物化按视图的逻辑顺序写入，落盘内存恰好就是&quot;每个 (b, h) 连成一块&quot;的布局。总共只拷贝一次，且位置发生在维度解释确定之后；三步合起来的效果 = &quot;把 (b, h) 提成独立的批&quot;。
+这正是第 1 课讲的行优先存储的实战应用。</p>
+</blockquote>
+<h3 id="user-content-42-kv-的拆头">4.2 K、V 的拆头<a href="#42-kv-的拆头" aria-label="Link to heading '4.2 K、V 的拆头'" data-heading-content="4.2 K、V 的拆头" class="anchor"></a></h3>
+<p>K、V 的拆法与 Q 完全一样，但头数用的是 <code>self.n_kv_head</code>（GQA 时 K/V 的头数少于 Q，<code>c_k</code> / <code>c_v</code> 的输出维度就是 <code>n_kv_head * head_dim</code>）。注意这里的 T 变成了 <code>t_total</code>——带 KV cache 时更长（第 25 课讲解）：</p>
+<pre><code class="language-rust">let k = k
+    .reshape(vec![b, t_total, self.n_kv_head, head_dim])
+    .permute(&amp;[0, 2, 1, 3])
+    .reshape(vec![b * self.n_kv_head, t_total, head_dim]);
+// v 同理
+</code></pre>
+<h3 id="user-content-43-为什么先整体投影再拆头是等价的">4.3 为什么&quot;先整体投影再拆头&quot;是等价的？<a href="#43-为什么先整体投影再拆头是等价的" aria-label="Link to heading '4.3 为什么&quot;先整体投影再拆头&quot;是等价的？'" data-heading-content="4.3 为什么&quot;先整体投影再拆头&quot;是等价的？" class="anchor"></a></h3>
+<p><code>c_q</code> 是 [D, D] 线性层。对头 h 来说，它取输出的第 h 块（head_dim 维），这正好是输入 x 经过 W_Q <strong>第 h 块列</strong>的作用——数学上<strong>等价于每个头一个独立的投影 W_h^Q</strong>（经典实现也是这个思路，只是把投影合并写在一起）。</p>
+<hr />
+<h2 id="user-content-5-并行注意力一个批量-matmul-算完所有头">5. 并行注意力：一个批量 matmul 算完所有头<a href="#5-并行注意力一个批量-matmul-算完所有头" aria-label="Link to heading '5. 并行注意力：一个批量 matmul 算完所有头'" data-heading-content="5. 并行注意力：一个批量 matmul 算完所有头" class="anchor"></a></h2>
+<p>GQA 时 K/V 的头数比 Q 少（<code>n_rep = n_head / n_kv_head</code>），早期实现会先用 <code>repeat_kv</code> 把每个 KV 头复制 <code>n_rep</code> 次、把两边头数对齐。<strong>现在这一步不再物化</strong>：<code>flash_attention</code> 的 CPU 分块核按 Q 头 <code>hh / n_rep</code> 直接索引共享的 KV 头（GPU 路径在算子入口核外展开），省掉 <code>[B*n_head, T_total, head_dim]</code> 整块拷贝与对应的反向求和节点：</p>
+<pre><code class="language-rust">// 4. 拆头（GQA 不再物化 repeat_kv：flash_attention 的 CPU 分块核按 Q 头
+//    核内索引共享 KV 头，GPU 路径在 Tensor::flash_attention 内核外展开）
+let out = Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32);
+</code></pre>
+<p>拆头后的 Q 是 [B*H, T, head_dim]，正好是 <code>matmul</code> 支持的 3D 批量形状，第 9 课的公式（打分 → 掩码 → softmax → 加权求和）被一个融合算子一次算完：</p>
+<pre><code class="language-rust">// 5-7. 融合注意力：Q·Kᵀ/√d_k → softmax(+mask) → ·V 全在算子内部
+let out = Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32); // 调用点在 src/attention.rs
+</code></pre>
+<p>H 个头互不干扰，只是被&quot;压扁&quot;进了批维——这是拆头最大的好处：<strong>一次批量运算同时算完 H 个独立的注意力</strong>。</p>
+<hr />
+<h2 id="user-content-6-合并头拆头的逆操作">6. 合并头：拆头的逆操作<a href="#6-合并头拆头的逆操作" aria-label="Link to heading '6. 合并头：拆头的逆操作'" data-heading-content="6. 合并头：拆头的逆操作" class="anchor"></a></h2>
+<pre><code class="language-rust">// 7. 合并头回 [B, T, D]
+let out = out
+    .reshape(vec![b, self.n_head, t, head_dim]) // [B*H,T,head_dim] -&gt; [B,H,T,head_dim]
+    .permute(&amp;[0, 2, 1, 3])                     // -&gt; [B,T,H,head_dim]
+    .reshape(vec![b, t, d]);                    // -&gt; [B,T,D]（H×head_dim 拼回 D）
+</code></pre>
+<p>注意合并的顺序与拆头<strong>镜像对称</strong>：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>拆头</th>
+<th>合并</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>reshape</td>
+<td>[B,T,D] → [B,T,H,head_dim]</td>
+<td>[B*H,T,head_dim] → [B,H,T,head_dim]</td>
+</tr>
+<tr>
+<td>permute</td>
+<td>[0,2,1,3]（H 提前）</td>
+<td>[0,2,1,3]（H 归位）</td>
+</tr>
+<tr>
+<td>reshape</td>
+<td>[B*H,T,head_dim]（压平 B·H）</td>
+<td>[B,T,D]（拼回 D）</td>
+</tr>
+</tbody>
+</table>
+<p>拼回后，每个 (b, t) 的 D 维 = <code>[头0的16维, 头1的16维, 头2的16维, 头3的16维]</code>，与拆头前的布局完全一致——因为 <code>matmul</code> 的批维上每个 (b, h) 都是独立的，头之间从不串扰。</p>
+<hr />
+<h2 id="user-content-7-输出投影-c_proj让模型决定怎么混">7. 输出投影 c_proj：让模型决定&quot;怎么混&quot;<a href="#7-输出投影-c_proj让模型决定怎么混" aria-label="Link to heading '7. 输出投影 c_proj：让模型决定&quot;怎么混&quot;'" data-heading-content="7. 输出投影 c_proj：让模型决定&quot;怎么混&quot;" class="anchor"></a></h2>
+<pre><code class="language-rust">// 8. 输出投影
+self.c_proj.forward(&amp;out)
+</code></pre>
+<ul>
+<li>合并头只是&quot;物理拼接&quot;，各头之间还没有交互</li>
+<li><code>c_proj</code> 是一个 [D, D] 线性层：<strong>学习如何把 H 个头的信息融合</strong>（线性混合、重组）</li>
+<li>至此一个完整的多头注意力子层结束，输出形状 [B, T, D] 与输入一致，方便后面接残差连接（第 11 课）</li>
+</ul>
+<blockquote>
+<p>数学上：<code>Concat(head_1..head_H) · W_O</code>，W_O 就是 <code>c_proj</code> 的权重。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-8-forward-全流程8-步形状对照表">8. forward 全流程：8 步形状对照表<a href="#8-forward-全流程8-步形状对照表" aria-label="Link to heading '8. forward 全流程：8 步形状对照表'" data-heading-content="8. forward 全流程：8 步形状对照表" class="anchor"></a></h2>
+<p>以 <code>TransformerConfig::tiny</code>（D=64、H=4、head_dim=16）为例，B / T 视输入而定（训练演示时 B=8、T=block_size=32）：</p>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>代码</th>
+<th>形状</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>输入 x</td>
+<td><code>x</code></td>
+<td>[B, T, 64]</td>
+</tr>
+<tr>
+<td>① Q/K/V 投影</td>
+<td><code>c_q/c_k/c_v.forward(x).reshape(...)</code></td>
+<td>Q: [B, T, 64]；K/V: [B, T, kv_dim]（<code>kv_dim = n_kv_head * head_dim</code>）</td>
+</tr>
+<tr>
+<td>② RoPE 旋转 Q/K</td>
+<td><code>rotary_pair(&amp;q, &amp;k, &amp;positions, head_dim, &amp;self.rope)</code>（第 20 课）</td>
+<td>形状不变（V 不旋转）</td>
+</tr>
+<tr>
+<td>③ KV cache（可选）</td>
+<td><code>cache.append(&amp;k, &amp;v)</code></td>
+<td>K/V 的 T 变成 T_total（第 25 课）</td>
+</tr>
+<tr>
+<td>④ 拆头</td>
+<td><code>reshape → permute → reshape</code></td>
+<td>Q: [B<em>4, T, 16]；K/V: [B</em>n_kv_head, T_total, 16]</td>
+</tr>
+<tr>
+<td>⑤ GQA 共享 K/V</td>
+<td>不再物化：<code>flash_attention</code> 核内按 <code>hh / n_rep</code> 索引</td>
+<td>K/V 保持 [B*n_kv_head, T_total, 16]</td>
+</tr>
+<tr>
+<td>⑥ 融合注意力</td>
+<td><code>Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32)</code></td>
+<td>[B*4, T, 16]</td>
+</tr>
+<tr>
+<td>⑦ 合并头</td>
+<td><code>reshape → permute → reshape</code></td>
+<td>[B, T, 64]</td>
+</tr>
+<tr>
+<td>⑧ 输出投影</td>
+<td><code>c_proj.forward(&amp;out)</code></td>
+<td>[B, T, 64]</td>
+</tr>
+</tbody>
+</table>
+<p>完整的 forward 骨架（逻辑与源码 <code>src/attention.rs</code> 的 <code>MultiHeadAttention::forward</code> 一致）：</p>
+<pre><code class="language-rust">pub fn forward(
+    &amp;self,
+    x: &amp;Tensor,
+    mask: Option&lt;&amp;Tensor&gt;,
+    kv_cache: Option&lt;&amp;mut KVCache&gt;,
+    base: usize, // 当前窗口在绝对序列中的起始位置（训练时 = 0，KV cache 推理时 = 缓存长度）
+) -&gt; Tensor {
+    let (b, t, d) = (x.shape()[0], x.shape()[1], x.shape()[2]);
+    let head_dim = d / self.n_head;
+    let kv_dim = self.n_kv_head * head_dim;
+
+    // ① 投影得到 Q、K、V
+    let q = self.c_q.forward(x).reshape(vec![b, t, d]);
+    let k = self.c_k.forward(x).reshape(vec![b, t, kv_dim]);
+    let v = self.c_v.forward(x).reshape(vec![b, t, kv_dim]);
+
+    // ② RoPE：Q/K 按 head_dim 旋转（第 20 课），V 不转
+    //    注意 head_dim 是显式参数：GQA 下 Q/K 总宽不同，但两侧共用同一张逐头角度表
+    let mut positions = Vec::with_capacity(b * t);
+    for _ in 0..b {
+        positions.extend(base..base + t);
+    }
+    let (q, k) = q.reshape(vec![b * t, d])
+                  .rotary_pair(&amp;k.reshape(vec![b * t, kv_dim]), &amp;positions, head_dim, &amp;self.rope);
+    let (q, k) = (q.reshape(vec![b, t, d]), k.reshape(vec![b, t, kv_dim]));
+
+    // ③ KV cache：存&quot;已旋转的 K&quot;，只把新块追加到缓存末尾
+    let (k, v) = match kv_cache {
+        Some(cache) =&gt; { cache.append(&amp;k, &amp;v); (cache.k(), cache.v()) }
+        None =&gt; (k, v),
+    };
+    let t_total = k.shape()[1];
+
+    // ④ 拆头
+    let q = q.reshape(vec![b, t, self.n_head, head_dim])
+             .permute(&amp;[0, 2, 1, 3])
+             .reshape(vec![b * self.n_head, t, head_dim]);
+    let k = k.reshape(vec![b, t_total, self.n_kv_head, head_dim])
+             .permute(&amp;[0, 2, 1, 3])
+             .reshape(vec![b * self.n_kv_head, t_total, head_dim]);
+    let v = v.reshape(vec![b, t_total, self.n_kv_head, head_dim])
+             .permute(&amp;[0, 2, 1, 3])
+             .reshape(vec![b * self.n_kv_head, t_total, head_dim]);
+
+    // ⑤ GQA：K/V 直接按 [B*n_kv_head, ...] 传入，不再 repeat_kv 物化——
+    //    flash_attention 的 CPU 分块核核内索引共享头，GPU 路径在算子入口展开
+
+    // ⑥ 融合注意力：打分 + 掩码 + softmax + 加权求和（第 9 课）
+    let out = Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32);
+
+    // ⑦ 合并头，⑧ 输出投影
+    let out = out.reshape(vec![b, self.n_head, t, head_dim])
+                 .permute(&amp;[0, 2, 1, 3])
+                 .reshape(vec![b, t, d]);
+    self.c_proj.forward(&amp;out)
+}
+</code></pre>
+<hr />
+<h2 id="user-content-9-参数训练时谁在被更新">9. 参数：训练时谁在被更新？<a href="#9-参数训练时谁在被更新" aria-label="Link to heading '9. 参数：训练时谁在被更新？'" data-heading-content="9. 参数：训练时谁在被更新？" class="anchor"></a></h2>
+<p><code>Module for MultiHeadAttention</code> 负责收集全部可学习参数：</p>
+<pre><code class="language-rust">impl Module for MultiHeadAttention {
+    fn parameters(&amp;self) -&gt; Vec&lt;Tensor&gt; {
+        let mut ps = self.c_q.parameters();   // weight [64,64] + bias [64]
+        ps.extend(self.c_k.parameters());
+        ps.extend(self.c_v.parameters());
+        ps.extend(self.c_proj.parameters());  // 4 个 Linear = 8 个参数张量
+        ps
+    }
+}
+</code></pre>
+<p>前向算出的误差通过反向传播（第 2 课）一路传回这 8 个张量，4 个投影层的权重随训练不断调整——&quot;学什么相关性、怎么融合&quot;全都由数据决定。</p>
+<blockquote>
+<p><code>Linear</code> 是否带 bias 由配置决定（<code>model.qkv_bias</code> / <code>model.o_bias</code>，默认 <code>true</code> 即上面这个历史口径）。
+置 <code>false</code> 时无 bias 的层<strong>连参数表都不进</strong>，4 个投影就只剩 4 个权重张量——HF 的 LLaMA 全系列是这个口径
+（见第 39 课 <code>import-hf</code>）。</p>
+</blockquote>
+<blockquote>
+<p><code>forward</code> 第 ③ 步的 KV cache 只是<strong>推理时</strong>缓存历史 K/V 的加速手段，不改变计算结果，第 25 课专门讲解。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-10-运行与验证">10. 运行与验证<a href="#10-运行与验证" aria-label="Link to heading '10. 运行与验证'" data-heading-content="10. 运行与验证" class="anchor"></a></h2>
+<pre><code class="language-bash">cargo test   # tensor 的 test_permute / test_matmul_3d 验证拆头、批量 matmul 所需算子
+cargo run --release -- demo    # 演示 3 训练小 Transformer：4 头注意力参与每一轮前向/反向
+</code></pre>
+<h2 id="user-content-11-小结与下一课">11. 小结与下一课<a href="#11-小结与下一课" aria-label="Link to heading '11. 小结与下一课'" data-heading-content="11. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li>多头 = 把 D 切成 H 份，H 个注意力并行，学不同的相关性模式</li>
+<li>拆头三步曲：reshape（切块）→ permute（H 提前）→ reshape（压平 B·H），顺序不能乱</li>
+<li>合并是拆头的镜像；<code>c_proj</code> 负责融合各头信息</li>
+<li>一次批量 matmul 同时算所有头，高效且简洁</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li>把 <code>TransformerConfig::tiny</code> 的 <code>n_head</code> 从 4 改成 8（head_dim = 8）重新训练，观察 loss 是否变化（代码有 <code>assert_eq!(head_dim * self.n_head, d)</code> 保证必须能整除）。</li>
+<li>手动构造一个 [2, 3, 8] 的 Tensor，按 <code>reshape([2,3,2,4]) → permute([0,2,1,3]) → reshape([4,3,4])</code> 手写一遍，画出每个元素的归属，验证第 4 节的内存布局分析。</li>
+<li>修改代码：去掉第 ⑧ 步 <code>c_proj</code>，直接返回合并后的 out，重新训练对比 loss（思考：表达能力损失在哪里）。</li>
+<li>阅读 <code>forward</code> 中 <code>kv_cache</code> 分支的 <code>cache.append</code>，解释为什么推理时它能省掉&quot;历史 token 的重复计算&quot;（第 25 课预告）。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="11-%E4%BD%8D%E7%BD%AE%E7%BC%96%E7%A0%81%E4%B8%8E%E5%BD%92%E4%B8%80%E5%8C%96.md">第 11 课 位置编码与归一化</a> —— 位置编码 + LayerNorm + 残差连接，拼出完整的 Transformer Block！</p>
+</blockquote>

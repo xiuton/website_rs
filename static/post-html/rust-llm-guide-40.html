@@ -1,0 +1,865 @@
+<h1 id="user-content-第-40-课把模型部署成-api-服务--从自己跑到给别人调">第 40 课：把模型部署成 API 服务 —— 从&quot;自己跑&quot;到&quot;给别人调&quot;<a href="#第-40-课把模型部署成-api-服务--从自己跑到给别人调" aria-label="Link to heading '第 40 课：把模型部署成 API 服务 —— 从&quot;自己跑&quot;到&quot;给别人调&quot;'" data-heading-content="第 40 课：把模型部署成 API 服务 —— 从&quot;自己跑&quot;到&quot;给别人调&quot;" class="anchor"></a></h1>
+<blockquote>
+<p>代码位置：<code>src/serve.rs</code>、<code>src/cli.rs</code>（<code>serve</code> 子命令）、<code>src/cmd/deploy.rs</code>（<code>cmd_serve</code>）、<code>src/sample.rs</code>（Generator 状态机）</p>
+<p>本课无新算法，讲的是<strong>部署</strong>：如何把前 39 课训练出来的模型包装成一个
+和主流大模型厂商（OpenAI / DeepSeek / 智谱…）接口形状一致的 HTTP API，
+让任何支持 OpenAI 协议的客户端改一行 <code>base_url</code> 就能用上你的模型。
+CLI 用法详见 <a href="../README.md#5-serve--%E9%83%A8%E7%BD%B2%E6%88%90-openai-%E5%85%BC%E5%AE%B9%E7%9A%84-api-%E6%9C%8D%E5%8A%A1">README.md</a> 的 <code>serve</code> 章节。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>主流大模型 API 长什么样？为什么&quot;兼容 OpenAI&quot;是事实标准？</li>
+<li>一个常驻服务进程和一次性命令行程序，架构上差在哪？</li>
+<li>流式输出（SSE）为什么必须用<strong>状态机</strong>而不是&quot;跑完再返回&quot;？</li>
+<li>HTTP 层的 chunked transfer 和 SSE 是什么关系？</li>
+<li>客户端断开连接时，服务端怎么发现自己在对着空气烧 CPU？</li>
+<li>鉴权、CORS、请求日志与问答记录、队列状态这些&quot;API 周边&quot;各自解决什么问题？</li>
+<li>单机 CPU 推理该用什么并发模型——每请求一线程，还是排队？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-为什么是兼容-openai">2. 为什么是&quot;兼容 OpenAI&quot;<a href="#2-为什么是兼容-openai" aria-label="Link to heading '2. 为什么是&quot;兼容 OpenAI&quot;'" data-heading-content="2. 为什么是&quot;兼容 OpenAI&quot;" class="anchor"></a></h2>
+<p>把模型做成 API 有两条路：</p>
+<table>
+<thead>
+<tr>
+<th>路线</th>
+<th>做法</th>
+<th>问题</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>自定义协议</td>
+<td>自己设计 JSON 字段、自己写客户端</td>
+<td>每个调用方都要写适配层，没人愿意接</td>
+</tr>
+<tr>
+<td><strong>兼容 OpenAI</strong></td>
+<td>按 <code>POST /v1/chat/completions</code> 的形状实现</td>
+<td>生态里现成的 SDK、网关、评测工具直接可用</td>
+</tr>
+</tbody>
+</table>
+<p>OpenAI 的 Chat Completions 协议已经事实上标准化：LangChain、LobeChat、各种
+RAG 框架、甚至各家云厂商的网关，都默认会往 <code>{base_url}/v1/chat/completions</code>
+发 <code>{&quot;model&quot;: …, &quot;messages&quot;: [...], &quot;stream&quot;: true}</code>。本项目照这套协议实现，
+于是：</p>
+<ul>
+<li>改一行 <code>base_url</code> + <code>api_key</code>，OpenAI 官方 SDK 就能调本项目；</li>
+<li>SSE 帧的 <code>object: &quot;chat.completion.chunk&quot;</code>、<code>data: [DONE]</code> 结尾，全部照抄；</li>
+<li>错误体统一是 <code>{&quot;error&quot;: {&quot;message&quot;: …, &quot;type&quot;: …, &quot;code&quot;: …}}</code>。</li>
+</ul>
+<p><strong>代价</strong>：OpenAI 的字段比本项目实际需要的多（<code>logprobs</code>、<code>tools</code>、<code>n</code>、
+<code>function_call</code>…）。策略是<strong>不认识的字段一律忽略</strong>（否则官方 SDK 发来的请求
+全被 400 打回），但<strong>认识的字段严格校验并给出&quot;哪个字段错在哪&quot;的中文错误</strong>
+（否则调用方只能看到 400 干瞪眼）。唯一显式拒绝的是 <code>n != 1</code>——本服务一次
+只生成一个回答，硬撑 <code>n=4</code> 只会返回四个重复答案，不如早说。</p>
+<hr />
+<h2 id="user-content-3-架构常驻进程-vs-一次性命令">3. 架构：常驻进程 vs 一次性命令<a href="#3-架构常驻进程-vs-一次性命令" aria-label="Link to heading '3. 架构：常驻进程 vs 一次性命令'" data-heading-content="3. 架构：常驻进程 vs 一次性命令" class="anchor"></a></h2>
+<p><code>chat</code> 子命令的生命周期是「加载 → REPL 循环 → 退出」；<code>serve</code> 是
+「加载 → <strong>无限</strong> accept 循环 → 直到 Ctrl-C」。改造点集中在三处：</p>
+<h3 id="user-content-31-模块划分">3.1 模块划分<a href="#31-模块划分" aria-label="Link to heading '3.1 模块划分'" data-heading-content="3.1 模块划分" class="anchor"></a></h3>
+<pre><code class="language-plaintext">src/serve.rs
+├── ServeCfg          启动时定死的配置（host/port/api_key/system/采样默认值…）
+├── State = ServeCfg + Core + Stats + 时间戳
+│   ├── Core { model, tokenizer, rng }   ← 独占，包在 Mutex 里
+│   └── Stats { queued, running, chat, stream, embeddings, errors }  ← 全是原子量
+├── route()           路由：只看路径，不认识就 404/405
+├── parse_chat()      请求体 → ChatJob（严格校验）
+├── run_chat()        非流式：with_core 里跑完整生成
+├── stream_reply()    SSE：生成线程 + SsePipe + tiny_http chunked
+├── run_embeddings()  文本向量化（最后一层 hidden 均值池化）
+└── run()             accept 循环，每请求 spawn 一个线程
+</code></pre>
+<h3 id="user-content-32-加载链路复用-cmd_chat">3.2 加载链路复用 <code>cmd_chat</code><a href="#32-加载链路复用-cmd_chat" aria-label="Link to heading '3.2 加载链路复用 cmd_chat'" data-heading-content="3.2 加载链路复用 cmd_chat" class="anchor"></a></h3>
+<p><code>cmd_serve</code>（<a href="../src/cmd/deploy.rs">cmd/deploy.rs</a>）的前半段和 <code>cmd_chat</code> 一模一样：
+配置 → 分词器 → checkpoint → LoRA 合并 → RoPE 覆盖。区别只在最后一步：不进
+REPL，而是把模型和默认采样参数打包成 <code>ServeCfg</code> 交给 <code>serve::run</code>。这样
+<strong>chat 和 serve 永远不会跑出两套不同的加载逻辑</strong>（RoPE 覆盖顺序、LoRA 合并
+时机这类坑只用踩一次）。</p>
+<p>模型名取 checkpoint 文件名的 stem（<code>checkpoints/zh-sft-v2/final.ckpt</code> → <code>final</code>）：
+OpenAI 客户端会拿请求里的 <code>model</code> 和 <code>/v1/models</code> 的 id 对账，多个 checkpoint
+服务并存时不会撞名。</p>
+<h3 id="user-content-33-并发模型每请求一线程--单份模型排队">3.3 并发模型：每请求一线程 + 单份模型排队<a href="#33-并发模型每请求一线程--单份模型排队" aria-label="Link to heading '3.3 并发模型：每请求一线程 + 单份模型排队'" data-heading-content="3.3 并发模型：每请求一线程 + 单份模型排队" class="anchor"></a></h3>
+<pre><code class="language-rust">for req in server.incoming_requests() {
+    thread::spawn(move || handle(req, st));   // 每请求一线程
+}
+</code></pre>
+<p>HTTP 层是并发的（读请求体、鉴权、拼 JSON 都不碰模型），但<strong>生成是串行的</strong>：
+<code>Core</code> 只有一份，所有生成请求共用一把 <code>Mutex</code>（<code>with_core</code>）。</p>
+<p>为什么不多副本？单机 CPU 推理时，两个生成请求并行只会互相抢核心、互相污染
+cache，总吞吐不变而单条延迟翻倍；排队反而让延迟曲线平稳。要真并发：另起进程
+（多开几个端口）或上 GPU。<code>/v1/status</code> 里的 <code>queued</code> 就是这条队列的长度——
+<strong>这是排队可见性的价值</strong>：调用方能看到&quot;我在等前面 3 个人&quot;，而不是干等一个
+不返回的连接。</p>
+<p><code>with_core</code> 还做了两件防御性的事：</p>
+<ul>
+<li><code>catch_unwind</code>：模型推理里万一 panic（比如词表越界），只把这个请求变成
+500，服务进程不死；</li>
+<li><code>Mutex</code> 的 poison 处理：一个请求 panic 后，后续请求用 <code>into_inner</code> 继续，
+不会因为&quot;锁被下毒&quot;而整个服务永久瘫痪。</li>
+</ul>
+<hr />
+<h2 id="user-content-4-端点一览">4. 端点一览<a href="#4-端点一览" aria-label="Link to heading '4. 端点一览'" data-heading-content="4. 端点一览" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>路径</th>
+<th>鉴权</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST</td>
+<td><code>/v1/chat/completions</code></td>
+<td>✅</td>
+<td>对话补全，<code>stream=true</code> 走 SSE</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/embeddings</code></td>
+<td>✅</td>
+<td>文本向量化（均值池化）</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/models</code></td>
+<td>✅</td>
+<td>只有一个模型的列表（OpenAI 语义：它会暴露服务上有什么）</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/health</code></td>
+<td>❌</td>
+<td>存活探针 <code>{&quot;status&quot;:&quot;ok&quot;,&quot;model&quot;:…}</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/status</code></td>
+<td>❌</td>
+<td>队列/计数/模型信息，诊断用</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/openapi.json</code></td>
+<td>❌</td>
+<td>本服务的 OpenAPI 3.1 规范（JSON），导入 Postman/Apifox/Swagger UI</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/openapi.yaml</code></td>
+<td>❌</td>
+<td>同上，YAML 格式（两份与实际路由同源生成）</td>
+</tr>
+<tr>
+<td>OPTIONS</td>
+<td>任意</td>
+<td>❌</td>
+<td>CORS 预检 → 204</td>
+</tr>
+</tbody>
+</table>
+<p><strong>鉴权刻意豁免 <code>/health</code>、<code>/v1/status</code> 和 <code>/openapi.*</code></strong>：探针和监控系统通常
+不方便带 <code>Authorization</code> 头，且这些端点不泄露模型输出——一个只说&quot;我还活着&quot;，
+一个只说计数器，规范则只描述接口形状。<code>/v1/models</code> 则必须鉴权（它暴露服务上
+部署了什么）。</p>
+<h3 id="user-content-41-post-v1chatcompletions-请求字段">4.1 <code>POST /v1/chat/completions</code> 请求字段<a href="#41-post-v1chatcompletions-请求字段" aria-label="Link to heading '4.1 POST /v1/chat/completions 请求字段'" data-heading-content="4.1 POST /v1/chat/completions 请求字段" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>缺省（服务级）</th>
+<th>校验</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>messages</code></td>
+<td>数组</td>
+<td>必填</td>
+<td>非空、≤200 条、末条必须是 <code>user</code>、role 只认 system/developer/user/assistant</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td>string</td>
+<td>忽略</td>
+<td>不校验（单模型服务）</td>
+</tr>
+<tr>
+<td><code>temperature</code></td>
+<td>数字</td>
+<td><code>--temperature</code>（0.8）</td>
+<td><code>[0, 5]</code></td>
+</tr>
+<tr>
+<td><code>top_k</code></td>
+<td>整数</td>
+<td><code>--top-k</code>（40）</td>
+<td>≤10000（0 = 不限制）</td>
+</tr>
+<tr>
+<td><code>top_p</code></td>
+<td>数字</td>
+<td><code>--top-p</code>（0.9）</td>
+<td><code>(0, 1]</code></td>
+</tr>
+<tr>
+<td><code>repetition_penalty</code></td>
+<td>数字</td>
+<td><code>--repetition-penalty</code>（1.1）</td>
+<td><code>[0.1, 10]</code></td>
+</tr>
+<tr>
+<td><code>repetition_window</code></td>
+<td>整数</td>
+<td><code>--repetition-window</code>（64）</td>
+<td>≤100000</td>
+</tr>
+<tr>
+<td><code>max_tokens</code></td>
+<td>整数</td>
+<td><code>--max-new</code>（1000）</td>
+<td>&gt;0；<strong>两者都钳到上下文窗口内</strong>（缺省用服务级 <code>--max-new</code> 后再钳）</td>
+</tr>
+<tr>
+<td><code>stop</code></td>
+<td>字符串/数组</td>
+<td>SFT 模板停止标记</td>
+<td>≤4 个，每个 ≤64 字节</td>
+</tr>
+<tr>
+<td><code>seed</code></td>
+<td>整数</td>
+<td>服务级 <code>--seed</code></td>
+<td>非负；给了就用独立 RNG，可复现</td>
+</tr>
+<tr>
+<td><code>stream</code></td>
+<td>bool</td>
+<td>false</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>n</code></td>
+<td>整数</td>
+<td>1</td>
+<td>只接受 1</td>
+</tr>
+<tr>
+<td>其余</td>
+<td>—</td>
+<td>—</td>
+<td><strong>一律忽略</strong>（<code>user</code>/<code>logit_bias</code>/<code>tools</code>…）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>system 的合并规则</strong>：服务级 <code>--system</code> 在前，请求里所有 <code>system</code>/<code>developer</code>
+消息用换行接在它后面（<code>merge_system</code>）。这样运维能设一个&quot;服务级人格&quot;，调用方
+仍能按 OpenAI 习惯在 messages 里再加一层。</p>
+<p><strong>历史裁剪</strong>：<code>block_size</code> 是「system + 历史 + 本轮生成」共用的窗口，
+<code>prompt_budget = block_size - max_tokens</code>，超出的历史从最老的轮次丢起
+（与 <code>chat</code> 完全同源，见 <code>prompt::assemble</code>）。裁剪发生时服务端日志会打印
+<code>历史超出输入预算：312 → 180 token</code>。</p>
+<p><strong><code>max_tokens</code> 的缺省值来自服务级 <code>--max-new</code>（默认 <code>1000</code>），它是上限而不是保证</strong>：实际长度还会被
+<strong>EOS / 停止标记</strong>提前收尾（<code>finish_reason</code> 为 <code>&quot;stop&quot;</code>）。窗口小的模型要显式压小——<code>--max-new ≥ block_size</code>
+时输入预算被压到 0（历史全丢，启动时也会打印告警）；<strong>生成段一定留在窗口内</strong>：缺省值也会先钳到
+<code>block_size</code>（与显式 <code>max_tokens</code> 同一条路径），所以不会出现&quot;生成到一半滑出视野&quot;。
+<strong>开发时要快速试跑就自己传小值</strong>（如 <code>--max-new 4</code>）。</p>
+<h3 id="user-content-42-非流式响应">4.2 非流式响应<a href="#42-非流式响应" aria-label="Link to heading '4.2 非流式响应'" data-heading-content="4.2 非流式响应" class="anchor"></a></h3>
+<pre><code class="language-json">{
+  &quot;id&quot;: &quot;chatcmpl-1&quot;,
+  &quot;object&quot;: &quot;chat.completion&quot;,
+  &quot;created&quot;: 1769…,
+  &quot;model&quot;: &quot;final&quot;,
+  &quot;choices&quot;: [{
+    &quot;index&quot;: 0,
+    &quot;message&quot;: { &quot;role&quot;: &quot;assistant&quot;, &quot;content&quot;: &quot;……&quot; },
+    &quot;finish_reason&quot;: &quot;stop&quot;,
+    &quot;logprobs&quot;: null
+  }],
+  &quot;usage&quot;: { &quot;prompt_tokens&quot;: 12, &quot;completion_tokens&quot;: 33, &quot;total_tokens&quot;: 45,
+             &quot;tokens_per_second&quot;: 328.4 }
+}
+</code></pre>
+<p><code>tokens_per_second</code> 是服务端用 <code>Instant</code> 实测的<strong>纯解码段</strong>生成速率（首 token 之后
+逐 token 解码的耗时，不含 prefill，也不受网络/缓冲影响）；生成不足 2 个 token 时
+为 <code>null</code>。客户端不要自己拿墙钟算 SSE 到达间隔——TCP/代理缓冲会把多帧合并成一次
+到达，算出来的速率会虚高到离谱。</p>
+<p><code>finish_reason</code> 映射：采到 EOS / 命中停止标记 → <code>&quot;stop&quot;</code>；跑满 <code>max_tokens</code> →
+<code>&quot;length&quot;</code>。和 <code>chat</code> 一样，MaxNew 截断说明回答没说完——客户端看到 <code>length</code>
+就该调大 <code>max_tokens</code> 或收窄输入。</p>
+<hr />
+<h2 id="user-content-5-流式输出generator-状态机--sse">5. 流式输出：Generator 状态机 + SSE<a href="#5-流式输出generator-状态机--sse" aria-label="Link to heading '5. 流式输出：Generator 状态机 + SSE'" data-heading-content="5. 流式输出：Generator 状态机 + SSE" class="anchor"></a></h2>
+<h3 id="user-content-51-为什么要状态机">5.1 为什么要状态机<a href="#51-为什么要状态机" aria-label="Link to heading '5.1 为什么要状态机'" data-heading-content="5.1 为什么要状态机" class="anchor"></a></h3>
+<p>原来的生成循环长这样：<code>for</code> 采样到 EOS，把整段文本 return。这种<strong>一把梭的
+函数</strong>没法流式——HTTP 层要的是一边生成一边往外写，也就是&quot;生成器跑一步、吐一
+个 token、把控制权交回 HTTP 层&quot;。</p>
+<p>改造做法（<a href="../src/sample.rs">sample.rs</a>）：把循环拆成 <code>Generator</code> 的四个方法——</p>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Generator::new(...)</code></td>
+<td>装 prompt、预填首 token，不推进</td>
+</tr>
+<tr>
+<td><code>step() -&gt; bool</code></td>
+<td>推进一个 token；返回 false = 生成结束</td>
+</tr>
+<tr>
+<td><code>next_text() -&gt; Option&lt;&amp;str&gt;</code></td>
+<td>取出<strong>这次</strong>产出的增量文本（可能为空）</td>
+</tr>
+<tr>
+<td><code>flush() -&gt; String</code></td>
+<td>生成结束后取回被 hold-back 的尾巴</td>
+</tr>
+<tr>
+<td><code>run()</code></td>
+<td><code>while step() {}</code> ——非流式路径的封装</td>
+</tr>
+</tbody>
+</table>
+<p>关键细节：<strong>安全流式（safe_len hold-back）</strong>。分词器里存在多字节字符和
+<code>stop</code> 标记的前缀——如果一个 token 单独看是半个汉字，直接发给客户端就会出现
+乱码；同样，<code>&quot;用户：&quot;</code> 只出了 <code>&quot;用户&quot;</code> 就发出去，等下一帧发现命中停止标记时，
+客户端已经渲染了不该出现的半截。所以 <code>step()</code> 后只吐出&quot;确定不会再变&quot;的部分，
+剩下的攒到 <code>flush()</code> 一次发干净。<strong>流式和非流式跑的是同一个 <code>Generator</code>，
+因此两者输出必然逐字一致</strong>——这是把循环抽成状态机换来的不变量。</p>
+<p><code>generate_with_reason()</code> 仍保留，内部就是 <code>Generator::run()</code> 的封装，所以
+<code>generate</code>/<code>chat</code> 等老命令一行没改。</p>
+<h3 id="user-content-52-sse-与-http-chunked-的关系">5.2 SSE 与 HTTP chunked 的关系<a href="#52-sse-与-http-chunked-的关系" aria-label="Link to heading '5.2 SSE 与 HTTP chunked 的关系'" data-heading-content="5.2 SSE 与 HTTP chunked 的关系" class="anchor"></a></h3>
+<pre><code class="language-plaintext">HTTP 层：Response::new(200, headers, SsePipe, None /* 无长度 */, None)
+                                    ↑              ↑
+                            自定义 Read 实现    None = 不发 Content-Length，
+                                               HTTP/1.1 自动用 chunked
+</code></pre>
+<ul>
+<li><strong>chunked</strong> 是传输层机制：body 分块发，每块前面写 <code>十六进制长度\r\n</code>，
+结尾发 <code>0\r\n\r\n</code>。它让&quot;不知道总长度的流&quot;能在 HTTP/1.1 里合法传输。</li>
+<li><strong>SSE</strong> 是应用层协议：<code>Content-Type: text/event-stream</code>，每条消息形如
+<code>data: {json}\n\n</code>，永不关闭连接（<code>Cache-Control: no-cache</code> 防代理缓存）。</li>
+<li><code>SsePipe</code> 是两者之间的桥：它实现 <code>Read</code>，从 <code>mpsc</code> channel 里取帧往外读；
+读到 <code>Ok(0)</code> 就是 EOF，tiny_http 据此写终止块、正常收尾。</li>
+</ul>
+<h3 id="user-content-53-帧序列实测输出">5.3 帧序列（实测输出）<a href="#53-帧序列实测输出" aria-label="Link to heading '5.3 帧序列（实测输出）'" data-heading-content="5.3 帧序列（实测输出）" class="anchor"></a></h3>
+<pre><code class="language-plaintext">data: {&quot;id&quot;:&quot;chatcmpl-1&quot;,&quot;object&quot;:&quot;chat.completion.chunk&quot;,…,&quot;delta&quot;:{&quot;role&quot;:&quot;assistant&quot;,&quot;content&quot;:&quot;&quot;}}
+data: {&quot;…&quot;,&quot;delta&quot;:{&quot;content&quot;:&quot;好的&quot;}}
+data: {&quot;…&quot;,&quot;delta&quot;:{&quot;content&quot;:&quot;，&quot;}}
+…
+data: {&quot;…&quot;,&quot;delta&quot;:{},&quot;finish_reason&quot;:&quot;stop&quot;}     ← 收尾帧
+data: {&quot;…&quot;,&quot;choices&quot;:[],&quot;usage&quot;:{…}}              ← usage 单独一帧（OpenAI 实际做法）
+data: [DONE]
+</code></pre>
+<p>第一帧先声明角色（OpenAI 客户端靠它拿到 assistant 角色）；usage 单独发一帧
+且 <code>choices</code> 为空数组——<code>stream_options: {&quot;include_usage&quot;: true}</code> 之外也发，
+因为多数轻量客户端不发这个字段却仍然想要 usage。这帧除了三个 token 计数，还带
+服务端实测的 <code>tokens_per_second</code>（纯解码段速率，见 4.2 节），客户端直接展示即可，
+不必自己拿墙钟测 SSE 帧间隔。</p>
+<h3 id="user-content-54-背压有界-channel">5.4 背压：有界 channel<a href="#54-背压有界-channel" aria-label="Link to heading '5.4 背压：有界 channel'" data-heading-content="5.4 背压：有界 channel" class="anchor"></a></h3>
+<pre><code class="language-rust">let (tx, rx) = sync_channel::&lt;Vec&lt;u8&gt;&gt;(16);
+</code></pre>
+<p>生成线程往 channel 塞帧，HTTP 线程从 <code>SsePipe</code> 读帧往 socket 写。容量 16 意味着
+<strong>生成最多领先客户端 16 帧</strong>：客户端读得慢（慢速网络、逐字渲染的前端）时，
+<code>tx.send</code> 会阻塞，生成自然慢下来，而不是把内存堆爆。反过来客户端读得快时，
+生成速度不受影响。</p>
+<hr />
+<h2 id="user-content-6-断开可中断别对着空气烧-cpu">6. 断开可中断：别对着空气烧 CPU<a href="#6-断开可中断别对着空气烧-cpu" aria-label="Link to heading '6. 断开可中断：别对着空气烧 CPU'" data-heading-content="6. 断开可中断：别对着空气烧 CPU" class="anchor"></a></h2>
+<p><strong>问题</strong>：用户点了&quot;停止生成&quot;或直接关掉网页，TCP 连接断了，但服务端的
+<code>while g.step()</code> 还在吭哧吭哧采样——CPU 白烧，还占着模型锁让后面的人排队。</p>
+<p><strong>检测链路</strong>（三段接力）：</p>
+<pre><code class="language-plaintext">客户端断开
+  → tiny_http 写 socket 失败（对端 RST）
+  → req.respond() 返回 Err，SsePipe 被 drop
+  → rx 关闭
+  → 生成线程下一次 tx.send() 返回 Err
+  → 提前 return StreamOutcome { aborted: true }
+  → 日志：[serve] 客户端提前断开，生成已中止（51 token）
+</code></pre>
+<p>要点是<strong>每个环节都必须真的把 drop 传导下去</strong>：</p>
+<ol>
+<li><code>stream_reply</code> 里 <code>let _ = req.respond(...)</code>——返回 Err 也不能吞掉后续，
+因为 SsePipe 是 <code>respond</code> 的实参，<code>respond</code> 返回时它必然已被 drop；</li>
+<li>生成线程<strong>每帧都检查</strong> <code>tx.send</code> 的返回值（而不是 <code>let _ =</code> 忽略）；</li>
+<li><code>aborted</code> 通过 <code>StreamOutcome</code> 带回外层，外层据此<strong>不再发</strong>
+finish/usage/DONE 帧（对一个已断开的连接发这些毫无意义，还可能触发二次错误）。</li>
+</ol>
+<p>实测：<code>curl --max-time 0.15</code> 中途掐断，服务端 51 token 处停止并打印中止日志；
+而一个 302ms 内自己采到 EOS 的请求即使 curl 超时也走正常收尾——<strong>两条路径
+互不干扰</strong>（生成先结束就走正常分支，连接先断才走中止分支）。</p>
+<hr />
+<h2 id="user-content-7-api-周边能力">7. API 周边能力<a href="#7-api-周边能力" aria-label="Link to heading '7. API 周边能力'" data-heading-content="7. API 周边能力" class="anchor"></a></h2>
+<h3 id="user-content-71-鉴权--api-key">7.1 鉴权（<code>--api-key</code>）<a href="#71-鉴权--api-key" aria-label="Link to heading '7.1 鉴权（--api-key）'" data-heading-content="7.1 鉴权（--api-key）" class="anchor"></a></h3>
+<pre><code class="language-rust">// Authorization: Bearer sk-test   → 剥掉 &quot;bearer &quot; 前缀（大小写不敏感）比较
+if token == expected { Ok(()) } else { 401 authentication_error }
+</code></pre>
+<ul>
+<li><strong>给 <code>--api-key</code> 用它，不给就现场生成一个</strong>（<code>serve::random_api_key()</code>，
+<code>sk-</code> + 32 位十六进制）：服务<strong>始终有鉴权</strong>，随机 key 打在控制台的
+<code>[serve] 鉴权开，API key = sk-…</code> 行与 runlog 里，别人才没法白嫖你的模型；</li>
+<li>key 随机生成时还会通过 <code>VITE_API_KEY</code> 注入前端测试页，页面打开即自动填好
+（key 每次启动都可能变，让用户手抄不现实）；</li>
+<li>比较前 <code>trim()</code>，容忍头值两端的空白；</li>
+<li>错误体是 OpenAI 形状：<code>{&quot;error&quot;:{&quot;message&quot;:&quot;缺少或错误的 API key…&quot;,&quot;type&quot;:&quot;authentication_error&quot;}}</code>，
+官方 SDK 能直接识别成 <code>AuthenticationError</code> 并触发它的重试/报错逻辑。</li>
+</ul>
+<h3 id="user-content-72-cors--cors">7.2 CORS（<code>--cors</code>）<a href="#72-cors--cors" aria-label="Link to heading '7.2 CORS（--cors）'" data-heading-content="7.2 CORS（--cors）" class="anchor"></a></h3>
+<p>浏览器页面（比如本地写的 prompt 调试页）直接 fetch 一个不同源的 API，会被
+同源策略拦下；浏览器会先发一个 <code>OPTIONS</code> 预检，问&quot;允许我带 <code>Authorization</code>
+吗&quot;。开 <code>--cors</code> 后：</p>
+<pre><code class="language-plaintext">OPTIONS → 204 + Access-Control-Allow-Origin: *
+          + Allow-Methods: GET, POST, OPTIONS
+          + Allow-Headers: Content-Type, Authorization
+          + Max-Age: 600（预检结果缓存 10 分钟）
+</code></pre>
+<p>关掉时一个头都不加——<code>*</code> 意味着任何网页都能拿你的 key 调你的模型，<strong>生产
+环境不该开</strong>。</p>
+<h3 id="user-content-73-请求日志与问答记录">7.3 请求日志与问答记录<a href="#73-请求日志与问答记录" aria-label="Link to heading '7.3 请求日志与问答记录'" data-heading-content="7.3 请求日志与问答记录" class="anchor"></a></h3>
+<p><strong>接口行</strong>每个请求一条（同时进 stdout 与 <code>logs/serve_*.log</code>）：</p>
+<pre><code class="language-plaintext">[serve] GET /v1/models → 401（1ms）
+[serve] POST /v1/chat/completions → 200（135ms）
+[serve] 流式完成 chatcmpl-1：11 token（采到 EOS）
+[serve] 客户端提前断开，生成已中止（51 token）
+[serve] 历史超出输入预算：312 → 180 token（预算 312）
+</code></pre>
+<p>方法、路径、状态码、耗时四要素齐全；生成类事件单独一行（带 token 数和收尾
+原因），因为&quot;哪个请求慢&quot;和&quot;慢在生成还是慢在排队&quot;是两个问题。</p>
+<p><strong>问答记录</strong>每条到达生成的 chat 请求一个块——只写 <code>logs/serve_*.log</code>，
+<strong>控制台保持上面的简洁接口行，不打印问答正文</strong>：</p>
+<pre><code class="language-plaintext">--- 问答 chatcmpl-2（流式） ---
+时间     : 2026-09-30 00:19:48.180
+system   : 你是简明助手
+历史     : 2 条
+输入     : 用一句话介绍勾股定理
+输出     : 我想好。还不客？j我有什么趣！……
+收尾     : 跑满 --max-new 被截断
+采样参数 : temperature=0.8, top_k=40, top_p=0.9, repetition_penalty=1.1, repetition_window=64, stop=[&quot;。。&quot;, &quot;用户：&quot;], seed=7, max_tokens=40
+用量     : prompt 41 + completion 40 = 81 token，112.4 tok/s
+</code></pre>
+<p>设计要点：</p>
+<ul>
+<li><strong>只记本轮问答 + 参数</strong>：历史全文由无状态的调用方每次重发，原样记下来会让
+同一段历史在日志里反复刷屏，所以历史只记条数（首轮标 <code>0 条（首轮问答）</code>）；</li>
+<li>时间戳用 <code>runlog::now()</code> 单独标注——运行头部只有一个&quot;开始时间&quot;，常驻进程
+跑久了对不上号；</li>
+<li>收尾原因复用 chat 的标签（<code>采到 EOS</code> / <code>命中停止标记「…」</code> / <code>跑满 --max-new 被截断</code>）；</li>
+<li><strong>失败也留痕</strong>：非流式生成出错、流式响应头已按 200 发出后出错、客户端提前
+断开，都写一条问答记录（后两者收尾标 <code>未正常收尾（见备注）</code>，备注说明原因），
+否则&quot;题目在、答案没了&quot;的请求在日志里查不到下文。</li>
+</ul>
+<h3 id="user-content-74-v1status-队列状态">7.4 <code>/v1/status</code> 队列状态<a href="#74-v1status-队列状态" aria-label="Link to heading '7.4 /v1/status 队列状态'" data-heading-content="7.4 /v1/status 队列状态" class="anchor"></a></h3>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;ok&quot;,
+  &quot;uptime_seconds&quot;: 123,
+  &quot;queue&quot;: { &quot;queued&quot;: 2, &quot;running&quot;: 1 },
+  &quot;requests&quot;: { &quot;chat&quot;: 10, &quot;stream&quot;: 4, &quot;embeddings&quot;: 2, &quot;errors&quot;: 1 },
+  &quot;model&quot;: { &quot;name&quot;: &quot;final&quot;, &quot;block_size&quot;: 512, &quot;max_new&quot;: 64, &quot;prompt_format&quot;: &quot;sft&quot; }
+}
+</code></pre>
+<p><code>queued</code>/<code>running</code> 来自 <code>with_core</code> 里的 <code>RunGuard</code>（RAII：进锁前 <code>queued++</code>，
+拿到锁后 <code>queued--</code>/<code>running++</code>，离开作用域 <code>running--</code>——<strong>连 panic 都不会
+漏计数</strong>，因为 Drop 一定执行）。全部计数器是原子量，读它们不需要碰模型锁，
+所以状态端点在生成高峰期也瞬间返回。</p>
+<h3 id="user-content-75-v1embeddings">7.5 <code>/v1/embeddings</code><a href="#75-v1embeddings" aria-label="Link to heading '7.5 /v1/embeddings'" data-heading-content="7.5 /v1/embeddings" class="anchor"></a></h3>
+<pre><code class="language-json">POST { &quot;input&quot;: &quot;你好世界&quot; }
+→ { &quot;object&quot;: &quot;list&quot;,
+    &quot;data&quot;: [{ &quot;object&quot;: &quot;embedding&quot;, &quot;index&quot;: 0, &quot;embedding&quot;: [0.012, -0.34, …] }],
+    &quot;model&quot;: &quot;final&quot;,
+    &quot;usage&quot;: { &quot;prompt_tokens&quot;: 9, &quot;total_tokens&quot;: 9 } }
+</code></pre>
+<p>实现：<code>model.forward_hidden()</code> 取最后一层 hidden states，按行<strong>均值池化</strong>成
+一个向量（<code>no_grad</code> 包裹，不建计算图）。<code>input</code> 收字符串、token id 或它们的
+数组（≤32 条）。维度 = <code>n_embd</code>，<strong>不同 checkpoint 维度不同</strong>，RAG 场景混用
+前要对齐。越界 token id 先挡成 400 而不是让它 panic。</p>
+<p>这是个<strong>教学版 embedding</strong>：没有专门的对比学习训练，向量质量取决于底座预训练
+效果；RAG 实验（第 37 课）里的向量化对照有更细的讨论。</p>
+<h3 id="user-content-76-请求体与资源上限">7.6 请求体与资源上限<a href="#76-请求体与资源上限" aria-label="Link to heading '7.6 请求体与资源上限'" data-heading-content="7.6 请求体与资源上限" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>限制</th>
+<th>值</th>
+<th>防什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>请求体</td>
+<td>2 MB</td>
+<td>拿超大 body 撑爆内存</td>
+</tr>
+<tr>
+<td>messages</td>
+<td>200 条</td>
+<td>一万个 message</td>
+</tr>
+<tr>
+<td>stop</td>
+<td>4 个 × 64 字节</td>
+<td>拿 stop 字符串当缓冲区</td>
+</tr>
+<tr>
+<td>stop 驻留表</td>
+<td>256 种组合 / 1024 个字符串</td>
+<td><code>&amp;'static</code> 需求导致的无界泄漏（见下）</td>
+</tr>
+<tr>
+<td>embeddings 批量</td>
+<td>32 条</td>
+<td>一批塞爆</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>stop</code> 为什么需要&quot;驻留表&quot;</strong>：<code>SampleOpts.stop</code> 的类型是
+<code>&amp;'static [&amp;'static str]</code>（生成器热路径上要零成本反复比对）。请求里的 stop
+是运行时字符串，只能 <code>Box::leak</code> 换 <code>'static</code>——但每个请求都泄漏，服务跑一周
+就是内存缓慢上涨。解法是两层 interner：字符串只在<strong>首次出现</strong>时泄漏一次
+（1024 个封顶，超出报 400），相同组合复用同一份切片（256 份封顶）。<strong>有界
+泄漏</strong>是这里唯一诚实的方案：Rust 的类型系统要求 <code>'static</code>，而进程内没有别
+的生命周期能给它。</p>
+<h3 id="user-content-77-openapijson-接口规范">7.7 <code>/openapi.json</code> 接口规范<a href="#77-openapijson-接口规范" aria-label="Link to heading '7.7 /openapi.json 接口规范'" data-heading-content="7.7 /openapi.json 接口规范" class="anchor"></a></h3>
+<pre><code class="language-bash">curl -s http://127.0.0.1:8080/openapi.json   # OpenAPI 3.1，JSON
+curl -s http://127.0.0.1:8080/openapi.yaml   # 同一份，YAML
+</code></pre>
+<p>规范<strong>由 <code>openapi_spec(&amp;ServeCfg)</code> 在运行时从代码里现拼</strong>，不维护手写文档：
+路径、鉴权方式、数值上下限（<code>temperature ≤ 5</code>、<code>messages ≤ 200</code>、<code>stop ≤ 4 个</code>）
+全部和 <code>parse_chat</code> 的真实校验共用同一批常量，并有单测
+<code>openapi_spec_constraints_match_parse_chat</code> 盯着两者不许漂移；另有
+<code>openapi_spec_covers_every_route</code> 保证 7 条路由一条不漏、
+<code>openapi_spec_every_ref_resolves</code> 保证 <code>$ref</code> 没有悬空引用。</p>
+<p>拿到规范就能直接导入 Postman / Apifox / Swagger UI，或者让 OpenAI SDK 按
+schema 做请求校验（JSON 端点按 <code>to_string_pretty</code> 缩进输出，方便人读和看
+git diff）。</p>
+<p><strong>导入即可直接调用</strong>（不用手改示例、不用逐请求配鉴权）：</p>
+<ul>
+<li><code>chat</code> / <code>embeddings</code> 的 <code>requestBody</code> 在 media type 层带了<strong>能跑通的
+<code>example</code></strong>——Postman 会直接拿它当请求体。若不给 <code>example</code>，导入工具会按
+schema 自己编，编出 <code>n≠1</code> 或以 assistant 结尾的 messages，一点 Send 就是
+「本服务只支持 n=1」「messages 的最后一条必须是 role=user」两个 400。
+单测 <code>openapi_examples_pass_real_parsers</code> 把 example 塞回真实 <code>parse_chat</code>
+验一遍，漂移会当场失败。</li>
+<li>鉴权是<strong>规范里写不了密钥值的</strong>（安全），但已在 <code>bearerAuth.description</code>
+里写清做法：导入后在 collection 的 Authorization → Bearer Token 填一次
+key 即可，子请求全部继承，无需逐请求设置；key 取 <code>--api-key</code>，没给则
+是启动时自动生成的随机 key（看控制台启动日志）。</li>
+</ul>
+<p>同一份规范还会在 <strong><code>serve</code> 启动时自动写进 <code>openapi/</code> 目录</strong>
+（<code>dump_openapi_files</code>，与端点出自同一个 <code>openapi_spec</code>，逐字一致）：</p>
+<ul>
+<li><a href="../openapi/openapi.json"><code>openapi/openapi.json</code></a> / <a href="../openapi/openapi.yaml"><code>openapi/openapi.yaml</code></a></li>
+<li>手删了下次启动也会自动重建，内容跟着代码走、永不过期</li>
+<li>写盘失败只打一行警告，不影响服务本身</li>
+<li>不想启服务也能手动刷新（与端点字节一致）：</li>
+</ul>
+<pre><code class="language-bash">curl -s -o openapi/openapi.json http://127.0.0.1:8080/openapi.json
+curl -s -o openapi/openapi.yaml http://127.0.0.1:8080/openapi.yaml
+</code></pre>
+<p>YAML 是手写的极简序列化器（<code>json_to_yaml</code>，不引 yaml 库）：块映射 + 块序列，
+字符串按最保守规则决定裸写还是双引号——<code>true</code>/<code>yes</code>、<code>1.1.1</code>、<code>0x1F</code>、
+<code>2026-09-27</code> 这类会被 YAML 解析回 bool/数字的值一律上引号。</p>
+<hr />
+<h3 id="user-content-78-前端测试页web随-serve-一起启动">7.8 前端测试页（<code>web/</code>，随 serve 一起启动）<a href="#78-前端测试页web随-serve-一起启动" aria-label="Link to heading '7.8 前端测试页（web/，随 serve 一起启动）'" data-heading-content="7.8 前端测试页（web/，随 serve 一起启动）" class="anchor"></a></h3>
+<p><code>serve</code> 默认在进入常驻循环前顺带拉起 <a href="../web/"><code>web/</code></a> 目录下的 <strong>vite dev
+server</strong>（React + TypeScript），浏览器打开 <code>http://localhost:5173</code> 就是一个
+可视化接口调试台：</p>
+<table>
+<thead>
+<tr>
+<th>页签</th>
+<th>覆盖端点</th>
+<th>能干什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>对话</td>
+<td><code>POST /v1/chat/completions</code></td>
+<td>流式开关、模型下拉、temperature/top_k/top_p/max_tokens 调参、气泡对话、meta（耗时/finish_reason/usage）、原始 JSON、等价 cURL</td>
+</tr>
+<tr>
+<td>向量化</td>
+<td><code>POST /v1/embeddings</code></td>
+<td>多行文本按行批量向量化，显示维度、前 8 维、usage、完整 JSON</td>
+</tr>
+<tr>
+<td>状态</td>
+<td><code>/health</code>、<code>/v1/status</code>、<code>/v1/models</code></td>
+<td>三卡片并行探活 + 刷新，附 openapi.yaml 下载链接</td>
+</tr>
+</tbody>
+</table>
+<p><strong>为什么不需要 <code>--cors</code></strong>：页面请求打的是 vite dev server 自己的源，
+vite 把 <code>/v1</code>、<code>/health</code>、<code>/openapi.*</code> <strong>代理转发</strong>到 <code>http://127.0.0.1:${API_PORT}</code>
+——浏览器视角是同源，CORS 根本不参与；转发目标端口由 Rust 侧通过环境变量
+<code>API_PORT</code> 传入（vite.config.ts 读取），<code>--web-port</code> 传 dev server 端口
+（<code>WEB_PORT</code>，默认 5173，<code>strictPort</code> 占用即报错不静默换端口）。</p>
+<p><strong>启动编排</strong>（<code>serve::spawn_web_frontend</code>）：</p>
+<ul>
+<li>定位 <code>web/</code>：先找工作目录（部署时 web/ 与二进制并排放），找不到再退回
+编译时的仓库目录（开发时从子目录 <code>cargo run</code>）；</li>
+<li>用 <code>node web/node_modules/vite/bin/vite.js</code> 直接拉起——绕开 Windows 上
+<code>npm</code> 实际是 <code>npm.cmd</code>、<code>std::process::Command</code> 找不到的问题；</li>
+<li>找不到工程或没装依赖（<code>node_modules/vite</code> 不存在）只打一行警告就返回，
+<strong>绝不影响 API 启动</strong>；缺依赖时提示 <code>cd web &amp;&amp; npm install</code>；</li>
+<li>除端口外还注入 <code>VITE_API_KEY</code>（<code>VITE_</code> 前缀才会进 <code>import.meta.env</code>）：
+鉴权始终开着、key 又可能是随机的，页面自动填好才免得用户手抄；</li>
+<li>子进程交给独立线程 <code>wait()</code> 收割（不留僵尸进程），与 API 共享控制台，
+Ctrl-C 时两边一起停。</li>
+</ul>
+<p><strong>开关</strong>：<code>--no-web</code> 只起 API；<code>--web-port &lt;端口&gt;</code> 换页面端口。
+生产部署（systemd/nginx，见 §11）务必加 <code>--no-web</code>——dev server 只服务开发调试。</p>
+<pre><code class="language-bash">cargo run --release -- serve --ckpt checkpoints/zh-sft/best.ckpt --api-key sk-test
+#   [serve] 前端测试页已启动：http://localhost:5173（代理 API → 127.0.0.1:8080）
+</code></pre>
+<hr />
+<h2 id="user-content-8-错误处理openai-形状--中文原因">8. 错误处理：OpenAI 形状 + 中文原因<a href="#8-错误处理openai-形状--中文原因" aria-label="Link to heading '8. 错误处理：OpenAI 形状 + 中文原因'" data-heading-content="8. 错误处理：OpenAI 形状 + 中文原因" class="anchor"></a></h2>
+<pre><code class="language-json">{ &quot;error&quot;: { &quot;message&quot;: &quot;messages 的最后一条必须是 role=user&quot;,
+             &quot;type&quot;: &quot;invalid_request_error&quot;,
+             &quot;code&quot;: null } }
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>状态</th>
+<th>type</th>
+<th>典型场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>400</td>
+<td><code>invalid_request_error</code></td>
+<td>字段缺失/类型错/取值越界（消息指名<strong>哪个字段</strong>）</td>
+</tr>
+<tr>
+<td>401</td>
+<td><code>authentication_error</code></td>
+<td>缺 key 或 key 错</td>
+</tr>
+<tr>
+<td>404</td>
+<td><code>not_found</code></td>
+<td>未知路径</td>
+</tr>
+<tr>
+<td>405</td>
+<td><code>invalid_request_error</code></td>
+<td>方法不对（PUT 等）</td>
+</tr>
+<tr>
+<td>413</td>
+<td><code>invalid_request_error</code></td>
+<td>请求体 &gt; 2 MB</td>
+</tr>
+<tr>
+<td>500</td>
+<td><code>server_error</code></td>
+<td>生成中途出错（SSE 下发一个 error 帧 + <code>[DONE]</code>）</td>
+</tr>
+</tbody>
+</table>
+<p><code>type</code> 字段是给<strong>机器</strong>看的（SDK 靠它分类），<code>message</code> 是给人看的（中文、说
+清怎么改）。SSE 路径下的 500 不能改状态码（200 和首帧早就发出去了），所以发
+一个 error 事件帧再发 <code>[DONE]</code>——客户端拿到这两帧才知道&quot;不是正常结束&quot;。</p>
+<hr />
+<h2 id="user-content-9-实测记录">9. 实测记录<a href="#9-实测记录" aria-label="Link to heading '9. 实测记录'" data-heading-content="9. 实测记录" class="anchor"></a></h2>
+<p><code>checkpoints/zh-sft-v2/final.ckpt</code>，<code>--port 8099 --api-key sk-test --cors --max-new 64</code>：</p>
+<table>
+<thead>
+<tr>
+<th>用例</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>无 key 访问 <code>/v1/models</code></td>
+<td>401 <code>authentication_error</code></td>
+</tr>
+<tr>
+<td>带 key 访问 <code>/v1/models</code></td>
+<td>200，<code>data[0].id = &quot;final&quot;</code></td>
+</tr>
+<tr>
+<td>非流式 chat</td>
+<td>200，<code>finish_reason:&quot;stop&quot;</code>，<code>usage{12,33,45}</code></td>
+</tr>
+<tr>
+<td><code>stream:true</code></td>
+<td>角色帧 → 逐 token delta → finish 帧 → usage 帧 → <code>[DONE]</code></td>
+</tr>
+<tr>
+<td>embeddings（2 条）</td>
+<td>200，两条 128 维向量，<code>usage.prompt_tokens:9</code></td>
+</tr>
+<tr>
+<td>错 key / 空 messages / PUT / 未知路径</td>
+<td>401 / 400 / 405 / 404（均为 OpenAI 错误体）</td>
+</tr>
+<tr>
+<td><code>OPTIONS</code> 预检</td>
+<td>204 + 完整 CORS 头</td>
+</tr>
+<tr>
+<td>curl 中途断开</td>
+<td>服务端 51 token 处中止，打印 <code>客户端提前断开</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-踩坑powershell-下-curl-发-json">踩坑：PowerShell 下 curl 发 JSON<a href="#踩坑powershell-下-curl-发-json" aria-label="Link to heading '踩坑：PowerShell 下 curl 发 JSON'" data-heading-content="踩坑：PowerShell 下 curl 发 JSON" class="anchor"></a></h3>
+<pre><code class="language-powershell"># ❌ 在 PowerShell 双引号字符串里写 \&quot; 会被吞掉，发出去的 body 不合法
+curl -d &quot;{\&quot;model\&quot;:\&quot;final\&quot;, …}&quot;
+
+# ✅ 写临时 UTF-8 文件，再用 --data-binary @file 发
+$json = '{&quot;model&quot;:&quot;final&quot;,&quot;stream&quot;:true,&quot;messages&quot;:[{&quot;role&quot;:&quot;user&quot;,&quot;content&quot;:&quot;你好&quot;}]}'
+[IO.File]::WriteAllText(&quot;$env:TEMP\req.json&quot;, $json, [Text.UTF8Encoding]::new($false))
+curl.exe -s -N --data-binary &quot;@$env:TEMP\req.json&quot; `
+  -H &quot;Content-Type: application/json&quot; `
+  -H &quot;Authorization: Bearer sk-test&quot; `
+  http://127.0.0.1:8099/v1/chat/completions
+</code></pre>
+<p>三个坑叠在一起：PowerShell 的 <code>\&quot;</code> 转义规则、<code>curl</code> 在 Windows 上可能解析到
+别的程序、<code>-d</code> 会做 URL 编辑（<code>--data-binary</code> 不会）。服务端当时的报错是
+<code>key must be a string at line 1 column 2</code>——<strong>报错指向的字段名往往不是真凶</strong>，
+先怀疑&quot;我发出去的字节到底是什么&quot;（Wireshark 或服务端日志打印原始 body 都行）。</p>
+<hr />
+<h2 id="user-content-10-单元测试28-个">10. 单元测试（28 个）<a href="#10-单元测试28-个" aria-label="Link to heading '10. 单元测试（28 个）'" data-heading-content="10. 单元测试（28 个）" class="anchor"></a></h2>
+<p><code>src/serve.rs</code> 底部的 <code>#[cfg(test)] mod tests</code>，不启端口、纯函数级：</p>
+<table>
+<thead>
+<tr>
+<th>测试</th>
+<th>验证内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>split_sft_history_shape</code> / <code>split_raw_history_shape</code></td>
+<td>消息拆成 system/历史/输入三段的形状</td>
+</tr>
+<tr>
+<td><code>split_sft_two_rounds_join_with_newline</code></td>
+<td>多轮历史的换行拼接</td>
+</tr>
+<tr>
+<td><code>split_merges_multiple_system_messages</code></td>
+<td>多条 system 全部汇进 system</td>
+</tr>
+<tr>
+<td><code>merge_system_service_level_comes_first</code></td>
+<td>服务级 system 在前</td>
+</tr>
+<tr>
+<td><code>parse_chat_rejects_bad_requests</code></td>
+<td>各种非法请求的 400 与错误消息</td>
+</tr>
+<tr>
+<td><code>parse_chat_applies_defaults_and_overrides</code></td>
+<td>默认值套用与逐字段覆盖（含 SFT stop 缺省）</td>
+</tr>
+<tr>
+<td><code>parse_chat_counts_history_turns</code></td>
+<td>历史条数统计：首轮 0、system 不计入、多轮正确计数</td>
+</tr>
+<tr>
+<td><code>qa_log_block_records_round_and_params</code></td>
+<td>问答记录块：标题/输入/输出/收尾/采样参数/用量逐项齐全</td>
+</tr>
+<tr>
+<td><code>qa_log_block_handles_empty_output_and_abort</code></td>
+<td>空输出与中止场景：标注&quot;（空）&quot;&quot;未正常收尾&quot;与备注</td>
+</tr>
+<tr>
+<td><code>stop_interner_dedups_identical_slices</code></td>
+<td>驻留表去重</td>
+</tr>
+<tr>
+<td><code>stop_interner_rejects_oversized_input</code></td>
+<td>驻留表上限生效（不无界泄漏）</td>
+</tr>
+<tr>
+<td><code>sse_pipe_reads_frames_then_hits_eof</code></td>
+<td>SsePipe 帧读取 + EOF 语义</td>
+</tr>
+<tr>
+<td><code>finish_reason_mapping</code></td>
+<td>EOS/StopMark → stop，MaxNew → length</td>
+</tr>
+<tr>
+<td><code>mean_pool_averages_rows</code></td>
+<td>均值池化数值正确</td>
+</tr>
+<tr>
+<td><code>openapi_spec_covers_every_route</code></td>
+<td>规范含 7 条路由、版本 3.1、<code>bearerAuth</code>、不鉴权端点的 <code>security: []</code></td>
+</tr>
+<tr>
+<td><code>openapi_spec_constraints_match_parse_chat</code></td>
+<td>规范里的数值上限与 <code>parse_chat</code> 的真实校验逐项一致</td>
+</tr>
+<tr>
+<td><code>openapi_spec_every_ref_resolves</code></td>
+<td>所有 <code>$ref</code> 都能在 <code>components</code> 里找到</td>
+</tr>
+<tr>
+<td><code>json_to_yaml_renders_nested_structures</code></td>
+<td>YAML 序列化：嵌套对象/数组、空容器、换行与引号</td>
+</tr>
+<tr>
+<td><code>yaml_quoting_never_leaks_ambiguous_scalars</code></td>
+<td><code>true</code>/<code>1.1.1</code>/<code>2026-09-27</code> 一律引号，普通文本裸写</td>
+</tr>
+<tr>
+<td><code>dump_openapi_files_writes_both_formats</code></td>
+<td>启动自动写出的 <code>openapi/{json,yaml}</code> 与端点字节逐字一致，JSON 可解析回 7 条路由</td>
+</tr>
+<tr>
+<td><code>openapi_examples_pass_real_parsers</code></td>
+<td>requestBody 的 <code>example</code> 能过真实 <code>parse_chat</code> / input 类型校验——导入 Postman 点 Send 直接 200</td>
+</tr>
+</tbody>
+</table>
+<p>端到端（鉴权、CORS、SSE、断开中止）靠 §9 的 curl 实测覆盖——HTTP 层的正确性
+用真 socket 验证比 mock 更可信。</p>
+<hr />
+<h2 id="user-content-11-小结与下一课">11. 小结与下一课<a href="#11-小结与下一课" aria-label="Link to heading '11. 小结与下一课'" data-heading-content="11. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<p><strong>当前已具备</strong>：流式/非流式、鉴权、CORS、embeddings、请求日志与完整问答记录、队列状态、
+OpenAPI 规范（运行时端点 + <code>serve</code> 启动自动写出 <code>openapi/{openapi.json,openapi.yaml}</code>）、
+前端测试页（<code>web/</code> 随 serve 启动，§7.8，生产加 <code>--no-web</code>）、
+断开可中断、OpenAI 兼容错误体、资源上限、全量单测（<code>cargo test serve</code> 覆盖本课模块，
+总数以实际输出为准）。</p>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<p><strong>上生产前还要补的</strong>（本课未做，刻意不半成品实现）：</p>
+<ol>
+<li><strong>TLS</strong>：<code>--api-key</code> 走明文 HTTP 等于裸奔。要么前置 nginx/caddy 终结 TLS，
+要么用 rustls 给 tiny_http 套壳。</li>
+<li><strong>限流与超时</strong>：单 IP QPS 上限、生成总时长上限（防止一个 <code>max_tokens=10^6</code>
+的请求永久占锁）。</li>
+<li><strong>多副本 + 负载均衡</strong>：真并发要么多进程多端口，要么上 GPU。</li>
+<li><strong>持久化会话</strong>：现在是无状态的（每次请求带全量 messages），多轮记忆靠调用
+方自己维护——这正是 OpenAI 的语义，但产品化时常要服务端会话。</li>
+<li><strong>可观测性</strong>：<code>/v1/status</code> 是自绘计数器，生产上通常换成 Prometheus 格式
+（<code>/metrics</code>）+ 链路追踪。</li>
+</ol>
+<p><strong>思考题</strong>：</p>
+<ol>
+<li>为什么 SSE 的 usage 要单独发一帧，而不是塞进最后一个 delta 帧？</li>
+<li><code>sync_channel</code> 容量从 16 调成 1，对&quot;慢客户端 + 快生成&quot;的场景各有什么影响？</li>
+<li>如果把 <code>Core</code> 的 <code>Mutex</code> 换成 <code>RwLock</code>，能让 embeddings 和生成并行吗？
+（提示：模型权重是只读的，但 KV cache 和 rng 在哪？）</li>
+<li><code>Box::leak</code> 换 <code>'static</code> 的 interner 方案，如果改成 <code>Arc&lt;[&amp;str]&gt;</code> 要动哪些
+类型签名？代价是什么？</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="41-%E5%A4%9A%E6%A8%A1%E6%80%81.md">第 41 课 多模态</a> —— 转向多模态：手写 ViT 做图片理解、手写 VQ-VAE 把图离散成码本 token 做图片生成。</p>
+</blockquote>

@@ -1,0 +1,320 @@
+<h1 id="user-content-第-36-课rlhf-与人类对齐alignment">第 36 课：RLHF 与人类对齐（Alignment）<a href="#第-36-课rlhf-与人类对齐alignment" aria-label="Link to heading '第 36 课：RLHF 与人类对齐（Alignment）'" data-heading-content="第 36 课：RLHF 与人类对齐（Alignment）" class="anchor"></a></h1>
+<blockquote>
+<p><strong>本课已落地为可运行代码</strong>：<code>src/align.rs</code>（单测跑 <code>cargo test align</code>，数量以实际输出为准）+ <code>align</code> 子命令——奖励模型（Bradley-Terry
+成对损失）、DPO（隐式奖励 + 参考模型 logprob）、GRPO（组内相对优势）、PPO（clip 目标 + KL(k3) 惩罚）。
+与已有代码的衔接：SFT 复用 <code>src/train.rs</code> 的训练循环与 <code>src/loss.rs</code> 的交叉熵；
+DPO / PPO 都建在 <code>src/tensor.rs</code> 现有算子上，<code>sigmoid</code> / <code>softplus</code> / KL 估计等标量函数写在 <code>src/align.rs</code> 里。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-为什么需要对齐">1. 为什么需要对齐？<a href="#1-为什么需要对齐" aria-label="Link to heading '1. 为什么需要对齐？'" data-heading-content="1. 为什么需要对齐？" class="anchor"></a></h2>
+<p>预训练模型的目标是<strong>预测下一个 token</strong>，但这个目标和&quot;对人类有用、无害、诚实&quot;之间存在巨大鸿沟：</p>
+<ul>
+<li>预训练后，模型可能会生成有害内容、编造事实（幻觉）、不遵循指令</li>
+<li>模型学到的是&quot;互联网上什么样的文本最常见&quot;，而不是&quot;什么样的回答最好&quot;</li>
+</ul>
+<p><strong>对齐（Alignment）</strong> 就是让模型的行为符合人类的价值观和偏好。</p>
+<h2 id="user-content-2-三阶段训练流程">2. 三阶段训练流程<a href="#2-三阶段训练流程" aria-label="Link to heading '2. 三阶段训练流程'" data-heading-content="2. 三阶段训练流程" class="anchor"></a></h2>
+<p>现代 LLM 的训练通常分为三个阶段：</p>
+<pre><code class="language-plaintext">阶段 1: 预训练 (Pre-training)
+  目标: 学习语言能力（预测下一个 token）
+  数据: 互联网文本（万亿 token）
+  ↓
+
+阶段 2: 监督微调 (Supervised Fine-Tuning, SFT)
+  目标: 学习&quot;如何回答问题&quot;的格式
+  数据: 人工标注的 (问题, 回答) 对（万~十万条）
+  ↓
+
+阶段 3: 对齐 (Alignment)
+  目标: 学习&quot;什么是好回答&quot;
+  方法: RLHF / DPO 等
+  数据: 人工排序的 (好回答, 差回答) 对
+</code></pre>
+<h2 id="user-content-3-监督微调sft">3. 监督微调（SFT）<a href="#3-监督微调sft" aria-label="Link to heading '3. 监督微调（SFT）'" data-heading-content="3. 监督微调（SFT）" class="anchor"></a></h2>
+<p>SFT 是最简单的对齐方式：直接用高质量的 (指令, 回答) 数据微调模型。</p>
+<pre><code class="language-plaintext">训练样本:
+  Input:  &quot;请解释什么是量子计算&quot;
+  Target: &quot;量子计算是利用量子力学原理进行计算的技术...&quot;
+
+Loss: CrossEntropy(模型输出, Target tokens)
+</code></pre>
+<p><strong>关键难点</strong>：</p>
+<ul>
+<li>数据质量 &gt; 数据数量：少量高质量数据 &gt;&gt; 大量低质量数据（LIMA 论文：仅 1000 条精心标注的数据就能达到很好的 SFT 效果）</li>
+<li>回答风格需要一致（不能有时详细、有时简略）</li>
+</ul>
+<h2 id="user-content-4-rlhfreinforcement-learning-from-human-feedback">4. RLHF（Reinforcement Learning from Human Feedback）<a href="#4-rlhfreinforcement-learning-from-human-feedback" aria-label="Link to heading '4. RLHF（Reinforcement Learning from Human Feedback）'" data-heading-content="4. RLHF（Reinforcement Learning from Human Feedback）" class="anchor"></a></h2>
+<h3 id="user-content-41-核心思想">4.1 核心思想<a href="#41-核心思想" aria-label="Link to heading '4.1 核心思想'" data-heading-content="4.1 核心思想" class="anchor"></a></h3>
+<ol>
+<li>训练一个<strong>奖励模型（Reward Model, RM）</strong>，学习人类对回答质量的偏好</li>
+<li>用强化学习（PPO）优化 LLM，使其生成奖励模型打高分的回答</li>
+</ol>
+<h3 id="user-content-42-步骤详解">4.2 步骤详解<a href="#42-步骤详解" aria-label="Link to heading '4.2 步骤详解'" data-heading-content="4.2 步骤详解" class="anchor"></a></h3>
+<h4 id="user-content-步骤-1收集偏好数据">步骤 1：收集偏好数据<a href="#步骤-1收集偏好数据" aria-label="Link to heading '步骤 1：收集偏好数据'" data-heading-content="步骤 1：收集偏好数据" class="anchor"></a></h4>
+<p>对同一个问题，让 SFT 模型生成多个回答，由人工排序：</p>
+<pre><code class="language-plaintext">问题: &quot;如何做番茄炒蛋？&quot;
+
+回答 A: &quot;先打鸡蛋，然后...&quot;（详细、正确）
+回答 B: &quot;把东西放锅里炒&quot;（过于简略）
+回答 C: &quot;番茄炒蛋的量子力学原理是...&quot;（离谱）
+
+人类排序: A &gt; B &gt; C
+</code></pre>
+<h4 id="user-content-步骤-2训练奖励模型">步骤 2：训练奖励模型<a href="#步骤-2训练奖励模型" aria-label="Link to heading '步骤 2：训练奖励模型'" data-heading-content="步骤 2：训练奖励模型" class="anchor"></a></h4>
+<p>奖励模型的目标：对好回答打高分，对差回答打低分。</p>
+<p>使用 <strong>Bradley-Terry 模型</strong>，损失函数：</p>
+<p>$$
+\mathcal{L}<em>{RM} = -\log \sigma(r</em>\theta(x, y_w) - r_\theta(x, y_l))
+$$</p>
+<p>其中：</p>
+<ul>
+<li>$y_w$ 是人类偏好的&quot;更好&quot;回答</li>
+<li>$y_l$ 是&quot;更差&quot;回答</li>
+<li>$r_\theta(x, y)$ 是奖励模型对 (问题 x, 回答 y) 的打分</li>
+<li>$\sigma$ 是 sigmoid 函数</li>
+</ul>
+<p><strong>直觉</strong>：让好回答的分数比差回答的分数高出足够多（sigmoid 的输入越大，loss 越小）。</p>
+<h4 id="user-content-步骤-3ppo-强化学习优化">步骤 3：PPO 强化学习优化<a href="#步骤-3ppo-强化学习优化" aria-label="Link to heading '步骤 3：PPO 强化学习优化'" data-heading-content="步骤 3：PPO 强化学习优化" class="anchor"></a></h4>
+<p>用 Proximal Policy Optimization（PPO）算法优化 LLM 的生成策略：</p>
+<p>$$
+\mathcal{L}<em>{PPO} = \mathbb{E}</em>{(x,y) \sim \pi_\theta} \left[ r_\phi(x, y) - \beta \cdot D_{KL}(\pi_\theta | \pi_{\text{ref}}) \right]
+$$</p>
+<p>其中：</p>
+<ul>
+<li>$\pi_\theta$ 是当前 LLM 策略</li>
+<li>$\pi_{\text{ref}}$ 是 SFT 后的参考模型（防止模型偏离太远）</li>
+<li>$r_\phi$ 是奖励模型的打分</li>
+<li>$\beta$ 是 KL 惩罚系数（控制&quot;不要太偏离原始模型&quot;）</li>
+</ul>
+<p><strong>KL 惩罚的作用</strong>：防止模型&quot;hack&quot;奖励模型——如果不加 KL 约束，LLM 会找到奖励模型的漏洞（如反复说&quot;我非常确定&quot;来得高分），而不是真正提高回答质量（这叫 reward hacking）。</p>
+<h3 id="user-content-43-ppo-算法核心">4.3 PPO 算法核心<a href="#43-ppo-算法核心" aria-label="Link to heading '4.3 PPO 算法核心'" data-heading-content="4.3 PPO 算法核心" class="anchor"></a></h3>
+<p>PPO 是一种<strong>策略梯度</strong>方法，核心是 clipped surrogate objective：</p>
+<p>$$
+L^{CLIP} = \mathbb{E}_t \left[ \min\left( r_t(\theta) \hat{A}_t, ; \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) \hat{A}_t \right) \right]
+$$</p>
+<p>其中：</p>
+<ul>
+<li>$r_t(\theta) = \frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{old}}(a_t|s_t)}$ 是新旧策略的概率比</li>
+<li>$\hat{A}_t$ 是优势函数估计（advantage）</li>
+<li>$\epsilon$ 是裁剪范围（通常 0.1~0.2）</li>
+</ul>
+<p><strong>直觉</strong>：不要让策略更新太大——如果新策略和旧策略差异超过 $\epsilon$，就用 clip 截断梯度。</p>
+<h3 id="user-content-44-rlhf-的完整训练流程">4.4 RLHF 的完整训练流程<a href="#44-rlhf-的完整训练流程" aria-label="Link to heading '4.4 RLHF 的完整训练流程'" data-heading-content="4.4 RLHF 的完整训练流程" class="anchor"></a></h3>
+<pre><code class="language-plaintext">                ┌─────────────┐
+                │  预训练 LLM  │
+                └──────┬──────┘
+                       │ SFT
+                ┌──────▼──────┐
+                │   SFT 模型   │──────────────────┐
+                └──────┬──────┘                   │
+                       │                          │ (作为参考模型 π_ref)
+                       │ 生成多个回答              │
+                       │ + 人工排序                │
+                ┌──────▼──────┐                   │
+                │  奖励模型 RM │                   │
+                └──────┬──────┘                   │
+                       │ 打分                     │
+                ┌──────▼──────┐                   │
+                │ PPO 优化 LLM │◄──────────────────┘
+                └──────┬──────┘     KL 惩罚
+                       │
+                ┌──────▼──────┐
+                │ 对齐后 LLM   │
+                └─────────────┘
+</code></pre>
+<h2 id="user-content-5-dpodirect-preference-optimization2023">5. DPO（Direct Preference Optimization，2023）<a href="#5-dpodirect-preference-optimization2023" aria-label="Link to heading '5. DPO（Direct Preference Optimization，2023）'" data-heading-content="5. DPO（Direct Preference Optimization，2023）" class="anchor"></a></h2>
+<h3 id="user-content-51-为什么需要-dpo">5.1 为什么需要 DPO？<a href="#51-为什么需要-dpo" aria-label="Link to heading '5.1 为什么需要 DPO？'" data-heading-content="5.1 为什么需要 DPO？" class="anchor"></a></h3>
+<p>RLHF 的 PPO 阶段非常复杂：</p>
+<ul>
+<li>需要训练单独的奖励模型</li>
+<li>PPO 训练不稳定，超参数敏感</li>
+<li>需要同时维护 4 个模型（策略、参考、奖励、价值），显存开销大</li>
+</ul>
+<p>DPO 的核心思想：<strong>跳过奖励模型，直接用偏好数据优化 LLM</strong>。</p>
+<h3 id="user-content-52-数学推导">5.2 数学推导<a href="#52-数学推导" aria-label="Link to heading '5.2 数学推导'" data-heading-content="5.2 数学推导" class="anchor"></a></h3>
+<p>DPO 从 RLHF 的目标函数出发，经过数学推导，得到一个<strong>闭式解</strong>：</p>
+<p>$$
+\mathcal{L}<em>{DPO} = -\mathbb{E}</em>{(x, y_w, y_l)} \left[ \log \sigma \left( \beta \log \frac{\pi_\theta(y_w|x)}{\pi_{ref}(y_w|x)} - \beta \log \frac{\pi_\theta(y_l|x)}{\pi_{ref}(y_l|x)} \right) \right]
+$$</p>
+<p>其中：</p>
+<ul>
+<li>$\pi_\theta$ 是当前模型</li>
+<li>$\pi_{ref}$ 是参考模型（通常是 SFT 后的模型）</li>
+<li>$y_w$ 是偏好回答（chosen）</li>
+<li>$y_l$ 是非偏好回答（rejected）</li>
+<li>$\beta$ 是温度参数（通常 0.1~0.5）</li>
+</ul>
+<p><strong>直觉</strong>：增大好回答相对于参考模型的概率比，同时减小差回答的概率比。</p>
+<h3 id="user-content-53-dpo-vs-rlhf-对比">5.3 DPO vs RLHF 对比<a href="#53-dpo-vs-rlhf-对比" aria-label="Link to heading '5.3 DPO vs RLHF 对比'" data-heading-content="5.3 DPO vs RLHF 对比" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>方面</th>
+<th>RLHF (PPO)</th>
+<th>DPO</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>是否需要奖励模型</td>
+<td>是</td>
+<td>否</td>
+</tr>
+<tr>
+<td>训练稳定性</td>
+<td>不稳定，超参敏感</td>
+<td>稳定，类似 SFT</td>
+</tr>
+<tr>
+<td>显存占用</td>
+<td>4 个模型</td>
+<td>2 个模型（策略 + 参考）</td>
+</tr>
+<tr>
+<td>实现复杂度</td>
+<td>高</td>
+<td>低</td>
+</tr>
+<tr>
+<td>性能</td>
+<td>被认为更好（但差距在缩小）</td>
+<td>接近 RLHF</td>
+</tr>
+</tbody>
+</table>
+<h2 id="user-content-6-其他对齐方法">6. 其他对齐方法<a href="#6-其他对齐方法" aria-label="Link to heading '6. 其他对齐方法'" data-heading-content="6. 其他对齐方法" class="anchor"></a></h2>
+<h3 id="user-content-61-rlaifrl-from-ai-feedback">6.1 RLAIF（RL from AI Feedback）<a href="#61-rlaifrl-from-ai-feedback" aria-label="Link to heading '6.1 RLAIF（RL from AI Feedback）'" data-heading-content="6.1 RLAIF（RL from AI Feedback）" class="anchor"></a></h3>
+<p>用 AI 代替人类标注偏好数据（如用商用大模型判断哪个回答更好），大幅降低标注成本。</p>
+<h3 id="user-content-62-grpogroup-relative-policy-optimizationdeepseek">6.2 GRPO（Group Relative Policy Optimization，DeepSeek）<a href="#62-grpogroup-relative-policy-optimizationdeepseek" aria-label="Link to heading '6.2 GRPO（Group Relative Policy Optimization，DeepSeek）'" data-heading-content="6.2 GRPO（Group Relative Policy Optimization，DeepSeek）" class="anchor"></a></h3>
+<p>DeepSeek 提出的简化 PPO 方法：</p>
+<ul>
+<li>不需要单独的价值模型（Critic）</li>
+<li>用同一组采样的相对奖励作为 baseline</li>
+<li>训练更稳定，资源消耗更少</li>
+</ul>
+<p>$$
+\mathcal{L}<em>{GRPO} = \mathbb{E}</em>{q, {o_i}} \left[ \frac{1}{G} \sum_{i=1}^{G} \min\left( r_i(\theta) \hat{A}_i, \text{clip}(r_i(\theta)) \hat{A}<em>i \right) - \beta D</em>{KL} \right]
+$$</p>
+<p>其中 $\hat{A}_i = \frac{r_i - \text{mean}({r_j})}{\text{std}({r_j})}$ 是组内相对优势。</p>
+<h3 id="user-content-63-constitutional-aianthropic">6.3 Constitutional AI（Anthropic）<a href="#63-constitutional-aianthropic" aria-label="Link to heading '6.3 Constitutional AI（Anthropic）'" data-heading-content="6.3 Constitutional AI（Anthropic）" class="anchor"></a></h3>
+<p>让 AI 自己根据一组&quot;宪法&quot;原则来修订和改进回答，减少人工参与。</p>
+<h2 id="user-content-7-本仓库实现要点">7. 本仓库实现要点<a href="#7-本仓库实现要点" aria-label="Link to heading '7. 本仓库实现要点'" data-heading-content="7. 本仓库实现要点" class="anchor"></a></h2>
+<p>上面的原理已全部落地为可运行代码。核心文件是 <a href="../src/align.rs"><code>src/align.rs</code></a>（单测跑 <code>cargo test align</code>，数量以实际输出为准），
+CLI 入口是 <a href="../README.md"><code>align</code></a> 子命令。</p>
+<h3 id="user-content-71-代码结构">7.1 代码结构<a href="#71-代码结构" aria-label="Link to heading '7.1 代码结构'" data-heading-content="7.1 代码结构" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>位置</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RewardModel</code></td>
+<td><code>align.rs</code></td>
+<td>奖励模型：Transformer 主干 + 标量头（<code>Linear</code>），给一条回答打分（无界实数，仅相对大小有意义）。实现 <code>Module</code> trait 聚合 backbone 和 head 的参数</td>
+</tr>
+<tr>
+<td><code>MaskedSequence</code></td>
+<td><code>align.rs</code></td>
+<td>带掩码的 token 序列：<code>ids</code> + <code>mask[i]</code>（是否计入对数概率）。提供 <code>full()</code>（整条参与）和 <code>answer_only()</code>（仅回答部分参与）两种构造方式</td>
+</tr>
+<tr>
+<td><code>PreferencePair</code></td>
+<td><code>align.rs</code></td>
+<td>一对偏好样本：同一 prompt 下的 <code>chosen</code>（优选）和 <code>rejected</code>（劣选）两个 <code>MaskedSequence</code></td>
+</tr>
+<tr>
+<td><code>bradley_terry_loss</code></td>
+<td><code>align.rs</code></td>
+<td>Bradley-Terry 成对损失：<code>-log σ(r_chosen - r_rejected)</code>，形式等价于 <code>softplus(-delta)</code>，手写梯度注入</td>
+</tr>
+<tr>
+<td><code>ranking_accuracy</code></td>
+<td><code>align.rs</code></td>
+<td>排序准确率：chosen 分数严格高于 rejected 的比例（随机猜测基准 0.5）</td>
+</tr>
+<tr>
+<td><code>sequence_logprob</code> / <code>sequence_logprob_value</code></td>
+<td><code>align.rs</code></td>
+<td>序列对数概率之和（因果位移 + 掩码求和），<code>_value</code> 版本不建计算图，用于预计算参考模型 logprob</td>
+</tr>
+<tr>
+<td><code>precompute_reference_logprobs</code></td>
+<td><code>align.rs</code></td>
+<td>批量预计算参考模型的对数概率（参考模型冻结，提前算好避免每步重复计算）</td>
+</tr>
+<tr>
+<td><code>implicit_reward</code></td>
+<td><code>align.rs</code></td>
+<td>DPO 隐式奖励：<code>β * (log π_θ(y) - log π_ref(y))</code>，策略与参考模型的对数概率比</td>
+</tr>
+<tr>
+<td><code>dpo_loss</code> / <code>dpo_batch_loss</code></td>
+<td><code>align.rs</code></td>
+<td>DPO 成对损失 + 批量版本：<code>-log σ(β * [(log π_c - log π_ref_c) - (log π_r - log π_ref_r)])</code></td>
+</tr>
+<tr>
+<td><code>group_advantages</code></td>
+<td><code>align.rs</code></td>
+<td>GRPO 组内相对优势归一化：<code>(r_i - mean(r)) / std(r)</code>，std=0 时短路返回全零</td>
+</tr>
+<tr>
+<td><code>kl_k3</code></td>
+<td><code>align.rs</code></td>
+<td>k3 估计的 KL 散度：<code>exp(-δ) - (-δ) - 1</code>（无偏、低方差、恒非负）</td>
+</tr>
+<tr>
+<td><code>grpo_loss</code></td>
+<td><code>align.rs</code></td>
+<td>GRPO 损失：组内相对优势 + 裁剪代理目标，与 PPO 形式相同但优势来源不同</td>
+</tr>
+<tr>
+<td><code>ppo_loss</code></td>
+<td><code>align.rs</code></td>
+<td>PPO 损失：裁剪代理目标 + 参考模型 KL 惩罚（<code>kl_coef</code> 控制约束松紧）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-72-cli-用法">7.2 CLI 用法<a href="#72-cli-用法" aria-label="Link to heading '7.2 CLI 用法'" data-heading-content="7.2 CLI 用法" class="anchor"></a></h3>
+<pre><code class="language-bash"># 默认配置（奖励模型 150 步 + DPO 60 步 + GRPO + PPO）
+cargo run --release -- align
+
+# 调整训练步数
+cargo run --release -- align --rm-steps 200 --steps 100
+
+# 调整超参数
+cargo run --release -- align --beta 0.2 --clip-eps 0.3 --kl-coef 0.1
+
+# GRPO 组大小和学习率
+cargo run --release -- align --group-size 8 --rm-lr 5e-3 --lr 2e-3
+
+# 调整模型规模
+cargo run --release -- align --n-embd 32 --n-layer 4 --block-size 64
+</code></pre>
+<hr />
+<h2 id="user-content-8-小结与下一课">8. 小结与下一课<a href="#8-小结与下一课" aria-label="Link to heading '8. 小结与下一课'" data-heading-content="8. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li>对齐要解决的问题：预训练目标是&quot;预测下一个 token&quot;，而不是&quot;给出好回答&quot;；后者的信号只能来自人类偏好</li>
+<li>三阶段流水线：预训练 → SFT（学格式）→ 对齐（学好坏）</li>
+<li>RLHF = 奖励模型（Bradley-Terry 成对损失）+ PPO（clip 目标 + 对参考模型的 KL 惩罚）；KL 项是防 reward hacking 的关键</li>
+<li>DPO 用闭式解跳过奖励模型，只维护&quot;策略 + 参考&quot;两个模型，训练稳定性接近 SFT</li>
+<li>其他路线：RLAIF（AI 代替人工标注）、GRPO（组内相对优势、免 Critic）、Constitutional AI（宪法原则自修订）</li>
+<li>本仓库把四条线全部落地为 <code>src/align.rs</code> + <code>align</code> 子命令：奖励模型、DPO、GRPO、PPO（KL 用 k3 估计，无偏且恒非负）</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现（<code>src/align.rs</code> + <code>align</code> 子命令），这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li><strong>理解 SFT Loss</strong>：在已有的 CrossEntropy 基础上，实现一个简单的 SFT 训练循环（用 (指令, 回答) 数据）。</li>
+<li><strong>实现 Bradley-Terry Loss</strong>：给定 (好回答分数, 差回答分数)，实现奖励模型的损失函数。</li>
+<li><strong>实现 DPO Loss</strong>：给定 (策略模型概率, 参考模型概率, 好回答, 差回答)，实现 DPO 损失函数。</li>
+<li><strong>对比实验</strong>：在小模型上分别用 SFT 和 DPO 训练，观察生成质量的变化。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="37-RAG%E6%A3%80%E7%B4%A2%E5%A2%9E%E5%BC%BA%E7%94%9F%E6%88%90.md">第 37 课 RAG 检索增强生成（Retrieval-Augmented Generation）</a> —— 对齐改的是&quot;怎么回答&quot;，下一课改的是&quot;知识从哪来&quot;——用检索把外部文档喂进上下文。</p>
+</blockquote>

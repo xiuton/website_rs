@@ -25,54 +25,22 @@
     <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"BlogPosting","headline":"第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型","description":"用低秩矩阵近似权重更新，冻结主干只训适配器，把微调成本压到极低。","url":"https://ganto.me/post/rust-llm-guide-29","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 微调","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
     </script>
-    <link rel="stylesheet" href="/styles-c3674ec134f9a612.css">
-<link rel="modulepreload" href="/web-rs-ed78e9ed78fe0ba6.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous">
-<link rel="preload" href="/web-rs-ed78e9ed78fe0ba6_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm">
+    <link rel="stylesheet" href="/styles-7299efb8f2a4d60.css">
+<link rel="modulepreload" href="/web-rs-4b7fc77d2e4f841a.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-web-eae67878b22d6805/inline0.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-cli-config-74c4aa43f52789a0/inline0.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/inline0.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/hydrate.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/patch_console.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/set_attribute.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-web-eae67878b22d6805/src/js/eval.js" crossorigin="anonymous">
+<link rel="preload" href="/web-rs-4b7fc77d2e4f841a_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm">
 
     <style>
-:root {
-            --bg-base: #f8f4ed;
-            --bg-elevated: #fdfbf7;
-            --bg-subtle: #f0ebe0;
-            --text-primary: #3e3327;
-            --text-secondary: #7a6c5a;
-            --text-tertiary: #a49480;
-            --border-default: #e0d6c5;
-            --border-subtle: #ede4d5;
-            --accent: #6a9b50;
-            --accent-rgb: 106, 155, 80;
-            --accent-soft: rgba(106, 155, 80, 0.1);
-            --radius-sm: 6px;
-            --radius-md: 10px;
-            --radius-lg: 14px;
-            --radius-full: 999px;
-        }
-.dark {
-            --bg-base: #1b1612;
-            --bg-elevated: #241e19;
-            --bg-subtle: #2d2620;
-            --text-primary: #ede4d6;
-            --text-secondary: #b0a290;
-            --text-tertiary: #7d7060;
-            --border-default: #3a3229;
-            --border-subtle: #2a241f;
-            --accent: #78b860;
-            --accent-rgb: 120, 184, 96;
-            --accent-soft: rgba(120, 184, 96, 0.12);
-        }
+.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
 
     </style>
     <style>
-        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
-        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
         .theme-toggle .icon-sun { display: none; }
         .dark .theme-toggle .icon-sun { display: inline; }
         .dark .theme-toggle .icon-moon { display: none; }
@@ -98,50 +66,7 @@
     </script>
 </head>
 <body>
-    <div id="main">
-        <div class="app">
-<div class="navbar-content">
-    <div class="navbar-ui">
-        <div class="navbar-title-wrapper">
-            <h1 class="navbar-title">干徒</h1>
-            <div class="navbar-glow"></div>
-        </div>
-        <div class="navbar-subtitle">这很酷</div>
-    </div>
-</div>
-<div class="navbar-sticky-wrap">
-    <div class="navbar-links">
-        <a class="nav-link nav-active" href="/">首页</a>
-        <a class="nav-link" href="/about">关于</a>
-        <a class="nav-link" href="/tags">书签</a>
-        <a class="nav-link" href="/search">搜索</a>
-        <a class="nav-link" href="/knowledge-graph">图谱</a>
-        <a class="nav-link" href="/ai-summary">AI摘要</a>
-        <div class="nav-item-with-sub">
-            <a class="nav-link" href="/dev">开发</a>
-            <div class="nav-submenu">
-                <a class="nav-sub-link" href="/circle-generator">圆形生成器</a>
-            </div>
-        </div>
-        <a class="nav-icon-btn rss-toggle" href="/rss" title="RSS 订阅" aria-label="RSS 订阅">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"/></svg>
-        </a>
-        <button class="nav-icon-btn theme-toggle" id="prerender-theme-toggle" aria-label="切换主题" title="切换主题">
-            <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
-            <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="16" height="16" fill="currentColor"><path d="M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"/></svg>
-        </button>
-    </div>
-</div>
-        <main class="main-content">
-            <article class="blog-post prerender-article">
-                <h1>第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</h1>
-                <div class="prerender-meta">
-                    <span>2026-09-01</span>
-                    <span>干徒</span>
-                </div>
-                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">微调</span></div>
-                <div class="blog-content">
-<h1><a href="#第-29-课lora-低秩适配--用-1-的参数微调大模型" aria-hidden="true" class="anchor" id="user-content-第-29-课lora-低秩适配--用-1-的参数微调大模型"></a>第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</h1>
+    <div id="main"><div class="app"><div class="navbar-content"><div class="navbar-ui"><div class="navbar-title-wrapper"><h1 class="navbar-title">干徒</h1><div class="navbar-glow"></div></div><div class="navbar-subtitle">这很酷</div></div></div><div class="navbar-sticky-wrap"><div class="navbar-links"><a href="/" class="nav-link nav-active">首页</a><a href="/about" class="nav-link">关于</a><a href="/tags" class="nav-link">书签</a><a href="/search" class="nav-link">搜索</a><a href="/knowledge-graph" class="nav-link">图谱</a><a href="/ai-summary" class="nav-link">AI摘要</a><div class="nav-item-with-sub"><a href="/dev" class="nav-link">开发</a><button class="nav-sub-trigger"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5 L5 6.5 L8 3.5"></path></svg></button></div><a href="/playground" class="nav-link">操场</a><a href="/test" class="nav-link">测试</a><a href="/rss" class="nav-icon-btn rss-toggle" title="RSS 订阅"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"></path></svg></a><button class="nav-icon-btn theme-toggle"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"></path></svg></button></div></div><main class="main-content" id="main-content"><div class="blog-container"><article class="blog-post" aria-label="文章：第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型"><div class="blog-title-wrapper"><div class="blog-title"><h2>第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</h2><span class="blog-category">rust-llm</span></div><div class="blog-meta"><span class="blog-date">2026-09-01 12:00:00</span><span class="blog-author">干徒</span></div></div><div class="blog-content"><div><h1 id="user-content-第-29-课lora-低秩适配--用-1-的参数微调大模型">第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型<a href="#第-29-课lora-低秩适配--用-1-的参数微调大模型" aria-label="Link to heading '第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型'" data-heading-content="第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型" class="anchor"></a></h1>
 <blockquote>
 <p>代码位置：<a href="../src/layers.rs">src/layers.rs</a>（<code>LoraAdapter</code> 适配层）、
 <a href="../src/attention.rs">src/attention.rs</a>（<code>MultiHeadAttention::apply_lora</code>）、
@@ -151,7 +76,7 @@
 <p>上手命令：<code>cargo run --release -- finetune --pretrained checkpoints/zh/latest.ckpt --steps 60 --lr 5e-5</code></p>
 </blockquote>
 <hr />
-<h2><a href="#1-本课要搞懂的问题" aria-hidden="true" class="anchor" id="user-content-1-本课要搞懂的问题"></a>1. 本课要搞懂的问题</h2>
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
 <ol>
 <li>为什么大模型微调不需要更新全部参数？</li>
 <li>LoRA 是怎么用低秩矩阵近似权重更新的？</li>
@@ -160,18 +85,18 @@
 <li>把 LoRA 接进训练循环时，&quot;冻结主干&quot;要在哪几处一起做实才不出错？</li>
 </ol>
 <hr />
-<h2><a href="#2-全量微调的问题" aria-hidden="true" class="anchor" id="user-content-2-全量微调的问题"></a>2. 全量微调的问题</h2>
+<h2 id="user-content-2-全量微调的问题">2. 全量微调的问题<a href="#2-全量微调的问题" aria-label="Link to heading '2. 全量微调的问题'" data-heading-content="2. 全量微调的问题" class="anchor"></a></h2>
 <p>LLaMA-7B 有 70 亿参数，全量微调需要：</p>
-<pre><code>参数显存：7B * 4B = 28GB（FP32）
+<pre><code class="language-plaintext">参数显存：7B * 4B = 28GB（FP32）
 优化器状态：7B * 8B = 56GB（AdamW 的 m 和 v）
 梯度：7B * 4B = 28GB
 总计：~112GB
 </code></pre>
 <p>单卡放不下，而且微调数据通常很少（几千条），全量更新容易过拟合。</p>
 <hr />
-<h2><a href="#3-lora-的核心思想" aria-hidden="true" class="anchor" id="user-content-3-lora-的核心思想"></a>3. LoRA 的核心思想</h2>
+<h2 id="user-content-3-lora-的核心思想">3. LoRA 的核心思想<a href="#3-lora-的核心思想" aria-label="Link to heading '3. LoRA 的核心思想'" data-heading-content="3. LoRA 的核心思想" class="anchor"></a></h2>
 <p><strong>关键假设</strong>：微调时的权重变化 ΔW 是<strong>低秩</strong>的（信息集中在少数方向）。</p>
-<pre><code>ΔW = (α / r) · B · A
+<pre><code class="language-plaintext">ΔW = (α / r) · B · A
 </code></pre>
 <p>其中：</p>
 <ul>
@@ -180,8 +105,8 @@
 <li>r ≪ min(in, out)：秩（通常 4-64）</li>
 <li>α：缩放因子（见第 6 节）</li>
 </ul>
-<h3><a href="#31-参数量对比" aria-hidden="true" class="anchor" id="user-content-31-参数量对比"></a>3.1 参数量对比</h3>
-<pre><code>全量微调：in × out 参数
+<h3 id="user-content-31-参数量对比">3.1 参数量对比<a href="#31-参数量对比" aria-label="Link to heading '3.1 参数量对比'" data-heading-content="3.1 参数量对比" class="anchor"></a></h3>
+<pre><code class="language-plaintext">全量微调：in × out 参数
 LoRA：    r × (in + out) 参数
 
 例：in=4096, out=4096, r=16
@@ -189,10 +114,10 @@ LoRA：    r × (in + out) 参数
 LoRA：16 × (4096 + 4096) = 131,072（131K）→ 0.78%
 </code></pre>
 <p>本项目实测（<a href="../config/config.json">config/config.json</a>：d=128、4 层、Q/K/V 三处、r=8）：</p>
-<pre><code>全量：1,866,496
+<pre><code class="language-plaintext">全量：1,866,496
 LoRA：3 个投影 × 2 个矩阵 × 8 × 128 × 4 层 = 24,576（1.32%）
 </code></pre>
-<h3><a href="#32-为什么在层内而不是权重上加适配器" aria-hidden="true" class="anchor" id="user-content-32-为什么在层内而不是权重上加适配器"></a>3.2 为什么在「层内」而不是「权重上」加适配器</h3>
+<h3 id="user-content-32-为什么在层内而不是权重上加适配器">3.2 为什么在「层内」而不是「权重上」加适配器<a href="#32-为什么在层内而不是权重上加适配器" aria-label="Link to heading '3.2 为什么在「层内」而不是「权重上」加适配器'" data-heading-content="3.2 为什么在「层内」而不是「权重上」加适配器" class="anchor"></a></h3>
 <p>本项目把适配器挂成 <a href="../src/layers.rs"><code>Linear</code></a> 的一个字段（<code>lora: Option&lt;LoraAdapter&gt;</code>），
 <strong>不持有、也不复制 W</strong>——<code>LoraAdapter</code> 里只有 A 和 B 两个张量。
 好处：</p>
@@ -202,8 +127,8 @@ LoRA：3 个投影 × 2 个矩阵 × 8 × 128 × 4 层 = 24,576（1.32%）
 <li>checkpoint 只需额外存 A/B，主干仍按原来的名字和形状存，旧存档逻辑不用改。</li>
 </ul>
 <hr />
-<h2><a href="#4-前向计算" aria-hidden="true" class="anchor" id="user-content-4-前向计算"></a>4. 前向计算</h2>
-<pre><code>y = x @ (W + ΔW) = x @ W + (x @ B) @ A = x @ W + (α/r) · (x @ B) @ A
+<h2 id="user-content-4-前向计算">4. 前向计算<a href="#4-前向计算" aria-label="Link to heading '4. 前向计算'" data-heading-content="4. 前向计算" class="anchor"></a></h2>
+<pre><code class="language-plaintext">y = x @ (W + ΔW) = x @ W + (x @ B) @ A = x @ W + (α/r) · (x @ B) @ A
 </code></pre>
 <ul>
 <li>W 是预训练权重（<strong>冻结</strong>，不更新）</li>
@@ -226,13 +151,13 @@ if let Some(lora) = &amp;self.lora {
 冻结参数不该产生梯度，也就没必要为它保留 <code>dW</code> 的计算图和显存。</p>
 </blockquote>
 <hr />
-<h2><a href="#5-初始化策略" aria-hidden="true" class="anchor" id="user-content-5-初始化策略"></a>5. 初始化策略</h2>
-<h3><a href="#51-a正态分布-n0-σ²" aria-hidden="true" class="anchor" id="user-content-51-a正态分布-n0-σ²"></a>5.1 A：正态分布 N(0, σ²)</h3>
-<pre><code>σ = 1 / √r
+<h2 id="user-content-5-初始化策略">5. 初始化策略<a href="#5-初始化策略" aria-label="Link to heading '5. 初始化策略'" data-heading-content="5. 初始化策略" class="anchor"></a></h2>
+<h3 id="user-content-51-a正态分布-n0-σ²">5.1 A：正态分布 N(0, σ²)<a href="#51-a正态分布-n0-σ²" aria-label="Link to heading '5.1 A：正态分布 N(0, σ²)'" data-heading-content="5.1 A：正态分布 N(0, σ²)" class="anchor"></a></h3>
+<pre><code class="language-plaintext">σ = 1 / √r
 </code></pre>
 <p>保证初始 ΔW = BA 的方差不会太大。</p>
-<h3><a href="#52-b全零" aria-hidden="true" class="anchor" id="user-content-52-b全零"></a>5.2 B：全零</h3>
-<pre><code>B = 0 → ΔW = (α/r)·B·A = 0
+<h3 id="user-content-52-b全零">5.2 B：全零<a href="#52-b全零" aria-label="Link to heading '5.2 B：全零'" data-heading-content="5.2 B：全零" class="anchor"></a></h3>
+<pre><code class="language-plaintext">B = 0 → ΔW = (α/r)·B·A = 0
 </code></pre>
 <p><strong>关键</strong>：训练开始时 ΔW = 0，模型行为和预训练模型完全一致。
 这保证了微调不会&quot;破坏&quot;预训练学到的知识。</p>
@@ -242,9 +167,9 @@ let a = Tensor::param(rng.randn() * a_scale, [r, in]);    // A ~ N(0, 1/r)
 let b = Tensor::param(vec![0.0; out * r], [out, r]);      // B = 0
 </code></pre>
 <p>单测 <code>test_lora_zero_init_keeps_forward_identical</code> 断言：挂上适配器前后，同一输入的前向输出<strong>逐位相同</strong>。</p>
-<h3><a href="#53-为什么a-随机b-为零而不是反过来或都随机" aria-hidden="true" class="anchor" id="user-content-53-为什么a-随机b-为零而不是反过来或都随机"></a>5.3 为什么&quot;A 随机、B 为零&quot;，而不是反过来或都随机</h3>
+<h3 id="user-content-53-为什么a-随机b-为零而不是反过来或都随机">5.3 为什么&quot;A 随机、B 为零&quot;，而不是反过来或都随机<a href="#53-为什么a-随机b-为零而不是反过来或都随机" aria-label="Link to heading '5.3 为什么&quot;A 随机、B 为零&quot;，而不是反过来或都随机'" data-heading-content="5.3 为什么&quot;A 随机、B 为零&quot;，而不是反过来或都随机" class="anchor"></a></h3>
 <p>看两个梯度（<code>h = x · Aᵀ</code>，<code>g = ∂L/∂y</code>）：</p>
-<pre><code>∂L/∂B = (α/r) · hᵀ · g      ∂L/∂A = (α/r) · xᵀ · (g · B)
+<pre><code class="language-plaintext">∂L/∂B = (α/r) · hᵀ · g      ∂L/∂A = (α/r) · xᵀ · (g · B)
 </code></pre>
 <table>
 <thead>
@@ -279,8 +204,8 @@ let b = Tensor::param(vec![0.0; out * r], [out, r]);      // B = 0
 <p>第三行才是对的：B 为零保证起点不动，而 A 非零让 <code>h</code> 有值、<code>∂L/∂B</code> 非零，于是 B 先动、
 A 随后跟上（B 一动，<code>∂L/∂A</code> 也就不再为零）。若两个都是零，两条梯度同时为零，训练直接卡死。</p>
 <hr />
-<h2><a href="#6-α-缩放因子" aria-hidden="true" class="anchor" id="user-content-6-α-缩放因子"></a>6. α 缩放因子</h2>
-<pre><code>ΔW = (α / r) · B · A
+<h2 id="user-content-6-α-缩放因子">6. α 缩放因子<a href="#6-α-缩放因子" aria-label="Link to heading '6. α 缩放因子'" data-heading-content="6. α 缩放因子" class="anchor"></a></h2>
+<pre><code class="language-plaintext">ΔW = (α / r) · B · A
 </code></pre>
 <ul>
 <li>α 通常设为 r（即不缩放，scaling = 1）</li>
@@ -295,8 +220,8 @@ A 随后跟上（B 一动，<code>∂L/∂A</code> 也就不再为零）。若�
 <p>所以改 α <strong>不会</strong>改变适配层的初始状态（ΔW 恒为 0），只是把增量的尺度整体放大/缩小——
 单测 <code>test_lora_forward_matches_formula</code> 断言了&quot;α 翻倍 ⇒ 增量翻倍&quot;。</p>
 <hr />
-<h2><a href="#7-应用场景" aria-hidden="true" class="anchor" id="user-content-7-应用场景"></a>7. 应用场景</h2>
-<h3><a href="#71-本项目里的调用链" aria-hidden="true" class="anchor" id="user-content-71-本项目里的调用链"></a>7.1 本项目里的调用链</h3>
+<h2 id="user-content-7-应用场景">7. 应用场景<a href="#7-应用场景" aria-label="Link to heading '7. 应用场景'" data-heading-content="7. 应用场景" class="anchor"></a></h2>
+<h3 id="user-content-71-本项目里的调用链">7.1 本项目里的调用链<a href="#71-本项目里的调用链" aria-label="Link to heading '7.1 本项目里的调用链'" data-heading-content="7.1 本项目里的调用链" class="anchor"></a></h3>
 <p>不用手写注入逻辑，<code>finetune</code> 子命令一条命令就走完整条路（见 <a href="#8-%E6%8E%A5%E5%85%A5%E7%B3%BB%E7%BB%9Ffinetune-%E5%AD%90%E5%91%BD%E4%BB%A4">§8</a>）。
 直接调 API 的话是这样：</p>
 <pre><code class="language-rust">// 1. 加载预训练模型（checkpoint 的头里若记了 LoRA 形态，会先按它重建适配层再灌参数）
@@ -317,7 +242,7 @@ let opt = AdamW::new(5e-5, model.parameters(), 0.1);   // 传全集也行，step
 
 // 5. 只想推理的话，可以把增量就地并进主干：model.merge_lora()（不可逆，之后不能再续训）
 </code></pre>
-<h3><a href="#72-给哪些层加-lora" aria-hidden="true" class="anchor" id="user-content-72-给哪些层加-lora"></a>7.2 给哪些层加 LoRA</h3>
+<h3 id="user-content-72-给哪些层加-lora">7.2 给哪些层加 LoRA<a href="#72-给哪些层加-lora" aria-label="Link to heading '7.2 给哪些层加 LoRA'" data-heading-content="7.2 给哪些层加 LoRA" class="anchor"></a></h3>
 <p>通用的经验分布：</p>
 <table>
 <thead>
@@ -395,7 +320,7 @@ Q/K/V 是注意力里信息量最大的一组，缺省选它是因为参数量�
 所以训练与推理的挂载位置永远一致，忘了传参也不会静默错配。旧档没有 <code>targets</code> 字段，
 <code>#[serde(default)]</code> 让它回落成 <code>q,k,v</code>，读起来与从前完全一样。</p>
 <hr />
-<h2><a href="#8-接入系统finetune-子命令" aria-hidden="true" class="anchor" id="user-content-8-接入系统finetune-子命令"></a>8. 接入系统：<code>finetune</code> 子命令</h2>
+<h2 id="user-content-8-接入系统finetune-子命令">8. 接入系统：<code>finetune</code> 子命令<a href="#8-接入系统finetune-子命令" aria-label="Link to heading '8. 接入系统：finetune 子命令'" data-heading-content="8. 接入系统：finetune 子命令" class="anchor"></a></h2>
 <p>LoRA <strong>已完整接入</strong>：<code>finetune</code> 就是&quot;LoRA 版的 SFT&quot;——同一套训练循环、同一份对话语料
 （<code>train.sft_file</code>，可用 <code>--sft-file</code> 覆盖），唯一差别是<strong>参数集合</strong>：</p>
 <table>
@@ -429,7 +354,7 @@ Q/K/V 是注意力里信息量最大的一组，缺省选它是因为参数量�
 </tr>
 </tbody>
 </table>
-<h3><a href="#81-冻结是真的冻结三处一起做实" aria-hidden="true" class="anchor" id="user-content-81-冻结是真的冻结三处一起做实"></a>8.1 冻结是&quot;真的&quot;冻结，三处一起做实</h3>
+<h3 id="user-content-81-冻结是真的冻结三处一起做实">8.1 冻结是&quot;真的&quot;冻结，三处一起做实<a href="#81-冻结是真的冻结三处一起做实" aria-label="Link to heading '8.1 冻结是&quot;真的&quot;冻结，三处一起做实'" data-heading-content="8.1 冻结是&quot;真的&quot;冻结，三处一起做实" class="anchor"></a></h3>
 <p>缺任何一处都会出现&quot;以为冻结了、其实没冻&quot;的隐性错误：</p>
 <table>
 <thead>
@@ -460,7 +385,7 @@ Q/K/V 是注意力里信息量最大的一组，缺省选它是因为参数量�
 <p>还有一个容易踩的坑：<code>requires_grad</code> 必须是<strong>共享标志</strong>。本项目早期它是普通 <code>bool</code>，
 而 <code>Tensor</code> 派生了 <code>Clone</code>——在模型上冻结、优化器手里那份仍是 <code>true</code>，冻结就失效了。
 现在它是 <code>Arc&lt;AtomicBool&gt;</code>，模型与优化器看的是同一个开关。</p>
-<h3><a href="#82-命令行用法" aria-hidden="true" class="anchor" id="user-content-82-命令行用法"></a>8.2 命令行用法</h3>
+<h3 id="user-content-82-命令行用法">8.2 命令行用法<a href="#82-命令行用法" aria-label="Link to heading '8.2 命令行用法'" data-heading-content="8.2 命令行用法" class="anchor"></a></h3>
 <pre><code class="language-bash"># LoRA 微调（缺省 1000 步、lr 1e-4、rank 16、alpha=rank、挂 q,k,v，语料取 config 的 train.sft_file）
 cargo run --release -- finetune --pretrained checkpoints/zh/latest.ckpt
 
@@ -539,9 +464,9 @@ cargo run --release -- finetune --pretrained checkpoints/zh/latest.ckpt \
 </tr>
 </tbody>
 </table>
-<h3><a href="#83-实测一次真实的-lora-微调" aria-hidden="true" class="anchor" id="user-content-83-实测一次真实的-lora-微调"></a>8.3 实测：一次真实的 LoRA 微调</h3>
+<h3 id="user-content-83-实测一次真实的-lora-微调">8.3 实测：一次真实的 LoRA 微调<a href="#83-实测一次真实的-lora-微调" aria-label="Link to heading '8.3 实测：一次真实的 LoRA 微调'" data-heading-content="8.3 实测：一次真实的 LoRA 微调" class="anchor"></a></h3>
 <p>命令：<code>finetune --pretrained checkpoints/zh/latest.ckpt --lora-rank 8 --lora-alpha 8 --steps 60 --lr 5e-5</code></p>
-<pre><code>LoRA 微调：rank=8 alpha=8 挂载=q,k,v steps=60 lr=0.00005｜冻结主干，只训适配层
+<pre><code class="language-plaintext">LoRA 微调：rank=8 alpha=8 挂载=q,k,v steps=60 lr=0.00005｜冻结主干，只训适配层
 模型参数：1866496（含冻结主干）｜可训练：24576（1.317%）｜12 对低秩矩阵（挂载 q,k,v），共 24 个适配参数张量
 SFT 语料：89 段对话，打包 17898 token | 监督位置（回答段）占 56.1%
 LoRA：rank=8 alpha=8 挂载=q,k,v｜可训练参数 24576 / 1866496（1.32%）｜主干冻结：反向不算 dW、优化器不更新、不吃权重衰减
@@ -552,7 +477,7 @@ step    60 | lr 0.000005 | loss 6.3406 | val 6.5813 (ppl 721.5) | 515 tok/s
 [done] checkpoint 已保存到 checkpoints/zh-lora/ | 总耗时 478s | 7.96s/步（共 60 步）
 </code></pre>
 <p>产物（目录自包含，含冻结主干）：</p>
-<pre><code>checkpoints/zh-lora/{best,final,latest}.ckpt   tokenizer.json   lora.csv
+<pre><code class="language-plaintext">checkpoints/zh-lora/{best,final,latest}.ckpt   tokenizer.json   lora.csv
 </code></pre>
 <p><strong>存档变大了多少</strong>：22,106,657 → 22,402,843 字节，差 296,186 = <code>24,576 个适配参数 × 4 字节 × 3 段数据块 （参数 / m / v）</code> + 1,274 字节（JSON 头里多了 24 个参数条目和 <code>lora</code> 字段）——主干那部分的字节数一个没变。</p>
 <blockquote>
@@ -566,7 +491,7 @@ step    60 | lr 0.000005 | loss 6.3406 | val 6.5813 (ppl 721.5) | 515 tok/s
 这个数字<strong>没有判别力</strong>（<a href="39-%E5%B7%A5%E7%A8%8B%E5%8C%96%E5%AE%8C%E5%96%84.md">第 39 课</a> 的 SFT 也是这个坑）。真正要看的是
 ① 预训练 val 有没有退化（主干冻结 ⇒ 不会）② <code>chat</code> 聊两句有没有怪字。</p>
 </blockquote>
-<h3><a href="#84-配置文件方式" aria-hidden="true" class="anchor" id="user-content-84-配置文件方式"></a>8.4 配置文件方式</h3>
+<h3 id="user-content-84-配置文件方式">8.4 配置文件方式<a href="#84-配置文件方式" aria-label="Link to heading '8.4 配置文件方式'" data-heading-content="8.4 配置文件方式" class="anchor"></a></h3>
 <p>也可以在 <code>config/config.json</code> 里写好 LoRA 形态（CLI 参数会覆盖它；注意 <code>train</code> 子命令
 <strong>不</strong>注入适配层，它只读这份配置来打印提示）：</p>
 <pre><code class="language-jsonc">{
@@ -607,7 +532,7 @@ step    60 | lr 0.000005 | loss 6.3406 | val 6.5813 (ppl 721.5) | 515 tok/s
 <p>alpha 这一档多一个条件，是为了让&quot;没写配置 + 只传 <code>--lora-rank 8</code>&quot;仍然得到 α=8（缺省 α=rank 的直觉），
 而不是被 <code>LoRAConfig::default()</code> 里的 16.0 顶掉。实测：配置写 <code>&quot;rank&quot;: 4, &quot;alpha&quot;: 12.0, &quot;targets&quot;: { &quot;v&quot;: true, &quot;mlp&quot;: true }</code>，
 不传任何 LoRA 参数跑 <code>finetune</code>，日志是 <code>rank=4 alpha=12 挂载=q,k,v,mlp</code>（<code>q,k</code> 由缺省补上）。</p>
-<h3><a href="#85-工作流程finetune-实际执行的顺序" aria-hidden="true" class="anchor" id="user-content-85-工作流程finetune-实际执行的顺序"></a>8.5 工作流程（<code>finetune</code> 实际执行的顺序）</h3>
+<h3 id="user-content-85-工作流程finetune-实际执行的顺序">8.5 工作流程（<code>finetune</code> 实际执行的顺序）<a href="#85-工作流程finetune-实际执行的顺序" aria-label="Link to heading '8.5 工作流程（finetune 实际执行的顺序）'" data-heading-content="8.5 工作流程（finetune 实际执行的顺序）" class="anchor"></a></h3>
 <ol>
 <li>加载预训练 checkpoint；若该档本身是 LoRA 形态，先按档案头重建适配层再灌参数</li>
 <li>决定怎么挂：
@@ -626,7 +551,7 @@ step    60 | lr 0.000005 | loss 6.3406 | val 6.5813 (ppl 721.5) | 515 tok/s
 但加载端必须知道&quot;这是个 LoRA 档案&quot;。忘了注入就直接 <code>load_params</code> 会立刻报错，
 而不是悄悄装进去一半——<code>test_lora_checkpoint_roundtrip</code> 专门断言了这个 panic。</p>
 </blockquote>
-<h3><a href="#86-链式续训--resume-lora" aria-hidden="true" class="anchor" id="user-content-86-链式续训--resume-lora"></a>8.6 链式续训：<code>--resume-lora</code></h3>
+<h3 id="user-content-86-链式续训--resume-lora">8.6 链式续训：<code>--resume-lora</code><a href="#86-链式续训--resume-lora" aria-label="Link to heading '8.6 链式续训：--resume-lora'" data-heading-content="8.6 链式续训：--resume-lora" class="anchor"></a></h3>
 <p>把一个 LoRA 存档当基座有两种截然不同的语义，<code>finetune</code> 默认做的是<strong>前者</strong>：</p>
 <table>
 <thead>
@@ -660,7 +585,7 @@ step    60 | lr 0.000005 | loss 6.3406 | val 6.5813 (ppl 721.5) | 515 tok/s
 <p>实现上只有三步差异（<a href="../src/model.rs"><code>Transformer::resume_lora</code></a>）：<strong>不覆盖</strong>（沿用已注入的 A/B）、
 <strong>解冻</strong>（把 <code>lora_parameters()</code> 逐个 <code>set_requires_grad(true)</code>，其余仍是 <code>false</code>）、
 <strong>rank 必须一致</strong>（结构来自存档，想换 rank 只能重挂）。</p>
-<h3><a href="#87-推理合并--merge-lora" aria-hidden="true" class="anchor" id="user-content-87-推理合并--merge-lora"></a>8.7 推理合并：<code>--merge-lora</code></h3>
+<h3 id="user-content-87-推理合并--merge-lora">8.7 推理合并：<code>--merge-lora</code><a href="#87-推理合并--merge-lora" aria-label="Link to heading '8.7 推理合并：--merge-lora'" data-heading-content="8.7 推理合并：--merge-lora" class="anchor"></a></h3>
 <p><code>eval</code> / <code>generate</code> / <code>chat</code> 都接受 <code>--merge-lora</code>，把增量<strong>就地</strong>并进主干权重：</p>
 <pre><code class="language-text">W ← W + (α/r)·AᵀBᵀ
 </code></pre>
@@ -678,8 +603,8 @@ step    60 | lr 0.000005 | loss 6.3406 | val 6.5813 (ppl 721.5) | 515 tok/s
 所以它是<strong>不可逆的运行时操作</strong>：合并过的模型对象不能再拿来续训，要续训请重新加载存档。
 存档本身不受影响——<code>--merge-lora</code> 只作用于本次进程的内存副本，A/B 仍原样躺在文件里。</p>
 <hr />
-<h2><a href="#9-小结与下一课" aria-hidden="true" class="anchor" id="user-content-9-小结与下一课"></a>9. 小结与下一课</h2>
-<h3><a href="#本课小结" aria-hidden="true" class="anchor" id="user-content-本课小结"></a>本课小结</h3>
+<h2 id="user-content-9-小结与下一课">9. 小结与下一课<a href="#9-小结与下一课" aria-label="Link to heading '9. 小结与下一课'" data-heading-content="9. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
 <ul>
 <li>LoRA 用低秩矩阵 ΔW = (α/r)·B·A 近似权重更新，可训练参数量降到 1% 左右</li>
 <li>冻结预训练权重，只训练 A 和 B；冻结要在<strong>前向 / 优化器 / GPU 快路</strong>三处一起做实</li>
@@ -692,7 +617,7 @@ step    60 | lr 0.000005 | loss 6.3406 | val 6.5813 (ppl 721.5) | 515 tok/s
 <li>适配层要能被 checkpoint 记住形态（rank / alpha / targets），否则加载端无法对齐参数名</li>
 <li>适合&quot;在已有大模型上微调特定任务&quot;的场景——本项目实测可训练参数 1.32%，主干零改动</li>
 </ul>
-<h3><a href="#拓展方向" aria-hidden="true" class="anchor" id="user-content-拓展方向"></a>拓展方向</h3>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
 <blockquote>
 <p>核心内容已全部实现，这里是进阶拓展。</p>
 </blockquote>
@@ -705,25 +630,24 @@ step    60 | lr 0.000005 | loss 6.3406 | val 6.5813 (ppl 721.5) | 515 tok/s
 <blockquote>
 <p><strong>下一课</strong>：<a href="30-Beam-Search.md">第 30 课 Beam Search</a> —— 微调侧收尾，下一课换到解码侧——用束搜索替代贪心与采样。</p>
 </blockquote>
-
-                </div>
-                <div class="series-nav"><div class="series-nav-actions"><a class="series-nav-btn" href="/series/rust-llm/">目录页</a></div><details class="series-nav-details"><summary class="series-nav-summary"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 51 章</span></div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="series-nav-chevron"><path d="m6 9 6 6 6-6"/></svg></summary><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：学习率调度 —— warmup + cosine decay</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：Dropout —— 训练时的「随机失忆」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：RMSNorm —— 现代 LLM 的归一化标配</span></a><a class="series-nav-item" href="/post/rust-llm-guide-22/"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">第 22 课：SwiGLU 激活函数 —— LLaMA 的「门控」MLP</span></a><a class="series-nav-item" href="/post/rust-llm-guide-23/"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-24/"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星</span></a><a class="series-nav-item" href="/post/rust-llm-guide-25/"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">第 25 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-26/"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">第 26 课：混合精度训练（AMP）—— 用半精度加速，用全精度保底</span></a><a class="series-nav-item" href="/post/rust-llm-guide-27/"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">第 27 课：GPU 加速 —— 手写 WGSL 计算着色器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-28/"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-29/"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-30/"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">第 30 课：Beam Search —— 贪心搜索的升级版</span></a><a class="series-nav-item" href="/post/rust-llm-guide-31/"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">第 31 课：Scaling Laws（缩放定律）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-32/"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">第 32 课：MoE 混合专家模型（Mixture of Experts）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-33/"><span class="series-nav-item-index">34</span><span class="series-nav-item-title">第 33 课：量化技术（Quantization）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-34/"><span class="series-nav-item-index">35</span><span class="series-nav-item-title">第 34 课：推测解码（Speculative Decoding）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-35/"><span class="series-nav-item-index">36</span><span class="series-nav-item-title">第 35 课：多 Token 预测（Multi-Token Prediction）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-36/"><span class="series-nav-item-index">37</span><span class="series-nav-item-title">第 36 课：RLHF 与人类对齐（Alignment）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-37/"><span class="series-nav-item-index">38</span><span class="series-nav-item-title">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-38/"><span class="series-nav-item-index">39</span><span class="series-nav-item-title">第 38 课：分布式训练（Distributed Training）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-39/"><span class="series-nav-item-index">40</span><span class="series-nav-item-title">第 39 课：工程化完善 —— 从算法实现到可用框架</span></a><a class="series-nav-item" href="/post/rust-llm-guide-40/"><span class="series-nav-item-index">41</span><span class="series-nav-item-title">第 40 课：把模型部署成 API 服务 —— 从「自己跑」到「给别人调」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-41/"><span class="series-nav-item-index">42</span><span class="series-nav-item-title">第 41 课：多模态 —— 图片理解与图片生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-42/"><span class="series-nav-item-index">43</span><span class="series-nav-item-title">第 42 课：知识蒸馏（Knowledge Distillation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-43/"><span class="series-nav-item-index">44</span><span class="series-nav-item-title">第 43 课：FP8 低精度训练（模拟）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-44/"><span class="series-nav-item-index">45</span><span class="series-nav-item-title">第 44 课：WSD 学习率调度（warmup-stable-decay）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-45/"><span class="series-nav-item-index">46</span><span class="series-nav-item-title">第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死</span></a><a class="series-nav-item" href="/post/rust-llm-guide-46/"><span class="series-nav-item-index">47</span><span class="series-nav-item-title">第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化</span></a><a class="series-nav-item" href="/post/rust-llm-guide-47/"><span class="series-nav-item-index">48</span><span class="series-nav-item-title">第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道</span></a><a class="series-nav-item" href="/post/rust-llm-guide-48/"><span class="series-nav-item-index">49</span><span class="series-nav-item-title">第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重</span></a><a class="series-nav-item" href="/post/rust-llm-guide-49/"><span class="series-nav-item-index">50</span><span class="series-nav-item-title">第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</span></a><a class="series-nav-item" href="/post/rust-llm-guide-50/"><span class="series-nav-item-index">51</span><span class="series-nav-item-title">第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</span></a></div></details><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-28/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-30/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 30 课：Beam Search —— 贪心搜索的升级版</span></a></div></div>
-            </article>
-        </main>
-<footer class="footer-content">
-    <div class="copyright">
-        <span>2019-2026 </span>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"/></svg>
-        <span> 干徒 / Ganto</span>
-    </div>
-</footer>
-        </div>
-    </div>
-<script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
-try{document.getElementById('main').innerHTML='';}catch(e){}</script>
+</div></div><div class="series-nav"><div class="series-nav-actions"><a href="/series/rust-llm" class="series-nav-btn"><span>目录页</span></a></div><details class="series-nav-details"><summary class="series-nav-summary"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 51 章</span></div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="series-nav-chevron"><path d="m6 9 6 6 6-6"></path></svg></summary><div class="series-nav-list"><a href="/post/rust-llm-guide-00" class="series-nav-item"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a href="/post/rust-llm-guide-01" class="series-nav-item"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a href="/post/rust-llm-guide-02" class="series-nav-item"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a href="/post/rust-llm-guide-03" class="series-nav-item"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a href="/post/rust-llm-guide-04" class="series-nav-item"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Arc&#60;Mutex&#62;/Shared 架构</span></a><a href="/post/rust-llm-guide-05" class="series-nav-item"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a href="/post/rust-llm-guide-06" class="series-nav-item"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a href="/post/rust-llm-guide-07" class="series-nav-item"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a href="/post/rust-llm-guide-08" class="series-nav-item"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a href="/post/rust-llm-guide-09" class="series-nav-item"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a href="/post/rust-llm-guide-10" class="series-nav-item"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a href="/post/rust-llm-guide-11" class="series-nav-item"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a href="/post/rust-llm-guide-12" class="series-nav-item"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</span></a><a href="/post/rust-llm-guide-13" class="series-nav-item"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a href="/post/rust-llm-guide-14" class="series-nav-item"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a href="/post/rust-llm-guide-15" class="series-nav-item"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a href="/post/rust-llm-guide-16" class="series-nav-item"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16</span></a><a href="/post/rust-llm-guide-17" class="series-nav-item"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a href="/post/rust-llm-guide-18" class="series-nav-item"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：学习率调度 —— warmup + cosine decay</span></a><a href="/post/rust-llm-guide-19" class="series-nav-item"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：Dropout —— 训练时的「随机失忆」</span></a><a href="/post/rust-llm-guide-20" class="series-nav-item"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a href="/post/rust-llm-guide-21" class="series-nav-item"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：RMSNorm —— 现代 LLM 的归一化标配</span></a><a href="/post/rust-llm-guide-22" class="series-nav-item"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">第 22 课：SwiGLU 激活函数 —— LLaMA 的「门控」MLP</span></a><a href="/post/rust-llm-guide-23" class="series-nav-item"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器</span></a><a href="/post/rust-llm-guide-24" class="series-nav-item"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星</span></a><a href="/post/rust-llm-guide-25" class="series-nav-item"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">第 25 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a href="/post/rust-llm-guide-26" class="series-nav-item"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">第 26 课：混合精度训练（AMP）—— 用半精度加速，用全精度保底</span></a><a href="/post/rust-llm-guide-27" class="series-nav-item"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">第 27 课：GPU 加速 —— 手写 WGSL 计算着色器</span></a><a href="/post/rust-llm-guide-28" class="series-nav-item"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a><a href="/post/rust-llm-guide-29" class="series-nav-item active" aria-current="page"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</span><span class="series-nav-item-now">本篇</span></a><a href="/post/rust-llm-guide-30" class="series-nav-item"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">第 30 课：Beam Search —— 贪心搜索的升级版</span></a><a href="/post/rust-llm-guide-31" class="series-nav-item"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">第 31 课：Scaling Laws（缩放定律）</span></a><a href="/post/rust-llm-guide-32" class="series-nav-item"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">第 32 课：MoE 混合专家模型（Mixture of Experts）</span></a><a href="/post/rust-llm-guide-33" class="series-nav-item"><span class="series-nav-item-index">34</span><span class="series-nav-item-title">第 33 课：量化技术（Quantization）</span></a><a href="/post/rust-llm-guide-34" class="series-nav-item"><span class="series-nav-item-index">35</span><span class="series-nav-item-title">第 34 课：推测解码（Speculative Decoding）</span></a><a href="/post/rust-llm-guide-35" class="series-nav-item"><span class="series-nav-item-index">36</span><span class="series-nav-item-title">第 35 课：多 Token 预测（Multi-Token Prediction）</span></a><a href="/post/rust-llm-guide-36" class="series-nav-item"><span class="series-nav-item-index">37</span><span class="series-nav-item-title">第 36 课：RLHF 与人类对齐（Alignment）</span></a><a href="/post/rust-llm-guide-37" class="series-nav-item"><span class="series-nav-item-index">38</span><span class="series-nav-item-title">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）</span></a><a href="/post/rust-llm-guide-38" class="series-nav-item"><span class="series-nav-item-index">39</span><span class="series-nav-item-title">第 38 课：分布式训练（Distributed Training）</span></a><a href="/post/rust-llm-guide-39" class="series-nav-item"><span class="series-nav-item-index">40</span><span class="series-nav-item-title">第 39 课：工程化完善 —— 从算法实现到可用框架</span></a><a href="/post/rust-llm-guide-40" class="series-nav-item"><span class="series-nav-item-index">41</span><span class="series-nav-item-title">第 40 课：把模型部署成 API 服务 —— 从「自己跑」到「给别人调」</span></a><a href="/post/rust-llm-guide-41" class="series-nav-item"><span class="series-nav-item-index">42</span><span class="series-nav-item-title">第 41 课：多模态 —— 图片理解与图片生成</span></a><a href="/post/rust-llm-guide-42" class="series-nav-item"><span class="series-nav-item-index">43</span><span class="series-nav-item-title">第 42 课：知识蒸馏（Knowledge Distillation）</span></a><a href="/post/rust-llm-guide-43" class="series-nav-item"><span class="series-nav-item-index">44</span><span class="series-nav-item-title">第 43 课：FP8 低精度训练（模拟）</span></a><a href="/post/rust-llm-guide-44" class="series-nav-item"><span class="series-nav-item-index">45</span><span class="series-nav-item-title">第 44 课：WSD 学习率调度（warmup-stable-decay）</span></a><a href="/post/rust-llm-guide-45" class="series-nav-item"><span class="series-nav-item-index">46</span><span class="series-nav-item-title">第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死</span></a><a href="/post/rust-llm-guide-46" class="series-nav-item"><span class="series-nav-item-index">47</span><span class="series-nav-item-title">第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化</span></a><a href="/post/rust-llm-guide-47" class="series-nav-item"><span class="series-nav-item-index">48</span><span class="series-nav-item-title">第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道</span></a><a href="/post/rust-llm-guide-48" class="series-nav-item"><span class="series-nav-item-index">49</span><span class="series-nav-item-title">第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重</span></a><a href="/post/rust-llm-guide-49" class="series-nav-item"><span class="series-nav-item-index">50</span><span class="series-nav-item-title">第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</span></a><a href="/post/rust-llm-guide-50" class="series-nav-item"><span class="series-nav-item-index">51</span><span class="series-nav-item-title">第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</span></a></div></details><div class="series-nav-pager"><a href="/post/rust-llm-guide-28" class="series-nav-page prev"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a><a href="/post/rust-llm-guide-30" class="series-nav-page next"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 30 课：Beam Search —— 贪心搜索的升级版</span></a></div></div><div class="blog-tags"><span class="blog-tag"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"></path></svg>Rust</span><span class="blog-tag"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"></path></svg>LLM</span><span class="blog-tag"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"></path></svg>微调</span></div><div class="details-sentinel" style="height:1px;"></div><div class="markov-section"><div class="markov-header"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"></path><polyline points="12 12 18 12 18 6"></polyline></svg><span>AI 续写</span><span class="markov-badge">马尔可夫链</span></div><p class="markov-desc">基于本文内容训练的 tri-gram 语言模型，自动生成下文片段。</p><div class="markov-actions"><button class="markov-btn">生成续写</button></div></div></article></div></main><nav class="floating-toolbar" aria-label="页面工具栏"><button class="tool-btn" type="button" aria-label="后退"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.75 19.5 8.25 12l7.5-7.5"></path></svg></button><a href="/" class="tool-btn" aria-label="首页"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"></path></svg></a><a href="/series/rust-llm" class="tool-btn" aria-label="系列目录"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"></path></svg></a><button class="tool-btn" type="button" aria-label="宽屏模式"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8m-8 18h8M4 12h16M4 12l3-3m-3 3l3 3m13-3l-3-3m3 3l-3 3"></path></svg></button><span class="tool-divider"></span><button class="tool-btn" type="button" aria-label="回到顶部"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.5v-15m0 0-6.75 6.75M12 4.5l6.75 6.75"></path></svg></button></nav><footer class="footer-content"><div class="copyright"><span>2019-2026 </span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"></path></svg><span> 干徒 / Ganto</span></div></footer></div></div>
+<script>/* 把预渲染正文交给 SPA 后清空 #main，避免重复渲染 */
+try{
+  var main=document.getElementById('main');
+  var content=main?main.querySelector('.blog-content'):null;
+  if(content){
+    var t=document.createElement('template');
+    t.id='prerender-content';
+    t.setAttribute('data-slug', "rust-llm-guide-29");
+    t.innerHTML=content.innerHTML;
+    document.body.appendChild(t);
+  }
+  if(main) main.innerHTML='';
+}catch(e){}
+</script>
 <script type="module">
-import init, * as bindings from '/web-rs-ed78e9ed78fe0ba6.js';
-const wasm = await init({ module_or_path: '/web-rs-ed78e9ed78fe0ba6_bg.wasm' });
+import init, * as bindings from '/web-rs-4b7fc77d2e4f841a.js';
+const wasm = await init({ module_or_path: '/web-rs-4b7fc77d2e4f841a_bg.wasm' });
 
 
 window.wasmBindings = bindings;

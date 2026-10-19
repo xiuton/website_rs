@@ -1,0 +1,211 @@
+<h1 id="user-content-第-2-课自动微分-autograd--让模型学会自我修正">第 2 课：自动微分 Autograd —— 让模型学会&quot;自我修正&quot;<a href="#第-2-课自动微分-autograd--让模型学会自我修正" aria-label="Link to heading '第 2 课：自动微分 Autograd —— 让模型学会&quot;自我修正&quot;'" data-heading-content="第 2 课：自动微分 Autograd —— 让模型学会&quot;自我修正&quot;" class="anchor"></a></h1>
+<blockquote>
+<p>代码位置：<a href="../src/tensor.rs">src/tensor.rs</a>（grad / 各运算的反向闭包登记）、<a href="../src/autograd.rs">src/autograd.rs</a>（线性 tape 与 backward）
+演示入口：<a href="../src/main.rs">src/main.rs</a></p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>什么是梯度？为什么&quot;梯度下降&quot;能让模型学习？</li>
+<li>链式法则是怎么回事？为什么反向传播比正向求导更高效？</li>
+<li>怎么用 Rust 把&quot;求导&quot;自动化，让代码自动算出每个参数的梯度？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-从拟合直线说起">2. 从&quot;拟合直线&quot;说起<a href="#2-从拟合直线说起" aria-label="Link to heading '2. 从&quot;拟合直线&quot;说起'" data-heading-content="2. 从&quot;拟合直线&quot;说起" class="anchor"></a></h2>
+<p>上一课我们实现了矩阵乘法。现在想象一个最简单的&quot;学习&quot;任务：
+已知一些点 (x, y)，它们近似满足 <code>y = 2x + 1</code>，但参数 w、b 未知。怎么让程序<strong>自己找到</strong> w=2、b=1？</p>
+<p>思路：先随便给个初始值（比如 w=0, b=0），然后：</p>
+<ol>
+<li>算出预测值和真实值的差距 → <strong>损失 loss</strong></li>
+<li>问：<strong>如果我调大一点 w，loss 会变大还是变小？</strong> → 这个方向就叫<strong>梯度</strong></li>
+<li>沿着&quot;让 loss 变小的方向&quot;微调 w、b</li>
+<li>重复直到 loss 足够小</li>
+</ol>
+<p>第 2 步里的&quot;损失随参数的变化率&quot;，数学上叫<strong>偏导数</strong>。所有参数偏导数的集合叫<strong>梯度</strong>。</p>
+<h2 id="user-content-3-梯度下降公式">3. 梯度下降公式<a href="#3-梯度下降公式" aria-label="Link to heading '3. 梯度下降公式'" data-heading-content="3. 梯度下降公式" class="anchor"></a></h2>
+<p>对参数 θ，更新规则只有一行：</p>
+<pre><code class="language-plaintext">θ = θ - 学习率 × ∂loss/∂θ
+</code></pre>
+<ul>
+<li><code>∂loss/∂θ &gt; 0</code>：θ 增大 loss 也增大 → 所以减去它，θ 变小</li>
+<li><code>∂loss/∂θ &lt; 0</code>：θ 增大 loss 减小 → 减去它，θ 变大</li>
+<li>学习率（learning rate）控制每次迈多大步子，太小太慢、太大震荡</li>
+</ul>
+<p>我们采用的损失是 MSE（均方误差）：</p>
+<pre><code class="language-plaintext">loss = Σ (pred - y)²        # pred = x·w + b
+</code></pre>
+<h2 id="user-content-4-链式法则复合函数求导的关键">4. 链式法则：复合函数求导的关键<a href="#4-链式法则复合函数求导的关键" aria-label="Link to heading '4. 链式法则：复合函数求导的关键'" data-heading-content="4. 链式法则：复合函数求导的关键" class="anchor"></a></h2>
+<p>问题来了：loss 是复合函数，<code>loss = g(pred)</code>，而 <code>pred = f(w)</code>。
+要求 <code>∂loss/∂w</code>，不能直接求，需要一层层拆开：</p>
+<p><strong>链式法则</strong>：如果 <code>z = g(f(x))</code>，那么</p>
+<pre><code class="language-plaintext">dz/dx = (dg/df) × (df/dx)
+</code></pre>
+<p>类比&quot;流水线&quot;：损失一路流经 pred 再到 w，每一段的&quot;变化率&quot;相乘就是总的&quot;变化率&quot;。</p>
+<p>例：<code>z = x*y + w</code>，各梯度是：</p>
+<pre><code class="language-plaintext">∂z/∂x = y      （对 x 求导时把 y 当常数）
+∂z/∂y = x      （对 y 求导时把 x 当常数）
+∂z/∂w = 1      （加法求导是 1）
+</code></pre>
+<p>程序输出正是 <code>dz/dx=3, dz/dy=2, dz/dw=1</code> ✓</p>
+<h2 id="user-content-5-反向传播把链式法则批量自动化">5. 反向传播：把链式法则批量自动化<a href="#5-反向传播把链式法则批量自动化" aria-label="Link to heading '5. 反向传播：把链式法则批量自动化'" data-heading-content="5. 反向传播：把链式法则批量自动化" class="anchor"></a></h2>
+<p>手工对每个参数求导太累，模型参数动辄百万个。怎么办？</p>
+<p><strong>核心思想</strong>：前向传播时，把每一步运算记录下来，形成一张<strong>计算图</strong>；反向传播时，从 loss 出发，把梯度沿图<strong>逐层往回传</strong>，每层的梯度都复用上一层的结果。</p>
+<pre><code class="language-plaintext">前向（边算边记）：  x ──┐
+                     mul ──► t ──┐
+                     y ──┘         add ──► z = 7
+                     w ───────────┘
+
+反向（梯度倒流）：  x ◄── grad=3
+                     t ◄── grad=1 ──► w ◄── grad=1
+                     y ◄── grad=2
+</code></pre>
+<p>关键好处：每个中间结果<strong>只算一次梯度</strong>，总计算量与前向相当，而不是对每个参数各算一次前向（那样要 O(参数个数) 倍计算）。这就是反向传播比&quot;数值微分&quot;快的原因。</p>
+<h2 id="user-content-6-rust-实现线性-tape-登记反向">6. Rust 实现：线性 tape 登记反向<a href="#6-rust-实现线性-tape-登记反向" aria-label="Link to heading '6. Rust 实现：线性 tape 登记反向'" data-heading-content="6. Rust 实现：线性 tape 登记反向" class="anchor"></a></h2>
+<p>张量只保留数据本体，计算图结构不在张量上——反向闭包统一登记到<strong>线性 tape</strong>（<code>thread_local!</code> 线程局部存储，每条训练线程各持一条，加锁无竞争）：</p>
+<pre><code class="language-rust">pub struct Tensor {
+    data: Shared&lt;Buffer&gt;,           // 数值（Shared = Arc&lt;Mutex&gt;；Buffer::F32 / Bf16 存储层）
+    shape: Vec&lt;usize&gt;,
+    strides: Vec&lt;usize&gt;,            // 视图步长，permute 零拷贝（见第 5 课）
+    grad: Shared&lt;Vec&lt;f32&gt;&gt;,         // 梯度，恒 f32，初始全 0，反向时累加
+    requires_grad: Arc&lt;AtomicBool&gt;, // 是否需要梯度（参数=true，数据=false；Relaxed 原子读写）
+    // 计算图结构不在这里：反向闭包登记到 autograd 的线性 tape
+}
+
+// autograd.rs：一条 tape 记录
+struct TapeEntry {
+    out: usize,        // 输出张量的身份键（grad 缓冲地址）
+    parents: Vec&lt;usize&gt;, // 各父张量的身份键
+    f: BackwardFn,     // 链式法则闭包 Arc&lt;dyn Fn()&gt;
+    done: bool,        // 本次 backward 是否已执行
+}
+thread_local! { static TAPE: RefCell&lt;Vec&lt;TapeEntry&gt;&gt;; } // 线程局部线性 tape，按前向顺序追加
+</code></pre>
+<p>每个&quot;需要梯度&quot;的算子前向算完后，调用统一登记门 <code>record(&amp;输出, vec![父们], Arc::new(反向闭包))</code> 把这一步记到 tape 末尾。</p>
+<p>用到的 Rust 核心特性：</p>
+<ul>
+<li><strong><code>Arc&lt;T&gt;</code>（原子引用计数）</strong>：计算图里一个节点可能被多个运算共享，Arc 让多份句柄指向同一份数据；原子计数线程安全，计算图可以跨线程共享（供 rayon / 数据并行使用）</li>
+<li><strong><code>Mutex&lt;T&gt;</code>（互斥锁，经薄封装 <code>Shared&lt;T&gt;</code> 暴露）</strong>：让&quot;共享数据&quot;同时可以&quot;可变借用&quot;，<code>Shared::borrow()/borrow_mut()</code> 返回 <code>MutexGuard</code>，用运行期加锁取代 RefCell 的运行期借用检查</li>
+<li>每定义一个运算，就写两个东西：<strong>前向</strong>（算结果）+ <strong>反向闭包</strong>（算梯度传给输入），并 <code>record</code> 登记</li>
+<li><strong>身份键去重</strong>：<code>Shared::as_ptr(&amp;t.grad)</code>（梯度缓冲地址）唯一标识一个节点，tape 靠它回溯可达性</li>
+<li><strong>守约</strong>：反向闭包内不得构造 Tensor——<code>backward</code> 扫描期间 tape 已被 <code>borrow_mut</code>，闭包内再 <code>record</code> 是 <code>RefCell</code> 运行期 borrow panic（全库接线点已核查）</li>
+</ul>
+<h2 id="user-content-7-各运算的反向规则背下这几条">7. 各运算的反向规则（背下这几条）<a href="#7-各运算的反向规则背下这几条" aria-label="Link to heading '7. 各运算的反向规则（背下这几条）'" data-heading-content="7. 各运算的反向规则（背下这几条）" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th>前向</th>
+<th>反向（g 是输出的梯度）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>c = a + b</code></td>
+<td><code>∂a += g</code>，<code>∂b += g</code></td>
+</tr>
+<tr>
+<td><code>c = a - b</code></td>
+<td><code>∂a += g</code>，<code>∂b -= g</code></td>
+</tr>
+<tr>
+<td><code>c = a * b</code></td>
+<td><code>∂a += g*b</code>，<code>∂b += g*a</code></td>
+</tr>
+<tr>
+<td><code>c = a * s</code></td>
+<td><code>∂a += g*s</code></td>
+</tr>
+<tr>
+<td><code>c = a @ b</code></td>
+<td><code>∂a += g @ bᵀ</code>，<code>∂b += aᵀ @ g</code></td>
+</tr>
+<tr>
+<td><code>c = sum(a)</code></td>
+<td><code>∂a += g</code>（每个元素都加同一个 g）</td>
+</tr>
+</tbody>
+</table>
+<p>以乘法为例，真实的 <code>mul</code> 只有一行（<code>src/tensor.rs</code> 的 <code>Tensor::mul</code>）：前向是 <code>a * b</code>，反向返回 <code>(∂c/∂a, ∂c/∂b) = (b, a)</code>，形状检查、广播、并行和建图都交给通用函数 <code>binary</code>：</p>
+<pre><code class="language-rust">pub fn mul(&amp;self, other: &amp;Tensor) -&gt; Tensor {
+    // ∂c/∂a = b，∂c/∂b = a
+    self.binary(other, |a, b| a * b, |a, b| (b, a))
+}
+</code></pre>
+<p>下面是 <code>binary</code> 内部反向逻辑的<strong>原理示意</strong>（省略广播与并行细节；真实实现见 <code>src/tensor.rs</code> 的 <code>binary</code>）。注意累加 <code>+=</code>，因为一个张量可能被多条路径使用，梯度要累加：</p>
+<pre><code class="language-rust">// 原理示意
+let g = rg.borrow();
+let mut sgm = sg.borrow_mut();
+let mut ogm = og.borrow_mut();
+for i in 0..g.len() {
+    sgm[i] += g[i] * od_b[i];    // ∂a = g * b
+    ogm[i] += g[i] * sd_b[i];    // ∂b = g * a
+}
+</code></pre>
+<h2 id="user-content-8-反向传播主流程逆序扫描线性-tape">8. 反向传播主流程：逆序扫描线性 tape<a href="#8-反向传播主流程逆序扫描线性-tape" aria-label="Link to heading '8. 反向传播主流程：逆序扫描线性 tape'" data-heading-content="8. 反向传播主流程：逆序扫描线性 tape" class="anchor"></a></h2>
+<p>图是有向无环图（DAG），必须保证&quot;子节点先算，父节点后算&quot;（拓扑逆序）。
+线性 tape 的妙处：<strong>tape 按前向顺序追加 ⇒ 逆序扫描就是拓扑逆序</strong>——子节点总是比父节点登记得晚，所以一趟从尾到头的扫描就是合法的反向执行序，不需要显式做拓扑排序：</p>
+<pre><code class="language-rust">pub fn backward(&amp;self) {
+    // 1. loss 自己的梯度 = 1（d loss / d loss = 1）
+    self.grad.borrow_mut()[0] = 1.0;
+    // 2. 锁 tape，从末尾逆序扫描（逆序 == 拓扑逆序）
+    let mut reachable = HashSet::new();
+    reachable.insert(身份键(self));   // 从根出发的可达集
+    for i in (0..tape.len()).rev() {
+        if reachable.contains(&amp;tape[i].out) {
+            (tape[i].f)();                        // 执行链式法则闭包
+            reachable.extend(tape[i].parents);    // 沿父键继续回溯
+            tape[i].done = true;
+        }
+    }
+    // 3. 只移除本次执行的条目；回溯不到根的（其它交错前向的图、故意不反的分支）保留
+    tape.retain(|e| !e.done);
+}
+</code></pre>
+<p>要点：</p>
+<ul>
+<li><strong>可达集裁剪</strong>：只有能沿&quot;输出 → 父&quot;身份键回溯到 loss 的条目才执行。不能简单&quot;执行到根条目就截断&quot;——流水线调度（第 9 课 1F1B）会让多个 micro-batch 的前向在 tape 上交错且反向非 FIFO，按位置截断会误杀别的图</li>
+<li><strong>选择性移除</strong>：执行过的条目移除，使 tape 每步稳态有界；<code>aux_only_balance</code> 这类只反部分图的 demo，另一部分永远不可达，用 <code>clear_tape()</code> 整条清掉</li>
+<li>用 <code>Shared::as_ptr(&amp;t.grad)</code> 作为节点的唯一身份键（一个节点被多个运算共享时靠它命中同一条回溯路径）</li>
+</ul>
+<h2 id="user-content-9-训练循环四步舞">9. 训练循环：四步舞<a href="#9-训练循环四步舞" aria-label="Link to heading '9. 训练循环：四步舞'" data-heading-content="9. 训练循环：四步舞" class="anchor"></a></h2>
+<p>一次&quot;学习&quot;包含四步（也是所有深度学习框架训练循环的骨架）：</p>
+<pre><code class="language-rust">// 1. 前向：算预测和损失
+let loss = x.matmul(&amp;w).sub(&amp;y).mul(...).sum();
+// 2. 反向：自动算每个参数的梯度
+loss.backward();
+// 3. 更新：w -= lr * 梯度（这里手动实现，展示底层）
+w.set_data(vec![w.data()[0] - lr * w.grad()[0], ...]);
+// 4. 清零梯度：否则下一轮会把旧梯度累加上去
+w.zero_grad();
+</code></pre>
+<p>这段线性回归在仓库里以<strong>单元测试</strong>的形式保留：<code>cargo test test_linear_regression_converges</code>
+（数据是 y = 2x + 1，用均值 MSE + lr = 0.005 跑 5000 步，断言 w→2.0、b→1.0，容差 0.1）。
+<code>demo</code> 子命令里没有这一段——它依次跑的是 XOR MLP、BPE 分词、小 Transformer 训练与生成。</p>
+<h2 id="user-content-10-一个重要的细节梯度累加">10. 一个重要的细节：梯度累加<a href="#10-一个重要的细节梯度累加" aria-label="Link to heading '10. 一个重要的细节：梯度累加'" data-heading-content="10. 一个重要的细节：梯度累加" class="anchor"></a></h2>
+<p>为什么用 <code>+=</code> 而不是 <code>=</code>？因为一个张量可能被多条路径使用。</p>
+<p>例：<code>z = x*x</code>。求梯度时 x 有两条路径（<code>z</code> 对第一个 x 的导数是第二个 x，对第二个 x 的导数是第一个 x），必须相加：<code>∂x = g*x + g*x = 2gx</code>。</p>
+<p>代码里我们用 <code>Shared::ptr_eq(&amp;sg, &amp;og)</code> 判断两个父节点是不是同一个张量，是的话就合并累加。这也是测试 <code>test_chain_rule</code> 验证的内容。</p>
+<h2 id="user-content-11-运行与验证">11. 运行与验证<a href="#11-运行与验证" aria-label="Link to heading '11. 运行与验证'" data-heading-content="11. 运行与验证" class="anchor"></a></h2>
+<pre><code class="language-bash">cargo test     # 测试全部通过（本课内容对应 test_chain_rule / test_linear_regression_converges）
+cargo run --release -- demo    # 项目演示入口：XOR MLP → BPE 分词 → 小 Transformer 训练与生成
+</code></pre>
+<h2 id="user-content-12-小结与下一课">12. 小结与下一课<a href="#12-小结与下一课" aria-label="Link to heading '12. 小结与下一课'" data-heading-content="12. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li>梯度 = 损失对参数的&quot;变化方向&quot;，梯度下降就是沿着反方向走</li>
+<li>链式法则 + 计算图 = 反向传播，一次性高效算出所有梯度</li>
+<li>Rust 用 <code>Arc&lt;Mutex&gt;</code>（<code>Shared</code> 封装）+ 闭包实现了可自动求导的张量</li>
+<li>亲手跑通了第一个&quot;会学习&quot;的程序：线性回归（<code>test_linear_regression_converges</code>）</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li>给张量加一个 <code>pow(n)</code> 运算（<code>c = a^n</code>），推导并实现它的反向传播（提示：<code>∂a = g * n * a^(n-1)</code>）。</li>
+<li>思考：为什么 loss 必须是标量（0 维）才能调用 <code>backward()</code>？如果不是标量会怎样？</li>
+<li>把学习率从 0.001 改成 1.0，观察 loss 曲线，解释发生了什么（振荡/发散）。</li>
+<li>这是本项目的&quot;心脏&quot;。试着不看代码，自己画出 <code>loss = (x·w - y)²</code> 的计算图并手算 <code>∂loss/∂w</code>。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="03-%E5%BC%A0%E9%87%8F%E8%BF%90%E7%AE%97%E6%89%A9%E5%B1%95.md">第 3 课 张量运算扩展</a> —— 补齐张量运算（广播、softmax 等），为神经网络打基础</p>
+</blockquote>

@@ -1,0 +1,134 @@
+<blockquote>
+<p>在Vue3.4中，defineModel宏已经被正式启用，无需配置，直接可用</p>
+</blockquote>
+<h1 id="user-content-启用definemodel">启用defineModel<a href="#启用definemodel" aria-label="Link to heading '启用defineModel'" data-heading-content="启用defineModel" class="anchor"></a></h1>
+<p>目前[Vue3.3.13]defineModel宏是实验性特性，如果需要使用该宏，需要在<code>vite.config.js</code>配置以下内容</p>
+<pre><code class="language-js">export default defineConfig({
+  plugins: [
+    vue({
+      script: {
+        defineModel: true
+      }
+    }),
+  ],
+})
+
+</code></pre>
+<p>因为是实验性功能，在运行项目时，会有提示</p>
+<blockquote>
+<p>[@vue/compiler-sfc] defineModel() is an experimental feature and disabled by default.<br />
+To enable it, follow the RFC at <a href="https://github.com/vuejs/rfcs/discussions/503">https://github.com/vuejs/rfcs/discussions/503</a>.</p>
+</blockquote>
+<h1 id="user-content-definemodel出现的必要">defineModel出现的必要<a href="#definemodel出现的必要" aria-label="Link to heading 'defineModel出现的必要'" data-heading-content="defineModel出现的必要" class="anchor"></a></h1>
+<p>在Vue中，父传子的数据是单向数据流，即无法直接通过子组件修改父组件传递过来的数据<br />
+如果需要修改可以通过自定义事件的方式，通过子组件的自定义事件来修改父组件的状态</p>
+<pre><code class="language-vue">&lt;!-- src/App.vue --&gt;
+&lt;script setup&gt;
+import { ref } from 'vue'
+import Counter from './components/Counter.vue'
+
+const count = ref(0)
+const updateCount = (val) =&gt; {
+  count.value = val
+}
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;div&gt;父组件：{{ count }}&lt;/div&gt;
+  &lt;Counter :count=&quot;count&quot; @addCount=&quot;updateCount&quot;/&gt;
+&lt;/template&gt;
+
+</code></pre>
+<pre><code class="language-vue">&lt;!-- src/components/Counter.vue --&gt;
+&lt;script setup&gt;
+const props = defineProps({
+  count: Number
+})
+
+const emit = defineEmits([&quot;addCount&quot;])
+
+const handleClick = () =&gt; {
+  emit(&quot;addCount&quot;, props.count+1)
+}
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;div&gt;子组件：{{ count }}&lt;/div&gt;
+  &lt;button @click=&quot;handleClick&quot;&gt;count+1&lt;/button&gt;
+&lt;/template&gt;
+
+</code></pre>
+<p>以上代码可以实现子组件修改父组件的状态，虽然不算复杂，也很好理解原理，但是这并不优雅</p>
+<p>可以通过v-model来进一步简化代码，以下代码父组件并不是通过属性的方式将数据传递给子组件，而是通过v-model进行传递<br />
+子组件的代码量基本和上边的代码一致，只是自定义事件名变成了<code>update:count</code>的形式，这是固定写法<br />
+父组件无需注册子组件的自定义事件</p>
+<pre><code class="language-vue">&lt;!-- src/App.vue --&gt;
+&lt;script setup&gt;
+import { ref } from 'vue'
+import Counter from './components/Counter.vue'
+const count = ref(0)
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;div&gt;父组件：{{ count }}&lt;/div&gt;
+  &lt;Counter v-model:count=&quot;count&quot;/&gt;
+&lt;/template&gt;
+
+</code></pre>
+<blockquote>
+<p>如果父组件直接写<code>v-model=&quot;count&quot;</code>，其实可以理解为默认转换为<code>v-model:modelValue=&quot;count&quot;</code>，即：<code>:modelValue=&quot;count&quot;</code> <code>@update:modelValue=&quot;count&quot;</code><br />
+子组件中需要props接收<code>modelValue</code>，自定义事件将变为<code>update:modelValue</code></p>
+</blockquote>
+<pre><code class="language-vue">&lt;!-- src/components/Counter.vue --&gt;
+&lt;script setup&gt;
+const props = defineProps({
+  count: Number
+})
+
+const emit = defineEmits([&quot;update:count&quot;])
+
+const handleClick = () =&gt; {
+  emit(&quot;update:count&quot;, props.count+1)
+}
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;div&gt;子组件：{{ count }}&lt;/div&gt;
+  &lt;button @click=&quot;handleClick&quot;&gt;count+1&lt;/button&gt;
+&lt;/template&gt;
+
+</code></pre>
+<p>虽然简化了父组件的代码，但是子组件的代码量并没有减少，并且子组件自定义事件名变成了固定格式的写法<br />
+这不仅让人产生疑惑: &quot;自定义事件没有在父组件中被使用，这无疑是增加代码阅读的成本&quot;</p>
+<p>这些疑惑可以通过<code>defineModel</code>宏来打消<br />
+父组件还是一样的写法，只需子组件通过defineModel宏来处理，甚至不用defineProps来定义父组件传递的数据</p>
+<pre><code class="language-vue">&lt;!-- src/App.vue --&gt;
+&lt;script setup&gt;
+import { ref } from 'vue'
+import Counter from './components/Counter.vue'
+
+const count = ref(0)
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;div&gt;父组件：{{ count }}&lt;/div&gt;
+  &lt;Counter v-model:count=&quot;count&quot;/&gt;
+&lt;/template&gt;
+
+</code></pre>
+<pre><code class="language-vue">&lt;!-- src/components/Counter.vue --&gt;
+&lt;script setup&gt;
+const count = defineModel('count')
+
+const handleClick = () =&gt; {
+  count.value += 1
+}
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;div&gt;子组件：{{ count }}&lt;/div&gt;
+  &lt;button @click=&quot;handleClick&quot;&gt;count+1&lt;/button&gt;
+&lt;/template&gt;
+
+</code></pre>
+<p>defineModel宏目前还是实验性功能，不应该在生产环境中进行使用</p>

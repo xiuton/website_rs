@@ -1,0 +1,236 @@
+<h1 id="user-content-第-46-课muon-优化器--动量矩阵的-newtonschulz-正交化">第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化<a href="#第-46-课muon-优化器--动量矩阵的-newtonschulz-正交化" aria-label="Link to heading '第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化'" data-heading-content="第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化" class="anchor"></a></h1>
+<blockquote>
+<p><strong>本课已落地为可运行代码</strong>：<a href="../src/optim.rs"><code>src/optim.rs</code></a> 的 <code>Muon</code>
+（含私有辅助 <code>zeropower_newton_schulz</code> / <code>matmul</code> / <code>transpose</code>）+ 新增 trait
+<code>OptimizerState</code> + 工厂 <a href="../src/train.rs"><code>src/train.rs</code></a> 的 <code>make_optimizer</code>。
+配置开关：<code>train.optimizer</code>（默认 <code>&quot;adamw&quot;</code>）/ <code>train.muon_momentum</code>（默认 0.95）/
+<code>train.muon_ns_steps</code>（默认 5）。</p>
+<p>与第 17 课的衔接：第 17 课的 AdamW 在<strong>每个坐标</strong>上独立自适应缩放；Muon 换了个方向——
+把整个更新矩阵按<strong>谱范数</strong>归一化。两者在同一份代码里共存，一维参数自动回退 AdamW。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>AdamW 的&quot;逐坐标自适应&quot;在矩阵参数上有什么副作用？</li>
+<li>Muon 的两步（动量矩阵 + Newton–Schulz 正交化）各自在做什么？</li>
+<li>Newton–Schulz 的迭代式与常数是怎么定的？为什么迭代前要先按 Frobenius 范数归一化？</li>
+<li>为什么 Muon 的学习率要比 AdamW 大 <code>√cols</code> 倍才&quot;等效&quot;？</li>
+<li>一个优化器里怎么同时容纳 Muon 与 AdamW？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-动机逐坐标缩放的更新矩阵谱太宽">2. 动机：逐坐标缩放的更新矩阵谱太宽<a href="#2-动机逐坐标缩放的更新矩阵谱太宽" aria-label="Link to heading '2. 动机：逐坐标缩放的更新矩阵谱太宽'" data-heading-content="2. 动机：逐坐标缩放的更新矩阵谱太宽" class="anchor"></a></h2>
+<p>AdamW 的更新是 <code>lr · m̂ / (√v̂ + ε)</code>，<strong>逐个元素</strong>独立缩放。对矩阵权重 <code>W ∈ R^{r×c}</code> 来说，
+这意味着更新矩阵 <code>ΔW</code> 的各方向步长差异可以非常大：个别方向的奇异值特别大，其余很小。</p>
+<p>后果是&quot;被个别大奇异方向带偏&quot;——训练像是一部分方向猛走、一部分几乎不动。Muon
+（<strong>M</strong>oment<strong>u</strong>m <strong>o</strong>rthogonalized by <strong>N</strong>ewton–Schulz，Keller Jordan et al., 2024）
+的想法是：把更新矩阵<strong>正交化</strong>，让它的所有奇异值都等于 1，&quot;所有方向以同样的步长前进&quot;。</p>
+<hr />
+<h2 id="user-content-3-原理与公式">3. 原理与公式<a href="#3-原理与公式" aria-label="Link to heading '3. 原理与公式'" data-heading-content="3. 原理与公式" class="anchor"></a></h2>
+<p>每步对二维参数 <code>W ∈ R^{r×c}</code>：</p>
+<pre><code class="language-text">1. 累积动量      B ← μ·B + (1−μ)·G          （μ 默认 0.95，不做偏差校正）
+2. 正交化        O ← NewtonSchulz(B) ≈ U Vᵀ  （B = U Σ Vᵀ 的极因子）
+3. 缩放并更新    O ← O · √(max(1, r/c))
+                 W ← W − lr·(O + wd·W)
+</code></pre>
+<h3 id="user-content-31-newtonschulz-迭代">3.1 Newton–Schulz 迭代<a href="#31-newtonschulz-迭代" aria-label="Link to heading '3.1 Newton–Schulz 迭代'" data-heading-content="3.1 Newton–Schulz 迭代" class="anchor"></a></h3>
+<p>求近似正交极因子用的是 5 阶多项式迭代（<code>A = X Xᵀ</code>）：</p>
+<pre><code class="language-text">X ← a·X + (b·A + c·A²)·X
+    a = 3.4445,  b = −4.7750,  c = 2.0315
+</code></pre>
+<p>这组常数（Keller Jordan 的 Muon 用的就是它）是在&quot;不要发散&quot;约束下收敛最快的 5 阶组合，
+作用是把 <code>B</code> 的<strong>所有奇异值往 1 推</strong>。两个关键细节：</p>
+<ul>
+<li><strong>迭代前必须按 Frobenius 范数归一化</strong>：初值的最大奇异值 &gt; 1 时迭代会发散成 NaN；
+归一化把谱范数压到 <code>‖X‖₂ ≤ ‖X‖_F = 1</code>，迭代才是收缩的。实现里还加了 <code>+1e-7</code>
+防止全零矩阵除零（梯度全零时返回零矩阵而不是 NaN）。</li>
+<li><strong><code>rows &gt; cols</code> 时先转置成&quot;矮胖&quot;矩阵</strong>：中间量 <code>A = X Xᵀ</code> 的规模由<strong>较小那一维</strong>决定，
+转置能让它从 <code>[rows, rows]</code> 缩到 <code>[cols, cols]</code>，省掉一大块算力。</li>
+</ul>
+<h3 id="user-content-32-缩放与有效步长">3.2 缩放与&quot;有效步长&quot;<a href="#32-缩放与有效步长" aria-label="Link to heading '3.2 缩放与&quot;有效步长&quot;'" data-heading-content="3.2 缩放与&quot;有效步长&quot;" class="anchor"></a></h3>
+<p><code>O ≈ UVᵀ</code> 的行是单位向量，每个元素的量级约 <code>1/√c</code>（<code>c</code> 是列数），于是：</p>
+<pre><code class="language-text">Muon 每元素更新量 ≈ lr / √c
+AdamW 每元素更新量 ≈ lr
+</code></pre>
+<p>要拿到相近的有效步长，Muon 的学习率通常要大 <code>√c</code> 倍。这也是 <code>scale = √(max(1, r/c))</code> 的来历：
+<code>r/c &gt; 1</code>（矮胖）时把整体尺度抬起来，使不同形状矩阵的更新范数可比。</p>
+<hr />
+<h2 id="user-content-4-本仓库实现要点">4. 本仓库实现要点<a href="#4-本仓库实现要点" aria-label="Link to heading '4. 本仓库实现要点'" data-heading-content="4. 本仓库实现要点" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../src/optim.rs"><code>src/optim.rs</code></a> <code>Muon</code></td>
+<td>字段：<code>momentum</code>(0.95)、<code>ns_steps</code>(5)、<code>weight_decay</code>，以及一维回退用的 <code>beta1</code>(0.9) / <code>beta2</code>(0.999) / <code>eps</code>(1e-8)；<code>m</code> / <code>v</code> 三段状态</td>
+</tr>
+<tr>
+<td><a href="../src/optim.rs"><code>src/optim.rs</code></a> <code>Muon::is_matrix</code></td>
+<td><code>shape.len() == 2 &amp;&amp; shape[0] &gt; 1 &amp;&amp; shape[1] &gt; 1</code>；<code>[n,1]</code>/<code>[1,n]</code> 的退化二维等价于一维，归回 AdamW</td>
+</tr>
+<tr>
+<td><a href="../src/optim.rs"><code>src/optim.rs</code></a> <code>Muon::step</code></td>
+<td>二维走 Muon，一维走 AdamW（公式与 <code>AdamW::step</code> 逐行相同，<code>t</code>/<code>beta</code>/<code>eps</code> 一致）</td>
+</tr>
+<tr>
+<td><a href="../src/optim.rs"><code>src/optim.rs</code></a> <code>zeropower_newton_schulz</code></td>
+<td>归一化 → <code>steps</code> 次迭代 →（必要时）转置回原形状；常数 <code>3.4445 / -4.7750 / 2.0315</code></td>
+</tr>
+<tr>
+<td><a href="../src/optim.rs"><code>src/optim.rs</code></a> <code>OptimizerState</code> trait</td>
+<td>在 <code>Optimizer</code> 之上补齐 <code>set_lr</code> / <code>state</code> / <code>restore_state</code>，供训练循环与 checkpoint 使用</td>
+</tr>
+<tr>
+<td><a href="../src/train.rs"><code>src/train.rs</code></a> <code>make_optimizer</code></td>
+<td><code>&quot;muon&quot;</code> → <code>Muon::new(max_lr, params, weight_decay, muon_momentum, muon_ns_steps)</code>；其余 → <code>AdamW::new(...)</code></td>
+</tr>
+<tr>
+<td><a href="../src/config.rs"><code>src/config.rs</code></a></td>
+<td><code>optimizer</code>（默认 <code>&quot;adamw&quot;</code>）/ <code>muon_momentum</code>（0.95）/ <code>muon_ns_steps</code>（5）字段与校验</td>
+</tr>
+</tbody>
+</table>
+<p><strong>状态布局</strong>（checkpoint 的三段数据块）：二维参数用 <code>m</code> 存正交化<strong>之前</strong>的动量缓冲、
+<code>v</code> 恒为 0 占位；一维参数的 <code>m</code> / <code>v</code> 语义与 AdamW 完全相同。这样 <code>Muon</code> 的状态导出/恢复
+与 <a href="../src/checkpoint.rs"><code>crate::checkpoint</code></a> 的三段格式（参数 / 一阶动量 / 二阶动量）一一对应。</p>
+<p><strong>为什么要新增 <code>OptimizerState</code></strong>：训练循环每步要用调度器改写学习率——<code>Box&lt;dyn Optimizer&gt;</code>
+抽象下访问不到结构体字段（<code>train_vqvae</code> 原本写的是 <code>opt.lr = ...</code>）。把 <code>set_lr</code> /
+<code>state</code> / <code>restore_state</code> 提到 trait 上，<code>AdamW</code> 与 <code>Muon</code> 才能被同一套训练循环与 checkpoint
+代码统一处理。</p>
+<h3 id="user-content-默认路径逐位不变">默认路径逐位不变<a href="#默认路径逐位不变" aria-label="Link to heading '默认路径逐位不变'" data-heading-content="默认路径逐位不变" class="anchor"></a></h3>
+<ul>
+<li>默认 <code>optimizer = &quot;adamw&quot;</code>：<code>make_optimizer</code> 走 <code>_</code> 分支，<code>AdamW::new(max_lr, params, weight_decay)</code>
+与加 Muon 之前<strong>完全一致</strong>；</li>
+<li><code>AdamW</code> 的实现没变，只是把 <code>set_lr</code> / <code>state</code> / <code>restore_state</code> 也实现到 <code>OptimizerState</code> 上——
+这与它原来就有的同名方法是同一套逻辑，行为逐位不变；</li>
+<li>单测 <code>test_optimizer_factory_defaults_to_adamw</code> 钉住两点：默认配置就是 <code>&quot;adamw&quot;</code>；
+对未知取值也回退 <code>AdamW</code>（<code>validate</code> 会先拦下非法值，工厂这里是不 panic 的双保险）。</li>
+</ul>
+<h3 id="user-content-代码地图">代码地图<a href="#代码地图" aria-label="Link to heading '代码地图'" data-heading-content="代码地图" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../src/optim.rs"><code>src/optim.rs</code></a></td>
+<td><code>Muon</code>、<code>zeropower_newton_schulz</code>、<code>matmul</code> / <code>transpose</code>、<code>OptimizerState</code></td>
+</tr>
+<tr>
+<td><a href="../src/train.rs"><code>src/train.rs</code></a></td>
+<td><code>make_optimizer</code> 工厂</td>
+</tr>
+<tr>
+<td><a href="../src/config.rs"><code>src/config.rs</code></a></td>
+<td><code>optimizer</code> / <code>muon_momentum</code> / <code>muon_ns_steps</code> 字段与校验</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="user-content-5-运行与验证">5. 运行与验证<a href="#5-运行与验证" aria-label="Link to heading '5. 运行与验证'" data-heading-content="5. 运行与验证" class="anchor"></a></h2>
+<pre><code class="language-bash"># Muon 单测（NS 精确性、零梯度、闭式更新、缩放比、一维回退、冻结跳过、状态往返）
+cargo test muon
+
+# Newton–Schulz 对正交结构输入的精确代数性质
+cargo test newton_schulz
+
+# 工厂默认行为
+cargo test optimizer_factory
+</code></pre>
+<p>配置示例：</p>
+<pre><code class="language-jsonc">{
+  &quot;train&quot;: {
+    &quot;optimizer&quot;: &quot;muon&quot;,     // 默认 &quot;adamw&quot;
+    &quot;max_lr&quot;: 0.05,          // ⚠️ Muon 每元素更新量约 lr/√cols，要比 AdamW 大 √cols 倍
+    &quot;muon_momentum&quot;: 0.95,   // 默认 0.95
+    &quot;muon_ns_steps&quot;: 5       // 默认 5
+  }
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>测试</th>
+<th>验证内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_newton_schulz_matches_polynomial_on_orthogonal_input</code></td>
+<td>对&quot;最小维单位阵&quot;输入，输出精确等于 <code>p⁵(1/‖Q‖_F)·Q</code>（见 §5 常见坑第 2 条）</td>
+</tr>
+<tr>
+<td><code>test_muon_zero_gradient_yields_zero_update</code></td>
+<td>全零动量 + 零权重衰减 ⇒ 参数一动不动，且不产生 NaN（<code>+1e-7</code> 的作用）</td>
+</tr>
+<tr>
+<td><code>test_muon_matrix_update_matches_closed_form</code></td>
+<td>梯度取单位阵时，逐元素核对整条链路 <code>Δ = −lr·scale·p⁵(s)·I</code></td>
+</tr>
+<tr>
+<td><code>test_muon_scaling_uses_dimension_ratio</code></td>
+<td>缩放因子是 <code>√(max(1, r/c))</code>：<code>[8,2]</code> 的更新范数是 <code>[2,8]</code> 的 2 倍</td>
+</tr>
+<tr>
+<td><code>test_muon_falls_back_to_adamw_on_1d_params</code></td>
+<td>一维参数与 AdamW 走出<strong>逐位相同</strong>的结果</td>
+</tr>
+<tr>
+<td><code>test_muon_skips_frozen_params</code></td>
+<td>冻结参数整体跳过（连权重衰减都不吃）</td>
+</tr>
+<tr>
+<td><code>test_muon_state_roundtrip</code></td>
+<td><code>state</code> / <code>restore_state</code> 往返一致（checkpoint 续训依赖）</td>
+</tr>
+<tr>
+<td><code>test_muon_changes_training_same_seed</code></td>
+<td>同种子对照：换 Muon 确实改变 loss，且 loss 有限</td>
+</tr>
+<tr>
+<td><code>test_optimizer_factory_defaults_to_adamw</code></td>
+<td>默认走 AdamW；未知取值不 panic</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-常见坑实测踩出来的">常见坑（实测踩出来的）<a href="#常见坑实测踩出来的" aria-label="Link to heading '常见坑（实测踩出来的）'" data-heading-content="常见坑（实测踩出来的）" class="anchor"></a></h3>
+<h4 id="user-content-1-沿用-adamw-的学习率muon-会几乎不动">1. 沿用 AdamW 的学习率，Muon 会&quot;几乎不动&quot;<a href="#1-沿用-adamw-的学习率muon-会几乎不动" aria-label="Link to heading '1. 沿用 AdamW 的学习率，Muon 会&quot;几乎不动&quot;'" data-heading-content="1. 沿用 AdamW 的学习率，Muon 会&quot;几乎不动&quot;" class="anchor"></a></h4>
+<p>Muon 每元素更新量约 <code>lr/√cols</code>，比 AdamW 小 <code>√cols</code> 倍。直接套默认 <code>max_lr = 3e-3</code>，
+参数几乎不动，看起来像&quot;没生效&quot;。<code>test_muon_changes_training_same_seed</code> 特意把学习率设成
+<code>0.05</code>（而不是默认的 <code>3e-3</code>）并注释了原因——这正是配置注释里 <code>⚠️</code> 提醒的那一条。</p>
+<p>配置里给了 <code>optimizer = &quot;muon&quot;</code> 却忘了调大 <code>max_lr</code>，是一条很容易踩的暗坑：loss 曲线不会报错，
+只是学得很慢。</p>
+<h4 id="user-content-2-5-阶-newtonschulz-输出不是严格-uvᵀ而是-usvᵀ">2. 5 阶 Newton–Schulz 输出不是严格 <code>UVᵀ</code>，而是 <code>US'Vᵀ</code><a href="#2-5-阶-newtonschulz-输出不是严格-uvᵀ而是-usvᵀ" aria-label="Link to heading '2. 5 阶 Newton–Schulz 输出不是严格 UVᵀ，而是 US'Vᵀ'" data-heading-content="2. 5 阶 Newton–Schulz 输出不是严格 UVᵀ，而是 US'Vᵀ" class="anchor"></a></h4>
+<p>这组 5 阶常数的设计目标是&quot;零点斜率最大、不保证处处精确收敛到 1&quot;，
+所以迭代完的奇异值<strong>分散在 0.5~1.5</strong>，输出其实写作 <code>US'Vᵀ</code>，而不是严格的 <code>UVᵀ</code>。</p>
+<p>只有在&quot;<strong>奇异值全相同</strong>&quot;的特殊输入上，迭代才精确退化成对一个标量的多项式反复作用：</p>
+<pre><code class="language-text">Q 的奇异值全为 s = 1/‖Q‖_F  ⇒  输出 = p⁵(s) · Q
+p(x) = 3.4445·x − 4.775·x³ + 2.0315·x⁵
+</code></pre>
+<p>这正是单测 <code>test_newton_schulz_matches_polynomial_on_orthogonal_input</code> 的断言口径
+（用&quot;最小维单位阵&quot;当输入，逐元素核对 <code>p⁵(s)·Q</code>）。它<strong>不是</strong>在断言&quot;输出是行正交单位&quot;——
+用后者当口径会被常量设计上的行为差异误判成 bug。</p>
+<p>另一个容易混的细节：<strong>二维参数的动量不做偏差校正</strong>（直接用 <code>B</code>，不除 <code>1−μᵗ</code>），
+而<strong>一维回退的 AdamW 走完整偏差校正</strong>。同一个优化器实例里两套动量语义并存，别混。</p>
+<hr />
+<h2 id="user-content-6-小结与下一课">6. 小结与下一课<a href="#6-小结与下一课" aria-label="Link to heading '6. 小结与下一课'" data-heading-content="6. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<p>Muon 把更新矩阵按谱范数正交化（Newton–Schulz 5 阶迭代），一维参数自动回退 AdamW；代价是学习率口径与 AdamW 不同——要大约 <code>√cols</code> 倍才等效。</p>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<ul>
+<li><strong>嵌入/输出头单独走 AdamW</strong>：本实现按<strong>形状</strong>分流，嵌入矩阵也是二维、也会走 Muon。
+工程上更常见的做法是把嵌入与输出头留在 AdamW（它们的梯度按行统计更有意义）；
+本项目优化器层拿不到参数名，故统一按形状分流——要改需要把参数名传进优化器。</li>
+<li><strong><code>ns_steps</code> 扫描</strong>：<code>muon_ns_steps = 1/3/5/10</code> 对照，看&quot;正交化不足 vs 太慢&quot;的拐点。</li>
+<li><strong>与 WSD 组合</strong>：换了有效步长口径后，学习率调度曲线的峰值需要重新标定（见第 44 课）。</li>
+<li><strong>扩展到三维以上</strong>：本实现只对二维权重正交化，其余全部回退 AdamW。</li>
+</ul>
+<blockquote>
+<p><strong>下一课</strong>：<a href="47-mHC%E6%B5%81%E5%BD%A2%E7%BA%A6%E6%9D%9F%E8%B6%85%E8%BF%9E%E6%8E%A5.md">第 47 课 mHC 流形约束超连接</a> —— 把残差流拓宽成多条并行通道：mHC 用双随机矩阵耦合。</p>
+</blockquote>

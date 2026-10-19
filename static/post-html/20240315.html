@@ -1,0 +1,20 @@
+<p>在windows系统上，通过以下命令安装pnpm包管理工具，然后在终端执行<code>pnpm -v</code>会报错</p>
+<pre><code class="language-sh">npm install -g pnpm
+
+pnpm -v # 报错
+
+</code></pre>
+<p>运行get-ExecutionPolicy，显示Restricted（受限的）</p>
+<pre><code class="language-sh">get-ExecutionPolicy
+Restricted
+
+</code></pre>
+<p>运行set-ExecutionPolicy RemoteSigned，设置RemoteSigned</p>
+<pre><code class="language-sh">set-ExecutionPolicy RemoteSigned
+
+</code></pre>
+<p>再次查看</p>
+<pre><code class="language-sh">get-ExecutionPolicy
+RemoteSigned
+
+</code></pre>

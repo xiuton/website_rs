@@ -1,0 +1,402 @@
+<h1 id="user-content-第-48-课fp4-量化感知训练--e2m1-与-4-位权重">第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重<a href="#第-48-课fp4-量化感知训练--e2m1-与-4-位权重" aria-label="Link to heading '第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重'" data-heading-content="第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重" class="anchor"></a></h1>
+<blockquote>
+<p><strong>本课已落地为可运行代码</strong>：<a href="../src/fp4.rs"><code>src/fp4.rs</code></a>（E2M1 编解码 + nibble 打包的
+<code>Fp4Tensor</code> + <code>roundtrip_params_in_place</code>），接入 <a href="../src/train.rs"><code>src/train.rs</code></a> 的训练步，
+演示命令 <a href="../src/cmd/experiments.rs"><code>src/cmd/experiments.rs</code></a> 的 <code>cmd_fp4</code>。
+配置开关：<code>train.fp4</code>（默认 <code>false</code>）/ 命令 <code>cargo run -- fp4</code>。</p>
+<p>与第 43 课的关系：第 43 课把权重压到 8 位（E4M3 + 每 32 元素一个 scale = 9 bit/元素）。
+本课再砍一半，只留 4 位（E2M1 + 每 32 元素一个 scale = <strong>5 bit/元素</strong>，对 f32 是 6.4 倍压缩），
+代价全在精度上。两课的账本<strong>必须并排看</strong>才有意义。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>4 位里塞下&quot;符号 + 指数 + 尾数&quot;之后，一个数还剩多少精度？</li>
+<li>E2M1 为什么<strong>既没有 Inf 也没有 NaN</strong>？没有 NaN 码时 <code>NaN</code> 输入怎么办？</li>
+<li>为什么 FP4 离开分块 scale 就几乎不可用？</li>
+<li>5 bit/元素这个数字是怎么算出来的？&quot;块大小 1&quot;为什么反而比 f32 更费？</li>
+<li>权重掉到 FP4 之后，验证 loss 会差多少？（这是本课的账本）</li>
+</ol>
+<hr />
+<h2 id="user-content-2-e2m14-位能表示的全部-16-个数">2. E2M1：4 位能表示的全部 16 个数<a href="#2-e2m14-位能表示的全部-16-个数" aria-label="Link to heading '2. E2M1：4 位能表示的全部 16 个数'" data-heading-content="2. E2M1：4 位能表示的全部 16 个数" class="anchor"></a></h2>
+<p>字段切分是 <strong>1 位符号 + 2 位指数 + 1 位尾数</strong>，指数偏置取 1，于是
+<code>value = (1 + m/2) · 2^(ef − 1)</code>。正号侧只有 8 个值：</p>
+<table>
+<thead>
+<tr>
+<th>码</th>
+<th><code>ef</code></th>
+<th><code>m</code></th>
+<th>解码值</th>
+<th>与上一档的相对间距</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x0</code></td>
+<td>0（非规格化）</td>
+<td>0</td>
+<td>0</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>0x1</code></td>
+<td>0</td>
+<td>1</td>
+<td>0.5</td>
+<td>—（上一档是 0，无定义）</td>
+</tr>
+<tr>
+<td><code>0x2</code></td>
+<td>1</td>
+<td>0</td>
+<td>1.0</td>
+<td>100%</td>
+</tr>
+<tr>
+<td><code>0x3</code></td>
+<td>1</td>
+<td>1</td>
+<td>1.5</td>
+<td>50%</td>
+</tr>
+<tr>
+<td><code>0x4</code></td>
+<td>2</td>
+<td>0</td>
+<td>2.0</td>
+<td>33%</td>
+</tr>
+<tr>
+<td><code>0x5</code></td>
+<td>2</td>
+<td>1</td>
+<td>3.0</td>
+<td>50%</td>
+</tr>
+<tr>
+<td><code>0x6</code></td>
+<td>3</td>
+<td>0</td>
+<td>4.0</td>
+<td>33%</td>
+</tr>
+<tr>
+<td><code>0x7</code></td>
+<td>3</td>
+<td>1</td>
+<td><strong>6.0</strong></td>
+<td><strong>50%</strong></td>
+</tr>
+</tbody>
+</table>
+<p>加上符号位，16 个码<strong>全是有限值</strong>——E2M1 没有 Inf 码、也没有 NaN 码
+（对比 E4M3 至少留了 <code>0x7F</code> 当 NaN）。这条推论很硬：</p>
+<ul>
+<li><code>|x| &gt; 6</code> → 在编码前就<strong>饱和</strong>到 <code>±6.0</code>；</li>
+<li><code>NaN</code> → 4 位里无处可放，也只能饱和到 <code>±6.0</code>；</li>
+<li>因此 <a href="../src/fp4.rs"><code>encode_e2m1</code></a> 里没有任何&quot;特殊码&quot;分支，只有饱和。</li>
+</ul>
+<p><strong>精度直觉</strong>：在正规数区间（≥ <code>1.0</code>）内，最差相对间距出现在 <code>[4,6]</code> 段，是 <code>2/4 = 50%</code>
+（间距一律按「相邻间距 ÷ 上一档」算，<code>fp4</code> 命令第一节的表就是这个口径）；由此得单元素相对精度上界
+<code>2^−(mb+1) = 0.25</code>。而 E4M3 的尾数有 3 位，同一口径是 <code>2⁻⁴ ≈ 6%</code>。差了一个数量级。</p>
+<hr />
+<h2 id="user-content-3-分块缩放fp4-的必需品">3. 分块缩放：FP4 的必需品<a href="#3-分块缩放fp4-的必需品" aria-label="Link to heading '3. 分块缩放：FP4 的必需品'" data-heading-content="3. 分块缩放：FP4 的必需品" class="anchor"></a></h2>
+<p>正因为单个数太糙，FP4 必须靠 <strong>分块 scale</strong>（MXFP4：每 32 个元素共享一个 f32 scale）
+把小尺度的块整体抬进 <code>[0, 6]</code>：</p>
+<pre><code class="language-text">scale = max|x_block| / 6.0
+q     = encode_e2m1(x / scale)      // 半个字节（nibble）
+x'    = decode_e2m1(q) * scale
+</code></pre>
+<h3 id="user-content-31-位宽账本">3.1 位宽账本<a href="#31-位宽账本" aria-label="Link to heading '3.1 位宽账本'" data-heading-content="3.1 位宽账本" class="anchor"></a></h3>
+<pre><code class="language-text">FP4 + 每 32 元素一个 scale：4 bit/元素 + 32/32 bit/元素 = 5 bit/元素 → 32/5 = 6.4 倍
+FP8 + 每 32 元素一个 scale：8 bit/元素 + 32/32 bit/元素 = 9 bit/元素 → 32/9 ≈ 3.56 倍
+</code></pre>
+<p><strong>收益与开销必须一起看</strong>——<code>cargo run -- fp4</code> 第二节特意把&quot;块大小 1&quot;也列出来：</p>
+<pre><code class="language-text">每 1 个元素一个 f32 scale：4 bit + 32 bit = 36 bit/元素 —— 比 f32 还费 12.5%
+</code></pre>
+<p>那不是量化，只是把 f32 换了个地方存。量化最容易自欺的地方就在这里。</p>
+<h3 id="user-content-32-为什么-bits_per_element-要算得这么细">3.2 为什么 <code>bits_per_element</code> 要算得这么细<a href="#32-为什么-bits_per_element-要算得这么细" aria-label="Link to heading '3.2 为什么 bits_per_element 要算得这么细'" data-heading-content="3.2 为什么 bits_per_element 要算得这么细" class="anchor"></a></h3>
+<p><a href="../src/fp4.rs"><code>Fp4Tensor::bytes</code></a> 报的是<strong>真实字节数</strong>：码按 nibble 打包
+（元素 <code>i</code> 占字节 <code>i/2</code> 的低/高半字节），长度 <code>ceil(n/2)</code>。如果偷懒每元素存一个 <code>u8</code>，
+压缩比会被虚报一倍——账本就成了自欺的第二个入口。</p>
+<hr />
+<h2 id="user-content-4-本仓库实现要点">4. 本仓库实现要点<a href="#4-本仓库实现要点" aria-label="Link to heading '4. 本仓库实现要点'" data-heading-content="4. 本仓库实现要点" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../src/fp4.rs"><code>src/fp4.rs</code></a> <code>encode_e2m1</code> / <code>decode_e2m1</code></td>
+<td>骨架与 <a href="../src/fp8.rs"><code>crate::fp8::encode</code></a> 一致：算指数 → 尾数整数化 → ties-to-even 舍入 → 进位则指数 +1；复用 <code>fp8</code> 的 <code>exp2</code> / <code>round_ties_even</code>，避免两处实现悄悄跑偏</td>
+</tr>
+<tr>
+<td><a href="../src/fp4.rs"><code>src/fp4.rs</code></a> <code>Fp4Tensor</code></td>
+<td>字段 <code>codes</code>（打包 nibble）/ <code>scales</code> / <code>elements</code> / <code>block</code>；<code>bytes()</code> = <code>ceil(n/2) + 4·blocks</code></td>
+</tr>
+<tr>
+<td><a href="../src/fp4.rs"><code>src/fp4.rs</code></a> <code>bits_per_element</code></td>
+<td><code>(4·n + 32·blocks)/n</code>，FP4/32 恰好 5.0</td>
+</tr>
+<tr>
+<td><a href="../src/fp4.rs"><code>src/fp4.rs</code></a> <code>roundtrip_params_in_place</code></td>
+<td>只处理 <code>rank == 2</code> 的参数（一维的 norm 增益 / bias 留在 f32）</td>
+</tr>
+<tr>
+<td><a href="../src/config.rs"><code>src/config.rs</code></a>、<code>TrainConfig::fp4</code></td>
+<td>默认 <code>false</code>；与 <code>fp8</code> 同时开启时<strong>以 FP4 为准</strong>（两步回写依次执行）</td>
+</tr>
+<tr>
+<td><a href="../src/train.rs"><code>src/train.rs</code></a></td>
+<td>训练步第 7c 步：<code>opt.step()</code> 之后、下次前向之前把二维权重往返量化回写</td>
+</tr>
+<tr>
+<td><a href="../src/cmd/experiments.rs"><code>src/cmd/experiments.rs</code></a> <code>cmd_fp4</code></td>
+<td><code>fp4</code> 子命令：16 个码 → 分块账本 → f32/FP8/FP4 验证 CE 三方对照</td>
+</tr>
+</tbody>
+</table>
+<p><strong>为什么只量化权重</strong>：与第 43 课同理——真实低精度训练把 1 维的 norm 增益 / bias 留在高精度
+（它们的尺度与矩阵权重差好几个数量级，压到 4 位会直接把归一化打歪）。</p>
+<h3 id="user-content-默认路径逐位不变">默认路径逐位不变<a href="#默认路径逐位不变" aria-label="Link to heading '默认路径逐位不变'" data-heading-content="默认路径逐位不变" class="anchor"></a></h3>
+<ul>
+<li>默认 <code>fp4 = false</code>：训练步第 7c 步整段不执行，参数、随机数消耗、前向都与加本课之前<strong>逐位一致</strong>；</li>
+<li>单测 <code>test_fp4_changes_training_same_seed</code> 里同时断言了 <code>TrainConfig::default().fp4 == false</code>；</li>
+<li>FP4 的编解码是<strong>纯函数</strong>，不参与计算图、不影响反向——梯度与优化器状态始终是 f32
+（这正是&quot;量化感知训练&quot;里&quot;感知&quot;二字的含义：让优化器看见量化后的权重）。</li>
+</ul>
+<h3 id="user-content-代码地图">代码地图<a href="#代码地图" aria-label="Link to heading '代码地图'" data-heading-content="代码地图" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../src/fp4.rs"><code>src/fp4.rs</code></a></td>
+<td>E2M1 编解码、<code>Fp4Tensor</code>（量化 / 反量化 / 误差统计）、<code>roundtrip_params_in_place</code></td>
+</tr>
+<tr>
+<td><a href="../src/fp8.rs"><code>src/fp8.rs</code></a></td>
+<td>共享的 <code>exp2</code> / <code>round_ties_even</code>（<code>pub(crate)</code>）与 <code>ErrStats</code> 误差口径</td>
+</tr>
+<tr>
+<td><a href="../src/train.rs"><code>src/train.rs</code></a></td>
+<td>训练步第 7c 步的权重回写 + 同种子账本测试</td>
+</tr>
+<tr>
+<td><a href="../src/cmd/experiments.rs"><code>src/cmd/experiments.rs</code></a></td>
+<td><code>cmd_fp4</code>：三节演示与打印</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="user-content-5-运行与验证">5. 运行与验证<a href="#5-运行与验证" aria-label="Link to heading '5. 运行与验证'" data-heading-content="5. 运行与验证" class="anchor"></a></h2>
+<pre><code class="language-bash"># FP4 单测（16 个码 / 饱和 / 舍入阶 / nibble 打包与字节数 / 位宽账本 / 分块 SNR / 全零块）
+cargo test fp4
+
+# 同种子对照：fp4 = false vs true 走完整训练循环
+cargo test fp4_changes_training_same_seed
+
+# 端到端账本：三节演示（码表 → 分块/位宽 → f32/FP8/FP4 验证 CE）
+cargo run --release -- fp4
+</code></pre>
+<p>配置示例：</p>
+<pre><code class="language-jsonc">{
+  &quot;train&quot;: {
+    &quot;fp4&quot;: true,    // 默认 false；开启后每步把二维权重按 E2M1 + 每 32 元素一个 scale 往返量化
+    &quot;fp8&quot;: false    // 两者同时开时以 fp4 为准（FP4 的回写在后）
+  }
+}
+</code></pre>
+<h3 id="user-content-51-实测账本cargo-run---release----fp4默认参数">5.1 实测账本（<code>cargo run --release -- fp4</code>，默认参数）<a href="#51-实测账本cargo-run---release----fp4默认参数" aria-label="Link to heading '5.1 实测账本（cargo run --release -- fp4，默认参数）'" data-heading-content="5.1 实测账本（cargo run --release -- fp4，默认参数）" class="anchor"></a></h3>
+<p>权重矩阵 <code>[256×256]</code>，行尺度从 ~1.0 一路递减到 ~1e-6（模拟真实权重不同通道的量级差）：</p>
+<table>
+<thead>
+<tr>
+<th>块大小</th>
+<th>SNR(dB)</th>
+<th>平均绝对误差</th>
+<th>最大绝对误差</th>
+<th>占用（f32 的 %）</th>
+<th>bit/元素</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>整张</td>
+<td>11.1</td>
+<td>2.360e-2</td>
+<td>4.275e-1</td>
+<td>12.5%</td>
+<td>4.00</td>
+</tr>
+<tr>
+<td>128</td>
+<td>19.3</td>
+<td>6.221e-3</td>
+<td>4.477e-1</td>
+<td>13.3%</td>
+<td>4.25</td>
+</tr>
+<tr>
+<td>32</td>
+<td>19.9</td>
+<td>5.592e-3</td>
+<td>4.348e-1</td>
+<td>15.6%</td>
+<td>5.00</td>
+</tr>
+<tr>
+<td>1</td>
+<td>151.9</td>
+<td>5.412e-10</td>
+<td>2.384e-7</td>
+<td><strong>112.5%</strong></td>
+<td>36.00</td>
+</tr>
+<tr>
+<td><code>fp8/32</code>（对照）</td>
+<td>32.5</td>
+<td>1.200e-3</td>
+<td>9.497e-2</td>
+<td>28.1%</td>
+<td>9.00</td>
+</tr>
+</tbody>
+</table>
+<p>两处值得盯住：</p>
+<ul>
+<li><strong>块大小 1 的 SNR 高到 151.9 dB，但占用 112.5% —— 比 f32 还费。</strong> 它是&quot;用显存换精度&quot;的极端，
+不该叫量化；把它列出来就是为了防止只看 SNR 自欺。</li>
+<li><strong>同一块大小下 FP8 的 SNR（32.5）比 FP4（19.9）高 12.6 dB</strong>，这就是少一半位宽的标价。</li>
+</ul>
+<p>同一个 60064 参数的小模型（<code>n_embd=32</code>、<code>n_layer=2</code>，训练 300 步后交叉熵 3.6363 → 0.7696、
+困惑度 37.95 → 2.16），验证集上<strong>只改权重的存储精度</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>权重要求</th>
+<th>验证 CE</th>
+<th>困惑度</th>
+<th>相对变化</th>
+<th>bit/元素</th>
+<th>压缩比</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>f32（原始）</td>
+<td>2.8526</td>
+<td>17.333</td>
+<td>—</td>
+<td>32.00</td>
+<td>1.00x</td>
+</tr>
+<tr>
+<td><code>fp8/e4m3/32</code></td>
+<td>2.8546</td>
+<td>17.368</td>
+<td><strong>+0.07%</strong></td>
+<td>9.00</td>
+<td>3.56x</td>
+</tr>
+<tr>
+<td><code>fp4/e2m1/32</code></td>
+<td>2.8698</td>
+<td>17.634</td>
+<td><strong>+0.60%</strong></td>
+<td>5.00</td>
+<td>6.40x</td>
+</tr>
+</tbody>
+</table>
+<p>读法：位宽从 9 再砍到 5（显存又省 1.8 倍），CE 劣化从 <code>+0.07%</code> 涨到 <code>+0.60%</code>，<strong>约 8.6 倍</strong>。
+权重掉到 FP4 仍只让 CE 涨零点几个百分点，&quot;FP4 更适合权重&quot;这个工程结论在本仓库的小模型上同样成立；
+但再说一遍——<strong>这里没有 FP4 kernel，一个字节的显存、一次乘加的速度都没省下</strong>，它不是性能数据。</p>
+<table>
+<thead>
+<tr>
+<th>测试</th>
+<th>验证内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_e2m1_representable_values_are_exact</code></td>
+<td>正号侧 8 个值编码→解码逐位往返，码就是 <code>0..=7</code></td>
+</tr>
+<tr>
+<td><code>test_e2m1_saturates_without_inf_or_nan</code></td>
+<td>溢出 / <code>±Inf</code> / <code>NaN</code> 都饱和到 <code>±6.0</code></td>
+</tr>
+<tr>
+<td><code>test_e2m1_unit_roundoff</code></td>
+<td>ties-to-even 的三个中点（0.25 / 0.75 / 5.0）落点正确，最差相对间距 50%</td>
+</tr>
+<tr>
+<td><code>test_nibble_packing_roundtrip_and_bytes</code></td>
+<td>打包无损，<code>bytes()</code> 与 <code>ceil(n/2)</code> 口径一致（含奇数长度）</td>
+</tr>
+<tr>
+<td><code>test_bits_per_element_ledger</code></td>
+<td>FP4/32 = 5 bit、FP8/32 = 9 bit、对 f32 6.4 倍，且 FP4 字节数 &lt; FP8</td>
+</tr>
+<tr>
+<td><code>test_smaller_block_improves_snr</code></td>
+<td>块越小 SNR 越高；同一张量上 FP8 的 SNR 必须高于 FP4</td>
+</tr>
+<tr>
+<td><code>test_all_zero_block_no_nan</code></td>
+<td>全零块 scale=0、码全 0，解码不产生 NaN</td>
+</tr>
+<tr>
+<td><code>test_roundtrip_zero_tensor_is_zero</code></td>
+<td>全零张量往返仍逐位为 0</td>
+</tr>
+<tr>
+<td><code>test_roundtrip_params_in_place_only_touches_matrices</code></td>
+<td>只动二维参数，一维参数原样不动，字节数如实</td>
+</tr>
+<tr>
+<td><code>test_fp4_changes_training_same_seed</code></td>
+<td>默认关闭；开启后同种子 loss 有限且确实改变</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-常见坑实测踩出来的">常见坑（实测踩出来的）<a href="#常见坑实测踩出来的" aria-label="Link to heading '常见坑（实测踩出来的）'" data-heading-content="常见坑（实测踩出来的）" class="anchor"></a></h3>
+<h4 id="user-content-1-ties-to-even-取偶数档要看清是谁的偶数">1. &quot;ties-to-even 取偶数档&quot;要看清是<strong>谁的</strong>偶数<a href="#1-ties-to-even-取偶数档要看清是谁的偶数" aria-label="Link to heading '1. &quot;ties-to-even 取偶数档&quot;要看清是谁的偶数'" data-heading-content="1. &quot;ties-to-even 取偶数档&quot;要看清是谁的偶数" class="anchor"></a></h4>
+<p>第一版把 <code>0.75</code>（<code>0.5</code> 与 <code>1.0</code> 的中点）当成&quot;取偶数档 0.5&quot;，断言写成码 <code>0x1</code>，实测失败。
+正确结果是 <strong><code>1.0</code>（码 <code>0x2</code>）</strong>：ties-to-even 比的是<strong>尾数字段的最低位</strong>，
+而非规格化的 <code>0.5</code> 存的是 <code>m = 1</code>（奇），<code>1.0</code> 作为最小正规数存的是 <code>m = 0</code>（偶），
+所以往 <code>1.0</code> 靠。实现上这正好落在&quot;把 <code>ax/step</code> 取整再判奇偶&quot;这条路径上
+（<code>ax/step = 1.5 → 2</code>，2 是偶数），不需要额外特判。</p>
+<p>顺带一个容易踩的点：<strong>非规格化与正规数的交界处没有断点</strong>——<code>ax/step</code> 舍入到 <code>2^mb</code> 时
+得到的码恰好是最小正规数（<code>ef = 1, m = 0</code>），所以解码分支里不需要为交界写特例。</p>
+<h4 id="user-content-2-别把4-位直接理解成省-8-倍显存">2. 别把&quot;4 位&quot;直接理解成&quot;省 8 倍显存&quot;<a href="#2-别把4-位直接理解成省-8-倍显存" aria-label="Link to heading '2. 别把&quot;4 位&quot;直接理解成&quot;省 8 倍显存&quot;'" data-heading-content="2. 别把&quot;4 位&quot;直接理解成&quot;省 8 倍显存&quot;" class="anchor"></a></h4>
+<p><code>32 / 5 = 6.4</code> 才是真实压缩比，因为每个 block 还要摊 1 bit 的 scale。而 FP8 是 <code>32 / 9 ≈ 3.56</code>。
+换句话说：<strong>从 bf16 走到 FP8 省下的显存，比从 FP8 走到 FP4 还多</strong>——位宽越小，
+固定开销（scale）摊得越薄，边际收益越低。这还没算上真实硬件里 FP4 通常要求
+更规整的 block 布局（MXFP4 的 block 是 32，不能随便改）。</p>
+<hr />
+<h2 id="user-content-6-小结与下一课">6. 小结与下一课<a href="#6-小结与下一课" aria-label="Link to heading '6. 小结与下一课'" data-heading-content="6. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<p>FP4 在 E2M1 + 每 32 元素一个 scale 下是 5 bit/元素（对 f32 6.4 倍压缩），权重掉到 4 位只让验证 CE 涨 +0.60%；同样地，这里没有 FP4 kernel，省下的是纸面账本。</p>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<ul>
+<li><strong>block 大小扫描</strong>：<code>32 / 16 / 8</code> 的 SNR × 位宽曲线，找&quot;固定开销 vs 局部适配&quot;的拐点。</li>
+<li><strong>误差反馈（error feedback）</strong>：把每次舍入的残差 <code>x − x'</code> 累加回下一步的参数，
+这是 QAT 之外的另一种&quot;补偿量化误差&quot;的做法，实现量很小（一个与参数同形的 buffer）。</li>
+<li><strong>梯度也落 FP4</strong>：本课只压权重。把激活 / 梯度也压到 4 位会明显更疼，可以先用
+<code>Fp4Tensor::quantize</code> 在中间激活上量一遍误差再决定。</li>
+<li><strong>真 kernel</strong>：本仓库没有 FP4 的 tensor core 路径，所有收益都是纸面上的（口径见本课「5.1 实测账本」的&quot;读法&quot;段：这里没有 FP4 kernel，它不是性能数据）。</li>
+</ul>
+<blockquote>
+<p><strong>下一课</strong>：<a href="49-CSA-HCA%E6%B7%B7%E5%90%88%E6%B3%A8%E6%84%8F%E5%8A%9B.md">第 49 课 CSA + HCA 混合注意力</a> —— 转向长序列注意力：CSA + HCA 用块均值压缩把每个 query 要看的 key 数从 <code>T</code> 降到 <code>m + k + T/(m·h)</code>。</p>
+</blockquote>

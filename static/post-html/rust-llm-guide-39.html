@@ -1,0 +1,1147 @@
+<h1 id="user-content-第-39-课工程化完善--从算法实现到可用框架">第 39 课：工程化完善 —— 从算法实现到可用框架<a href="#第-39-课工程化完善--从算法实现到可用框架" aria-label="Link to heading '第 39 课：工程化完善 —— 从算法实现到可用框架'" data-heading-content="第 39 课：工程化完善 —— 从算法实现到可用框架" class="anchor"></a></h1>
+<blockquote>
+<p>代码位置：<code>src/main.rs</code>、<code>src/cli.rs</code>、<code>src/config.rs</code>、<code>src/tokenizer.rs</code>、<code>src/train.rs</code>、<code>src/data.rs</code>、<code>src/checkpoint.rs</code>、<code>src/hf.rs</code></p>
+<p>本课无新算法，专注于把前面各课散落的实现组装成<strong>真实可用</strong>的 LLM 训练与推理框架。
+命令行用法详见 <a href="../README.md">README.md</a>。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>一个可用的 LLM 框架需要哪些工程化能力？</li>
+<li>如何设计 CLI 工程让用户高效使用？</li>
+<li>分词器为什么要持久化？怎么实现？</li>
+<li>预设配置如何降低使用门槛？</li>
+<li>预训练模型只会&quot;接着往下写&quot;，怎么让它<strong>回答问题</strong>？SFT 和预训练在数据与 loss 上差在哪？</li>
+<li>微调（<code>finetune</code>）的工作流是怎样的？挂载位置、链式续训、推理合并各解决什么问题？</li>
+<li>交互式对话模式如何实现？</li>
+<li>训练指标日志有什么用？</li>
+<li>checkpoint 为什么要用二进制而不是 JSON 存？续训要恢复哪些东西？写盘被打断会怎样？</li>
+<li>想把 HuggingFace 上的开源权重（LLaMA / Qwen2）拿过来用，除了文件格式还要对齐哪些<strong>语义</strong>？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-cli-子命令设计">2. CLI 子命令设计<a href="#2-cli-子命令设计" aria-label="Link to heading '2. CLI 子命令设计'" data-heading-content="2. CLI 子命令设计" class="anchor"></a></h2>
+<h3 id="user-content-21-从-4-个到-23-个子命令下表已同步到当前版本">2.1 从 4 个到 23 个子命令（下表已同步到当前版本）<a href="#21-从-4-个到-23-个子命令下表已同步到当前版本" aria-label="Link to heading '2.1 从 4 个到 23 个子命令（下表已同步到当前版本）'" data-heading-content="2.1 从 4 个到 23 个子命令（下表已同步到当前版本）" class="anchor"></a></h3>
+<blockquote>
+<p>本课落地时是 9 个（train / eval / generate / chat / sft / finetune / preset / demo / bench），
+之后各课陆续补进 <code>serve</code>、<code>scaling</code>、<code>moe</code>、<code>quant</code>、<code>distributed</code>、<code>align</code>、<code>rag</code>、<code>speculative</code>、<code>distill</code>、<code>fp8</code>、<code>fp4</code>、<code>csa</code>、<code>mla</code>，
+再加上没有对应课、只做权重导入的 <code>import-hf</code>，现在共 23 个。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>子命令</th>
+<th>功能</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>train</code></td>
+<td>训练模型</td>
+<td>增强（指标日志、早停、梯度累积）</td>
+</tr>
+<tr>
+<td><code>eval</code></td>
+<td>评估模型</td>
+<td>不变</td>
+</tr>
+<tr>
+<td><code>generate</code></td>
+<td>生成文本</td>
+<td>增强（支持 Beam Search）</td>
+</tr>
+<tr>
+<td><strong><code>chat</code></strong></td>
+<td>交互式对话</td>
+<td><strong>新增</strong></td>
+</tr>
+<tr>
+<td><strong><code>sft</code></strong></td>
+<td>监督微调：用「提问→回答」语料把只会续写的预训练模型教会应答</td>
+<td><strong>新增</strong></td>
+</tr>
+<tr>
+<td><strong><code>finetune</code></strong></td>
+<td>LoRA 微调：冻结预训练主干，只训练挂载的低秩适配层（缺省 Q/K/V，可扩到 O 与 MLP）</td>
+<td><strong>新增</strong></td>
+</tr>
+<tr>
+<td><strong><code>preset</code></strong></td>
+<td>生成预设配置</td>
+<td><strong>新增</strong></td>
+</tr>
+<tr>
+<td><code>demo</code></td>
+<td>端到端演示</td>
+<td>不变</td>
+</tr>
+<tr>
+<td><strong><code>bench</code></strong></td>
+<td>性能基准：固定小模型跑少量训练步与短生成，输出吞吐（tok/s）</td>
+<td><strong>新增</strong></td>
+</tr>
+<tr>
+<td><strong><code>scaling</code></strong></td>
+<td>Scaling Laws 实验：预算规划（20:1 / 参数化闭式解 / 时长电费）+ 多规模实测扫描与幂律拟合</td>
+<td><strong>新增</strong>（第 31 课）</td>
+</tr>
+<tr>
+<td><strong><code>moe</code></strong></td>
+<td>MoE 稀疏专家实验：参数口径 / 负载均衡 / 端到端对照 / 容量因子与 Token Dropping</td>
+<td><strong>新增</strong>（第 32 课）</td>
+</tr>
+<tr>
+<td><strong><code>quant</code></strong></td>
+<td>权重量化：RTN / Hessian 量化 / AWQ 三种 weight-only 量化（int8 / int4），含校准集与逐层误差报告</td>
+<td><strong>新增</strong>（第 33 课）</td>
+</tr>
+<tr>
+<td><strong><code>distributed</code></strong></td>
+<td>分布式训练实验：集合通信量对照 + DP / ZeRO-1/2 / TP / PP / 3D 切分报告</td>
+<td><strong>新增</strong>（第 38 课）</td>
+</tr>
+<tr>
+<td><strong><code>align</code></strong></td>
+<td>对齐实验：奖励模型排序准确率 + DPO 偏好边界 + GRPO 组内优势 + PPO 裁剪与 KL</td>
+<td><strong>新增</strong>（第 36 课）</td>
+</tr>
+<tr>
+<td><strong><code>rag</code></strong></td>
+<td>RAG 实验：分块不变量 + 三种向量化对照 + top-k / MMR 检索 + 提示组装</td>
+<td><strong>新增</strong>（第 37 课）</td>
+</tr>
+<tr>
+<td><strong><code>speculative</code></strong></td>
+<td>推测解码与 MTP 实验：无损性核对 + 接受率 / 加速比 + 缓存不变量 + 分布等价 + MTP 头当草稿</td>
+<td><strong>新增</strong>（第 34/35 课）</td>
+</tr>
+<tr>
+<td><strong><code>serve</code></strong></td>
+<td>把模型部署成 OpenAI 兼容的 HTTP API（<code>/v1/chat/completions</code> 非流式 + SSE 流式）</td>
+<td><strong>新增</strong>（第 40 课）</td>
+</tr>
+<tr>
+<td><strong><code>distill</code></strong></td>
+<td>知识蒸馏实验：温度 / top-k 对软标签的影响 + KD 梯度数值自检 + 软标签 vs 硬标签同学生对照</td>
+<td><strong>新增</strong>（第 42 课）</td>
+</tr>
+<tr>
+<td><strong><code>fp8</code></strong></td>
+<td>FP8 低精度模拟：E4M3 / E5M2 二进制对照 + 分块缩放收益 + 权重落 FP8 对 loss 的影响</td>
+<td><strong>新增</strong>（第 43 课，纯数值模拟无加速）</td>
+</tr>
+<tr>
+<td><strong><code>fp4</code></strong></td>
+<td>FP4 低精度模拟：E2M1 十六码表 + 分块 / 位宽账本 + f32 / FP8 / FP4 验证 CE 三方对照</td>
+<td><strong>新增</strong>（第 48 课，纯数值模拟无加速）</td>
+</tr>
+<tr>
+<td><strong><code>csa</code></strong></td>
+<td>CSA + HCA 混合注意力账本：三分支覆盖不变式 + KV 字节账本 + top-k 稀疏算力账本</td>
+<td><strong>新增</strong>（第 49 课，解析账本非实测性能）</td>
+</tr>
+<tr>
+<td><strong><code>mla</code></strong></td>
+<td>MLA 解耦 RoPE 账本：缓存字节账本（扫描 <code>r</code>）+ 朴素 / 吸收解码算力账本 + 解耦约束自检</td>
+<td><strong>新增</strong>（第 50 课，解析账本非实测性能）</td>
+</tr>
+<tr>
+<td><strong><code>import-hf</code></strong></td>
+<td>导入 HuggingFace 权重：把 <code>config.json</code> + <code>*.safetensors</code> 一次转成本仓库原生存档（权重 only 的 <code>LLMCP2</code>）；<code>--tokenizer</code> 可一并把 HF 的 <code>tokenizer.json</code> 转成本仓库格式</td>
+<td><strong>新增</strong>（没有对应课；LLaMA / Qwen2 系，语义开关随存档头写走，见 <a href="../src/hf.rs"><code>src/hf.rs</code></a>）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-22-设计原则">2.2 设计原则<a href="#22-设计原则" aria-label="Link to heading '2.2 设计原则'" data-heading-content="2.2 设计原则" class="anchor"></a></h3>
+<ol>
+<li><strong>渐进式复杂度</strong>：新手用 <code>demo</code> 验证 → <code>preset</code> 生成配置 → <code>train</code> 训练 → <code>generate</code> 生成。
+进阶用户用 <code>chat</code> 对话 → <code>sft</code> 教会应答 → <code>finetune</code> 微调。</li>
+<li><strong>配置优先</strong>：超参数全在 <code>config/config.json</code>。命令行只覆盖少数高频项：<code>generate</code> / <code>chat</code> 的采样参数、<code>sft</code> 的 <code>--sft-file/--steps/--lr/--out-dir</code>、<code>finetune</code> 的 <code>--lora-rank/--lora-alpha/--lora-targets/--resume-lora/--steps/--lr</code>（会覆写 <code>cfg.train</code> 对应字段）、<code>bench</code> 的 <code>--steps/--gen-tokens</code>；<code>train</code> 本身只接受 <code>--config</code> 与 <code>--resume</code>，<code>eval</code> / <code>chat</code> / <code>generate</code> 只接受 <code>--config</code> / <code>--ckpt</code> / <code>--tokenizer</code>（加各自的采样参数、<code>--merge-lora</code>，以及 <code>generate</code> / <code>chat</code> / <code>serve</code> 的 RoPE 外推四件套 <code>--rope-scaling</code> / <code>--rope-factor</code> / <code>--rope-base</code> / <code>--max-ctx</code>，见第 20 课 §13）；<code>import-hf</code> 只接受 <code>--model-dir</code> / <code>--output</code> / <code>--tokenizer</code> / <code>--tokenizer-out</code>。</li>
+<li><strong>合理默认值</strong>：所有参数都有默认值，最简情况只需 <code>cargo run -- train</code>。</li>
+</ol>
+<hr />
+<h2 id="user-content-3-分词器序列化">3. 分词器序列化<a href="#3-分词器序列化" aria-label="Link to heading '3. 分词器序列化'" data-heading-content="3. 分词器序列化" class="anchor"></a></h2>
+<h3 id="user-content-31-为什么需要持久化">3.1 为什么需要持久化<a href="#31-为什么需要持久化" aria-label="Link to heading '3.1 为什么需要持久化'" data-heading-content="3.1 为什么需要持久化" class="anchor"></a></h3>
+<p>训练 BPE 分词器需要遍历整个语料统计频率，大语料（&gt;100MB）可能耗时数十秒。
+每次 eval / generate 都重新训练分词器是浪费。持久化后：</p>
+<ul>
+<li>训练一次，保存到 <code>tokenizer.json</code></li>
+<li>eval / generate / chat 直接加载，秒级完成</li>
+<li>保证训练和推理用完全相同的词表</li>
+</ul>
+<h3 id="user-content-32-json-格式">3.2 JSON 格式<a href="#32-json-格式" aria-label="Link to heading '3.2 JSON 格式'" data-heading-content="3.2 JSON 格式" class="anchor"></a></h3>
+<pre><code class="language-jsonc">// CharTokenizer
+{
+  &quot;type&quot;: &quot;char&quot;,
+  &quot;chars&quot;: [&quot;H&quot;, &quot;e&quot;, &quot;l&quot;, &quot;o&quot;, &quot; &quot;, &quot;W&quot;, &quot;r&quot;, &quot;d&quot;]
+}
+
+// BPETokenizer
+{
+  &quot;type&quot;: &quot;bpe&quot;,
+  &quot;merges&quot;: [[108, 111, 256], ...], // 合并规则：[左 id, 右 id, 合并后的 id]
+  &quot;vocab&quot;: [[72], [101], ...],      // token id → 字节序列
+  &quot;byte_ids&quot;: [0, 1, 2, ...],       // 共 256 项：每个单字节对应的 token id
+  &quot;pretok&quot;: false                   // true = 编码前先按 GPT-2 正则切片（HF 口径）
+}
+</code></pre>
+<p>三点格式约定都是<strong>为了 HF 词表</strong>（见 3.5），但都向后兼容：</p>
+<ul>
+<li><strong><code>merges</code> 的第三个元素（合并结果 id）必须显式存</strong>：自研训练时它恰好是 <code>256 + 合并序号</code>，
+但 HF 的词表把特殊 token 排在前面，这个等式不成立。老存档的二元组 <code>[a, b]</code> 仍可读，
+按 <code>256 + 序号</code> 还原（逐位不变）。</li>
+<li><strong><code>byte_ids</code></strong>：自研分词器恒为 <code>[0, 1, ..., 255]</code>（字节 token 就是 <code>0..256</code>），HF 词表里
+字节 token 的 id 得查表。缺这个字段时按恒等映射还原。</li>
+<li><strong><code>pretok</code></strong>：<code>false</code> = 整段文本一起做 BPE 合并（本仓库历史行为）；<code>true</code> = 先按 GPT-2 正则
+切片、再逐片合并（HF 的 <code>pre_tokenizer: ByteLevel</code> 口径）。</li>
+</ul>
+<h3 id="user-content-33-自动保存">3.3 自动保存<a href="#33-自动保存" aria-label="Link to heading '3.3 自动保存'" data-heading-content="3.3 自动保存" class="anchor"></a></h3>
+<p>训练时如果 <code>tokenizer_file</code> 未配置，会自动保存到 <code>{out_dir}/tokenizer.json</code>：</p>
+<pre><code class="language-jsonc">{
+  &quot;train&quot;: {
+    &quot;tokenizer_file&quot;: null  // null = 从语料训练并自动保存
+  }
+}
+</code></pre>
+<p>指定路径则直接加载，跳过训练：</p>
+<pre><code class="language-jsonc">{
+  &quot;train&quot;: {
+    &quot;tokenizer_file&quot;: &quot;checkpoints/tokenizer.json&quot;  // 直接加载
+  }
+}
+</code></pre>
+<h3 id="user-content-34-推理时自动加载分词器eval-仍要语料">3.4 推理时自动加载分词器（<code>eval</code> 仍要语料）<a href="#34-推理时自动加载分词器eval-仍要语料" aria-label="Link to heading '3.4 推理时自动加载分词器（eval 仍要语料）'" data-heading-content="3.4 推理时自动加载分词器（eval 仍要语料）" class="anchor"></a></h3>
+<p>训练完成后，<code>eval</code> / <code>generate</code> / <code>chat</code> <strong>都不再需要单独指定分词器文件</strong>——它们会从 checkpoint 目录
+自动加载 <code>tokenizer.json</code>。但要注意&quot;不用给分词器&quot;不等于&quot;不用给语料&quot;：</p>
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>需要分词器</th>
+<th>需要语料</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>generate</code> / <code>chat</code></td>
+<td>自动加载</td>
+<td><strong>不需要</strong></td>
+</tr>
+<tr>
+<td><code>eval</code></td>
+<td>自动加载</td>
+<td><strong>需要</strong>：要算验证集 loss，仍会读配置里的 <code>train_file</code>（或 <code>val_file</code>）</td>
+</tr>
+</tbody>
+</table>
+<p>所以 <code>eval</code> 的 <code>--config</code> 必须指向语料还在的原配置；用 <code>train_file</code> 已经被删掉的配置会直接报错。</p>
+<p>代码中通过 <code>load_tokenizer_for_inference</code> 函数实现自动查找：</p>
+<pre><code class="language-rust">// src/cmd/mod.rs
+fn load_tokenizer_for_inference(tcfg: &amp;config::TrainConfig, expect_vocab: usize) -&gt; Tokenizer {
+    // 1. 用户显式配置了 tokenizer_file
+    if let Some(ref path) = tcfg.tokenizer_file {
+        return Tokenizer::load(path);
+    }
+    // 2. 自动查找训练时保存的 tokenizer.json
+    let auto_path = format!(&quot;{}/tokenizer.json&quot;, tcfg.out_dir);
+    if std::path::Path::new(&amp;auto_path).exists() {
+        return Tokenizer::load(&amp;auto_path);
+    }
+    // 3. 都没有，从语料训练（兜底）
+    let train_text = load_text(&amp;tcfg.train_file);
+    build_tokenizer(tcfg, &amp;train_text, expect_vocab)
+}
+</code></pre>
+<p>命令行还支持 <code>--tokenizer</code> 参数直接指定路径，优先级最高：</p>
+<pre><code class="language-plaintext">1. --tokenizer 参数（命令行显式指定）
+2. config/config.json 的 tokenizer_file 字段
+3. {out_dir}/tokenizer.json（训练时自动保存的，推荐）
+4. 从 train_file 语料训练（兜底，不推荐）
+</code></pre>
+<p>这样保证了：</p>
+<ul>
+<li>训练和推理使用完全相同的分词器（词表一致性）</li>
+<li>推理时不需要原始语料文件（<code>eval</code> 除外，它要算 loss）</li>
+<li>checkpoint 目录可以独立复制到其他机器使用</li>
+</ul>
+<h3 id="user-content-35-导入-huggingface-分词器tokenizerload_hf">3.5 导入 HuggingFace 分词器（<code>Tokenizer::load_hf</code>）<a href="#35-导入-huggingface-分词器tokenizerload_hf" aria-label="Link to heading '3.5 导入 HuggingFace 分词器（Tokenizer::load_hf）'" data-heading-content="3.5 导入 HuggingFace 分词器（Tokenizer::load_hf）" class="anchor"></a></h3>
+<p><code>import-hf --tokenizer &lt;HF 的 tokenizer.json&gt;</code> 会把 HF 分词器一并转成本仓库格式
+（缺省写到输出存档同目录的 <code>tokenizer.json</code>）。HF 的字节级 BPE 与本仓库自研分词器有三处
+<strong>口径差异</strong>，转换时每一步都宁可报错、不静默降级：</p>
+<table>
+<thead>
+<tr>
+<th>差异</th>
+<th>本仓库自研（<code>pretok = false</code>）</th>
+<th>HF（LLaMA / Qwen2 系）</th>
+<th>存档里怎么表达</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单字节 token 的 id</td>
+<td>恒为字节值 <code>0..256</code></td>
+<td>特殊 token 排在前面，字节 token 从 3 或十几万号开始</td>
+<td><code>byte_ids</code>（256 项查表）</td>
+</tr>
+<tr>
+<td>合并结果 id</td>
+<td>恒为 <code>256 + 序号</code></td>
+<td>由词表决定，<code>256 + 序号</code> 不成立</td>
+<td><code>merges</code> 三元组显式存</td>
+</tr>
+<tr>
+<td>编码前是否切片</td>
+<td>整段文本一起做 BPE</td>
+<td>先按 GPT-2 正则切片、再逐片合并</td>
+<td><code>pretok: true</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>只接受字节级 BPE</strong>（<code>model.type = &quot;BPE&quot;</code>）+ <strong>ByteLevel 预切分</strong>；<code>normalizer</code> 只放行 <code>NFC</code>
+（对已是 NFC 的中文/常规英文是恒等变换），其余归一化会改变字节序列、直接报错；
+SentencePiece / WordPiece / Unigram 需要另做转换。</li>
+<li><strong>常见的大词表都能导入</strong>：32k / 128k / 151k 的 HF 词表（LLaMA-2 / Qwen2 / LLaMA-3 量级）都走同一条路。
+注意 HF 的特殊 token（<code>&lt;s&gt;</code> / <code>&lt;/s&gt;</code> / <code>&lt;|endoftext|&gt;</code> …）<strong>本来就在内容词表里</strong>，所以
+<code>vocab_size()</code> 不会再额外加 3（见 <a href="../src/tokenizer.rs"><code>Tokenizer::vocab_size</code></a>）；
+其余 <code>special: true</code> 的进 <code>extra_literals</code>，编码时整体命中、不被 BPE 拆开。</li>
+<li><strong>导入产物就是普通分词器</strong>：写出来仍走 3.2 的 <code>tokenizer.json</code> 格式，之后
+<code>train</code> / <code>eval</code> / <code>generate</code> / <code>chat</code> 的加载路径完全不变。</li>
+</ul>
+<hr />
+<h2 id="user-content-4-预设配置">4. 预设配置<a href="#4-预设配置" aria-label="Link to heading '4. 预设配置'" data-heading-content="4. 预设配置" class="anchor"></a></h2>
+<h3 id="user-content-41-三个预设">4.1 三个预设<a href="#41-三个预设" aria-label="Link to heading '4.1 三个预设'" data-heading-content="4.1 三个预设" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>预设</th>
+<th>参数量</th>
+<th>架构</th>
+<th>隐藏维度</th>
+<th>层数</th>
+<th>上下文</th>
+<th>适合场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>small</code></td>
+<td>~3.3M</td>
+<td>经典风格</td>
+<td>256</td>
+<td>4</td>
+<td>128</td>
+<td>学习/演示，CPU 几分钟</td>
+</tr>
+<tr>
+<td><code>medium</code></td>
+<td>~26M</td>
+<td>LLaMA 风格</td>
+<td>512</td>
+<td>8</td>
+<td>256</td>
+<td>中等语料，推荐 GPU</td>
+</tr>
+<tr>
+<td><code>large</code></td>
+<td>~79M</td>
+<td>LLaMA 风格</td>
+<td>768</td>
+<td>12</td>
+<td>512</td>
+<td>较大语料，需要 GPU</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>参数量口径：<code>词嵌入(vocab×d)</code> + <code>每层(注意力 Q/K/V/O + MLP + 归一化)</code> × 层数 + <code>ln_f</code>。
+模型用 RoPE，<strong>没有可学习的位置嵌入表</strong>，所以不含 <code>block_size×d</code>；词表由语料训练出的分词器决定
+（<code>vocab_size: 0</code>），实际参数量会随语料略有浮动。</p>
+<p>另外，预设<strong>只覆盖模型结构和训练超参</strong>，<code>train_file</code> / <code>out_dir</code> 这些沿用 <code>TrainConfig</code> 默认值
+（<code>data/alice.txt</code> 与 <code>checkpoints</code>）。仓库自带的 <code>config/config.json</code> 才被改成了中文语料 +
+<code>out_dir = checkpoints/zh</code>，所以文档里出现的 <code>checkpoints/zh/...</code> 都对应它。</p>
+</blockquote>
+<h3 id="user-content-42-使用方式">4.2 使用方式<a href="#42-使用方式" aria-label="Link to heading '4.2 使用方式'" data-heading-content="4.2 使用方式" class="anchor"></a></h3>
+<pre><code class="language-bash"># 生成配置文件
+cargo run --release -- preset --name medium --output config/config_medium.json
+
+# 用生成的配置训练
+cargo run --release -- train --config config/config_medium.json
+</code></pre>
+<h3 id="user-content-43-架构选择">4.3 架构选择<a href="#43-架构选择" aria-label="Link to heading '4.3 架构选择'" data-heading-content="4.3 架构选择" class="anchor"></a></h3>
+<ul>
+<li><strong>small</strong> 使用经典风格（LayerNorm + GELU MLP + 标准 MHA），适合学习基础</li>
+<li><strong>medium / large</strong> 使用 LLaMA 风格（RMSNorm + SwiGLU + GQA），与现代 LLM 对齐</li>
+</ul>
+<hr />
+<h2 id="user-content-5-监督微调sft把只会续写变成会回答">5. 监督微调（<code>sft</code>）：把&quot;只会续写&quot;变成&quot;会回答&quot;<a href="#5-监督微调sft把只会续写变成会回答" aria-label="Link to heading '5. 监督微调（sft）：把&quot;只会续写&quot;变成&quot;会回答&quot;'" data-heading-content="5. 监督微调（sft）：把&quot;只会续写&quot;变成&quot;会回答&quot;" class="anchor"></a></h2>
+<h3 id="user-content-51-预训练和-sft-差在哪">5.1 预训练和 SFT 差在哪<a href="#51-预训练和-sft-差在哪" aria-label="Link to heading '5.1 预训练和 SFT 差在哪'" data-heading-content="5.1 预训练和 SFT 差在哪" class="anchor"></a></h3>
+<p>预训练的目标是&quot;给定前文，预测下一个 token&quot;，所以模型学到的本事是<strong>续写</strong>：你输入
+<code>用户：今天天气怎么样？</code>，它会顺着往下编，甚至编出下一句&quot;用户：&quot;。SFT 不换模型结构，
+只换<strong>数据和 loss 的算法</strong>：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>预训练 <code>train</code></th>
+<th>监督微调 <code>sft</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>数据</td>
+<td>连续文本</td>
+<td>「提问 → 回答」对话语料</td>
+</tr>
+<tr>
+<td>加载器</td>
+<td><code>DataLoader</code></td>
+<td><code>SftLoader</code>（每批多带一个 loss 掩码）</td>
+</tr>
+<tr>
+<td>每个位置都算 loss？</td>
+<td>是</td>
+<td><strong>否</strong>：只有回答正文与收尾符号（EOS）被监督</td>
+</tr>
+<tr>
+<td>起点</td>
+<td>随机初始化</td>
+<td><code>--pretrained</code> 预训练权重（<strong>只读</strong>，不会被覆盖）</td>
+</tr>
+<tr>
+<td>输出目录</td>
+<td><code>checkpoints/zh/</code></td>
+<td><code>checkpoints/zh-sft/</code>（自动加 <code>-sft</code> 后缀）</td>
+</tr>
+</tbody>
+</table>
+<p>不在&quot;提问&quot;上算 loss 是关键：提问是<strong>给模型的上下文</strong>，不是它该学会生成的东西。
+把提问也当训练目标，模型就学会了&quot;自己提问自己回答&quot;——这是很多简陋 SFT 实现
+训出来会自问自答的直接原因。</p>
+<h3 id="user-content-52-对话语料格式与角色识别">5.2 对话语料格式与角色识别<a href="#52-对话语料格式与角色识别" aria-label="Link to heading '5.2 对话语料格式与角色识别'" data-heading-content="5.2 对话语料格式与角色识别" class="anchor"></a></h3>
+<p>语料就是普通 <code>.txt</code>，用角色标记分行（仓库示例在 <code>data/sft/</code>）：</p>
+<pre><code class="language-text">用户：今天天气怎么样？
+助手：今天晴，气温 20 到 26 度，适合出门。
+用户：明天呢？
+助手：明天有雨，记得带伞。
+
+A: 吃了吗
+B: 吃了
+</code></pre>
+<p>固定标签 <code>用户</code> / <code>助手</code> / <code>A</code> / <code>B</code> 有明确含义，也可以用人名标签（<code>面试官：</code> / <code>陈教授：</code>）。
+一段对话末尾的<strong>收尾符号由程序自动补，不用自己写</strong>：分词器带特殊 token 时补的是可训练的
+<strong>EOS</strong>（见 5.3），老分词器（没有特殊 token）才退化为文本标记 <code>。。</code>。</p>
+<p>解析规则在 <a href="../src/data.rs">data.rs</a> 的 <code>parse_dialogues</code>：</p>
+<ul>
+<li><strong>标记长什么样</strong>：行首 <code>&lt;标签&gt;：</code> 或 <code>&lt;标签&gt;:</code>，标签 1~8 个字符且全为字母数字（含汉字）。
+所以 <code>A:</code> / <code>用户：</code> / <code>面试官：</code> / <code>陈教授：</code> 都认，而 <code>2024年数据：……</code> 这类正文不会被误判成角色行。</li>
+<li><strong>谁是提问方</strong>：<code>用户</code> / <code>A</code> 固定是提问方，<code>助手</code> / <code>B</code> 固定是回答方；人名标签（如 <code>陈教授</code>）
+没有固定含义，按<strong>该文件里首次出现的顺序</strong>判定——第一个出现的算提问方（对话语料里总是提问方先说）。</li>
+<li><strong>角色是文件级属性</strong>：换一份语料，先说的人可能换成另一个人，所以每解析一个文件都要重建一次角色表。
+这也是 <code>load_texts</code> 按文件加载、而不是拼成一大份文本的原因——拼接会让后面文件里的角色弄反。</li>
+<li><strong>多行回答不会被腰斩</strong>：某个角色行之后的所有非空行都续到当前角色上；空行只在&quot;回答已经出现&quot;时
+才当作一段对话的结束，否则提问与回答之间的空行会把它们拆散。</li>
+<li><strong>人名标签只在&quot;整份文件一眼就能看出是对话语料&quot;时才接受</strong>：非空行里 ≥90% 是角色行、<strong>且说话人
+恰好只有两个</strong>时才启用。把 <code>data/corpus_zh/</code> 这类混杂目录指给 <code>sft_file</code> 时，小说旁白会把这个
+比例稀释到 90% 以下，于是正文不会被当成对话喂进来；不带角色标记的文本整体跳过。</li>
+<li><strong>收尾符号由程序自动补</strong>，语料里不用自己写（EOS，老分词器退化为 <code>。。</code>）。一轮对话必须
+&quot;提问与回答都非空&quot;才会被采纳。</li>
+</ul>
+<h3 id="user-content-53-loss-掩码监督谁以及为什么要右移一位">5.3 loss 掩码：监督谁、以及为什么要右移一位<a href="#53-loss-掩码监督谁以及为什么要右移一位" aria-label="Link to heading '5.3 loss 掩码：监督谁、以及为什么要右移一位'" data-heading-content="5.3 loss 掩码：监督谁、以及为什么要右移一位" class="anchor"></a></h3>
+<p>对话样本长这样（<code>src/data.rs</code> 的 <code>build_sft_stream</code>）：</p>
+<pre><code class="language-text">[BOS] 用户：\n&lt;提问&gt;\n助手：\n&lt;回答&gt;\n [EOS]
+      └────── 屏蔽（不计 loss）──────┘└─ 监督 ─┘ └监督┘
+</code></pre>
+<p>两个角色标记 <code>用户：</code> / <code>助手：</code> 是<strong>纯文本</strong>，收尾符号则是分词器里的 <strong>EOS 特殊 token</strong>。</p>
+<ul>
+<li><strong>角色标记为什么用纯文本</strong>：字节级 BPE 本就能把任意 UTF-8 字符串编码成已有 token 的序列，
+所以标记不必动词表、不必给 embedding 扩容，也就不会出现&quot;加了 token 之后旧 checkpoint
+的 embedding 行数对不上&quot;的兼容问题。</li>
+<li><strong>标记必须用&quot;高频&quot;字，光&quot;出现过&quot;不够</strong>：<code>#</code> 在 4.7M 字的语料里只出现 2 次，embedding
+基本没被训过，模板一带上 <code>### </code> 就会把模型推进 ASCII 乱码模式（实测基座模型输出
+<code>'何人？」621.-----2..3E8188</code>）；<code>【】</code> 同理不能用在标记里（也只出现 2 次）。
+<strong>结束标记尤其不能踩这个坑</strong>——它每段对话都要被监督，模型必须能把它生成出来。最早选的
+<code>（结束）</code> 只满足&quot;出现过&quot;：<code>（</code>129 次 / <code>结</code>204 次 / <code>束</code>391 次 / <code>）</code>130 次，频率全在
+0.002%~0.008%，和被判死刑的 <code>#</code>（12 次）是同一个数量级。结果模型只学会了&quot;回答完吐一个 <code>（</code>&quot;，
+而 <code>（</code> 之后该接什么全无先验，实测输出被 <code>（结公主要了。</code> / <code>（好！&quot;结成了。</code> 这类括号乱码
+淹没，<code>（结束）</code> 这个完整串几乎拼不出来、停止标记形同虚设。</li>
+<li><strong>换成 <code>。。</code> 只是缓解，真正的解法是 EOS 特殊 token</strong>：<code>。。</code> 两头都占——<code>。</code> 是语料最高频
+字符（131,594 次 / 2.79%，输出行训得最充分），而这个组合在 471.9 万字里只出现 <strong>2 次</strong>，
+不会和正文撞车。但它治的是&quot;别把收尾符号学成乱码&quot;，根子上仍是<strong>靠语料里碰巧出现的字符组合
+暗示&quot;该收尾了&quot;</strong>：一段对话以 <code>。。</code> 结尾这件事，模型得自己从分布里归纳出来。
+现在的做法是给分词器加 <strong>EOS 特殊 token</strong>（词表 8192 → 8195，多出 BOS / EOS / PAD）：
+它是<strong>可训练的结束符号</strong>，每段回答都以它收尾且 <code>sup = true</code>，模型学到的是明确的&quot;说完了&quot;。
+代价是特殊 token 之后建立的 checkpoint 与之前的 embedding 行数不再通用。
+<code>。。</code> 只对老分词器训出来的权重还有意义，见 <a href="../src/prompt.rs"><code>SFT_STOP</code></a> 的兜底注释。</li>
+<li><strong>收尾符号必须有</strong>：单轮样本如果只是&quot;提问+回答&quot;就结束，模型没地方学&quot;该收尾了&quot;，
+推理时只好像预训练那样一路续写。<code>chat</code> 的收尾判据依次是 EOS（正常路径）、文本停止标记
+<code>用户：</code> / <code>。。</code>（兜底：万一没学会收尾，它会顺着模板编下一轮提问）、<code>--max-new</code>。</li>
+<li><strong>右移一位</strong>：窗口里 <code>y[i] = tokens[start+1+i]</code>，所以第 i 个位置的掩码要看<strong>目标</strong> token
+所在的位置 <code>start+1+i</code>，而不是输入位置 <code>start+i</code>（见 <code>window_mask</code>）。少移这一位，整批
+监督信号会整体错开一个 token——loss 照降，学到的却是&quot;用前一个字的答案预测后一个字&quot;，
+形式上完全说得通，极难从结果看出来。</li>
+<li><strong>样本是打包的</strong>：所有对话首尾相接成一条 token 流，训练时按 <code>block_size</code> 随机切窗口，
+所以一个窗口可能横跨几段对话、也可能从提问中途开始；掩码照实跟随，跨段边界的位置一样屏蔽。</li>
+<li><strong>逐段编码再拼接</strong>，而不是先拼成一个大字符串整体编码：BPE 的合并会跨边界进行，整串编码
+可能把&quot;标记末尾&quot;和&quot;正文开头&quot;并成一个 token，监督区起点就不落在 token 边界上，掩码会错位。</li>
+</ul>
+<h3 id="user-content-54-使用方式与参数收窄规则">5.4 使用方式与参数收窄规则<a href="#54-使用方式与参数收窄规则" aria-label="Link to heading '5.4 使用方式与参数收窄规则'" data-heading-content="5.4 使用方式与参数收窄规则" class="anchor"></a></h3>
+<pre><code class="language-bash"># 从预训练权重出发做 SFT：--pretrained 只读，权重与指标都写进 checkpoints/zh-sft/
+cargo run --release -- sft --config config/config.json \
+    --pretrained checkpoints/zh/best.ckpt --sft-file data/sft/ --steps 800
+
+# 训练完用带 SFT 模板的对话（--prompt-format 默认就是 sft）
+cargo run --release -- chat --config config/config.json --ckpt checkpoints/zh-sft/best.ckpt
+</code></pre>
+<p><code>cmd_sft</code> 会把预训练量级的超参收窄，避免直接套到几百步的 SFT 上。
+关键是<strong>按 SFT 语料自己的 epoch 推导，而不是沿用预训练那套数</strong>（见 <code>sft_schedule</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>项</th>
+<th>缺省取值</th>
+<th>为什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--steps</code></td>
+<td><code>min(config 的 train.steps, 400 × steps_per_epoch)</code></td>
+<td>config 里的 4000 是配 471.9 万字预训练语料定的。SFT 语料常只有一两万字，<code>steps_per_epoch</code> 只有几步，4000 步就等于上千个 epoch——实测 1.4 万字语料训 2600 步，train 2.68 / val <strong>7.77</strong>，而 val 早在 600 步就见底，多出来的步数全是过拟合。显式传 <code>--steps</code> 时完全按你给的数跑，不做任何收敛</td>
+</tr>
+<tr>
+<td><code>--lr</code></td>
+<td>config <code>max_lr</code> 的 <strong>1/10</strong></td>
+<td>SFT 是在已收敛的权重上继续训，用预训练步长会把它攒下的语言能力一起冲掉（实测几百步就退化成乱码）。显式传 <code>--lr</code> 时以你给的为准</td>
+</tr>
+<tr>
+<td><code>min_lr</code></td>
+<td><code>max_lr × 0.1</code></td>
+<td>跟着峰值走</td>
+</tr>
+<tr>
+<td><code>warmup_steps</code></td>
+<td><code>min(warmup_steps, steps/10).max(1)</code></td>
+<td>预热太长，SFT 大部分步数都耗在爬坡上</td>
+</tr>
+<tr>
+<td><code>eval_every</code></td>
+<td><code>min(config 的 eval_every, 20 × steps_per_epoch)</code></td>
+<td>每 20 个 epoch 评估一次。原先按&quot;步数的 1/10&quot;收成 200 步，在只有几步一 epoch 的 SFT 语料上等于每隔约 80 个 epoch 才看一眼，val 曲线总共十几个点，&quot;刚开始像样&quot;的那一步很可能整个被跨过去——<code>best.ckpt</code> 就落在这么粗的网格上。早停的 patience 是 10 次评估（≈200 epoch），通常先于步数上限触发</td>
+</tr>
+<tr>
+<td><code>--out-dir</code></td>
+<td><code>{out_dir}-sft</code></td>
+<td><strong>绝不能写回 <code>out_dir</code></strong>：会覆盖预训练攒下的 <code>latest.ckpt</code> / <code>best.ckpt</code>，SFT 效果不好就再也回不去；指标 CSV 同理（改写到 <code>{out_dir}-sft/sft.csv</code>）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-55-跑-sft-请用不带-gpu-的构建">5.5 跑 SFT 请用不带 <code>gpu</code> 的构建<a href="#55-跑-sft-请用不带-gpu-的构建" aria-label="Link to heading '5.5 跑 SFT 请用不带 gpu 的构建'" data-heading-content="5.5 跑 SFT 请用不带 gpu 的构建" class="anchor"></a></h3>
+<p>SFT 的 loss 带逐位置掩码，GPU 的<strong>常驻输出头</strong>路径不吃逐位置权重，整段会回落到逐算子路径。
+实测（MX150）这条回落路径比纯 CPU 还慢（392 tok/s vs 780 tok/s），长跑还会崩。<code>cmd_sft</code>
+检测到 <code>gpu</code> feature 时会打印这条提示——<strong>只有预训练 <code>train</code> 适合开 GPU</strong>。</p>
+<blockquote>
+<p>SFT 在整条对齐流水线里的位置（SFT → 奖励模型 → PPO / DPO）见<a href="36-RLHF%E4%B8%8E%E5%AF%B9%E9%BD%90.md">第 36 课</a>。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-6-微调工作流finetune--lora-微调">6. 微调工作流（<code>finetune</code> = LoRA 微调）<a href="#6-微调工作流finetune--lora-微调" aria-label="Link to heading '6. 微调工作流（finetune = LoRA 微调）'" data-heading-content="6. 微调工作流（finetune = LoRA 微调）" class="anchor"></a></h2>
+<p><code>finetune</code> 加载预训练权重后<strong>冻结全部主干</strong>，只训练挂在各投影上的低秩适配层（LoRA）。
+<strong>挂哪里是可配的</strong>（<code>--lora-targets</code>）：缺省 Q/K/V，可扩到 O（<code>c_proj</code>）与 MLP——实测三档分别占
+1.32% / 1.75% / 3.85% 的可训练参数。结构与 rank / alpha 一起写进存档头部，推理端照头部重建，
+不存在&quot;训练挂了 MLP、推理漏挂一半&quot;这种静默错配。
+训练循环与语料跟 <code>sft</code> 完全共用（同一份 <code>train.sft_file</code>），差别只在参数集合——这样&quot;全参 SFT vs LoRA&quot;
+才是可对比的。原理见 <a href="29-LoRA%E4%BD%8E%E7%A7%A9%E9%80%82%E9%85%8D.md">第 29 课</a>。</p>
+<p><strong>冻结是三处一起做实的</strong>，缺一处就会出现&quot;以为冻结了、其实没冻&quot;：</p>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>做法</th>
+<th>不做会怎样</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>前向</td>
+<td>冻结权重走 <code>Tensor::matmul_frozen</code>，反向只求 <code>dx</code></td>
+<td><code>dW</code> 白算白存（4 字节/参数）</td>
+</tr>
+<tr>
+<td>优化器</td>
+<td><code>AdamW</code> / <code>SGD</code> 的 <code>step()</code> 跳过冻结参数，<strong>连带不吃权重衰减</strong></td>
+<td>衰减项与梯度无关，冻结主干会每步朝 0 缩</td>
+</tr>
+<tr>
+<td>GPU 常驻快路</td>
+<td>LoRA 形态下整体让路</td>
+<td>那些路径直接读权重显存、绕过 <code>Linear::forward</code>，增量被<strong>静默丢弃</strong></td>
+</tr>
+</tbody>
+</table>
+<p>另有一个容易踩的坑：<code>requires_grad</code> 必须是<strong>共享标志</strong>（本项目改成了 <code>Arc&lt;AtomicBool&gt;</code>，Relaxed 原子读写）。
+它早先是普通 <code>bool</code>，而 <code>Tensor</code> 派生 <code>Clone</code>——在模型上冻结、优化器手里那份仍是 <code>true</code>，冻结就失效了。</p>
+<h3 id="user-content-61-完整流程">6.1 完整流程<a href="#61-完整流程" aria-label="Link to heading '6.1 完整流程'" data-heading-content="6.1 完整流程" class="anchor"></a></h3>
+<pre><code class="language-plaintext">1. 从零训练基础模型
+   cargo run --release -- train --config config/config.json
+
+2. 冻结主干、只训适配层（LoRA 微调）
+   cargo run --release -- finetune --pretrained checkpoints/zh/latest.ckpt \
+       --lora-rank 8 --lora-alpha 8 --steps 60 --lr 5e-5
+
+3. 用微调后的模型对话（存档目录自包含，不必再指向基座）
+   cargo run --release -- chat --ckpt checkpoints/zh-lora/best.ckpt --temperature 0.3
+
+4.（可选）接着训这套适配层，或把增量并在主干上再推理
+   cargo run --release -- finetune --pretrained checkpoints/zh-lora/best.ckpt --resume-lora --steps 60
+   cargo run --release -- chat --ckpt checkpoints/zh-lora/best.ckpt --merge-lora
+</code></pre>
+<h3 id="user-content-62-关键参数">6.2 关键参数<a href="#62-关键参数" aria-label="Link to heading '6.2 关键参数'" data-heading-content="6.2 关键参数" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>推荐值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--lr</code></td>
+<td>1e-4 ~ 5e-5</td>
+<td>微调学习率，比从零训练小 10-100 倍（<code>min_lr</code> 自动取 <code>lr × 0.1</code>）</td>
+</tr>
+<tr>
+<td><code>--steps</code></td>
+<td>500-5000</td>
+<td>取决于数据量，通常远少于从零训练</td>
+</tr>
+<tr>
+<td><code>--lora-rank</code> / <code>--lora-alpha</code></td>
+<td>4-64 / 通常 = rank</td>
+<td>适配层的秩与缩放因子；<strong>真正生效</strong>——决定挂多少适配参数</td>
+</tr>
+<tr>
+<td><code>--lora-targets</code></td>
+<td><code>q,k,v</code>（缺省）</td>
+<td>挂载位置：<code>q</code> / <code>k</code> / <code>v</code> / <code>o</code> / <code>mlp</code> / <code>all</code>；扩挂载会同步抬高参数量占比</td>
+</tr>
+<tr>
+<td><code>--resume-lora</code></td>
+<td>关</td>
+<td><strong>链式续训</strong>：基座是 LoRA 存档时接着训存档里那套（保留旧增量），与 rank/alpha/targets 互斥</td>
+</tr>
+<tr>
+<td><code>--sft-file</code></td>
+<td>缺省用 config 的 <code>train.sft_file</code></td>
+<td>对话语料，与 <code>sft</code> 共用同一份</td>
+</tr>
+<tr>
+<td><code>--out-dir</code></td>
+<td>缺省 <code>{out_dir}-lora</code></td>
+<td><strong>绝不写回 <code>out_dir</code></strong>，否则会覆盖预训练攒下的 <code>latest.ckpt</code> / <code>best.ckpt</code></td>
+</tr>
+</tbody>
+</table>
+<p>推理侧的 <code>--merge-lora</code>（<code>eval</code> / <code>generate</code> / <code>chat</code> 都支持）把 <code>ΔW = (α/r)·AᵀBᵀ</code> <strong>就地</strong>并进主干，
+省掉每层两次小矩阵乘、数值不变；它是<strong>不可逆</strong>的运行时操作（合并后适配器被摘除，不能再续训），
+且只作用于内存副本，存档里的 A/B 不受影响。</p>
+<h3 id="user-content-63-参数效率实测">6.3 参数效率（实测）<a href="#63-参数效率实测" aria-label="Link to heading '6.3 参数效率（实测）'" data-heading-content="6.3 参数效率（实测）" class="anchor"></a></h3>
+<p>本项目 <code>config/config.json</code>（d=128、4 层，共 1,866,496 参数）跑 <code>--lora-rank 8</code>：</p>
+<pre><code class="language-plaintext">可训练参数 = 3 个投影（Q/K/V）× 2 个矩阵（A/B）× rank 8 × d 128 × 4 层 = 24,576
+可训练比例 = 24,576 / 1,866,496 = 1.32%
+</code></pre>
+<p>挂载范围放宽后的实测值（同一模型、同一 rank）：</p>
+<table>
+<thead>
+<tr>
+<th><code>--lora-targets</code></th>
+<th>每层对数</th>
+<th>可训练参数</th>
+<th>占比</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>q,k,v</code></td>
+<td>3</td>
+<td>24,576</td>
+<td>1.32%</td>
+</tr>
+<tr>
+<td><code>q,k,v,o</code></td>
+<td>4</td>
+<td>32,768</td>
+<td>1.75%</td>
+</tr>
+<tr>
+<td><code>all</code>（含 MLP）</td>
+<td>6</td>
+<td>73,728</td>
+<td>3.85%</td>
+</tr>
+</tbody>
+</table>
+<p>日志打印的是<strong>实测值</strong>（<code>trainable_parameters()</code> 的长度与元素数），不是按公式预估——
+估错了会立刻露馅。适配层初始 B=0，因此微调起点与基座<strong>逐位等价</strong>（单测断言）。</p>
+<hr />
+<h2 id="user-content-7-交互式对话模式">7. 交互式对话模式<a href="#7-交互式对话模式" aria-label="Link to heading '7. 交互式对话模式'" data-heading-content="7. 交互式对话模式" class="anchor"></a></h2>
+<h3 id="user-content-71-功能特点">7.1 功能特点<a href="#71-功能特点" aria-label="Link to heading '7.1 功能特点'" data-heading-content="7.1 功能特点" class="anchor"></a></h3>
+<ul>
+<li>持续输入文本，模型实时生成回复</li>
+<li>自动维护对话历史（按 token 数裁剪到上下文窗口内，给本轮生成留出空间）；
+<strong>只把正常收尾的回答写回去</strong>（见 7.3）</li>
+<li>每轮都报告收尾原因（EOS / 停止标记 / 被 <code>--max-new</code> 截断），空输出也说得清是怎么空的</li>
+<li>始终使用 KV Cache 加速（推理效率最高）</li>
+<li>支持系统提示词（system prompt）</li>
+</ul>
+<h3 id="user-content-72-使用方式">7.2 使用方式<a href="#72-使用方式" aria-label="Link to heading '7.2 使用方式'" data-heading-content="7.2 使用方式" class="anchor"></a></h3>
+<pre><code class="language-bash"># 基础对话
+cargo run --release -- chat --config config/config.json
+
+# 带系统提示
+cargo run --release -- chat --config config/config.json --system &quot;你是一个有帮助的助手。&quot;
+
+# 调整采样参数
+cargo run --release -- chat --config config/config.json --temperature 0.7 --max-new 300
+</code></pre>
+<h3 id="user-content-73-实现细节">7.3 实现细节<a href="#73-实现细节" aria-label="Link to heading '7.3 实现细节'" data-heading-content="7.3 实现细节" class="anchor"></a></h3>
+<ul>
+<li>使用 KV Cache 实现高效多轮推理（每轮只计算新 token）</li>
+<li>上下文窗口 <code>block_size</code> 在「system prompt」「对话历史」「本轮生成」三者间分配，优先级从高到低：
+<ul>
+<li><strong>system prompt 永远保留</strong>：它固定在序列最前面、独立于裁剪逻辑。丢掉它不只是失忆，
+还会破坏序列开头的注意力分布（attention sink）</li>
+<li><strong>本轮生成预留 <code>max_new</code> 个 token</strong>：生成的 token 也占用窗口。缓存是滑动窗口（第 25 课），
+生成不会提前停，但窗口只保留最近 <code>block_size</code> 个 token——预算给得不够时，最早的输入会先滑出视野</li>
+<li><strong>对话历史拿剩下的额度</strong>，按 <strong>token 数</strong>（真调 <code>encode</code> 计数，不用字节/字符估算）从最老的轮次开始丢</li>
+</ul>
+</li>
+<li>提示信息覆盖四种情况：
+<ul>
+<li><strong>历史被丢弃</strong>：首次立即提示（含丢弃量），之后每 10 次汇总一次（累计丢弃量）——
+避免&quot;持续静默失忆&quot;</li>
+<li>单轮输入本身超窗口</li>
+<li>system prompt 占满输入预算</li>
+<li><code>--max-new ≥ block_size</code></li>
+</ul>
+</li>
+<li>上述提示统一走 <code>logln</code>（stdout + 运行日志留痕）：日志里能复盘&quot;从第几轮开始失忆、
+累计丢了多少 token&quot;，不用靠回忆</li>
+<li><strong>每轮都记收尾原因</strong>（<code>StopReason</code>，来自 <code>generate_with_reason</code>）。日志形如
+<code>[第 3 轮] 输出：…（收尾：采到 EOS）</code>，空输出则是 <code>[本轮无输出] 模型采到 EOS，自己收了尾</code>。
+空白的生成段和&quot;程序根本没跑&quot;在终端上是同一行空白，必须给个解释；
+而且<strong>非空</strong>回答是&quot;采到 EOS&quot;还是&quot;命中停止标记&quot;停下的也得记——两者的区别会体现在下一轮的
+上下文里（见下一条）</li>
+<li><strong>未正常收尾的回答不写回历史</strong>（SFT 模板下）：
+<ul>
+<li>空回答整轮跳过。历史里一旦出现「助手：」后面空着，就成了训练语料里根本没有的
+in-context 示范——模型会跟着一起沉默，于是从某一轮起<strong>连续</strong>输出空白</li>
+<li>被 <code>--max-new</code> 硬截断的回答同样跳过（会打印一条 <code>[info]</code>）。训练语料里助手回合都是短句，
+后面紧跟「用户：」或 EOS；而截断的回答是一段没有收尾的半截话，把这种&quot;跑满 <code>--max-new</code>
+还不收尾&quot;的状态喂回去，下一轮模型第一步就采到 EOS，此后每轮全空</li>
+<li>历史按轮裁剪（以 <code>用户：</code> 为切点），所以跳过整轮只影响&quot;还能记住几轮&quot;，不会把别的轮切碎</li>
+</ul>
+</li>
+<li>输入 <code>:quit</code> 或 <code>:exit</code> 退出</li>
+</ul>
+<p><strong><code>--max-new</code> 默认 <code>1000</code>（<code>generate</code> / <code>chat</code> / <code>serve</code> 三处一致）是&quot;够用的上限&quot;，不是保证</strong>：
+实际长度还会被 <strong>EOS / 停止标记</strong>提前收尾；窗口侧如上所述，本轮生成先占掉 <code>max_new</code> 个额度，
+窗口小的模型（如 <code>config/config.json</code> 的 <code>block_size=512</code>）用默认值会把输入预算压到 0 并触发
+<code>--max-new ≥ block_size</code> 告警。<strong>开发时要快速试跑就自己传小值</strong>（如 <code>--max-new 4</code>）。</p>
+<hr />
+<h2 id="user-content-8-beam-search-cli-集成">8. Beam Search CLI 集成<a href="#8-beam-search-cli-集成" aria-label="Link to heading '8. Beam Search CLI 集成'" data-heading-content="8. Beam Search CLI 集成" class="anchor"></a></h2>
+<h3 id="user-content-81-使用方式">8.1 使用方式<a href="#81-使用方式" aria-label="Link to heading '8.1 使用方式'" data-heading-content="8.1 使用方式" class="anchor"></a></h3>
+<pre><code class="language-bash"># 采样生成（默认）
+cargo run --release -- generate --config config/config.json --prompt &quot;The fox&quot; --max-new 100
+
+# Beam Search 生成（确定性，质量更高）
+cargo run --release -- generate --config config/config.json --prompt &quot;The fox&quot; --beam 5 --max-new 100
+
+# 带长度惩罚
+cargo run --release -- generate --config config/config.json --prompt &quot;The fox&quot; --beam 8 --length-penalty 0.8
+</code></pre>
+<h3 id="user-content-82-采样-vs-beam-search">8.2 采样 vs Beam Search<a href="#82-采样-vs-beam-search" aria-label="Link to heading '8.2 采样 vs Beam Search'" data-heading-content="8.2 采样 vs Beam Search" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>采样</th>
+<th>Beam Search</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>确定性</td>
+<td>随机（不同 seed 不同结果）</td>
+<td>确定性（给定参数唯一结果）</td>
+</tr>
+<tr>
+<td>多样性</td>
+<td>高</td>
+<td>低</td>
+</tr>
+<tr>
+<td>质量</td>
+<td>中</td>
+<td>高（全局最优）</td>
+</tr>
+<tr>
+<td>速度</td>
+<td>快</td>
+<td>慢（beam_size 倍）</td>
+</tr>
+<tr>
+<td>适合场景</td>
+<td>创意写作、对话</td>
+<td>翻译、摘要、事实性生成</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="user-content-9-多文件数据加载">9. 多文件数据加载<a href="#9-多文件数据加载" aria-label="Link to heading '9. 多文件数据加载'" data-heading-content="9. 多文件数据加载" class="anchor"></a></h2>
+<h3 id="user-content-91-支持的路径格式">9.1 支持的路径格式<a href="#91-支持的路径格式" aria-label="Link to heading '9.1 支持的路径格式'" data-heading-content="9.1 支持的路径格式" class="anchor"></a></h3>
+<pre><code class="language-jsonc">{
+  &quot;train&quot;: {
+    &quot;train_file&quot;: &quot;data/alice.txt&quot;,     // 单文件
+    &quot;train_file&quot;: &quot;data/&quot;,              // 目录（自动合并所有 .txt 文件）
+  }
+}
+</code></pre>
+<h3 id="user-content-92-目录加载逻辑">9.2 目录加载逻辑<a href="#92-目录加载逻辑" aria-label="Link to heading '9.2 目录加载逻辑'" data-heading-content="9.2 目录加载逻辑" class="anchor"></a></h3>
+<ol>
+<li>扫描目录下所有 <code>.txt</code> 文件</li>
+<li>按文件名排序</li>
+<li>依次读取并拼接（用换行符分隔）</li>
+<li>打印加载的文件数量</li>
+</ol>
+<hr />
+<h2 id="user-content-10-训练指标日志">10. 训练指标日志<a href="#10-训练指标日志" aria-label="Link to heading '10. 训练指标日志'" data-heading-content="10. 训练指标日志" class="anchor"></a></h2>
+<h3 id="user-content-101-启用方式">10.1 启用方式<a href="#101-启用方式" aria-label="Link to heading '10.1 启用方式'" data-heading-content="10.1 启用方式" class="anchor"></a></h3>
+<pre><code class="language-jsonc">{
+  &quot;train&quot;: {
+    &quot;log_file&quot;: &quot;logs/train.csv&quot;  // 默认值；logs/ 目录不存在时自动创建。null = 不记录
+  }
+}
+</code></pre>
+<blockquote>
+<p><code>log_file</code> 的默认值就是 <code>logs/train.csv</code>，所以默认配置下训练<strong>自动</strong>产生日志，无需手动建 <code>logs/</code> 目录。</p>
+</blockquote>
+<h3 id="user-content-102-csv-格式">10.2 CSV 格式<a href="#102-csv-格式" aria-label="Link to heading '10.2 CSV 格式'" data-heading-content="10.2 CSV 格式" class="anchor"></a></h3>
+<pre><code class="language-csv">step,lr,train_loss,val_loss,ppl,tokens_per_sec
+1,0.00000600,4.142356,,,
+2,0.00001200,4.121789,,,
+...
+250,0.00059400,2.345678,2.456789,11.67,12500
+</code></pre>
+<blockquote>
+<p>上表是示意值，假设 <code>train.max_lr = 6e-4</code>、<code>train.warmup_steps = 100</code>（<code>preset --name medium</code> 的默认值）：
+warmup 阶段 lr 从 <code>6e-4 / 100 = 6e-6</code> 起步、每步增加 <code>6e-6</code>，所以 step 1 / 2 是 <code>0.000006</code> / <code>0.000012</code>；
+step 250 已进入 cosine 衰减，lr 略低于 <code>max_lr</code>。换成别的配置时这些数值都会不同。</p>
+</blockquote>
+<h3 id="user-content-103-用途">10.3 用途<a href="#103-用途" aria-label="Link to heading '10.3 用途'" data-heading-content="10.3 用途" class="anchor"></a></h3>
+<ul>
+<li>绘制训练曲线（loss / lr / ppl 随步数变化）</li>
+<li>监控训练速度（tokens_per_sec）</li>
+<li>对比不同配置的训练效果</li>
+<li>排查训练问题（loss 突然上升、学习率异常等）</li>
+</ul>
+<hr />
+<h2 id="user-content-11-产物目录规范化">11. 产物目录规范化<a href="#11-产物目录规范化" aria-label="Link to heading '11. 产物目录规范化'" data-heading-content="11. 产物目录规范化" class="anchor"></a></h2>
+<p>初版把所有产物都写在仓库根目录：<code>config.json</code>、<code>checkpoints_zh/</code>、<code>train.log</code> 混在一起，跑几次实验就分不清哪个文件属于哪个实验。现在按用途分目录：</p>
+<table>
+<thead>
+<tr>
+<th>产物</th>
+<th>目录</th>
+<th>由谁决定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>配置文件</td>
+<td><code>config/</code></td>
+<td><code>--config</code> / <code>preset --output</code>，默认 <code>config/config.json</code></td>
+</tr>
+<tr>
+<td>权重（checkpoint + <code>tokenizer.json</code>）</td>
+<td><code>checkpoints/</code></td>
+<td><code>train.out_dir</code>，默认 <code>checkpoints</code></td>
+</tr>
+<tr>
+<td>训练指标 CSV</td>
+<td><code>logs/</code></td>
+<td><code>train.log_file</code>，默认 <code>logs/train.csv</code></td>
+</tr>
+<tr>
+<td>运行日志</td>
+<td><code>logs/</code></td>
+<td>程序自动生成，名形如 <code>{操作}_{时间戳}.log</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-111-自动建目录关键">11.1 自动建目录（关键）<a href="#111-自动建目录关键" aria-label="Link to heading '11.1 自动建目录（关键）'" data-heading-content="11.1 自动建目录（关键）" class="anchor"></a></h3>
+<p>重点是<strong>不让用户手写 <code>mkdir</code></strong>。<code>src/config.rs</code> 提供两个工具函数：</p>
+<pre><code class="language-rust">/// 确保目录本身存在（checkpoint 目录、日志目录等）
+fn ensure_dir(dir: &amp;str) {
+    std::fs::create_dir_all(dir).unwrap_or_else(|e| panic!(&quot;创建目录 {dir} 失败: {e}&quot;));
+}
+
+/// 写文件前确保其父目录存在：`logs/train.csv` → 自动创建 `logs/`
+pub fn ensure_parent_dir(path: &amp;str) {
+    if let Some(parent) = std::path::Path::new(path).parent() {
+        if !parent.as_os_str().is_empty() {
+            ensure_dir(&amp;parent.to_string_lossy());
+        }
+    }
+}
+</code></pre>
+<p>调用点放在<strong>每一个写盘出口</strong>，而不是散落在各调用方：</p>
+<table>
+<thead>
+<tr>
+<th>出口</th>
+<th>位置</th>
+<th>覆盖的产物</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Config::save()</code></td>
+<td><code>src/config.rs</code></td>
+<td><code>preset --output</code> 生成的配置</td>
+</tr>
+<tr>
+<td><code>checkpoint::save()</code></td>
+<td><code>src/checkpoint.rs</code></td>
+<td><code>latest.ckpt</code> / <code>best.ckpt</code> / <code>final.ckpt</code></td>
+</tr>
+<tr>
+<td><code>Tokenizer::save()</code></td>
+<td><code>src/tokenizer.rs</code></td>
+<td><code>tokenizer.json</code></td>
+</tr>
+<tr>
+<td><code>MetricsLogger::new()</code></td>
+<td><code>src/train.rs</code></td>
+<td><code>logs/train.csv</code></td>
+</tr>
+<tr>
+<td><code>runlog::start()</code></td>
+<td><code>src/runlog.rs</code></td>
+<td><code>logs/{操作}_{时间戳}.log</code></td>
+</tr>
+</tbody>
+</table>
+<p>这样配置里写多深的路径（如 <code>outputs/run1/logs/train.csv</code>）都会自动建好目录。<code>ensure_parent_dir</code> 对 <code>a.txt</code> 这类没有目录部分的路径是空操作，不会误建目录。</p>
+<h3 id="user-content-112-运行日志自动生成">11.2 运行日志（自动生成）<a href="#112-运行日志自动生成" aria-label="Link to heading '11.2 运行日志（自动生成）'" data-heading-content="11.2 运行日志（自动生成）" class="anchor"></a></h3>
+<p>CSV 指标日志只有数字，回答不了&quot;这次到底跑的什么命令、用的什么配置&quot;。所以 <code>train</code> / <code>eval</code> / <code>generate</code> / <code>chat</code> / <code>sft</code> / <code>finetune</code> 六个子命令<strong>每次运行都会自动写一份运行日志</strong>（本课落地时是这六个，后续各课的子命令也陆续接入，现在共 19 个），实现集中在 <code>src/runlog.rs</code>：</p>
+<pre><code class="language-text">logs/
+├── train_2026-09-19_14-30-12-345.log
+├── generate_2026-09-19_14-35-02-118.log
+└── chat_2026-09-19_14-36-40-907.log
+</code></pre>
+<ul>
+<li><strong>命名</strong>：<code>{操作}_{年-月-日_时-分-秒-毫秒}.log</code>。操作名区分不同子命令，毫秒级时间戳区分同一子命令的多次运行，所以<strong>两次运行不会互相覆盖</strong>（Windows 文件名不允许 <code>:</code>，时分秒之间用 <code>-</code>）。</li>
+<li><strong>时间基准</strong>：文件名时间戳、头部「开始时间」、尾部「总耗时」同源，都取 <strong><code>main()</code> 入口处 <code>runlog::mark_start()</code> 记下的时刻</strong>（即命令开始执行），因此耗时<strong>包含</strong>参数解析、GPU 初始化、配置与模型加载等全过程，而不是只算&quot;日志文件建好之后&quot;那一段。</li>
+<li><strong>时间来源</strong>：Windows 用 <code>GetLocalTime</code> 取系统本地时间；其它平台标准库没有时区 API，退化为 UTC。</li>
+</ul>
+<p>每份日志分四段：</p>
+<table>
+<thead>
+<tr>
+<th>段落</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>运行头部</td>
+<td>操作名、开始时间（命令开始执行的时刻）、<strong>完整命令行</strong>（可执行文件 + 全部参数，另附一条等价的 <code>cargo run</code> 命令便于复制复现）、工作目录、版本 / debug-release / 平台、逻辑核数与 rayon 线程数、GPU 型号</td>
+</tr>
+<tr>
+<td>完整配置</td>
+<td><code>--config</code> 解析后的<strong>全部字段</strong>（模型超参数 + 训练参数）以 JSON 写出；<code>finetune</code> 记的是被 CLI 覆盖后的最终配置</td>
+</tr>
+<tr>
+<td>本次运行参数</td>
+<td>该操作关心的键值对：<code>generate</code> / <code>chat</code> 记 prompt、采样参数、seed、KV cache 开关，<code>train</code> / <code>finetune</code> 记语料、分词器与参数量，<code>sft</code> 记预训练权重、SFT 语料、步数/学习率来源与 prompt 模板，<code>eval</code> 记 checkpoint 步数</td>
+</tr>
+<tr>
+<td>运行主体与结尾</td>
+<td>过程输出（训练进度行、评估点、生成文本、对话轮次）+ 结束时间与总耗时（命令开始执行 → 结束的真实墙钟耗时）</td>
+</tr>
+</tbody>
+</table>
+<p>过程输出靠 <code>logln!</code> 宏写入：它和 <code>println!</code> 一样用法，但同时打控制台和日志，所以<strong>日志内容 = 控制台看到的一切 + 头部与完整配置</strong>。未调用 <code>runlog::start()</code> 的子命令（<code>preset</code> / <code>demo</code> / <code>bench</code> / <code>import-hf</code>）不产生日志文件，写入接口自动退化为空操作。</p>
+<blockquote>
+<p><code>.gitignore</code> 已忽略 <code>config/</code>（默认配置除外）、<code>checkpoints/</code>、<code>logs/</code> 与 <code>*.log</code>，实验产物不会进仓库。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-12-checkpoint-文件格式优化器状态为什么要从-json-文本改成二进制">12. checkpoint 文件格式：优化器状态为什么要从 JSON 文本改成二进制<a href="#12-checkpoint-文件格式优化器状态为什么要从-json-文本改成二进制" aria-label="Link to heading '12. checkpoint 文件格式：优化器状态为什么要从 JSON 文本改成二进制'" data-heading-content="12. checkpoint 文件格式：优化器状态为什么要从 JSON 文本改成二进制" class="anchor"></a></h2>
+<p>初版的 checkpoint（<code>LLMCP1</code>）其实<strong>不是纯二进制</strong>：参数是正儿八经的 f32 数据块，但 AdamW 的一阶动量 <code>m</code>、
+二阶动量 <code>v</code> 是当 JSON 文本塞在头里的（头长啥样见下）。能跑，但有两个问题：体积被文本编码撑大了 2.6 倍，
+而且训练发散时会存成一个读不回来的废文件。</p>
+<pre><code class="language-text">LLMCP1 的文件布局（改动前）
+魔数 &quot;LLMCP1\n&quot;（7 字节）
+u32 小端：JSON 头长度
+JSON 头 51.3 MB ← step、best_val_loss、模型配置、opt_t、opt_m（文本）、opt_v（文本）、参数元信息
+参数数据块 7.4 MB ← 按参数顺序拼接的 f32 小端
+</code></pre>
+<h3 id="user-content-121-体积文本编码把优化器状态撑大了约-35-倍">12.1 体积：文本编码把优化器状态撑大了约 3.5 倍<a href="#121-体积文本编码把优化器状态撑大了约-35-倍" aria-label="Link to heading '12.1 体积：文本编码把优化器状态撑大了约 3.5 倍'" data-heading-content="12.1 体积：文本编码把优化器状态撑大了约 3.5 倍" class="anchor"></a></h3>
+<p>JSON 没有二进制类型，一个 <code>f32</code> 只能写成文本，平均要 <strong>13~14 字节</strong>（如 <code>0.000123456789012345</code>），
+而原生 f32 只要 <strong>4 字节</strong>。本项目 184 万参数的模型（<code>config/config.json</code>）实测：</p>
+<table>
+<thead>
+<tr>
+<th>内容</th>
+<th>大小</th>
+<th>占比</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>参数数据块（f32 二进制）</td>
+<td>7.4 MB</td>
+<td>12.6%</td>
+</tr>
+<tr>
+<td>JSON 头（<code>m</code> / <code>v</code> 的十进制文本 + 元信息）</td>
+<td>51.3 MB</td>
+<td>87.4%</td>
+</tr>
+<tr>
+<td><strong><code>LLMCP1</code> 合计</strong></td>
+<td><strong>58.6 MB</strong></td>
+<td>100%</td>
+</tr>
+<tr>
+<td><strong><code>LLMCP2</code>（<code>m</code> / <code>v</code> 也改成数据块）</strong></td>
+<td><strong>22.1 MB</strong></td>
+<td>38%</td>
+</tr>
+</tbody>
+</table>
+<p>新格式 = 7.4 MB × 3（参数 / <code>m</code> / <code>v</code> 各一个数据块），<strong>省掉 62%</strong>。
+注意 <code>.ckpt</code> 只是文件后缀、不代表内部格式：真正需要改的不是&quot;权重没二进制&quot;，
+而是&quot;优化器状态被当文本存了&quot;。</p>
+<h3 id="user-content-122-正确性json-表示不了-nan--infinity">12.2 正确性：JSON 表示不了 NaN / Infinity<a href="#122-正确性json-表示不了-nan--infinity" aria-label="Link to heading '12.2 正确性：JSON 表示不了 NaN / Infinity'" data-heading-content="12.2 正确性：JSON 表示不了 NaN / Infinity" class="anchor"></a></h3>
+<p>JSON 规范里没有 <code>NaN</code> / <code>Infinity</code> 字面量，<code>serde_json</code> 只好把它们写成 <code>null</code>，读回时报：</p>
+<pre><code class="language-text">解析 checkpoint 头失败: invalid type: null, expected f32
+</code></pre>
+<p>也就是<strong>训练一发散，存档就变成读不回来的废文件</strong>——而这恰恰是最需要存档的时刻。二进制按位写 f32，
+<code>NaN</code> / <code>±Inf</code> 原样保留。</p>
+<h3 id="user-content-123-现在的格式llmcp2">12.3 现在的格式（<code>LLMCP2</code>）<a href="#123-现在的格式llmcp2" aria-label="Link to heading '12.3 现在的格式（LLMCP2）'" data-heading-content="12.3 现在的格式（LLMCP2）" class="anchor"></a></h3>
+<pre><code class="language-text">魔数 &quot;LLMCP2\n&quot;（7 字节）
+u32 小端：JSON 头长度
+JSON 头：step、best_val_loss、模型配置、优化器步数 opt_t、参数元信息（名字 + 形状）、LoRA 形态（`lora`，旧档可缺省）、权重 only 标记（`weights_only`，旧档缺省为 false）
+参数数据块：按参数顺序拼接的 f32 小端
+一阶动量 m 数据块：与参数同样的顺序与形状（权重 only 档省略）
+二阶动量 v 数据块：与参数同样的顺序与形状（权重 only 档省略）
+</code></pre>
+<p>格式分两档：<strong>训练档</strong>（<code>save</code>）写三段（参数 + m + v，体积 3× 参数量）；
+<strong>权重 only 档</strong>（<code>save_weights</code>，头部 <code>weights_only: true</code>）只写参数段（1×），
+用于量化产物落盘这类&quot;没有优化器状态可言&quot;的场合（<code>quant</code> 子命令的落盘走这条路径）。</p>
+<p><strong>为什么还留一个 JSON 头</strong>：头里只有标量和元信息（约 2 KB），却让文件保持&quot;自描述&quot;——
+不用反序列化任何张量就能读出 <code>step</code>、模型配置和每个参数的名字 / 形状，<code>eval</code> / <code>generate</code>
+先用它构造出结构一致的模型，再按名字把参数写回去；名字或形状对不上会直接报错，而不是把错位的数据写进模型。</p>
+<p>头里的<strong>模型配置是整个 <code>TransformerConfig</code></strong>（带 <code>#[serde(default)]</code>）：除了
+<code>n_embd</code> / <code>n_head</code> / <code>n_layer</code> / <code>block_size</code>，还包括 RoPE 的配对方式 <code>rope_style</code> 与
+<code>rope_base</code> / <code>rope_scaling</code> / <code>rope_train_ctx</code>，以及 <code>head_dim</code>、<code>ffn_hidden</code>、
+<code>qkv_bias</code> / <code>o_bias</code> / <code>mlp_bias</code>、<code>rms_eps</code>、<code>tie_embeddings</code> 这些从 HF 口径映射过来的
+<strong>语义开关</strong>。它们全部带默认值、且默认值就是本仓库的历史行为，所以旧存档读进来<strong>逐位不变</strong>；
+新字段只在需要时（如 <code>import-hf</code> 写 <code>rope_style = half</code>、<code>tie_embeddings = false</code>）才被显式写进头里。</p>
+<p><strong>为什么三段等长</strong>：每段长度都是「参数总元素数 × 4」，所以<strong>文件大小只由模型结构决定、与数值无关</strong>。
+权重 only 档砍掉后两段，同样的模型从 3× 参数量降到 1×。
+代价是推理端也会遇到一大堆用不到的优化器状态，所以加载拆成两条路径：</p>
+<table>
+<thead>
+<tr>
+<th>函数</th>
+<th>用途</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>load_header()</code></td>
+<td>eval / generate 先建模型</td>
+<td>只读魔数 + JSON 头，不碰数据块</td>
+</tr>
+<tr>
+<td><code>load_params()</code></td>
+<td>推理</td>
+<td>只解参数块，<strong>跳过</strong> m / v（不解码就不占内存）</td>
+</tr>
+<tr>
+<td><code>load_with_opt()</code></td>
+<td><code>--resume</code> 续训</td>
+<td>解出参数 + m + v + <code>opt_t</code>（<code>step</code> / <code>best_val_loss</code> 在头里）；读到 <code>weights_only: true</code> 的档时 m / v 补零</td>
+</tr>
+</tbody>
+</table>
+<p><code>best_val_loss</code> 在头里存的是 <code>Option&lt;f32&gt;</code>（<code>None</code> 表示&quot;还没产生 best&quot;，等价于 <code>+∞</code>），
+而不是直接存 <code>f32::INFINITY</code>——原因就是 12.2 说的：非有限值一旦进 JSON 就变成 <code>null</code>。</p>
+<p><strong>续训到底恢复了什么</strong>：<code>step</code>、<code>best_val_loss</code>（在头里），以及参数、<code>m</code>、<code>v</code>、<code>opt_t</code>（三个数据块）。
+少任何一项都不算续训——尤其 <code>opt_t</code> 归零会让 Adam 的偏差修正 <code>1 - β^t</code> 从 <code>t=1</code> 重来，前几步更新幅度突然放大。
+权重 only 档没有 m / v 可恢复，<code>load_with_opt</code> 把它们补成全零——AdamW 零状态 + 偏差修正正好等价于
+&quot;一个刚初始化的优化器&quot;，与词表扩展时给新增行补零是同一语义，所以拿量化落盘档 <code>--resume</code> 是合法的续训起点。
+但要注意<strong>数据采样的 RNG 不在存档里</strong>：<code>--resume</code> 后 <code>rng</code> 是从 <code>seed</code> 重新开始的，
+所以续训的 loss 轨迹不会和不中断训练逐位重合。单元测试因此只断言&quot;存档 → 读回逐位一致&quot;，
+而不是端到端轨迹一致——这才是本项目里「精确续训」的实际含义。</p>
+<blockquote>
+<p><strong>与旧存档不兼容</strong>：<code>LLMCP2</code> 不提供 <code>LLMCP1</code> 的转换脚本（改格式只为存得更小、更稳），旧 <code>.ckpt</code> 需要重新训练。
+相关单元测试（<code>src/checkpoint.rs</code>）：参数 / m / v / <code>opt_t</code> 逐位往返、推理路径跳过动量块、<code>NaN</code> / <code>Inf</code> 存活、
+LoRA 存档往返（头部记 rank/alpha/targets、加载端不注入适配层必须报错）、无 <code>lora</code> 字段的旧档仍可读、
+权重 only 档往返（体积 1×、参数逐位还原、<code>load_with_opt</code> 动量补零可续训）、无 <code>weights_only</code> 字段的旧档仍按三段读。</p>
+</blockquote>
+<h3 id="user-content-124-原子写入先写-pathtmp-再改名">12.4 原子写入：先写 <code>&lt;path&gt;.tmp</code> 再改名<a href="#124-原子写入先写-pathtmp-再改名" aria-label="Link to heading '12.4 原子写入：先写 &lt;path&gt;.tmp 再改名'" data-heading-content="12.4 原子写入：先写 &lt;path&gt;.tmp 再改名" class="anchor"></a></h3>
+<p>存档是&quot;先截断目标文件、再逐段写&quot;，而训练中途的存档动辄 3× 参数量、要写好几秒——正好也是
+最可能被打断的时候（Ctrl-C、OOM、断电）。直接写目标路径的话，<strong>一次中断就把上一次完好的
+<code>latest.ckpt</code> 变成半截垃圾</strong>，而那一刻恰恰是最需要它的时候。所以 <code>save</code> / <code>save_weights</code>
+都走同一条路：</p>
+<pre><code class="language-rust">// src/checkpoint.rs
+let (mut f, tmp) = create_with_head(path, model, &amp;header); // 真正创建的是 `{path}.tmp`
+// ... 写参数 / m / v 数据块 ...
+commit_atomic(f, &amp;tmp, path); // flush + close → std::fs::rename(tmp, path)
+</code></pre>
+<ul>
+<li>目标文件要么是<strong>完整的旧档</strong>、要么是<strong>完整的新档</strong>，不存在&quot;写了一半&quot;的中间态；</li>
+<li>临时名以 <code>.tmp</code> 结尾，不会被 <code>*.ckpt</code> 之类的通配匹配到，也不会被当成存档读走；</li>
+<li>改名是<strong>同一目录内</strong>的操作（<code>{path}.tmp</code> 与 <code>{path}</code> 同目录，不涉及跨设备复制）。</li>
+</ul>
+<hr />
+<h2 id="user-content-13-小结与下一课">13. 小结与下一课<a href="#13-小结与下一课" aria-label="Link to heading '13. 小结与下一课'" data-heading-content="13. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li><strong>CLI 设计</strong>：23 个子命令覆盖训练、评估、生成、对话、API 服务、监督微调、微调、预设、演示、性能基准、缩放定律、HuggingFace 权重导入，以及各课实验（MoE / 量化 / 分布式 / 对齐 / RAG / 推测解码 / 蒸馏 / FP8 / FP4 / CSA+HCA / MLA 解耦 RoPE）的完整工作流（完整清单见 §2.1）</li>
+<li><strong>分词器持久化</strong>：训练一次保存，后续直接加载，保证一致性</li>
+<li><strong>推理自动加载分词器</strong>：4 级优先级查找，<code>generate</code> / <code>chat</code> 连语料都不需要；<code>eval</code> 仍要读配置里的语料算验证 loss</li>
+<li><strong>预设配置</strong>：降低新手门槛，一键生成不同规模的配置文件</li>
+<li><strong>监督微调（<code>sft</code>）</strong>：对话语料 + loss 掩码（只监督回答，提问与角色标记屏蔽，掩码右移一位）；<code>--pretrained</code> 只读、输出到 <code>{out_dir}-sft</code>，lr/warmup/eval 按步数自动收窄；跑 SFT 用不带 <code>gpu</code> 的构建</li>
+<li><strong>LoRA 微调（<code>finetune</code>）</strong>：冻结预训练主干、只训低秩适配层（缺省 Q/K/V，实测可训练参数 1.32%；
+<code>--lora-targets</code> 可扩到 O 与 MLP，对应 1.75% / 3.85%）；
+冻结在前向（<code>matmul_frozen</code>）/ 优化器（跳过冻结参数与权重衰减）/ GPU 常驻快路（整体让路）三处一起做实，
+存档头部记录 LoRA 形态（rank / alpha / targets），加载端先注入再恢复参数</li>
+<li><strong>链式续训与推理合并</strong>：<code>--resume-lora</code> 接着训存档里那套适配层（保留旧增量、结构照存档）；
+<code>--merge-lora</code>（<code>eval</code> / <code>generate</code> / <code>chat</code>）把 <code>ΔW = (α/r)·AᵀBᵀ</code> <strong>就地</strong>并进主干，数值不变、省掉两次小矩阵乘，
+但<strong>不可逆</strong>——合并后适配器被摘除，不能再续训</li>
+<li><strong>交互式对话</strong>：KV Cache 加速的多轮对话，支持系统提示</li>
+<li><strong>Beam Search CLI</strong>：通过 <code>--beam</code> 参数直接使用，与采样生成无缝切换</li>
+<li><strong>多文件加载</strong>：支持目录路径，自动合并 .txt 文件</li>
+<li><strong>指标日志</strong>：CSV 格式记录训练过程（默认 <code>logs/train.csv</code>），便于分析和可视化</li>
+<li><strong>运行日志</strong>：<code>train</code> / <code>eval</code> / <code>generate</code> / <code>chat</code> / <code>serve</code> / <code>sft</code> / <code>finetune</code> / <code>scaling</code> / <code>moe</code> / <code>quant</code> / <code>distributed</code> / <code>align</code> / <code>rag</code> / <code>speculative</code> / <code>distill</code> / <code>fp8</code> / <code>fp4</code> / <code>csa</code> / <code>mla</code> 共 19 个子命令每次运行自动写一份 <code>logs/{操作}_{时间戳}.log</code>，含完整命令行、完整配置与全部过程输出，文件名带毫秒时间戳不会互相覆盖（全项目现有 23 个子命令，余下 <code>demo</code> / <code>bench</code> / <code>preset</code> / <code>import-hf</code> 不写运行日志）</li>
+<li><strong>产物目录规范化</strong>：配置进 <code>config/</code>、权重进 <code>checkpoints/</code>、日志进 <code>logs/</code>，所有写盘出口都会自动建目录，产物不再散落到仓库根目录</li>
+<li><strong>checkpoint 用二进制（<code>LLMCP2</code>）</strong>：JSON 头只放标量与参数元信息，参数 / m / v 按 f32 小端写数据块；同一个模型存档从 58.6MB 降到 22.1MB，且 <code>NaN</code> / <code>Inf</code> 不再变成读不回来的 <code>null</code>；写入是<strong>原子</strong>的（先写 <code>&lt;path&gt;.tmp</code> 再 rename），中断不会把上一份完好的存档毁掉</li>
+<li><strong>导入 HuggingFace 权重</strong>（<code>import-hf</code>）：<code>config.json</code> + <code>*.safetensors</code> 一次性转成原生 <code>LLMCP2</code>。HF 与本仓库的差异不只是文件格式（Linear 是 <code>[out,in]</code>、RoPE 用 <code>rotate_half</code>、参数名与词表口径不同），所以转换时把 <code>rope_style=half</code>、bias 开关、输出头是否绑定等<strong>语义</strong>一起写进存档头——之后训练/推理/量化全走既有路径，<strong>没有&quot;HF 专用&quot;的运行时代码</strong>，现有自研权重也不受任何影响（新字段都带默认值）。支持面（LLaMA / Qwen2 系、F16/BF16/F32、32k~151k 词表）与限制（MoE / MLA / SWA / <code>rope_scaling</code> 一律报错）见 <a href="../src/hf.rs"><code>src/hf.rs</code></a> 的模块文档与 <a href="../README.md">README §导入 HuggingFace 权重</a>。</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<ul>
+<li><strong>扩大 <code>import-hf</code> 的覆盖面</strong>：目前 MoE / MLA / SWA / <code>rope_scaling</code> 一律报错（见上面「导入 HuggingFace 权重」一条），要支持就得把这些语义也映射进 <code>TransformerConfig</code>。</li>
+<li><strong>补齐运行日志的子命令</strong>：<code>demo</code> / <code>bench</code> / <code>preset</code> / <code>import-hf</code> 目前不写运行日志（见 §11.2），接上之后运行记录才完整。</li>
+<li><strong>旧存档迁移</strong>：<code>LLMCP2</code> 不提供 <code>LLMCP1</code> 的转换脚本（见 §12.3），旧 <code>.ckpt</code> 只能重新训练。</li>
+<li><strong>配置版本号</strong>：现在的向后兼容全靠 <code>#[serde(default)]</code> 兜底，字段语义变更时还缺一个显式的版本标记。</li>
+</ul>
+<blockquote>
+<p><strong>下一课</strong>：<a href="40-%E6%8A%8A%E6%A8%A1%E5%9E%8B%E9%83%A8%E7%BD%B2%E6%88%90API%E6%9C%8D%E5%8A%A1.md">第 40 课 把模型部署成 API 服务</a> —— 把本课的训练 / 推理链路搬上网络：<code>serve</code> 起一个 OpenAI 兼容的常驻 API 服务（SSE 流式、鉴权、CORS、断开可中断）。</p>
+</blockquote>

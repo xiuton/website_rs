@@ -1,0 +1,59 @@
+<p>在 <a href="https://www.cnblogs.com/ganto/articles/18098638">浅谈React中的mutation</a> 一文中，突出表达了对象和数组类型的state，不宜直接修改原对象和数组，直接修改会制造一个mutation，并且无法触发React的重新渲染</p>
+<p>在官方文档中提到一个库 <a href="https://github.com/immerjs/use-immer">Immer</a> ，Immer 可以让我们直接修改对象和数组。</p>
+<h2 id="user-content-useimmer">useImmer<a href="#useimmer" aria-label="Link to heading 'useImmer'" data-heading-content="useImmer" class="anchor"></a></h2>
+<p>需要先安装use-immer库</p>
+<pre><code class="language-sh">pnpm add use-immer -D
+
+</code></pre>
+<pre><code class="language-jsx">import { useImmer } from 'use-immer';
+
+export default function App() {
+  const [state, setState] = useImmer({
+    count: 0,
+    name: 'Joe'
+  })
+
+  const handleClick = () =&gt; {
+    setState(draft =&gt; {
+      draft.count += 1
+    })
+    console.log(state)
+  }
+
+  return (
+    &lt;div className=&quot;app&quot;&gt;
+      &lt;h1&gt;{state.count}&lt;/h1&gt;
+      &lt;h2&gt;{state.name}&lt;/h2&gt;
+      &lt;button onClick={handleClick}&gt;CLICK ME&lt;/button&gt;
+    &lt;/div&gt;
+  )
+}
+
+</code></pre>
+<h2 id="user-content-usestate">useState<a href="#usestate" aria-label="Link to heading 'useState'" data-heading-content="useState" class="anchor"></a></h2>
+<pre><code class="language-jsx">import { useState } from 'react';
+
+export default function App() {
+  const [state, setState] = useState({
+    count: 0,
+    name: 'Joe'
+  })
+
+  const handleClick = () =&gt; {
+    setState(obj =&gt; {
+      obj.count += 1
+      return obj // setState的参数-匿名函数需要有返回值
+    })
+    console.log(state) // 此处的打印结果并非最新的state，但是依然能反应出state已被修改
+  }
+
+  return (
+    &lt;div className=&quot;app&quot;&gt;
+      &lt;h1&gt;{state.count}&lt;/h1&gt;
+      &lt;h2&gt;{state.name}&lt;/h2&gt;
+      &lt;button onClick={handleClick}&gt;CLICK ME&lt;/button&gt;
+    &lt;/div&gt;
+  )
+}
+
+</code></pre>

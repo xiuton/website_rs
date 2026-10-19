@@ -1,0 +1,68 @@
+<blockquote>
+<p>MDN：<a href="https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce">https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce</a></p>
+</blockquote>
+<p>关于reduce函数，我们再熟悉不过了，我们通常用他对数据进行求和，也被称为<strong>累加器</strong></p>
+<p>reduce常见用例如下：</p>
+<pre><code class="language-js">let goods = [
+  { name: &quot;T恤&quot;, price: 99, count: 2 },
+  { name: &quot;polo衫&quot;, price: 120, count: 1 },
+  { name: &quot;牛仔裤&quot;, price: 197, count: 11 }
+]
+
+const goodsSum = goods.reduce((sum, item) =&gt; {
+  return sum + item.price * item.count;
+}, initSum = 0)
+
+console.log(goodsSum) // 2485
+
+</code></pre>
+<p>以上代码，我相信对于你那真是信手捏来...</p>
+<blockquote>
+<p>但是还是需要解释一下，reduce就是对goods数组中的每项的价格进行相加<br />
+reduce传递两个参数，第一个参数是一个回调函数，第二个参数是一个用于统计累加结果的初始值<br />
+reduce函数的第一个回调函数又有两个参数，第一个参数<code>sum</code>的初始状态等于reduce第二个参数<code>initSum</code>，在reduce执行完一次，第一个参数<code>sum</code>会变成reduce执行完返回的内容<br />
+reduce函数的第一个回调函数的第二个参数也就是goods数组中的每项<br />
+reduce执行次数与数组的长度有关</p>
+</blockquote>
+<p>在阅读vue官方文档的时候，发现了一段有趣的代码</p>
+<pre><code class="language-js">// plugins/i18n.js
+export default {
+  install: (app, options) =&gt; {
+    // 注入一个全局可用的 $translate() 方法
+    app.config.globalProperties.$translate = (key) =&gt; {
+      // 获取 `options` 对象的深层属性
+      // 使用 `key` 作为索引
+      return key.split('.').reduce((o, i) =&gt; {
+        if (o) return o[i]
+      }, options)
+    }
+  }
+}
+
+</code></pre>
+<p>以上代码是vue中定义一个插件的代码，有趣的是其中的reduce函数</p>
+<p>我们将代码进行精简</p>
+<pre><code class="language-js">let obj = {
+  greetings: {
+    hello: &quot;你好&quot;
+  }
+}
+
+const ret = &quot;greetings.hello&quot;.split('.').reduce((o, i) =&gt; {
+  if (o) {
+    return o[i]
+  }
+}, obj)
+
+console.log(ret)
+
+</code></pre>
+<p>以上代码是通过&quot;greetings.hello&quot;这段字符串，进而获取obj对象中的值</p>
+<p>以上代码<code>&quot;greetings.hello&quot;.split('.')</code> 就是数组 <code>[&quot;greetings&quot;, &quot;hello&quot;]</code></p>
+<p>reduce函数中的第一个回调函数中的第一个参数也就是<code>o</code>等于<code>obj</code>对象，第二个参数<code>i</code>变成了 <code>[&quot;greetings&quot;, &quot;hello&quot;]</code> 数组中的每项</p>
+<p>第一次执行 <code>o 是 {greetings: {hello: &quot;你好&quot;}}</code> <code>i 是 &quot;greetings&quot;</code> ，返回 <code>o[i] 也就是 {hello: &quot;你好&quot;}</code> 此时 <code>o 变成 {hello: &quot;你好&quot;}</code></p>
+<p>进入下一次reduce回调</p>
+<p>第二次执行 <code>o 是 {hello: &quot;你好&quot;}</code> <code>i 是 &quot;hello&quot;</code> ，返回 <code>o[i] 也就是 &quot;你好&quot;</code></p>
+<p>结束reduce</p>
+<p>返回 <code>&quot;你好&quot;</code></p>
+<p>啊？reduce函数还能这么用！</p>

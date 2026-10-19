@@ -25,54 +25,22 @@
     <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"BlogPosting","headline":"第 38 课：分布式训练（Distributed Training）","description":"集合通信、数据并行、ZeRO 与张量/流水线并行，理解大模型如何在多卡上摊开。","url":"https://ganto.me/post/rust-llm-guide-38","datePublished":"2026-09-01","dateModified":"2026-09-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Rust, LLM, 分布式","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
     </script>
-    <link rel="stylesheet" href="/styles-c3674ec134f9a612.css">
-<link rel="modulepreload" href="/web-rs-ed78e9ed78fe0ba6.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous">
-<link rel="preload" href="/web-rs-ed78e9ed78fe0ba6_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm">
+    <link rel="stylesheet" href="/styles-7299efb8f2a4d60.css">
+<link rel="modulepreload" href="/web-rs-4b7fc77d2e4f841a.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-web-eae67878b22d6805/inline0.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-cli-config-74c4aa43f52789a0/inline0.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/inline0.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/hydrate.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/patch_console.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/set_attribute.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-web-eae67878b22d6805/src/js/eval.js" crossorigin="anonymous">
+<link rel="preload" href="/web-rs-4b7fc77d2e4f841a_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm">
 
     <style>
-:root {
-            --bg-base: #f8f4ed;
-            --bg-elevated: #fdfbf7;
-            --bg-subtle: #f0ebe0;
-            --text-primary: #3e3327;
-            --text-secondary: #7a6c5a;
-            --text-tertiary: #a49480;
-            --border-default: #e0d6c5;
-            --border-subtle: #ede4d5;
-            --accent: #6a9b50;
-            --accent-rgb: 106, 155, 80;
-            --accent-soft: rgba(106, 155, 80, 0.1);
-            --radius-sm: 6px;
-            --radius-md: 10px;
-            --radius-lg: 14px;
-            --radius-full: 999px;
-        }
-.dark {
-            --bg-base: #1b1612;
-            --bg-elevated: #241e19;
-            --bg-subtle: #2d2620;
-            --text-primary: #ede4d6;
-            --text-secondary: #b0a290;
-            --text-tertiary: #7d7060;
-            --border-default: #3a3229;
-            --border-subtle: #2a241f;
-            --accent: #78b860;
-            --accent-rgb: 120, 184, 96;
-            --accent-soft: rgba(120, 184, 96, 0.12);
-        }
+.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
 
     </style>
     <style>
-        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
-        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
         .theme-toggle .icon-sun { display: none; }
         .dark .theme-toggle .icon-sun { display: inline; }
         .dark .theme-toggle .icon-moon { display: none; }
@@ -98,50 +66,7 @@
     </script>
 </head>
 <body>
-    <div id="main">
-        <div class="app">
-<div class="navbar-content">
-    <div class="navbar-ui">
-        <div class="navbar-title-wrapper">
-            <h1 class="navbar-title">干徒</h1>
-            <div class="navbar-glow"></div>
-        </div>
-        <div class="navbar-subtitle">这很酷</div>
-    </div>
-</div>
-<div class="navbar-sticky-wrap">
-    <div class="navbar-links">
-        <a class="nav-link nav-active" href="/">首页</a>
-        <a class="nav-link" href="/about">关于</a>
-        <a class="nav-link" href="/tags">书签</a>
-        <a class="nav-link" href="/search">搜索</a>
-        <a class="nav-link" href="/knowledge-graph">图谱</a>
-        <a class="nav-link" href="/ai-summary">AI摘要</a>
-        <div class="nav-item-with-sub">
-            <a class="nav-link" href="/dev">开发</a>
-            <div class="nav-submenu">
-                <a class="nav-sub-link" href="/circle-generator">圆形生成器</a>
-            </div>
-        </div>
-        <a class="nav-icon-btn rss-toggle" href="/rss" title="RSS 订阅" aria-label="RSS 订阅">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"/></svg>
-        </a>
-        <button class="nav-icon-btn theme-toggle" id="prerender-theme-toggle" aria-label="切换主题" title="切换主题">
-            <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
-            <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="16" height="16" fill="currentColor"><path d="M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"/></svg>
-        </button>
-    </div>
-</div>
-        <main class="main-content">
-            <article class="blog-post prerender-article">
-                <h1>第 38 课：分布式训练（Distributed Training）</h1>
-                <div class="prerender-meta">
-                    <span>2026-09-01</span>
-                    <span>干徒</span>
-                </div>
-                <div class="blog-tags"><span class="blog-tag">Rust</span><span class="blog-tag">LLM</span><span class="blog-tag">分布式</span></div>
-                <div class="blog-content">
-<h1><a href="#第-38-课分布式训练distributed-training" aria-hidden="true" class="anchor" id="user-content-第-38-课分布式训练distributed-training"></a>第 38 课：分布式训练（Distributed Training）</h1>
+    <div id="main"><div class="app"><div class="navbar-content"><div class="navbar-ui"><div class="navbar-title-wrapper"><h1 class="navbar-title">干徒</h1><div class="navbar-glow"></div></div><div class="navbar-subtitle">这很酷</div></div></div><div class="navbar-sticky-wrap"><div class="navbar-links"><a href="/" class="nav-link nav-active">首页</a><a href="/about" class="nav-link">关于</a><a href="/tags" class="nav-link">书签</a><a href="/search" class="nav-link">搜索</a><a href="/knowledge-graph" class="nav-link">图谱</a><a href="/ai-summary" class="nav-link">AI摘要</a><div class="nav-item-with-sub"><a href="/dev" class="nav-link">开发</a><button class="nav-sub-trigger"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5 L5 6.5 L8 3.5"></path></svg></button></div><a href="/playground" class="nav-link">操场</a><a href="/test" class="nav-link">测试</a><a href="/rss" class="nav-icon-btn rss-toggle" title="RSS 订阅"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"></path></svg></a><button class="nav-icon-btn theme-toggle"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"></path></svg></button></div></div><main class="main-content" id="main-content"><div class="blog-container"><article class="blog-post" aria-label="文章：第 38 课：分布式训练（Distributed Training）"><div class="blog-title-wrapper"><div class="blog-title"><h2>第 38 课：分布式训练（Distributed Training）</h2><span class="blog-category">rust-llm</span></div><div class="blog-meta"><span class="blog-date">2026-09-01 12:00:00</span><span class="blog-author">干徒</span></div></div><div class="blog-content"><div><h1 id="user-content-第-38-课分布式训练distributed-training">第 38 课：分布式训练（Distributed Training）<a href="#第-38-课分布式训练distributed-training" aria-label="Link to heading '第 38 课：分布式训练（Distributed Training）'" data-heading-content="第 38 课：分布式训练（Distributed Training）" class="anchor"></a></h1>
 <blockquote>
 <p><strong>本课已落地为可运行代码</strong>：<code>src/distributed.rs</code>（单测跑 <code>cargo test distributed</code>，数量以实际输出为准）+ <code>distributed</code> 子命令——集合通信
 （环形 allreduce = reduce-scatter + all-gather）、数据并行、ZeRO-1/2、张量并行（含 QKV 按 head 列切分）、
@@ -151,7 +76,7 @@
 ZeRO 分片作用于 <code>src/optim.rs</code> 的 AdamW 动量状态（<code>m</code> / <code>v</code>）。</p>
 </blockquote>
 <hr />
-<h2><a href="#1-为什么需要分布式训练" aria-hidden="true" class="anchor" id="user-content-1-为什么需要分布式训练"></a>1. 为什么需要分布式训练？</h2>
+<h2 id="user-content-1-为什么需要分布式训练">1. 为什么需要分布式训练？<a href="#1-为什么需要分布式训练" aria-label="Link to heading '1. 为什么需要分布式训练？'" data-heading-content="1. 为什么需要分布式训练？" class="anchor"></a></h2>
 <p>一个 70B 参数的模型，仅权重就需要 <strong>140GB</strong>（FP16），加上梯度和优化器状态：</p>
 <table>
 <thead>
@@ -184,10 +109,10 @@ ZeRO 分片作用于 <code>src/optim.rs</code> 的 AdamW 动量状态（<code>m<
 </tbody>
 </table>
 <p>单张 A100 80GB 显存远远不够，必须<strong>分布到多张 GPU 上</strong>。</p>
-<h2><a href="#2-三种并行策略" aria-hidden="true" class="anchor" id="user-content-2-三种并行策略"></a>2. 三种并行策略</h2>
-<h3><a href="#21-数据并行data-parallelism-dp" aria-hidden="true" class="anchor" id="user-content-21-数据并行data-parallelism-dp"></a>2.1 数据并行（Data Parallelism, DP）</h3>
+<h2 id="user-content-2-三种并行策略">2. 三种并行策略<a href="#2-三种并行策略" aria-label="Link to heading '2. 三种并行策略'" data-heading-content="2. 三种并行策略" class="anchor"></a></h2>
+<h3 id="user-content-21-数据并行data-parallelism-dp">2.1 数据并行（Data Parallelism, DP）<a href="#21-数据并行data-parallelism-dp" aria-label="Link to heading '2.1 数据并行（Data Parallelism, DP）'" data-heading-content="2.1 数据并行（Data Parallelism, DP）" class="anchor"></a></h3>
 <p><strong>每张 GPU 都有模型的完整副本</strong>，但处理不同的数据 batch。</p>
-<pre><code>GPU 0: 完整模型 + Batch 0 → grad_0 ─┐
+<pre><code class="language-plaintext">GPU 0: 完整模型 + Batch 0 → grad_0 ─┐
 GPU 1: 完整模型 + Batch 1 → grad_1 ─┤→ AllReduce(平均梯度) → 各自更新
 GPU 2: 完整模型 + Batch 2 → grad_2 ─┤
 GPU 3: 完整模型 + Batch 3 → grad_3 ─┘
@@ -195,7 +120,7 @@ GPU 3: 完整模型 + Batch 3 → grad_3 ─┘
 <p><strong>AllReduce 操作</strong>：所有 GPU 把自己的梯度汇总求平均，每个 GPU 都得到相同的平均梯度。</p>
 <p><strong>优点</strong>：实现简单，线性加速
 <strong>缺点</strong>：每张 GPU 都要存完整模型，放不下就没法用</p>
-<h3><a href="#22-zerozero-redundancy-optimizer" aria-hidden="true" class="anchor" id="user-content-22-zerozero-redundancy-optimizer"></a>2.2 ZeRO（Zero Redundancy Optimizer）</h3>
+<h3 id="user-content-22-zerozero-redundancy-optimizer">2.2 ZeRO（Zero Redundancy Optimizer）<a href="#22-zerozero-redundancy-optimizer" aria-label="Link to heading '2.2 ZeRO（Zero Redundancy Optimizer）'" data-heading-content="2.2 ZeRO（Zero Redundancy Optimizer）" class="anchor"></a></h3>
 <p>DeepSpeed 提出的优化——<strong>把优化器状态、梯度、参数分片到不同 GPU 上</strong>：</p>
 <table>
 <thead>
@@ -223,7 +148,7 @@ GPU 3: 完整模型 + Batch 3 → grad_3 ─┘
 </tr>
 </tbody>
 </table>
-<pre><code>ZeRO-3 (4 GPUs):
+<pre><code class="language-plaintext">ZeRO-3 (4 GPUs):
   GPU 0: 参数分片 0-25% + 对应的优化器状态
   GPU 1: 参数分片 25-50% + 对应的优化器状态
   GPU 2: 参数分片 50-75% + 对应的优化器状态
@@ -233,11 +158,11 @@ GPU 3: 完整模型 + Batch 3 → grad_3 ─┘
 更新时: 只更新自己负责的参数分片
 </code></pre>
 <p><strong>70B 模型在 ZeRO-3 + 8 GPU 上</strong>：每 GPU 只需 ~105GB（接近单卡可承载）。</p>
-<h3><a href="#23-模型并行model-parallelism" aria-hidden="true" class="anchor" id="user-content-23-模型并行model-parallelism"></a>2.3 模型并行（Model Parallelism）</h3>
+<h3 id="user-content-23-模型并行model-parallelism">2.3 模型并行（Model Parallelism）<a href="#23-模型并行model-parallelism" aria-label="Link to heading '2.3 模型并行（Model Parallelism）'" data-heading-content="2.3 模型并行（Model Parallelism）" class="anchor"></a></h3>
 <p>把模型<strong>切分到不同 GPU 上</strong>——每张 GPU 只负责模型的一部分。</p>
-<h4><a href="#张量并行tensor-parallelism-tp" aria-hidden="true" class="anchor" id="user-content-张量并行tensor-parallelism-tp"></a>张量并行（Tensor Parallelism, TP）</h4>
+<h4 id="user-content-张量并行tensor-parallelism-tp">张量并行（Tensor Parallelism, TP）<a href="#张量并行tensor-parallelism-tp" aria-label="Link to heading '张量并行（Tensor Parallelism, TP）'" data-heading-content="张量并行（Tensor Parallelism, TP）" class="anchor"></a></h4>
 <p>把<strong>单层内的矩阵运算</strong>切分到多张 GPU：</p>
-<pre><code>线性层 Y = X @ W，W ∈ R^{d × d}
+<pre><code class="language-plaintext">线性层 Y = X @ W，W ∈ R^{d × d}
   │
   │ 按列切分 W = [W_1 | W_2]
   │
@@ -245,16 +170,16 @@ GPU 0: Y_1 = X @ W_1  ─┐
 GPU 1: Y_2 = X @ W_2  ─┤→ 拼接 Y = [Y_1 | Y_2]
 </code></pre>
 <p>注意力层可以按 head 切分（天然并行），FFN 可以按列/行切分。</p>
-<h4><a href="#流水线并行pipeline-parallelism-pp" aria-hidden="true" class="anchor" id="user-content-流水线并行pipeline-parallelism-pp"></a>流水线并行（Pipeline Parallelism, PP）</h4>
+<h4 id="user-content-流水线并行pipeline-parallelism-pp">流水线并行（Pipeline Parallelism, PP）<a href="#流水线并行pipeline-parallelism-pp" aria-label="Link to heading '流水线并行（Pipeline Parallelism, PP）'" data-heading-content="流水线并行（Pipeline Parallelism, PP）" class="anchor"></a></h4>
 <p>把模型的<strong>不同层</strong>放在不同 GPU 上：</p>
-<pre><code>GPU 0: Layer 0-7   → 输出传给 GPU 1
+<pre><code class="language-plaintext">GPU 0: Layer 0-7   → 输出传给 GPU 1
 GPU 1: Layer 8-15  → 输出传给 GPU 2
 GPU 2: Layer 16-23 → 输出传给 GPU 3
 GPU 3: Layer 24-31 → 最终输出
 </code></pre>
 <p><strong>问题</strong>：朴素实现会导致严重的 GPU 空闲（流水线气泡）。</p>
 <p><strong>解决方案——GPipe / 1F1B 调度</strong>：</p>
-<pre><code>时间 →
+<pre><code class="language-plaintext">时间 →
 GPU 0: [F1][F2][F3][F4]  [B4][B3][B2][B1]
 GPU 1:     [F1][F2][F3][F4]  [B4][B3][B2][B1]
 GPU 2:         [F1][F2][F3][F4]  [B4][B3][B2][B1]
@@ -263,9 +188,9 @@ GPU 3:             [F1][F2][F3][F4]  [B4][B3][B2][B1]
 F = Forward, B = Backward
 把一个 batch 拆成多个 micro-batch，让 GPU 尽量忙碌
 </code></pre>
-<h2><a href="#3-3d-并行" aria-hidden="true" class="anchor" id="user-content-3-3d-并行"></a>3. 3D 并行</h2>
+<h2 id="user-content-3-3d-并行">3. 3D 并行<a href="#3-3d-并行" aria-label="Link to heading '3. 3D 并行'" data-heading-content="3. 3D 并行" class="anchor"></a></h2>
 <p>实际大规模训练中，三种并行策略<strong>组合使用</strong>：</p>
-<pre><code>3D 并行 (以 256 GPU 为例):
+<pre><code class="language-plaintext">3D 并行 (以 256 GPU 为例):
   数据并行 × 流水线并行 × 张量并行 = 256
   例: DP=8, PP=4, TP=8
 
@@ -273,33 +198,33 @@ F = Forward, B = Backward
   - PP=4: 模型分成 4 个流水线阶段（组间用 InfiniBand）
   - DP=8: 8 组数据并行（组间 AllReduce 梯度）
 </code></pre>
-<h2><a href="#4-通信原语" aria-hidden="true" class="anchor" id="user-content-4-通信原语"></a>4. 通信原语</h2>
-<h3><a href="#allreduce" aria-hidden="true" class="anchor" id="user-content-allreduce"></a>AllReduce</h3>
+<h2 id="user-content-4-通信原语">4. 通信原语<a href="#4-通信原语" aria-label="Link to heading '4. 通信原语'" data-heading-content="4. 通信原语" class="anchor"></a></h2>
+<h3 id="user-content-allreduce">AllReduce<a href="#allreduce" aria-label="Link to heading 'AllReduce'" data-heading-content="AllReduce" class="anchor"></a></h3>
 <p>所有 GPU 求和/求平均，每张 GPU 都得到结果。</p>
-<pre><code>GPU 0: grad_0 ──┐
+<pre><code class="language-plaintext">GPU 0: grad_0 ──┐
 GPU 1: grad_1 ──┤→ 平均 → 每张 GPU 都有 avg(grad)
 GPU 2: grad_2 ──┤
 GPU 3: grad_3 ──┘
 </code></pre>
 <p>实现方式：Ring AllReduce（O(2(N-1)/N × 数据量)），通信量几乎不随 GPU 数量增加。</p>
-<h3><a href="#allgather" aria-hidden="true" class="anchor" id="user-content-allgather"></a>AllGather</h3>
+<h3 id="user-content-allgather">AllGather<a href="#allgather" aria-label="Link to heading 'AllGather'" data-heading-content="AllGather" class="anchor"></a></h3>
 <p>每张 GPU 持有部分数据，AllGather 后每张 GPU 都有完整数据。</p>
-<pre><code>GPU 0: [参数 0-25%] ──┐
+<pre><code class="language-plaintext">GPU 0: [参数 0-25%] ──┐
 GPU 1: [参数 25-50%] ─┤→ 每张 GPU 都有 [100% 参数]
 GPU 2: [参数 50-75%] ─┤
 GPU 3: [参数 75-100%]─┘
 </code></pre>
-<h3><a href="#reducescatter" aria-hidden="true" class="anchor" id="user-content-reducescatter"></a>ReduceScatter</h3>
+<h3 id="user-content-reducescatter">ReduceScatter<a href="#reducescatter" aria-label="Link to heading 'ReduceScatter'" data-heading-content="ReduceScatter" class="anchor"></a></h3>
 <p>每张 GPU 有一份完整数据，ReduceScatter 后每张 GPU 只保留对应分片的求和结果。</p>
-<pre><code>GPU 0: [完整梯度] ──┐
+<pre><code class="language-plaintext">GPU 0: [完整梯度] ──┐
 GPU 1: [完整梯度] ──┤→ GPU 0 得到 [分片0的和]
 GPU 2: [完整梯度] ──┤   GPU 1 得到 [分片1的和]
 GPU 3: [完整梯度] ──┘   ...
 </code></pre>
-<h3><a href="#allreduce--reducescatter--allgather" aria-hidden="true" class="anchor" id="user-content-allreduce--reducescatter--allgather"></a>AllReduce = ReduceScatter + AllGather</h3>
-<h2><a href="#5-梯度累积与分布式训练" aria-hidden="true" class="anchor" id="user-content-5-梯度累积与分布式训练"></a>5. 梯度累积与分布式训练</h2>
+<h3 id="user-content-allreduce--reducescatter--allgather">AllReduce = ReduceScatter + AllGather<a href="#allreduce--reducescatter--allgather" aria-label="Link to heading 'AllReduce = ReduceScatter + AllGather'" data-heading-content="AllReduce = ReduceScatter + AllGather" class="anchor"></a></h3>
+<h2 id="user-content-5-梯度累积与分布式训练">5. 梯度累积与分布式训练<a href="#5-梯度累积与分布式训练" aria-label="Link to heading '5. 梯度累积与分布式训练'" data-heading-content="5. 梯度累积与分布式训练" class="anchor"></a></h2>
 <p>分布式训练中，<strong>有效 batch size</strong> 会变得很大：</p>
-<pre><code>有效 batch = micro_batch × 梯度累积步数 × GPU 数量
+<pre><code class="language-plaintext">有效 batch = micro_batch × 梯度累积步数 × GPU 数量
 
 例: micro_batch=4, 梯度累积=8, GPU=32
 有效 batch = 4 × 8 × 32 = 1024
@@ -308,13 +233,13 @@ GPU 3: [完整梯度] ──┘   ...
 <p>$$
 \text{lr}<em>{\text{new}} = \text{lr}</em>{\text{base}} \times \frac{\text{batch}<em>{\text{new}}}{\text{batch}</em>{\text{base}}}
 $$</p>
-<h2><a href="#6-混合精度与分布式" aria-hidden="true" class="anchor" id="user-content-6-混合精度与分布式"></a>6. 混合精度与分布式</h2>
+<h2 id="user-content-6-混合精度与分布式">6. 混合精度与分布式<a href="#6-混合精度与分布式" aria-label="Link to heading '6. 混合精度与分布式'" data-heading-content="6. 混合精度与分布式" class="anchor"></a></h2>
 <p>分布式训练几乎总是结合混合精度：</p>
-<pre><code>通信阶段: FP16/BF16（减少通信量 2×）
+<pre><code class="language-plaintext">通信阶段: FP16/BF16（减少通信量 2×）
 计算阶段: FP16/BF16（利用 Tensor Core 加速）
 优化器更新: FP32（保持数值精度）
 </code></pre>
-<h3><a href="#bf16-vs-fp16" aria-hidden="true" class="anchor" id="user-content-bf16-vs-fp16"></a>BF16 vs FP16</h3>
+<h3 id="user-content-bf16-vs-fp16">BF16 vs FP16<a href="#bf16-vs-fp16" aria-label="Link to heading 'BF16 vs FP16'" data-heading-content="BF16 vs FP16" class="anchor"></a></h3>
 <table>
 <thead>
 <tr>
@@ -343,24 +268,24 @@ $$</p>
 </tbody>
 </table>
 <p>BF16 的范围与 FP32 相同，不需要损失缩放（loss scaling），训练更稳定。现代训练几乎都用 BF16。</p>
-<h2><a href="#7-通信瓶颈与优化" aria-hidden="true" class="anchor" id="user-content-7-通信瓶颈与优化"></a>7. 通信瓶颈与优化</h2>
-<h3><a href="#通信量估算" aria-hidden="true" class="anchor" id="user-content-通信量估算"></a>通信量估算</h3>
+<h2 id="user-content-7-通信瓶颈与优化">7. 通信瓶颈与优化<a href="#7-通信瓶颈与优化" aria-label="Link to heading '7. 通信瓶颈与优化'" data-heading-content="7. 通信瓶颈与优化" class="anchor"></a></h2>
+<h3 id="user-content-通信量估算">通信量估算<a href="#通信量估算" aria-label="Link to heading '通信量估算'" data-heading-content="通信量估算" class="anchor"></a></h3>
 <p>以 ZeRO-3 训练 70B 模型为例：</p>
-<pre><code>前向: AllGather 参数 140GB (每层一次，分摊到整个前向)
+<pre><code class="language-plaintext">前向: AllGather 参数 140GB (每层一次，分摊到整个前向)
 反向: AllGather 参数 140GB + ReduceScatter 梯度 140GB
 总计: ~420GB 通信量 / step
 
 用 NVLink 600GB/s: ~0.7 秒通信
 用 InfiniBand 400Gb/s (~50GB/s): ~8.4 秒通信
 </code></pre>
-<h3><a href="#计算-通信重叠" aria-hidden="true" class="anchor" id="user-content-计算-通信重叠"></a>计算-通信重叠</h3>
-<pre><code>理想情况:
+<h3 id="user-content-计算-通信重叠">计算-通信重叠<a href="#计算-通信重叠" aria-label="Link to heading '计算-通信重叠'" data-heading-content="计算-通信重叠" class="anchor"></a></h3>
+<pre><code class="language-plaintext">理想情况:
   [计算层 1]  [计算层 2]  [计算层 3]
   [通信层 0]  [通信层 1]  [通信层 2]  ← 通信与计算重叠
 </code></pre>
-<h3><a href="#梯度压缩" aria-hidden="true" class="anchor" id="user-content-梯度压缩"></a>梯度压缩</h3>
+<h3 id="user-content-梯度压缩">梯度压缩<a href="#梯度压缩" aria-label="Link to heading '梯度压缩'" data-heading-content="梯度压缩" class="anchor"></a></h3>
 <p>在数据并行中，AllReduce 梯度时可以用低精度（FP16 甚至 INT8）减少通信量。</p>
-<h2><a href="#8-实际框架对比" aria-hidden="true" class="anchor" id="user-content-8-实际框架对比"></a>8. 实际框架对比</h2>
+<h2 id="user-content-8-实际框架对比">8. 实际框架对比<a href="#8-实际框架对比" aria-label="Link to heading '8. 实际框架对比'" data-heading-content="8. 实际框架对比" class="anchor"></a></h2>
 <table>
 <thead>
 <tr>
@@ -397,7 +322,7 @@ $$</p>
 </tr>
 </tbody>
 </table>
-<h2><a href="#9-本仓库实现要点" aria-hidden="true" class="anchor" id="user-content-9-本仓库实现要点"></a>9. 本仓库实现要点</h2>
+<h2 id="user-content-9-本仓库实现要点">9. 本仓库实现要点<a href="#9-本仓库实现要点" aria-label="Link to heading '9. 本仓库实现要点'" data-heading-content="9. 本仓库实现要点" class="anchor"></a></h2>
 <p>上面的原理已全部落地为可运行代码，分<strong>两层</strong>：</p>
 <ul>
 <li><a href="../src/distributed.rs"><code>src/distributed.rs</code></a>：<strong>单进程模拟</strong>（所有 rank 都在一个地址空间里，
@@ -408,7 +333,7 @@ $$</p>
 </ul>
 <p>CLI 入口是 <a href="../README.md"><code>distributed</code></a>
 子命令（跑模拟器）；真多进程训练按下面「启动多进程训练」一节拉进程。</p>
-<h3><a href="#代码地图" aria-hidden="true" class="anchor" id="user-content-代码地图"></a>代码地图</h3>
+<h3 id="user-content-代码地图">代码地图<a href="#代码地图" aria-label="Link to heading '代码地图'" data-heading-content="代码地图" class="anchor"></a></h3>
 <table>
 <thead>
 <tr>
@@ -500,7 +425,7 @@ $$</p>
 </tr>
 </tbody>
 </table>
-<h3><a href="#cli-用法" aria-hidden="true" class="anchor" id="user-content-cli-用法"></a>CLI 用法</h3>
+<h3 id="user-content-cli-用法">CLI 用法<a href="#cli-用法" aria-label="Link to heading 'CLI 用法'" data-heading-content="CLI 用法" class="anchor"></a></h3>
 <pre><code class="language-bash"># 默认配置（dp=4, tp=2, pp=2，即 16 卡模拟）
 cargo run --release -- distributed
 
@@ -519,10 +444,10 @@ cargo run --release -- distributed --n-embd 64 --n-layer 4 --block-size 64
 # 单机多卡（只用数据并行）
 cargo run --release -- distributed --dp 8 --tp 1 --pp 1
 </code></pre>
-<h3><a href="#真多进程数据并行dp-接线" aria-hidden="true" class="anchor" id="user-content-真多进程数据并行dp-接线"></a>真多进程数据并行（DP 接线）</h3>
+<h3 id="user-content-真多进程数据并行dp-接线">真多进程数据并行（DP 接线）<a href="#真多进程数据并行dp-接线" aria-label="Link to heading '真多进程数据并行（DP 接线）'" data-heading-content="真多进程数据并行（DP 接线）" class="anchor"></a></h3>
 <p>上面那条子命令跑的是<strong>单进程模拟</strong>：所有 rank 都在一个地址空间里，&quot;通信&quot;退化成 memcpy。
 真起 N 个进程时缺的不是算法，而是三件事——<strong>传输</strong>、<strong>数据分片</strong>、<strong>哪些副作用只能由一个 rank 做</strong>。</p>
-<h4><a href="#传输层与三维通信组srccommrs" aria-hidden="true" class="anchor" id="user-content-传输层与三维通信组srccommrs"></a>传输层与三维通信组（<code>src/comm.rs</code>）</h4>
+<h4 id="user-content-传输层与三维通信组srccommrs">传输层与三维通信组（<code>src/comm.rs</code>）<a href="#传输层与三维通信组srccommrs" aria-label="Link to heading '传输层与三维通信组（src/comm.rs）'" data-heading-content="传输层与三维通信组（src/comm.rs）" class="anchor"></a></h4>
 <p>每个 rank 一个进程，两两建一条 TCP 连接（全连接拓扑，就是 PyTorch gloo 的 CPU 做法），
 环形 allreduce / reduce-scatter / all-gather / broadcast 每轮只跟真实邻居交换数据。两个设计点：</p>
 <ul>
@@ -564,7 +489,7 @@ cargo run --release -- distributed --dp 8 --tp 1 --pp 1
 </table>
 <p><strong>先断言整除、再做除法</strong>：除不尽被静默取整的话，<code>dp·tp·pp ≠ world</code> 的错误要拖到第一次集合
 通信才以&quot;挂死&quot;（等超时）的形式暴露，排查成本远高于起跑前 panic。</p>
-<h4><a href="#训练接线四个同步点--一个门控" aria-hidden="true" class="anchor" id="user-content-训练接线四个同步点--一个门控"></a>训练接线：四个同步点 + 一个门控</h4>
+<h4 id="user-content-训练接线四个同步点--一个门控">训练接线：四个同步点 + 一个门控<a href="#训练接线四个同步点--一个门控" aria-label="Link to heading '训练接线：四个同步点 + 一个门控'" data-heading-content="训练接线：四个同步点 + 一个门控" class="anchor"></a></h4>
 <p><code>train_transformer</code> 多了最后一个参数 <code>dist: Option&lt;&amp;DistRuntime&gt;</code>，传 <code>None</code> 就是原来的单进程
 路径（一行都不变）。接上之后，训练循环里多了四个同步点：</p>
 <table>
@@ -606,7 +531,7 @@ cargo run --release -- distributed --dp 8 --tp 1 --pp 1
 <p><strong>rank 0 门控</strong>只管副作用，不管控制流：运行日志与进度（<code>logln!</code> 在 <code>format!</code> 之前按
 <code>runlog::rank_muted()</code> 短路）、指标 CSV、checkpoint 与分词器落盘。N 个副本同时写同一个
 <code>tokenizer.json</code> / <code>latest.ckpt</code> / CSV，轻则内容互相覆盖，重则落下一份写了一半的存档。</p>
-<h4><a href="#启动多进程训练" aria-hidden="true" class="anchor" id="user-content-启动多进程训练"></a>启动多进程训练</h4>
+<h4 id="user-content-启动多进程训练">启动多进程训练<a href="#启动多进程训练" aria-label="Link to heading '启动多进程训练'" data-heading-content="启动多进程训练" class="anchor"></a></h4>
 <p>多进程训练没有&quot;一条命令&quot;的写法：必须<strong>一次编译 + N 份带不同 env 的进程 + 按退出码判成败</strong>。
 下面这段可以直接粘进 PowerShell 会话（把 <code>$n</code> 改成进程数即可），不需要任何启动脚本：</p>
 <pre><code class="language-powershell"># 1) 只编译一次：N 个进程同时 cargo build 会抢 target/ 的锁，且每个都要多付一次 cargo 启动开销
@@ -697,10 +622,10 @@ cargo 启动开销（本仓库 release + LTO 约 2 分钟）。</li>
 进程当场拒绝（<code>cmd_train</code> 里的断言），而不是跑出一个&quot;每个 rank 都拿完整模型&quot;的错结果。</p>
 </blockquote>
 <hr />
-<h2><a href="#10-小结与下一课" aria-hidden="true" class="anchor" id="user-content-10-小结与下一课"></a>10. 小结与下一课</h2>
-<h3><a href="#本课小结" aria-hidden="true" class="anchor" id="user-content-本课小结"></a>本课小结</h3>
+<h2 id="user-content-10-小结与下一课">10. 小结与下一课<a href="#10-小结与下一课" aria-label="Link to heading '10. 小结与下一课'" data-heading-content="10. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
 <p>本课覆盖分布式训练的完整拼图：三种并行策略（DP / ZeRO / TP·PP）、集合通信原语、通信量估算与计算-通信重叠。本仓库把原理落成两层代码——<a href="../src/distributed.rs"><code>src/distributed.rs</code></a> 的单进程模拟负责&quot;切分 → 通信 → 拼回&quot;的逐位对拍，<a href="../src/comm.rs"><code>src/comm.rs</code></a> 的 TCP 传输层负责把纯数据并行真正跑成多进程。</p>
-<h3><a href="#拓展方向" aria-hidden="true" class="anchor" id="user-content-拓展方向"></a>拓展方向</h3>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
 <blockquote>
 <p>核心内容已全部实现（<code>src/distributed.rs</code> + <code>distributed</code> 子命令），这里是进阶拓展。</p>
 </blockquote>
@@ -713,25 +638,24 @@ cargo 启动开销（本仓库 release + LTO 约 2 分钟）。</li>
 <blockquote>
 <p><strong>下一课</strong>：<a href="39-%E5%B7%A5%E7%A8%8B%E5%8C%96%E5%AE%8C%E5%96%84.md">第 39 课 工程化完善</a> —— 把训练链路工程化：23 个子命令、分词器持久化、预设配置、<code>sft</code> / <code>finetune</code> 工作流与 <code>LLMCP2</code> 二进制 checkpoint。</p>
 </blockquote>
-
-                </div>
-                <div class="series-nav"><div class="series-nav-actions"><a class="series-nav-btn" href="/series/rust-llm/">目录页</a></div><details class="series-nav-details"><summary class="series-nav-summary"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 51 章</span></div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="series-nav-chevron"><path d="m6 9 6 6 6-6"/></svg></summary><div class="series-nav-list"><a class="series-nav-item" href="/post/rust-llm-guide-00/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a class="series-nav-item" href="/post/rust-llm-guide-01/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a class="series-nav-item" href="/post/rust-llm-guide-02/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-03/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a class="series-nav-item" href="/post/rust-llm-guide-04/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Arc&lt;Mutex&gt;/Shared 架构</span></a><a class="series-nav-item" href="/post/rust-llm-guide-05/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-06/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-07/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a class="series-nav-item" href="/post/rust-llm-guide-08/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a class="series-nav-item" href="/post/rust-llm-guide-09/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-10/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a class="series-nav-item" href="/post/rust-llm-guide-11/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-12/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-13/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a class="series-nav-item" href="/post/rust-llm-guide-14/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a class="series-nav-item" href="/post/rust-llm-guide-15/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-16/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16</span></a><a class="series-nav-item" href="/post/rust-llm-guide-17/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-18/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：学习率调度 —— warmup + cosine decay</span></a><a class="series-nav-item" href="/post/rust-llm-guide-19/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：Dropout —— 训练时的「随机失忆」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-20/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a class="series-nav-item" href="/post/rust-llm-guide-21/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：RMSNorm —— 现代 LLM 的归一化标配</span></a><a class="series-nav-item" href="/post/rust-llm-guide-22/"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">第 22 课：SwiGLU 激活函数 —— LLaMA 的「门控」MLP</span></a><a class="series-nav-item" href="/post/rust-llm-guide-23/"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-24/"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星</span></a><a class="series-nav-item" href="/post/rust-llm-guide-25/"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">第 25 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a class="series-nav-item" href="/post/rust-llm-guide-26/"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">第 26 课：混合精度训练（AMP）—— 用半精度加速，用全精度保底</span></a><a class="series-nav-item" href="/post/rust-llm-guide-27/"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">第 27 课：GPU 加速 —— 手写 WGSL 计算着色器</span></a><a class="series-nav-item" href="/post/rust-llm-guide-28/"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a><a class="series-nav-item" href="/post/rust-llm-guide-29/"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</span></a><a class="series-nav-item" href="/post/rust-llm-guide-30/"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">第 30 课：Beam Search —— 贪心搜索的升级版</span></a><a class="series-nav-item" href="/post/rust-llm-guide-31/"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">第 31 课：Scaling Laws（缩放定律）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-32/"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">第 32 课：MoE 混合专家模型（Mixture of Experts）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-33/"><span class="series-nav-item-index">34</span><span class="series-nav-item-title">第 33 课：量化技术（Quantization）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-34/"><span class="series-nav-item-index">35</span><span class="series-nav-item-title">第 34 课：推测解码（Speculative Decoding）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-35/"><span class="series-nav-item-index">36</span><span class="series-nav-item-title">第 35 课：多 Token 预测（Multi-Token Prediction）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-36/"><span class="series-nav-item-index">37</span><span class="series-nav-item-title">第 36 课：RLHF 与人类对齐（Alignment）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-37/"><span class="series-nav-item-index">38</span><span class="series-nav-item-title">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）</span></a><a class="series-nav-item active" href="/post/rust-llm-guide-38/"><span class="series-nav-item-index">39</span><span class="series-nav-item-title">第 38 课：分布式训练（Distributed Training）</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/rust-llm-guide-39/"><span class="series-nav-item-index">40</span><span class="series-nav-item-title">第 39 课：工程化完善 —— 从算法实现到可用框架</span></a><a class="series-nav-item" href="/post/rust-llm-guide-40/"><span class="series-nav-item-index">41</span><span class="series-nav-item-title">第 40 课：把模型部署成 API 服务 —— 从「自己跑」到「给别人调」</span></a><a class="series-nav-item" href="/post/rust-llm-guide-41/"><span class="series-nav-item-index">42</span><span class="series-nav-item-title">第 41 课：多模态 —— 图片理解与图片生成</span></a><a class="series-nav-item" href="/post/rust-llm-guide-42/"><span class="series-nav-item-index">43</span><span class="series-nav-item-title">第 42 课：知识蒸馏（Knowledge Distillation）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-43/"><span class="series-nav-item-index">44</span><span class="series-nav-item-title">第 43 课：FP8 低精度训练（模拟）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-44/"><span class="series-nav-item-index">45</span><span class="series-nav-item-title">第 44 课：WSD 学习率调度（warmup-stable-decay）</span></a><a class="series-nav-item" href="/post/rust-llm-guide-45/"><span class="series-nav-item-index">46</span><span class="series-nav-item-title">第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死</span></a><a class="series-nav-item" href="/post/rust-llm-guide-46/"><span class="series-nav-item-index">47</span><span class="series-nav-item-title">第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化</span></a><a class="series-nav-item" href="/post/rust-llm-guide-47/"><span class="series-nav-item-index">48</span><span class="series-nav-item-title">第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道</span></a><a class="series-nav-item" href="/post/rust-llm-guide-48/"><span class="series-nav-item-index">49</span><span class="series-nav-item-title">第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重</span></a><a class="series-nav-item" href="/post/rust-llm-guide-49/"><span class="series-nav-item-index">50</span><span class="series-nav-item-title">第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</span></a><a class="series-nav-item" href="/post/rust-llm-guide-50/"><span class="series-nav-item-index">51</span><span class="series-nav-item-title">第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</span></a></div></details><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/rust-llm-guide-37/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）</span></a><a class="series-nav-page next" href="/post/rust-llm-guide-39/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 39 课：工程化完善 —— 从算法实现到可用框架</span></a></div></div>
-            </article>
-        </main>
-<footer class="footer-content">
-    <div class="copyright">
-        <span>2019-2026 </span>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"/></svg>
-        <span> 干徒 / Ganto</span>
-    </div>
-</footer>
-        </div>
-    </div>
-<script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
-try{document.getElementById('main').innerHTML='';}catch(e){}</script>
+</div></div><div class="series-nav"><div class="series-nav-actions"><a href="/series/rust-llm" class="series-nav-btn"><span>目录页</span></a></div><details class="series-nav-details"><summary class="series-nav-summary"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg><div class="series-nav-heading"><span class="series-nav-title">Rust 大语言模型 学习指南</span><span class="series-nav-count">共 51 章</span></div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="series-nav-chevron"><path d="m6 9 6 6 6-6"></path></svg></summary><div class="series-nav-list"><a href="/post/rust-llm-guide-00" class="series-nav-item"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">从零用 Rust 实现大语言模型 —— 学习计划</span></a><a href="/post/rust-llm-guide-01" class="series-nav-item"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">第 1 课：张量 Tensor —— 一切的基础</span></a><a href="/post/rust-llm-guide-02" class="series-nav-item"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">第 2 课：自动微分 Autograd —— 让模型学会「自我修正」</span></a><a href="/post/rust-llm-guide-03" class="series-nav-item"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</span></a><a href="/post/rust-llm-guide-04" class="series-nav-item"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">第 4 课：模块化重构 —— 项目结构分层与 Arc&#60;Mutex&#62;/Shared 架构</span></a><a href="/post/rust-llm-guide-05" class="series-nav-item"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">第 5 课：线性层与激活函数 —— 神经网络的「积木」</span></a><a href="/post/rust-llm-guide-06" class="series-nav-item"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">第 6 课：损失函数与优化器 —— 让模型知道「错在哪、怎么改」</span></a><a href="/post/rust-llm-guide-07" class="series-nav-item"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">第 7 课：第一个 MLP —— 教会神经网络算 XOR</span></a><a href="/post/rust-llm-guide-08" class="series-nav-item"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">第 8 课：BPE 分词器 —— 让模型「读懂」文字</span></a><a href="/post/rust-llm-guide-09" class="series-nav-item"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">第 9 课：注意力机制 —— 让 token 互相「看」</span></a><a href="/post/rust-llm-guide-10" class="series-nav-item"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">第 10 课：多头注意力 —— 让模型「多角度」看世界</span></a><a href="/post/rust-llm-guide-11" class="series-nav-item"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">第 11 课：位置编码与归一化 —— 让序列带上「位置感」</span></a><a href="/post/rust-llm-guide-12" class="series-nav-item"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</span></a><a href="/post/rust-llm-guide-13" class="series-nav-item"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">第 13 课：训练循环 —— 让模型真正开始学习</span></a><a href="/post/rust-llm-guide-14" class="series-nav-item"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">第 14 课：数据加载 —— 文本如何变成训练样本</span></a><a href="/post/rust-llm-guide-15" class="series-nav-item"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">第 15 课：推理与采样 —— 让模型「创造性」地生成</span></a><a href="/post/rust-llm-guide-16" class="series-nav-item"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">第 16 课：训练小 Transformer —— 看 loss 从 1.30 降到 0.16</span></a><a href="/post/rust-llm-guide-17" class="series-nav-item"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">第 17 课：AdamW 优化器 —— 给梯度下降装上「惯性」和「自适应步长」</span></a><a href="/post/rust-llm-guide-18" class="series-nav-item"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">第 18 课：学习率调度 —— warmup + cosine decay</span></a><a href="/post/rust-llm-guide-19" class="series-nav-item"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">第 19 课：Dropout —— 训练时的「随机失忆」</span></a><a href="/post/rust-llm-guide-20" class="series-nav-item"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">第 20 课：RoPE 旋转位置编码 —— 把「相对位置」揉进注意力</span></a><a href="/post/rust-llm-guide-21" class="series-nav-item"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">第 21 课：RMSNorm —— 现代 LLM 的归一化标配</span></a><a href="/post/rust-llm-guide-22" class="series-nav-item"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">第 22 课：SwiGLU 激活函数 —— LLaMA 的「门控」MLP</span></a><a href="/post/rust-llm-guide-23" class="series-nav-item"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">第 23 课：GQA 分组查询注意力 —— 推理时省显存的利器</span></a><a href="/post/rust-llm-guide-24" class="series-nav-item"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星</span></a><a href="/post/rust-llm-guide-25" class="series-nav-item"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">第 25 课：KV Cache —— 让逐 token 生成不再重复计算</span></a><a href="/post/rust-llm-guide-26" class="series-nav-item"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">第 26 课：混合精度训练（AMP）—— 用半精度加速，用全精度保底</span></a><a href="/post/rust-llm-guide-27" class="series-nav-item"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">第 27 课：GPU 加速 —— 手写 WGSL 计算着色器</span></a><a href="/post/rust-llm-guide-28" class="series-nav-item"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">第 28 课：梯度累积 —— 小显存也能跑大 batch</span></a><a href="/post/rust-llm-guide-29" class="series-nav-item"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型</span></a><a href="/post/rust-llm-guide-30" class="series-nav-item"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">第 30 课：Beam Search —— 贪心搜索的升级版</span></a><a href="/post/rust-llm-guide-31" class="series-nav-item"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">第 31 课：Scaling Laws（缩放定律）</span></a><a href="/post/rust-llm-guide-32" class="series-nav-item"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">第 32 课：MoE 混合专家模型（Mixture of Experts）</span></a><a href="/post/rust-llm-guide-33" class="series-nav-item"><span class="series-nav-item-index">34</span><span class="series-nav-item-title">第 33 课：量化技术（Quantization）</span></a><a href="/post/rust-llm-guide-34" class="series-nav-item"><span class="series-nav-item-index">35</span><span class="series-nav-item-title">第 34 课：推测解码（Speculative Decoding）</span></a><a href="/post/rust-llm-guide-35" class="series-nav-item"><span class="series-nav-item-index">36</span><span class="series-nav-item-title">第 35 课：多 Token 预测（Multi-Token Prediction）</span></a><a href="/post/rust-llm-guide-36" class="series-nav-item"><span class="series-nav-item-index">37</span><span class="series-nav-item-title">第 36 课：RLHF 与人类对齐（Alignment）</span></a><a href="/post/rust-llm-guide-37" class="series-nav-item"><span class="series-nav-item-index">38</span><span class="series-nav-item-title">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）</span></a><a href="/post/rust-llm-guide-38" class="series-nav-item active" aria-current="page"><span class="series-nav-item-index">39</span><span class="series-nav-item-title">第 38 课：分布式训练（Distributed Training）</span><span class="series-nav-item-now">本篇</span></a><a href="/post/rust-llm-guide-39" class="series-nav-item"><span class="series-nav-item-index">40</span><span class="series-nav-item-title">第 39 课：工程化完善 —— 从算法实现到可用框架</span></a><a href="/post/rust-llm-guide-40" class="series-nav-item"><span class="series-nav-item-index">41</span><span class="series-nav-item-title">第 40 课：把模型部署成 API 服务 —— 从「自己跑」到「给别人调」</span></a><a href="/post/rust-llm-guide-41" class="series-nav-item"><span class="series-nav-item-index">42</span><span class="series-nav-item-title">第 41 课：多模态 —— 图片理解与图片生成</span></a><a href="/post/rust-llm-guide-42" class="series-nav-item"><span class="series-nav-item-index">43</span><span class="series-nav-item-title">第 42 课：知识蒸馏（Knowledge Distillation）</span></a><a href="/post/rust-llm-guide-43" class="series-nav-item"><span class="series-nav-item-index">44</span><span class="series-nav-item-title">第 43 课：FP8 低精度训练（模拟）</span></a><a href="/post/rust-llm-guide-44" class="series-nav-item"><span class="series-nav-item-index">45</span><span class="series-nav-item-title">第 44 课：WSD 学习率调度（warmup-stable-decay）</span></a><a href="/post/rust-llm-guide-45" class="series-nav-item"><span class="series-nav-item-index">46</span><span class="series-nav-item-title">第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死</span></a><a href="/post/rust-llm-guide-46" class="series-nav-item"><span class="series-nav-item-index">47</span><span class="series-nav-item-title">第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化</span></a><a href="/post/rust-llm-guide-47" class="series-nav-item"><span class="series-nav-item-index">48</span><span class="series-nav-item-title">第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道</span></a><a href="/post/rust-llm-guide-48" class="series-nav-item"><span class="series-nav-item-index">49</span><span class="series-nav-item-title">第 48 课：FP4 量化感知训练 —— E2M1 与 4 位权重</span></a><a href="/post/rust-llm-guide-49" class="series-nav-item"><span class="series-nav-item-index">50</span><span class="series-nav-item-title">第 49 课：CSA + HCA 混合注意力 —— 把长序列注意力分层压缩</span></a><a href="/post/rust-llm-guide-50" class="series-nav-item"><span class="series-nav-item-index">51</span><span class="series-nav-item-title">第 50 课：MLA 解耦 RoPE + 权重吸收 —— 让 KV 缓存只存一份 latent</span></a></div></details><div class="series-nav-pager"><a href="/post/rust-llm-guide-37" class="series-nav-page prev"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）</span></a><a href="/post/rust-llm-guide-39" class="series-nav-page next"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">第 39 课：工程化完善 —— 从算法实现到可用框架</span></a></div></div><div class="blog-tags"><span class="blog-tag"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"></path></svg>Rust</span><span class="blog-tag"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"></path></svg>LLM</span><span class="blog-tag"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"></path></svg>分布式</span></div><div class="details-sentinel" style="height:1px;"></div><div class="markov-section"><div class="markov-header"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"></path><polyline points="12 12 18 12 18 6"></polyline></svg><span>AI 续写</span><span class="markov-badge">马尔可夫链</span></div><p class="markov-desc">基于本文内容训练的 tri-gram 语言模型，自动生成下文片段。</p><div class="markov-actions"><button class="markov-btn">生成续写</button></div></div></article></div></main><nav class="floating-toolbar" aria-label="页面工具栏"><button class="tool-btn" type="button" aria-label="后退"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.75 19.5 8.25 12l7.5-7.5"></path></svg></button><a href="/" class="tool-btn" aria-label="首页"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"></path></svg></a><a href="/series/rust-llm" class="tool-btn" aria-label="系列目录"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"></path></svg></a><button class="tool-btn" type="button" aria-label="宽屏模式"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8m-8 18h8M4 12h16M4 12l3-3m-3 3l3 3m13-3l-3-3m3 3l-3 3"></path></svg></button><span class="tool-divider"></span><button class="tool-btn" type="button" aria-label="回到顶部"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.5v-15m0 0-6.75 6.75M12 4.5l6.75 6.75"></path></svg></button></nav><footer class="footer-content"><div class="copyright"><span>2019-2026 </span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"></path></svg><span> 干徒 / Ganto</span></div></footer></div></div>
+<script>/* 把预渲染正文交给 SPA 后清空 #main，避免重复渲染 */
+try{
+  var main=document.getElementById('main');
+  var content=main?main.querySelector('.blog-content'):null;
+  if(content){
+    var t=document.createElement('template');
+    t.id='prerender-content';
+    t.setAttribute('data-slug', "rust-llm-guide-38");
+    t.innerHTML=content.innerHTML;
+    document.body.appendChild(t);
+  }
+  if(main) main.innerHTML='';
+}catch(e){}
+</script>
 <script type="module">
-import init, * as bindings from '/web-rs-ed78e9ed78fe0ba6.js';
-const wasm = await init({ module_or_path: '/web-rs-ed78e9ed78fe0ba6_bg.wasm' });
+import init, * as bindings from '/web-rs-4b7fc77d2e4f841a.js';
+const wasm = await init({ module_or_path: '/web-rs-4b7fc77d2e4f841a_bg.wasm' });
 
 
 window.wasmBindings = bindings;

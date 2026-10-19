@@ -1,0 +1,238 @@
+<h1 id="user-content-第-44-课wsd-学习率调度warmup-stable-decay">第 44 课：WSD 学习率调度（warmup-stable-decay）<a href="#第-44-课wsd-学习率调度warmup-stable-decay" aria-label="Link to heading '第 44 课：WSD 学习率调度（warmup-stable-decay）'" data-heading-content="第 44 课：WSD 学习率调度（warmup-stable-decay）" class="anchor"></a></h1>
+<blockquote>
+<p><strong>本课已落地为可运行代码</strong>：<a href="../src/train.rs"><code>src/train.rs</code></a> 的 <code>LRScheduler</code>
+（<code>new</code> / <code>new_wsd</code> / 私有 <code>with_wsd</code>，以及工厂 <code>lr_scheduler(cfg, total_steps)</code>）+
+配置开关 <code>train.lr_schedule</code> / <code>train.wsd_decay_frac</code>。</p>
+<p>与第 18 课的衔接：第 18 课实现的是 warmup + cosine 衰减；本课在<strong>同一个</strong> <code>LRScheduler</code>
+上加一条&quot;warmup → 恒定 → 线性退火&quot;的三段曲线，默认仍是 cosine——<code>lr_schedule = &quot;cosine&quot;</code>
+时调用链与加 WSD 之前<strong>逐位一致</strong>。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>cosine 衰减为什么要&quot;总步数一开始就定死&quot;？这带来什么工程约束？</li>
+<li>WSD 的三段各是什么？为什么&quot;稳定段 + 末段退火&quot;能替代余弦收尾？</li>
+<li>退火段该占多少比例？退火起点被谁夹住？</li>
+<li>怎么保证引入 WSD 不会偷偷改动默认的 cosine 路径？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-动机cosine-的总步数前置问题">2. 动机：cosine 的&quot;总步数前置&quot;问题<a href="#2-动机cosine-的总步数前置问题" aria-label="Link to heading '2. 动机：cosine 的&quot;总步数前置&quot;问题'" data-heading-content="2. 动机：cosine 的&quot;总步数前置&quot;问题" class="anchor"></a></h2>
+<p>cosine 衰减的形状由 <code>total_steps</code> 直接决定：</p>
+<pre><code class="language-text">progress = (step - warmup_steps) / (total_steps - warmup_steps)
+lr       = min_lr + (max_lr - min_lr) · 0.5·(1 + cos(π·progress))
+</code></pre>
+<p>只要 <code>total_steps</code> 变动，<strong>整条曲线就要重排</strong>——中途想&quot;再多训一会儿&quot;，前一段已经走过的
+学习率就再也对不上了。这在实际训练里很别扭：</p>
+<ul>
+<li>大规模预训练常常&quot;先跑一个稳定版本，看情况再决定何时收尾&quot;，而 cosine 逼你把收尾点一开始就定死；</li>
+<li>想用同一份数据从不同 checkpoint 接着训，cosine 的曲线形状对不上。</li>
+</ul>
+<p>WSD（warmup-stable-decay，MiniCPM / DeepSeek 等采用）把曲线拆成三段解决这个问题：
+<strong>稳定段是一段平线（恒等于峰值学习率）</strong>，任何时刻从平线上切出来退火都成立，于是
+&quot;稳定段随便训多久、要收尾时再退火&quot;成了常规操作。DeepSeek-V2/V3 能在稳定段中途换数据配比
+继续训，靠的就是这条性质。</p>
+<hr />
+<h2 id="user-content-3-三段的公式">3. 三段的公式<a href="#3-三段的公式" aria-label="Link to heading '3. 三段的公式'" data-heading-content="3. 三段的公式" class="anchor"></a></h2>
+<p><code>LRScheduler</code> 的两条曲线<strong>共用同一段线性 warmup</strong>（这是刻意设计，见 §4 的「默认路径逐位不变」）：</p>
+<pre><code class="language-text">warmup（step &lt; warmup_steps）：
+    lr = max_lr · (step + 1) / max(warmup_steps, 1)
+</code></pre>
+<p>warmup 之后按 <code>wsd_decay_steps</code> 分流：</p>
+<pre><code class="language-text">cosine（wsd_decay_steps = None）：
+    progress = min((step - warmup_steps) / max(total_steps - warmup_steps, 1), 1)
+    lr       = min_lr + (max_lr - min_lr) · 0.5·(1 + cos(π·progress))
+
+WSD（wsd_decay_steps = Some(d)）：
+    decay_start = max(total_steps - d, warmup_steps)     # 退火起点不能早于 warmup 结束
+    step &lt; decay_start:  lr = max_lr                     # 稳定段：一段平线
+    否则:
+        progress = min((step - decay_start) / max(total_steps - decay_start, 1), 1)
+        lr       = max_lr + (min_lr - max_lr) · progress  # 线性退火
+</code></pre>
+<p>三段直观形状（<code>warmup = 4, total = 20, decay = 5</code>，<code>max_lr = 1.0, min_lr = 0.1</code>）：</p>
+<pre><code class="language-text">lr
+1.0 ┤      ┌──────────────────┐
+    │    ┌─┘                  └──┐
+    │  ┌─┘                      └──┐
+0.1 ┤ ─┘                          └─
+    └───┬────┬─────────────────┬────┬──▶ step
+      warmup  stable(平台)      decay
+        4                 15     20
+</code></pre>
+<h3 id="user-content-31-退火步数怎么算">3.1 退火步数怎么算<a href="#31-退火步数怎么算" aria-label="Link to heading '3.1 退火步数怎么算'" data-heading-content="3.1 退火步数怎么算" class="anchor"></a></h3>
+<p>工厂 <code>lr_scheduler(cfg, total_steps)</code> 把比例换算成绝对步数：</p>
+<pre><code class="language-text">span   = max(total_steps - warmup_steps, 0)
+decay  = max(round(wsd_decay_frac × span), 1)     # 至少 1 步
+</code></pre>
+<p>默认 <code>wsd_decay_frac = 0.1</code>，即退火吃掉&quot;扣除 warmup 后剩余步数&quot;的 10%。</p>
+<hr />
+<h2 id="user-content-4-本仓库实现要点">4. 本仓库实现要点<a href="#4-本仓库实现要点" aria-label="Link to heading '4. 本仓库实现要点'" data-heading-content="4. 本仓库实现要点" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../src/train.rs"><code>src/train.rs</code></a> <code>LRScheduler</code></td>
+<td>字段 <code>wsd_decay_steps: Option&lt;usize&gt;</code>：<code>None</code> = cosine，<code>Some(d)</code> = WSD；<code>lr()</code> 按上面公式取当前步学习率</td>
+</tr>
+<tr>
+<td><a href="../src/train.rs"><code>src/train.rs</code></a> <code>LRScheduler::new</code></td>
+<td>cosine 构造：<code>with_wsd(..., None)</code></td>
+</tr>
+<tr>
+<td><a href="../src/train.rs"><code>src/train.rs</code></a> <code>LRScheduler::new_wsd</code></td>
+<td>WSD 构造：<code>with_wsd(..., Some(decay_steps.max(1)))</code></td>
+</tr>
+<tr>
+<td><a href="../src/train.rs"><code>src/train.rs</code></a> <code>with_wsd</code></td>
+<td>私有公共构造器，两条曲线只在这里分流</td>
+</tr>
+<tr>
+<td><a href="../src/train.rs"><code>src/train.rs</code></a> <code>lr_scheduler</code></td>
+<td>按 <code>cfg.lr_schedule</code> 分派；<code>&quot;wsd&quot;</code> 时算 <code>decay_steps</code>，否则退回 <code>new</code></td>
+</tr>
+<tr>
+<td><a href="../src/config.rs"><code>src/config.rs</code></a> <code>TrainConfig::lr_schedule</code></td>
+<td>默认 <code>&quot;cosine&quot;</code>；<code>validate</code> 断言只允许 <code>&quot;cosine&quot;</code> / <code>&quot;wsd&quot;</code></td>
+</tr>
+<tr>
+<td><a href="../src/config.rs"><code>src/config.rs</code></a> <code>TrainConfig::wsd_decay_frac</code></td>
+<td>默认 <code>0.1</code>；<code>validate</code> 断言必须落在 <code>(0, 1]</code></td>
+</tr>
+</tbody>
+</table>
+<p>训练循环里每步先 <code>scheduler.lr()</code> 取当前学习率写进优化器（<code>opt.set_lr(cur_lr)</code>），
+<strong>只有在优化器真正更新之后</strong>才 <code>scheduler.step()</code>——AMP 溢出跳步时不推进学习率
+（那一步没有真正发生）。</p>
+<blockquote>
+<p>设计取舍：抽出工厂 <code>lr_scheduler</code> 是为了让 <code>train</code> / <code>sft</code> / <code>finetune</code> 几条训练入口
+拿到<strong>同一条曲线</strong>，不会出现&quot;主训练用 WSD、微调悄悄退回 cosine&quot;这种不一致。</p>
+</blockquote>
+<h3 id="user-content-默认路径逐位不变">默认路径逐位不变<a href="#默认路径逐位不变" aria-label="Link to heading '默认路径逐位不变'" data-heading-content="默认路径逐位不变" class="anchor"></a></h3>
+<ul>
+<li>默认 <code>lr_schedule = &quot;cosine&quot;</code>：<code>lr_scheduler</code> 走进 <code>else</code> 分支，调用
+<code>LRScheduler::new(warmup_steps, total_steps, max_lr, min_lr)</code>——它与加 WSD 之前<strong>完全同一条路径</strong>。</li>
+<li><code>wsd_decay_steps</code> 为 <code>None</code> 时 <code>lr()</code> 里的 <code>match</code> 走 cosine 分支，公式一字未动。</li>
+<li>单测 <code>test_cosine_schedule_default_unchanged</code> 逐点钉住了默认曲线的数值快照
+（<code>warmup=2, total=6, max_lr=1, min_lr=0</code> → <code>[0.5, 1.0, 1.0, 0.8535534, 0.5, 0.14644664]</code>），
+谁改动 cosine 公式这里会立刻红。</li>
+<li><code>test_wsd_warmup_matches_cosine</code> 进一步证明：切到 WSD 后，前 <code>warmup_steps</code> 步与 cosine
+<strong>逐位相同</strong>——WSD 只改 warmup 之后的段。</li>
+</ul>
+<h3 id="user-content-代码地图">代码地图<a href="#代码地图" aria-label="Link to heading '代码地图'" data-heading-content="代码地图" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../src/train.rs"><code>src/train.rs</code></a> <code>LRScheduler</code></td>
+<td>两条曲线的统一实现 + <code>step</code> / <code>set_step</code>（续训跳步）</td>
+</tr>
+<tr>
+<td><a href="../src/train.rs"><code>src/train.rs</code></a> <code>lr_scheduler</code></td>
+<td>配置 → 调度器的工厂</td>
+</tr>
+<tr>
+<td><a href="../src/config.rs"><code>src/config.rs</code></a></td>
+<td><code>lr_schedule</code> / <code>wsd_decay_frac</code> 字段与校验</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="user-content-5-运行与验证">5. 运行与验证<a href="#5-运行与验证" aria-label="Link to heading '5. 运行与验证'" data-heading-content="5. 运行与验证" class="anchor"></a></h2>
+<pre><code class="language-bash"># WSD 相关单测（三段结构、warmup 对齐、工厂分派、退火夹取、同种子对照）
+cargo test wsd
+
+# 默认 cosine 行为未变
+cargo test cosine_schedule_default_unchanged
+
+# 工厂分派
+cargo test lr_scheduler
+</code></pre>
+<p>配置示例：</p>
+<pre><code class="language-jsonc">{
+  &quot;train&quot;: {
+    &quot;lr_schedule&quot;: &quot;wsd&quot;,   // 默认 &quot;cosine&quot;
+    &quot;wsd_decay_frac&quot;: 0.1   // 退火占&quot;剩余步数&quot;的比例，默认 0.1
+  }
+}
+</code></pre>
+<p>几个关键单测及它们钉住的性质：</p>
+<table>
+<thead>
+<tr>
+<th>测试</th>
+<th>验证内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_wsd_schedule_has_three_phases</code></td>
+<td>warmup 严格递增且末点踩到 <code>max_lr</code>；稳定段恒等于 <code>max_lr</code>；退火段单调不增、落在 <code>[min_lr, max_lr)</code></td>
+</tr>
+<tr>
+<td><code>test_wsd_warmup_matches_cosine</code></td>
+<td>warmup 段两条曲线逐位相同，末步确实不同（否则没测到差别）</td>
+</tr>
+<tr>
+<td><code>test_cosine_schedule_default_unchanged</code></td>
+<td>默认 cosine 曲线数值快照不变</td>
+</tr>
+<tr>
+<td><code>test_lr_scheduler_factory_respects_schedule</code></td>
+<td>工厂按 <code>lr_schedule</code> 分派；<code>decay_start = total − round(frac·(total−warmup))</code>，稳定段是真正的平台；cosine 无平台</td>
+</tr>
+<tr>
+<td><code>test_wsd_decay_clamped_to_warmup</code></td>
+<td>病态参数下退火起点被 <code>warmup</code> 夹住，曲线仍单调</td>
+</tr>
+<tr>
+<td><code>test_wsd_and_cosine_identical_when_lr_flat</code></td>
+<td><code>max_lr == min_lr</code> 时两曲线都是常值，同种子 loss 逐位相同（隔离性证明）</td>
+</tr>
+<tr>
+<td><code>test_wsd_vs_cosine_same_seed_differs</code></td>
+<td><code>max_lr &gt; min_lr</code> 时两曲线不同，同种子 loss 也确实不同（有效性证明）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-常见坑实测踩出来的">常见坑（实测踩出来的）<a href="#常见坑实测踩出来的" aria-label="Link to heading '常见坑（实测踩出来的）'" data-heading-content="常见坑（实测踩出来的）" class="anchor"></a></h3>
+<h4 id="user-content-1-退火步数过大会把稳定段吃掉">1. 退火步数过大会把稳定段吃掉<a href="#1-退火步数过大会把稳定段吃掉" aria-label="Link to heading '1. 退火步数过大会把稳定段吃掉'" data-heading-content="1. 退火步数过大会把稳定段吃掉" class="anchor"></a></h4>
+<p><code>decay_start = max(total_steps − decay_steps, warmup_steps)</code> 里的 <code>max(...)</code> 是必需的：
+当 <code>wsd_decay_frac</code> 配得很大（<code>decay_steps ≥ total_steps − warmup_steps</code>）时，退火起点会被
+<strong>夹到 warmup 结束处</strong>，稳定段长度为 0——warmup 一结束就开始退火。</p>
+<p><code>test_wsd_decay_clamped_to_warmup</code>（<code>warmup=8, total=10, decay=9</code>）验证了这条边界：
+退火起点落在第 8 步（warmup 结尾），且曲线仍保持&quot;warmup 之后单调不增&quot;。
+如果这里不夹，曲线会出现先降后升的折返，训练反而更不稳。</p>
+<h4 id="user-content-2-max_lr--min_lr-时两条曲线逐位相同别拿它当wsd-生效的证据">2. <code>max_lr == min_lr</code> 时两条曲线逐位相同，别拿它当&quot;WSD 生效&quot;的证据<a href="#2-max_lr--min_lr-时两条曲线逐位相同别拿它当wsd-生效的证据" aria-label="Link to heading '2. max_lr == min_lr 时两条曲线逐位相同，别拿它当&quot;WSD 生效&quot;的证据'" data-heading-content="2. max_lr == min_lr 时两条曲线逐位相同，别拿它当&quot;WSD 生效&quot;的证据" class="anchor"></a></h4>
+<p>当 <code>max_lr == min_lr</code>，cosine 与 WSD 在 warmup 之后都是<strong>常值</strong>，同种子的整轮训练
+必然逐位相同（<code>test_wsd_and_cosine_identical_when_lr_flat</code>）。</p>
+<p>这条测试本身的用途是<strong>隔离性证明</strong>（说明调度差异没有偷偷改动别的路径、训练可复现），
+但它也提醒：要验证&quot;WSD 真的接进了优化器&quot;，必须把学习率区间拉成 <code>max_lr &gt; min_lr</code>——
+<code>test_wsd_vs_cosine_same_seed_differs</code> 就是这么做的（断言两条曲线的 loss 都有限且不相等，
+不比较谁更优：十几步的极小模型上谁赢是噪声）。</p>
+<hr />
+<h2 id="user-content-6-小结与下一课">6. 小结与下一课<a href="#6-小结与下一课" aria-label="Link to heading '6. 小结与下一课'" data-heading-content="6. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<p>WSD 的价值是&quot;稳定段随便训多久、要收尾时再退火&quot;；引入它的同时默认 cosine 路径逐位未变，两条曲线共用同一段线性 warmup。</p>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<ul>
+<li><strong>稳定段续训</strong>：利用&quot;平线任意时刻可切&quot;的性质，写一个&quot;从稳定段 checkpoint 起、只跑退火段&quot;
+的实验，对比同算力下 cosine 从头训的效果。</li>
+<li><strong>退火形状</strong>：本实现用线性退火；可以试 <code>1 − √progress</code>、cosine 退火等变体，看末段损失曲线。</li>
+<li><strong>退火比例扫描</strong>：<code>wsd_decay_frac</code> 在 <code>{0.05, 0.1, 0.2, 0.5}</code> 上扫一遍，量&quot;退火太短来不及收敛、
+太长浪费算力&quot;的拐点。</li>
+<li><strong>与 Muon 组合</strong>：Muon 的有效步长口径与 AdamW 不同（见第 46 课），换优化器时调度曲线的峰值
+需要重新标定。</li>
+</ul>
+<blockquote>
+<p><strong>下一课</strong>：<a href="45-QK-Norm.md">第 45 课 QK-Norm</a> —— 把注意力的 Q / K 尺度钉死：QK-Norm 逐头 RMSNorm。</p>
+</blockquote>

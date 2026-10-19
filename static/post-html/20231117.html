@@ -1,0 +1,38 @@
+<p>柯里化就是将多参函数变成单参函数</p>
+<pre><code class="language-js">// 实现函数柯里化
+function currying() {
+  
+}
+
+// 测试柯里化函数
+const sum = (a, b, c, d) =&gt; a + b + c + d;
+
+console.log(currying(sum)(1)(2)(3)(4)); // 10
+console.log(currying(sum, 1)(2, 3)(4)); // 10
+console.log(currying(sum, 1, 2)(3)(4)); // 10
+console.log(currying(sum, 1, 2)(3, 4)); // 10
+
+</code></pre>
+<p>如上代码，实现柯里化函数<br />
+实现方式如下，自行理解代码</p>
+<pre><code class="language-js">// 实现函数柯里化
+function currying(fn, ...bindArgs) {
+  return (...args) =&gt; {
+    const allArgs = [...bindArgs, ...args];
+    if (allArgs.length &lt; fn.length) {
+      return currying(fn, ...allArgs);
+    } else {
+      return fn(...allArgs)
+    }
+  }
+}
+
+// 测试柯里化函数
+const sum = (a, b, c, d) =&gt; a + b + c + d;
+
+console.log(currying(sum)(1)(2)(3)(4)); // 10
+console.log(currying(sum, 1)(2, 3)(4)); // 10
+console.log(currying(sum, 1, 2)(3)(4)); // 10
+console.log(currying(sum, 1, 2)(3, 4)); // 10
+
+</code></pre>

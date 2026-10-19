@@ -85,11 +85,11 @@
     </script>
     <link rel="alternate" type="application/rss+xml" title="干徒的博客 RSS" href="/static/feed.xml">
     <link rel="alternate" type="application/atom+xml" title="干徒的博客 Atom" href="/static/atom.xml">
-    <link rel="stylesheet" href="/styles-c3674ec134f9a612.css" data-sass-options="&#x7B;&quot;style&quot;&#x3A;&quot;compressed&quot;&#x2C;&quot;sourceMap&quot;&#x3A;false&#x2C;&quot;quietDeps&quot;&#x3A;true&#x7D;"/>
+    <link rel="stylesheet" href="/styles-7299efb8f2a4d60.css" data-sass-options="&#x7B;&quot;style&quot;&#x3A;&quot;compressed&quot;&#x2C;&quot;sourceMap&quot;&#x3A;false&#x2C;&quot;quietDeps&quot;&#x3A;true&#x7D;"/>
     
 <script type="module">
-import init, * as bindings from '/web-rs-ed78e9ed78fe0ba6.js';
-const wasm = await init({ module_or_path: '/web-rs-ed78e9ed78fe0ba6_bg.wasm' });
+import init, * as bindings from '/web-rs-4b7fc77d2e4f841a.js';
+const wasm = await init({ module_or_path: '/web-rs-4b7fc77d2e4f841a_bg.wasm' });
 
 
 window.wasmBindings = bindings;
@@ -113,36 +113,8 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
     
     
     <style>
-        :root {
-            --bg-base: #f8f4ed;
-            --bg-elevated: #fdfbf7;
-            --bg-subtle: #f0ebe0;
-            --text-primary: #3e3327;
-            --text-secondary: #7a6c5a;
-            --text-tertiary: #a49480;
-            --border-default: #e0d6c5;
-            --border-subtle: #ede4d5;
-            --accent: #6a9b50;
-            --accent-rgb: 106, 155, 80;
-            --accent-soft: rgba(106, 155, 80, 0.1);
-            --radius-sm: 6px;
-            --radius-md: 10px;
-            --radius-lg: 14px;
-            --radius-full: 999px;
-        }
-        .dark {
-            --bg-base: #1b1612;
-            --bg-elevated: #241e19;
-            --bg-subtle: #2d2620;
-            --text-primary: #ede4d6;
-            --text-secondary: #b0a290;
-            --text-tertiary: #7d7060;
-            --border-default: #3a3229;
-            --border-subtle: #2a241f;
-            --accent: #78b860;
-            --accent-rgb: 120, 184, 96;
-            --accent-soft: rgba(120, 184, 96, 0.12);
-        }
+        /* 主题变量统一由 src/styles/_theme.scss 生成的外部 styles.css 提供，
+           这里不再复制一份，避免深色/浅色 token 两处漂移。 */
         #main-skeleton { transition: opacity 0.2s ease; }
         #main-skeleton.fade-out { opacity: 0; pointer-events: none; }
         .sk-page { display: none; }
@@ -206,7 +178,7 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
             .skeleton-card { padding: 1.1rem; }
         }
     </style>
-<link rel="modulepreload" href="/web-rs-ed78e9ed78fe0ba6.js" crossorigin="anonymous"><link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous"><link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous"><link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous"><link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous"><link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous"><link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous"><link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous"><link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous"><link rel="preload" href="/web-rs-ed78e9ed78fe0ba6_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm"></head>
+<link rel="modulepreload" href="/web-rs-4b7fc77d2e4f841a.js" crossorigin="anonymous"><link rel="modulepreload" href="/snippets/dioxus-web-eae67878b22d6805/inline0.js" crossorigin="anonymous"><link rel="modulepreload" href="/snippets/dioxus-cli-config-74c4aa43f52789a0/inline0.js" crossorigin="anonymous"><link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/inline0.js" crossorigin="anonymous"><link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/hydrate.js" crossorigin="anonymous"><link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/patch_console.js" crossorigin="anonymous"><link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/set_attribute.js" crossorigin="anonymous"><link rel="modulepreload" href="/snippets/dioxus-web-eae67878b22d6805/src/js/eval.js" crossorigin="anonymous"><link rel="preload" href="/web-rs-4b7fc77d2e4f841a_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm"></head>
 <body>
     <div id="main">
         <div id="main-skeleton">
@@ -416,5 +388,7 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
             }, 10000);
         })();
     </script>
+<noscript id="noscript-posts"><section><h2>最新文章</h2><ul><li><a href="/post/rust-llm-guide-46/">第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-31/">第 31 课：Scaling Laws（缩放定律）</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-24/">第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-43/">第 43 课：FP8 低精度训练（模拟）</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-12/">第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-21/">第 21 课：RMSNorm —— 现代 LLM 的归一化标配</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-39/">第 39 课：工程化完善 —— 从算法实现到可用框架</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-03/">第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-13/">第 13 课：训练循环 —— 让模型真正开始学习</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-14/">第 14 课：数据加载 —— 文本如何变成训练样本</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-05/">第 5 课：线性层与激活函数 —— 神经网络的「积木」</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-19/">第 19 课：Dropout —— 训练时的「随机失忆」</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-01/">第 1 课：张量 Tensor —— 一切的基础</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-18/">第 18 课：学习率调度 —— warmup + cosine decay</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-35/">第 35 课：多 Token 预测（Multi-Token Prediction）</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-41/">第 41 课：多模态 —— 图片理解与图片生成</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-07/">第 7 课：第一个 MLP —— 教会神经网络算 XOR</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-45/">第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-34/">第 34 课：推测解码（Speculative Decoding）</a> <time datetime="2026-09-01">2026-09-01</time></li><li><a href="/post/rust-llm-guide-38/">第 38 课：分布式训练（Distributed Training）</a> <time datetime="2026-09-01">2026-09-01</time></li></ul></section></noscript>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"ItemList","itemListElement":[{"@type":"ListItem","position":1,"url":"https://ganto.me/post/rust-llm-guide-46","name":"第 46 课：Muon 优化器 —— 动量矩阵的 Newton–Schulz 正交化"},{"@type":"ListItem","position":2,"url":"https://ganto.me/post/rust-llm-guide-31","name":"第 31 课：Scaling Laws（缩放定律）"},{"@type":"ListItem","position":3,"url":"https://ganto.me/post/rust-llm-guide-24","name":"第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星"},{"@type":"ListItem","position":4,"url":"https://ganto.me/post/rust-llm-guide-43","name":"第 43 课：FP8 低精度训练（模拟）"},{"@type":"ListItem","position":5,"url":"https://ganto.me/post/rust-llm-guide-12","name":"第 12 课：完整 Transformer 模型 —— 把积木拼成能预测下一个词的模型"},{"@type":"ListItem","position":6,"url":"https://ganto.me/post/rust-llm-guide-21","name":"第 21 课：RMSNorm —— 现代 LLM 的归一化标配"},{"@type":"ListItem","position":7,"url":"https://ganto.me/post/rust-llm-guide-39","name":"第 39 课：工程化完善 —— 从算法实现到可用框架"},{"@type":"ListItem","position":8,"url":"https://ganto.me/post/rust-llm-guide-03","name":"第 3 课：张量运算扩展 —— 广播、归约、softmax、批量矩阵乘法"},{"@type":"ListItem","position":9,"url":"https://ganto.me/post/rust-llm-guide-13","name":"第 13 课：训练循环 —— 让模型真正开始学习"},{"@type":"ListItem","position":10,"url":"https://ganto.me/post/rust-llm-guide-14","name":"第 14 课：数据加载 —— 文本如何变成训练样本"},{"@type":"ListItem","position":11,"url":"https://ganto.me/post/rust-llm-guide-05","name":"第 5 课：线性层与激活函数 —— 神经网络的「积木」"},{"@type":"ListItem","position":12,"url":"https://ganto.me/post/rust-llm-guide-19","name":"第 19 课：Dropout —— 训练时的「随机失忆」"},{"@type":"ListItem","position":13,"url":"https://ganto.me/post/rust-llm-guide-01","name":"第 1 课：张量 Tensor —— 一切的基础"},{"@type":"ListItem","position":14,"url":"https://ganto.me/post/rust-llm-guide-18","name":"第 18 课：学习率调度 —— warmup + cosine decay"},{"@type":"ListItem","position":15,"url":"https://ganto.me/post/rust-llm-guide-35","name":"第 35 课：多 Token 预测（Multi-Token Prediction）"},{"@type":"ListItem","position":16,"url":"https://ganto.me/post/rust-llm-guide-41","name":"第 41 课：多模态 —— 图片理解与图片生成"},{"@type":"ListItem","position":17,"url":"https://ganto.me/post/rust-llm-guide-07","name":"第 7 课：第一个 MLP —— 教会神经网络算 XOR"},{"@type":"ListItem","position":18,"url":"https://ganto.me/post/rust-llm-guide-45","name":"第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死"},{"@type":"ListItem","position":19,"url":"https://ganto.me/post/rust-llm-guide-34","name":"第 34 课：推测解码（Speculative Decoding）"},{"@type":"ListItem","position":20,"url":"https://ganto.me/post/rust-llm-guide-38","name":"第 38 课：分布式训练（Distributed Training）"}]}</script>
 </body>
 </html>

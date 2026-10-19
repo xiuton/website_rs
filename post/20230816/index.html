@@ -25,54 +25,22 @@
     <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"BlogPosting","headline":"Golang学习笔记","description":"旧文档归档","url":"https://ganto.me/post/20230816","datePublished":"2023-08-16","dateModified":"2023-08-16","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Old","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
     </script>
-    <link rel="stylesheet" href="/styles-c3674ec134f9a612.css">
-<link rel="modulepreload" href="/web-rs-ed78e9ed78fe0ba6.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous">
-<link rel="preload" href="/web-rs-ed78e9ed78fe0ba6_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm">
+    <link rel="stylesheet" href="/styles-7299efb8f2a4d60.css">
+<link rel="modulepreload" href="/web-rs-4b7fc77d2e4f841a.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-web-eae67878b22d6805/inline0.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-cli-config-74c4aa43f52789a0/inline0.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/inline0.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/hydrate.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/patch_console.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/set_attribute.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-web-eae67878b22d6805/src/js/eval.js" crossorigin="anonymous">
+<link rel="preload" href="/web-rs-4b7fc77d2e4f841a_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm">
 
     <style>
-:root {
-            --bg-base: #f8f4ed;
-            --bg-elevated: #fdfbf7;
-            --bg-subtle: #f0ebe0;
-            --text-primary: #3e3327;
-            --text-secondary: #7a6c5a;
-            --text-tertiary: #a49480;
-            --border-default: #e0d6c5;
-            --border-subtle: #ede4d5;
-            --accent: #6a9b50;
-            --accent-rgb: 106, 155, 80;
-            --accent-soft: rgba(106, 155, 80, 0.1);
-            --radius-sm: 6px;
-            --radius-md: 10px;
-            --radius-lg: 14px;
-            --radius-full: 999px;
-        }
-.dark {
-            --bg-base: #1b1612;
-            --bg-elevated: #241e19;
-            --bg-subtle: #2d2620;
-            --text-primary: #ede4d6;
-            --text-secondary: #b0a290;
-            --text-tertiary: #7d7060;
-            --border-default: #3a3229;
-            --border-subtle: #2a241f;
-            --accent: #78b860;
-            --accent-rgb: 120, 184, 96;
-            --accent-soft: rgba(120, 184, 96, 0.12);
-        }
+.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
 
     </style>
     <style>
-        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
-        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
         .theme-toggle .icon-sun { display: none; }
         .dark .theme-toggle .icon-sun { display: inline; }
         .dark .theme-toggle .icon-moon { display: none; }
@@ -98,50 +66,7 @@
     </script>
 </head>
 <body>
-    <div id="main">
-        <div class="app">
-<div class="navbar-content">
-    <div class="navbar-ui">
-        <div class="navbar-title-wrapper">
-            <h1 class="navbar-title">干徒</h1>
-            <div class="navbar-glow"></div>
-        </div>
-        <div class="navbar-subtitle">这很酷</div>
-    </div>
-</div>
-<div class="navbar-sticky-wrap">
-    <div class="navbar-links">
-        <a class="nav-link nav-active" href="/">首页</a>
-        <a class="nav-link" href="/about">关于</a>
-        <a class="nav-link" href="/tags">书签</a>
-        <a class="nav-link" href="/search">搜索</a>
-        <a class="nav-link" href="/knowledge-graph">图谱</a>
-        <a class="nav-link" href="/ai-summary">AI摘要</a>
-        <div class="nav-item-with-sub">
-            <a class="nav-link" href="/dev">开发</a>
-            <div class="nav-submenu">
-                <a class="nav-sub-link" href="/circle-generator">圆形生成器</a>
-            </div>
-        </div>
-        <a class="nav-icon-btn rss-toggle" href="/rss" title="RSS 订阅" aria-label="RSS 订阅">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"/></svg>
-        </a>
-        <button class="nav-icon-btn theme-toggle" id="prerender-theme-toggle" aria-label="切换主题" title="切换主题">
-            <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
-            <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="16" height="16" fill="currentColor"><path d="M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"/></svg>
-        </button>
-    </div>
-</div>
-        <main class="main-content">
-            <article class="blog-post prerender-article">
-                <h1>Golang学习笔记</h1>
-                <div class="prerender-meta">
-                    <span>2023-08-16</span>
-                    <span>干徒</span>
-                </div>
-                <div class="blog-tags"><span class="blog-tag">Old</span></div>
-                <div class="blog-content">
-<h1><a href="#hello-golang" aria-hidden="true" class="anchor" id="user-content-hello-golang"></a>Hello Golang</h1>
+    <div id="main"><div class="app"><div class="navbar-content"><div class="navbar-ui"><div class="navbar-title-wrapper"><h1 class="navbar-title">干徒</h1><div class="navbar-glow"></div></div><div class="navbar-subtitle">这很酷</div></div></div><div class="navbar-sticky-wrap"><div class="navbar-links"><a href="/" class="nav-link nav-active">首页</a><a href="/about" class="nav-link">关于</a><a href="/tags" class="nav-link">书签</a><a href="/search" class="nav-link">搜索</a><a href="/knowledge-graph" class="nav-link">图谱</a><a href="/ai-summary" class="nav-link">AI摘要</a><div class="nav-item-with-sub"><a href="/dev" class="nav-link">开发</a><button class="nav-sub-trigger"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5 L5 6.5 L8 3.5"></path></svg></button></div><a href="/playground" class="nav-link">操场</a><a href="/test" class="nav-link">测试</a><a href="/rss" class="nav-icon-btn rss-toggle" title="RSS 订阅"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"></path></svg></a><button class="nav-icon-btn theme-toggle"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"></path></svg></button></div></div><main class="main-content" id="main-content"><div class="blog-container"><article class="blog-post" aria-label="文章：Golang学习笔记"><div class="blog-title-wrapper"><div class="blog-title"><h2>Golang学习笔记</h2><span class="blog-category">old-docs</span></div><div class="blog-meta"><span class="blog-date">2023-08-16 17:20:00</span><span class="blog-author">干徒</span></div></div><div class="blog-content"><div><h1 id="user-content-hello-golang">Hello Golang<a href="#hello-golang" aria-label="Link to heading 'Hello Golang'" data-heading-content="Hello Golang" class="anchor"></a></h1>
 <pre><code class="language-go">// Hello Golang
 package main
 
@@ -156,7 +81,7 @@ func main() {
 <p><a href="//gogs.io">Gogs官网</a></p>
 <p>Gitea是Gogs的克隆项目，是属于Gogs的一个分支项目。</p>
 <p>gitea.com gitea.io</p>
-<h1><a href="#golang" aria-hidden="true" class="anchor" id="user-content-golang"></a>Golang</h1>
+<h1 id="user-content-golang">Golang<a href="#golang" aria-label="Link to heading 'Golang'" data-heading-content="Golang" class="anchor"></a></h1>
 <p>天生支持高并发</p>
 <pre><code class="language-go">package main
 
@@ -178,8 +103,8 @@ func main() {
 }
 
 </code></pre>
-<h1><a href="#windows---golang开发环境的搭建" aria-hidden="true" class="anchor" id="user-content-windows---golang开发环境的搭建"></a>Windows - Golang开发环境的搭建</h1>
-<h2><a href="#安装配置sdk软件开发工具包" aria-hidden="true" class="anchor" id="user-content-安装配置sdk软件开发工具包"></a>安装配置SDK（软件开发工具包）</h2>
+<h1 id="user-content-windows---golang开发环境的搭建">Windows - Golang开发环境的搭建<a href="#windows---golang开发环境的搭建" aria-label="Link to heading 'Windows - Golang开发环境的搭建'" data-heading-content="Windows - Golang开发环境的搭建" class="anchor"></a></h1>
+<h2 id="user-content-安装配置sdk软件开发工具包">安装配置SDK（软件开发工具包）<a href="#安装配置sdk软件开发工具包" aria-label="Link to heading '安装配置SDK（软件开发工具包）'" data-heading-content="安装配置SDK（软件开发工具包）" class="anchor"></a></h2>
 <p>go官网: <a href="https://go.dev">https://go.dev</a></p>
 <p>将官网下载的SDK直接解压到本地目录D:\Program Files\go</p>
 <p>在D:\Program Files\go\bin目录cmd，执行go version指令查看版本，如能正常打印版本，则表示安装成功。</p>
@@ -187,7 +112,7 @@ func main() {
 go version go1.19.1 windows/amd64
 
 </code></pre>
-<h2><a href="#环境变量的配置" aria-hidden="true" class="anchor" id="user-content-环境变量的配置"></a>环境变量的配置</h2>
+<h2 id="user-content-环境变量的配置">环境变量的配置<a href="#环境变量的配置" aria-label="Link to heading '环境变量的配置'" data-heading-content="环境变量的配置" class="anchor"></a></h2>
 <table>
 <thead>
 <tr>
@@ -222,9 +147,9 @@ go version go1.19.1 windows/amd64
 </li>
 </ul>
 <p>配置好之后，就可以全局使用go命令</p>
-<h1><a href="#基础" aria-hidden="true" class="anchor" id="user-content-基础"></a>*基础</h1>
-<h1><a href="#第一个go程序" aria-hidden="true" class="anchor" id="user-content-第一个go程序"></a>第一个go程序</h1>
-<h2><a href="#目录" aria-hidden="true" class="anchor" id="user-content-目录"></a>目录</h2>
+<h1 id="user-content-基础">*基础<a href="#基础" aria-label="Link to heading '*基础'" data-heading-content="*基础" class="anchor"></a></h1>
+<h1 id="user-content-第一个go程序">第一个go程序<a href="#第一个go程序" aria-label="Link to heading '第一个go程序'" data-heading-content="第一个go程序" class="anchor"></a></h1>
+<h2 id="user-content-目录">目录<a href="#目录" aria-label="Link to heading '目录'" data-heading-content="目录" class="anchor"></a></h2>
 <pre><code class="language-sh"> GoProject
  └── src
      └── go_code
@@ -236,7 +161,7 @@ go version go1.19.1 windows/amd64
          └── project02
 
 </code></pre>
-<h2><a href="#程序" aria-hidden="true" class="anchor" id="user-content-程序"></a>程序</h2>
+<h2 id="user-content-程序">程序<a href="#程序" aria-label="Link to heading '程序'" data-heading-content="程序" class="anchor"></a></h2>
 <pre><code class="language-go">// hello.go
 
 package main
@@ -257,14 +182,14 @@ hello.exe # hello go
 <pre><code class="language-sh">go build -o myhello.exe hello.go
 
 </code></pre>
-<h2><a href="#注意" aria-hidden="true" class="anchor" id="user-content-注意"></a>注意</h2>
+<h2 id="user-content-注意">注意<a href="#注意" aria-label="Link to heading '注意'" data-heading-content="注意" class="anchor"></a></h2>
 <ul>
 <li>在Go语言中，每个文件都必须归属一个包</li>
 <li>定义的包或变量、导入的包，必须使用，否则报错</li>
 <li>代码结尾不需要分号，多条语句不要写在同一行</li>
 <li>严格区分大小写</li>
 </ul>
-<h1><a href="#转义字符" aria-hidden="true" class="anchor" id="user-content-转义字符"></a>转义字符</h1>
+<h1 id="user-content-转义字符">转义字符<a href="#转义字符" aria-label="Link to heading '转义字符'" data-heading-content="转义字符" class="anchor"></a></h1>
 <table>
 <thead>
 <tr>
@@ -295,7 +220,7 @@ hello.exe # hello go
 </tr>
 </tbody>
 </table>
-<h1><a href="#数据类型" aria-hidden="true" class="anchor" id="user-content-数据类型"></a>数据类型</h1>
+<h1 id="user-content-数据类型">数据类型<a href="#数据类型" aria-label="Link to heading '数据类型'" data-heading-content="数据类型" class="anchor"></a></h1>
 <p>先背诵Java的数据类型：</p>
 <table>
 <thead>
@@ -407,8 +332,8 @@ hello.exe # hello go
 </tr>
 </tbody>
 </table>
-<h1><a href="#变量声明" aria-hidden="true" class="anchor" id="user-content-变量声明"></a>变量声明</h1>
-<h2><a href="#四种变量的声明方式" aria-hidden="true" class="anchor" id="user-content-四种变量的声明方式"></a>四种变量的声明方式</h2>
+<h1 id="user-content-变量声明">变量声明<a href="#变量声明" aria-label="Link to heading '变量声明'" data-heading-content="变量声明" class="anchor"></a></h1>
+<h2 id="user-content-四种变量的声明方式">四种变量的声明方式<a href="#四种变量的声明方式" aria-label="Link to heading '四种变量的声明方式'" data-heading-content="四种变量的声明方式" class="anchor"></a></h2>
 <pre><code class="language-go">package main
 
 import (
@@ -453,7 +378,7 @@ func main() {
 
 </code></pre>
 <p>方法一、方法二、方法三是可以声明全局变量的</p>
-<h2><a href="#声明多个变量" aria-hidden="true" class="anchor" id="user-content-声明多个变量"></a>声明多个变量</h2>
+<h2 id="user-content-声明多个变量">声明多个变量<a href="#声明多个变量" aria-label="Link to heading '声明多个变量'" data-heading-content="声明多个变量" class="anchor"></a></h2>
 <pre><code class="language-go">package main
 
 import (
@@ -475,8 +400,8 @@ func main() {
 }
 
 </code></pre>
-<h2><a href="#变量的内置-pair-结构详细说明" aria-hidden="true" class="anchor" id="user-content-变量的内置-pair-结构详细说明"></a>变量的内置 pair 结构详细说明</h2>
-<h1><a href="#常量声明" aria-hidden="true" class="anchor" id="user-content-常量声明"></a>常量声明</h1>
+<h2 id="user-content-变量的内置-pair-结构详细说明">变量的内置 pair 结构详细说明<a href="#变量的内置-pair-结构详细说明" aria-label="Link to heading '变量的内置 pair 结构详细说明'" data-heading-content="变量的内置 pair 结构详细说明" class="anchor"></a></h2>
+<h1 id="user-content-常量声明">常量声明<a href="#常量声明" aria-label="Link to heading '常量声明'" data-heading-content="常量声明" class="anchor"></a></h1>
 <pre><code class="language-go">package main
 
 import (
@@ -489,7 +414,7 @@ func main() {
 }
 
 </code></pre>
-<h2><a href="#iota" aria-hidden="true" class="anchor" id="user-content-iota"></a>IOTA</h2>
+<h2 id="user-content-iota">IOTA<a href="#iota" aria-label="Link to heading 'IOTA'" data-heading-content="IOTA" class="anchor"></a></h2>
 <p>iota只能出现在const定义的变量中</p>
 <pre><code class="language-go">package main
 
@@ -532,7 +457,7 @@ func main() {
 }
 
 </code></pre>
-<h1><a href="#位运算符" aria-hidden="true" class="anchor" id="user-content-位运算符"></a>位运算符</h1>
+<h1 id="user-content-位运算符">位运算符<a href="#位运算符" aria-label="Link to heading '位运算符'" data-heading-content="位运算符" class="anchor"></a></h1>
 <p>&lt;&lt; 左移，&gt;&gt; 右移</p>
 <pre><code class="language-go">package main
 
@@ -555,8 +480,8 @@ func main() {
 }
 
 </code></pre>
-<h1><a href="#函数" aria-hidden="true" class="anchor" id="user-content-函数"></a>函数</h1>
-<h2><a href="#多返回值" aria-hidden="true" class="anchor" id="user-content-多返回值"></a>多返回值</h2>
+<h1 id="user-content-函数">函数<a href="#函数" aria-label="Link to heading '函数'" data-heading-content="函数" class="anchor"></a></h1>
+<h2 id="user-content-多返回值">多返回值<a href="#多返回值" aria-label="Link to heading '多返回值'" data-heading-content="多返回值" class="anchor"></a></h2>
 <pre><code class="language-go">package main
 
 import (
@@ -608,7 +533,7 @@ func main() {
 }
 
 </code></pre>
-<h1><a href="#import导包路径问题与init方法调用流程" aria-hidden="true" class="anchor" id="user-content-import导包路径问题与init方法调用流程"></a>import导包路径问题与init方法调用流程</h1>
+<h1 id="user-content-import导包路径问题与init方法调用流程">import导包路径问题与init方法调用流程<a href="#import导包路径问题与init方法调用流程" aria-label="Link to heading 'import导包路径问题与init方法调用流程'" data-heading-content="import导包路径问题与init方法调用流程" class="anchor"></a></h1>
 <p>init函数一般先于main函数前执行，可以在init中进行初始化操作</p>
 <pre><code class="language-go">package main
 
@@ -621,7 +546,7 @@ func main() {
 }
 
 </code></pre>
-<h1><a href="#import匿名及别名导包方式" aria-hidden="true" class="anchor" id="user-content-import匿名及别名导包方式"></a>import匿名及别名导包方式</h1>
+<h1 id="user-content-import匿名及别名导包方式">import匿名及别名导包方式<a href="#import匿名及别名导包方式" aria-label="Link to heading 'import匿名及别名导包方式'" data-heading-content="import匿名及别名导包方式" class="anchor"></a></h1>
 <ul>
 <li>
 <p><code>_</code>为匿名别名，意思为导入了包，并且起了匿名别名，但是不使用也不会报错，会调用匿名导入包的init函数</p>
@@ -667,7 +592,7 @@ func main() {
 }
 
 </code></pre>
-<h1><a href="#指针" aria-hidden="true" class="anchor" id="user-content-指针"></a>指针</h1>
+<h1 id="user-content-指针">指针<a href="#指针" aria-label="Link to heading '指针'" data-heading-content="指针" class="anchor"></a></h1>
 <p>引子</p>
 <pre><code class="language-go">package main
 
@@ -745,7 +670,7 @@ func main() {
 }
 
 </code></pre>
-<h2><a href="#二级指针" aria-hidden="true" class="anchor" id="user-content-二级指针"></a>二级指针</h2>
+<h2 id="user-content-二级指针">二级指针<a href="#二级指针" aria-label="Link to heading '二级指针'" data-heading-content="二级指针" class="anchor"></a></h2>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -768,7 +693,7 @@ func main() {
 }
 
 </code></pre>
-<h1><a href="#defer语句调用顺序" aria-hidden="true" class="anchor" id="user-content-defer语句调用顺序"></a>defer语句调用顺序</h1>
+<h1 id="user-content-defer语句调用顺序">defer语句调用顺序<a href="#defer语句调用顺序" aria-label="Link to heading 'defer语句调用顺序'" data-heading-content="defer语句调用顺序" class="anchor"></a></h1>
 <p>defer定义的语句放在函数结束前进行触发，比如go语言中打开一个文件，需要最后关闭，可以直接添加defer语句，进行关闭</p>
 <p>类似于Java中try catch finally 中的finally，Java中的finally无论程序进入到try还是catch中，都最后执行finall中的语句</p>
 <pre><code class="language-go">package main
@@ -819,8 +744,8 @@ func main() {
 
 </code></pre>
 <p>可以看到结果，defer还是在最后执行</p>
-<h1><a href="#数组与动态数组的区别" aria-hidden="true" class="anchor" id="user-content-数组与动态数组的区别"></a>数组与动态数组的区别</h1>
-<h2><a href="#定义数组语法" aria-hidden="true" class="anchor" id="user-content-定义数组语法"></a>定义数组语法</h2>
+<h1 id="user-content-数组与动态数组的区别">数组与动态数组的区别<a href="#数组与动态数组的区别" aria-label="Link to heading '数组与动态数组的区别'" data-heading-content="数组与动态数组的区别" class="anchor"></a></h1>
+<h2 id="user-content-定义数组语法">定义数组语法<a href="#定义数组语法" aria-label="Link to heading '定义数组语法'" data-heading-content="定义数组语法" class="anchor"></a></h2>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -846,7 +771,7 @@ func main() {
 }
 
 </code></pre>
-<h2><a href="#值传递" aria-hidden="true" class="anchor" id="user-content-值传递"></a>值传递</h2>
+<h2 id="user-content-值传递">值传递<a href="#值传递" aria-label="Link to heading '值传递'" data-heading-content="值传递" class="anchor"></a></h2>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -868,7 +793,7 @@ func main() {
 }
 
 </code></pre>
-<h2><a href="#引用传递" aria-hidden="true" class="anchor" id="user-content-引用传递"></a>引用传递</h2>
+<h2 id="user-content-引用传递">引用传递<a href="#引用传递" aria-label="Link to heading '引用传递'" data-heading-content="引用传递" class="anchor"></a></h2>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -892,7 +817,7 @@ func main() {
 </code></pre>
 <p>引用传递在Golang中被称为切片slice</p>
 <p>动态数组在传递上是引用传递，而且不同元素长度的动态数组他们的形参是一致</p>
-<h2><a href="#数组切割" aria-hidden="true" class="anchor" id="user-content-数组切割"></a>数组切割</h2>
+<h2 id="user-content-数组切割">数组切割<a href="#数组切割" aria-label="Link to heading '数组切割'" data-heading-content="数组切割" class="anchor"></a></h2>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -905,7 +830,7 @@ func main() {
 }
 
 </code></pre>
-<h1><a href="#切片" aria-hidden="true" class="anchor" id="user-content-切片"></a>切片</h1>
+<h1 id="user-content-切片">切片<a href="#切片" aria-label="Link to heading '切片'" data-heading-content="切片" class="anchor"></a></h1>
 <p>切片的初始化方式有以下几种</p>
 <pre><code class="language-go">var nums []int // 值
 nums := []int{1, 2, 3} // 值
@@ -913,10 +838,10 @@ nums := make([]int, 0, 0) // 值
 nums := new([]int) // 指针
 
 </code></pre>
-<h2><a href="#slice切片的4种声明定义方式" aria-hidden="true" class="anchor" id="user-content-slice切片的4种声明定义方式"></a>slice切片的4种声明定义方式</h2>
+<h2 id="user-content-slice切片的4种声明定义方式">slice切片的4种声明定义方式<a href="#slice切片的4种声明定义方式" aria-label="Link to heading 'slice切片的4种声明定义方式'" data-heading-content="slice切片的4种声明定义方式" class="anchor"></a></h2>
 <p>Go 语言切片是对数组的抽象。</p>
 <p>Go 数组的长度不可改变，在特定场景中这样的集合就不太适用，Go 中提供了一种灵活，功能强悍的内置类型切片(&quot;动态数组&quot;)，与数组相比切片的长度是不固定的，可以追加元素，在追加时可能使切片的容量增大。</p>
-<h3><a href="#第一种" aria-hidden="true" class="anchor" id="user-content-第一种"></a>第一种</h3>
+<h3 id="user-content-第一种">第一种<a href="#第一种" aria-label="Link to heading '第一种'" data-heading-content="第一种" class="anchor"></a></h3>
 <p>声明slice1是一个切片，并且初始化默认值是：1，2，3。切片长度len是3</p>
 <pre><code class="language-go">package main
 
@@ -929,7 +854,7 @@ func main() {
 
 </code></pre>
 <p>其中<code>%d</code>为切片长度的占位符，<code>%v</code>则是打印切片的详细信息</p>
-<h3><a href="#第二种" aria-hidden="true" class="anchor" id="user-content-第二种"></a>第二种</h3>
+<h3 id="user-content-第二种">第二种<a href="#第二种" aria-label="Link to heading '第二种'" data-heading-content="第二种" class="anchor"></a></h3>
 <p>声明slice1是一个切片，但是并没有给slice1分配空间</p>
 <pre><code class="language-go">package main
 
@@ -963,7 +888,7 @@ func main() {
 }
 
 </code></pre>
-<h3><a href="#第三种" aria-hidden="true" class="anchor" id="user-content-第三种"></a>第三种</h3>
+<h3 id="user-content-第三种">第三种<a href="#第三种" aria-label="Link to heading '第三种'" data-heading-content="第三种" class="anchor"></a></h3>
 <p>声明slice1是一个切片，同时给slice1分配3个空间，初始化值为0</p>
 <pre><code class="language-go">package main
 
@@ -1003,7 +928,7 @@ func main() {
 
 </code></pre>
 <p>其中 <strong>长度</strong> 永远 <em>少于等于</em> <strong>容量</strong></p>
-<h3><a href="#第四种" aria-hidden="true" class="anchor" id="user-content-第四种"></a>第四种</h3>
+<h3 id="user-content-第四种">第四种<a href="#第四种" aria-label="Link to heading '第四种'" data-heading-content="第四种" class="anchor"></a></h3>
 <p>第四种是指针</p>
 <pre><code class="language-go">package main
 
@@ -1016,8 +941,8 @@ func main() {
 
 </code></pre>
 <p>用法暂不可知</p>
-<h2><a href="#slice切片容量追加与截取" aria-hidden="true" class="anchor" id="user-content-slice切片容量追加与截取"></a>slice切片容量追加与截取</h2>
-<h3><a href="#切片追加" aria-hidden="true" class="anchor" id="user-content-切片追加"></a>切片追加</h3>
+<h2 id="user-content-slice切片容量追加与截取">slice切片容量追加与截取<a href="#slice切片容量追加与截取" aria-label="Link to heading 'slice切片容量追加与截取'" data-heading-content="slice切片容量追加与截取" class="anchor"></a></h2>
+<h3 id="user-content-切片追加">切片追加<a href="#切片追加" aria-label="Link to heading '切片追加'" data-heading-content="切片追加" class="anchor"></a></h3>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -1052,7 +977,7 @@ func main() {
 }
 
 </code></pre>
-<h3><a href="#截取" aria-hidden="true" class="anchor" id="user-content-截取"></a>截取</h3>
+<h3 id="user-content-截取">截取<a href="#截取" aria-label="Link to heading '截取'" data-heading-content="截取" class="anchor"></a></h3>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -1092,7 +1017,7 @@ func main() {
 </tr>
 </tbody>
 </table>
-<h3><a href="#copy" aria-hidden="true" class="anchor" id="user-content-copy"></a>copy</h3>
+<h3 id="user-content-copy">copy<a href="#copy" aria-label="Link to heading 'copy'" data-heading-content="copy" class="anchor"></a></h3>
 <p>以下类似于js中的深拷贝/浅拷贝</p>
 <pre><code class="language-go">package main
 
@@ -1129,9 +1054,9 @@ func main() {
 
 </code></pre>
 <p>以上代码s1和s没有关联</p>
-<h1><a href="#map-集合" aria-hidden="true" class="anchor" id="user-content-map-集合"></a>Map 集合</h1>
+<h1 id="user-content-map-集合">Map 集合<a href="#map-集合" aria-label="Link to heading 'Map 集合'" data-heading-content="Map 集合" class="anchor"></a></h1>
 <p>Map 是一种无序的键值对的集合。</p>
-<h2><a href="#语法" aria-hidden="true" class="anchor" id="user-content-语法"></a>语法</h2>
+<h2 id="user-content-语法">语法<a href="#语法" aria-label="Link to heading '语法'" data-heading-content="语法" class="anchor"></a></h2>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -1204,8 +1129,8 @@ func main() {
 }
 
 </code></pre>
-<h2><a href="#操作map" aria-hidden="true" class="anchor" id="user-content-操作map"></a>操作map</h2>
-<h3><a href="#获取元素" aria-hidden="true" class="anchor" id="user-content-获取元素"></a>获取元素</h3>
+<h2 id="user-content-操作map">操作map<a href="#操作map" aria-label="Link to heading '操作map'" data-heading-content="操作map" class="anchor"></a></h2>
+<h3 id="user-content-获取元素">获取元素<a href="#获取元素" aria-label="Link to heading '获取元素'" data-heading-content="获取元素" class="anchor"></a></h3>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -1225,7 +1150,7 @@ func main() {
 }
 
 </code></pre>
-<h3><a href="#修改元素" aria-hidden="true" class="anchor" id="user-content-修改元素"></a>修改元素</h3>
+<h3 id="user-content-修改元素">修改元素<a href="#修改元素" aria-label="Link to heading '修改元素'" data-heading-content="修改元素" class="anchor"></a></h3>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -1243,7 +1168,7 @@ func main() {
 }
 
 </code></pre>
-<h3><a href="#获取-map-的长度" aria-hidden="true" class="anchor" id="user-content-获取-map-的长度"></a>获取 Map 的长度</h3>
+<h3 id="user-content-获取-map-的长度">获取 Map 的长度<a href="#获取-map-的长度" aria-label="Link to heading '获取 Map 的长度'" data-heading-content="获取 Map 的长度" class="anchor"></a></h3>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -1261,7 +1186,7 @@ func main() {
 }
 
 </code></pre>
-<h3><a href="#遍历-map" aria-hidden="true" class="anchor" id="user-content-遍历-map"></a>遍历 Map</h3>
+<h3 id="user-content-遍历-map">遍历 Map<a href="#遍历-map" aria-label="Link to heading '遍历 Map'" data-heading-content="遍历 Map" class="anchor"></a></h3>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -1284,7 +1209,7 @@ func main() {
 }
 
 </code></pre>
-<h3><a href="#删除元素" aria-hidden="true" class="anchor" id="user-content-删除元素"></a>删除元素</h3>
+<h3 id="user-content-删除元素">删除元素<a href="#删除元素" aria-label="Link to heading '删除元素'" data-heading-content="删除元素" class="anchor"></a></h3>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -1308,7 +1233,7 @@ func main() {
 }
 
 </code></pre>
-<h2><a href="#map的基本使用方式" aria-hidden="true" class="anchor" id="user-content-map的基本使用方式"></a>map的基本使用方式</h2>
+<h2 id="user-content-map的基本使用方式">map的基本使用方式<a href="#map的基本使用方式" aria-label="Link to heading 'map的基本使用方式'" data-heading-content="map的基本使用方式" class="anchor"></a></h2>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -1378,7 +1303,7 @@ func main() {
 }
 
 </code></pre>
-<h2><a href="#查询map种是否存在某个元素" aria-hidden="true" class="anchor" id="user-content-查询map种是否存在某个元素"></a>查询map种是否存在某个元素</h2>
+<h2 id="user-content-查询map种是否存在某个元素">查询map种是否存在某个元素<a href="#查询map种是否存在某个元素" aria-label="Link to heading '查询map种是否存在某个元素'" data-heading-content="查询map种是否存在某个元素" class="anchor"></a></h2>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -1400,7 +1325,7 @@ func main() {
 }
 
 </code></pre>
-<h1><a href="#struct-结构体" aria-hidden="true" class="anchor" id="user-content-struct-结构体"></a>struct 结构体</h1>
+<h1 id="user-content-struct-结构体">struct 结构体<a href="#struct-结构体" aria-label="Link to heading 'struct 结构体'" data-heading-content="struct 结构体" class="anchor"></a></h1>
 <p>基本定义与使用</p>
 <pre><code class="language-go">package main
 
@@ -1486,8 +1411,8 @@ func main() {
 */
 
 </code></pre>
-<h1><a href="#面向对象" aria-hidden="true" class="anchor" id="user-content-面向对象"></a>面向对象</h1>
-<h2><a href="#类的表示" aria-hidden="true" class="anchor" id="user-content-类的表示"></a>类的表示</h2>
+<h1 id="user-content-面向对象">面向对象<a href="#面向对象" aria-label="Link to heading '面向对象'" data-heading-content="面向对象" class="anchor"></a></h1>
+<h2 id="user-content-类的表示">类的表示<a href="#类的表示" aria-label="Link to heading '类的表示'" data-heading-content="类的表示" class="anchor"></a></h2>
 <p>go 语言中，类的表示是通过结构体进行的</p>
 <pre><code class="language-go">type Hero struct {
 	Name string
@@ -1496,7 +1421,7 @@ func main() {
 }
 
 </code></pre>
-<h2><a href="#封装" aria-hidden="true" class="anchor" id="user-content-封装"></a>封装</h2>
+<h2 id="user-content-封装">封装<a href="#封装" aria-label="Link to heading '封装'" data-heading-content="封装" class="anchor"></a></h2>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -1620,7 +1545,7 @@ type hero struct { // 私有类
 
 </code></pre>
 <p>类名、属性名、方法名 首字母大写表示对外（其它包）可以访问，否则只能够在本包内访问。</p>
-<h2><a href="#继承" aria-hidden="true" class="anchor" id="user-content-继承"></a>继承</h2>
+<h2 id="user-content-继承">继承<a href="#继承" aria-label="Link to heading '继承'" data-heading-content="继承" class="anchor"></a></h2>
 <p>go中的类的继承是在结构体中写入需要继承的类名即可</p>
 <pre><code class="language-go">// 父类
 type Human struct {
@@ -1703,8 +1628,8 @@ SuperMan.Fly()...
 */
 
 </code></pre>
-<h2><a href="#多态" aria-hidden="true" class="anchor" id="user-content-多态"></a>多态</h2>
-<h3><a href="#接口的定义" aria-hidden="true" class="anchor" id="user-content-接口的定义"></a>接口的定义</h3>
+<h2 id="user-content-多态">多态<a href="#多态" aria-label="Link to heading '多态'" data-heading-content="多态" class="anchor"></a></h2>
+<h3 id="user-content-接口的定义">接口的定义<a href="#接口的定义" aria-label="Link to heading '接口的定义'" data-heading-content="接口的定义" class="anchor"></a></h3>
 <pre><code class="language-go">// 本质是一个指针
 type AnimalIF interface {
 	Sleep()
@@ -1713,7 +1638,7 @@ type AnimalIF interface {
 }
 
 </code></pre>
-<h3><a href="#多态-1" aria-hidden="true" class="anchor" id="user-content-多态-1"></a>多态</h3>
+<h3 id="user-content-多态-1">多态<a href="#多态-1" aria-label="Link to heading '多态'" data-heading-content="多态" class="anchor"></a></h3>
 <p>一个类实现一个接口，必须将接口中的方法都实现</p>
 <p>Golang 中，类实现了接口中的所有方法，就实现了这个接口。</p>
 <pre><code class="language-go">package main
@@ -1784,7 +1709,7 @@ func main() {
 </code></pre>
 <p>以上就通过接口，实现了go语言中的多态。父类型引用指向子类型对象。</p>
 <p>这些都和Java中的多态机制的概念和作用基本保持一致，只是实现方式有了区别。</p>
-<h3><a href="#interface-空接口通用万能类型" aria-hidden="true" class="anchor" id="user-content-interface-空接口通用万能类型"></a>interface 空接口通用万能类型</h3>
+<h3 id="user-content-interface-空接口通用万能类型">interface 空接口通用万能类型<a href="#interface-空接口通用万能类型" aria-label="Link to heading 'interface 空接口通用万能类型'" data-heading-content="interface 空接口通用万能类型" class="anchor"></a></h3>
 <p>空接口：<code>interface{}</code></p>
 <p>int、string、float32、float64、struct... 都实现了 <code>interface{}</code>，根据多态机制，<code>interface{}</code> 类型 引用 任意的数据类型。（这就类似于Java中的 Object 对象）</p>
 <pre><code class="language-go">package main
@@ -1822,7 +1747,7 @@ func main() {
 }
 
 </code></pre>
-<h3><a href="#interface-类型断言机制" aria-hidden="true" class="anchor" id="user-content-interface-类型断言机制"></a>interface 类型断言机制</h3>
+<h3 id="user-content-interface-类型断言机制">interface 类型断言机制<a href="#interface-类型断言机制" aria-label="Link to heading 'interface 类型断言机制'" data-heading-content="interface 类型断言机制" class="anchor"></a></h3>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -1839,8 +1764,8 @@ func main() {
 
 </code></pre>
 <p>以上代码只有当 ok 为 true 的时候，value 才能有值。</p>
-<h2><a href="#反射" aria-hidden="true" class="anchor" id="user-content-反射"></a>反射</h2>
-<h3><a href="#变量结构" aria-hidden="true" class="anchor" id="user-content-变量结构"></a>变量结构</h3>
+<h2 id="user-content-反射">反射<a href="#反射" aria-label="Link to heading '反射'" data-heading-content="反射" class="anchor"></a></h2>
+<h3 id="user-content-变量结构">变量结构<a href="#变量结构" aria-label="Link to heading '变量结构'" data-heading-content="变量结构" class="anchor"></a></h3>
 <p>变量是由 type 和 value 组成，type 和 value 统称为 pair，type又有 static type（静态类型：int、string...） 和 concrete type（具体类型）。</p>
 <pre><code class="language-go">package main
 
@@ -1898,7 +1823,7 @@ func main() {
 }
 
 </code></pre>
-<h3><a href="#reflect包" aria-hidden="true" class="anchor" id="user-content-reflect包"></a>reflect包</h3>
+<h3 id="user-content-reflect包">reflect包<a href="#reflect包" aria-label="Link to heading 'reflect包'" data-heading-content="reflect包" class="anchor"></a></h3>
 <ul>
 <li><code>func ValueOf(i interface{}) Value {...}</code> ValueOf用来获取输入参数接口中的数据的值，如果接口为空则返回0</li>
 <li><code>func TypeOf(i interface{}) Type {...}</code> TypeOf 用来动态获取输入参数接口中的值的类型，如果接口为空则返回nil</li>
@@ -2078,7 +2003,7 @@ func main() {
 
 </code></pre>
 <p>可以看出通过Printf打印出来的变量类型是有局限性的，最重要的是，Printf只能用来打印，如果想要在语句中用到变量类型，还是得用reflect包进行反射。</p>
-<h3><a href="#解析结构体标签tag" aria-hidden="true" class="anchor" id="user-content-解析结构体标签tag"></a>解析结构体标签Tag</h3>
+<h3 id="user-content-解析结构体标签tag">解析结构体标签Tag<a href="#解析结构体标签tag" aria-label="Link to heading '解析结构体标签Tag'" data-heading-content="解析结构体标签Tag" class="anchor"></a></h3>
 <pre><code class="language-go">package main
 
 import (
@@ -2149,7 +2074,7 @@ func main() {
 }
 
 </code></pre>
-<h3><a href="#结构体标签在json中的应用" aria-hidden="true" class="anchor" id="user-content-结构体标签在json中的应用"></a>结构体标签在json中的应用</h3>
+<h3 id="user-content-结构体标签在json中的应用">结构体标签在json中的应用<a href="#结构体标签在json中的应用" aria-label="Link to heading '结构体标签在json中的应用'" data-heading-content="结构体标签在json中的应用" class="anchor"></a></h3>
 <pre><code class="language-go">package main
 
 import (
@@ -2217,7 +2142,7 @@ func main() {
 }
 
 </code></pre>
-<h1><a href="#range-范围" aria-hidden="true" class="anchor" id="user-content-range-范围"></a>Range 范围</h1>
+<h1 id="user-content-range-范围">Range 范围<a href="#range-范围" aria-label="Link to heading 'Range 范围'" data-heading-content="Range 范围" class="anchor"></a></h1>
 <p>Go 语言中 range 关键字用于 for 循环中迭代数组(array)、切片(slice)、通道(channel)或集合(map)的元素。在数组和切片中它返回元素的索引和索引对应的值，在集合中返回 key-value 对。</p>
 <p>for 循环的 range 格式可以对 slice、map、数组、字符串等进行迭代循环。格式如下：</p>
 <pre><code class="language-go">arr := []string{&quot;aaa&quot;, &quot;bbb&quot;, &quot;ccc&quot;}
@@ -2318,7 +2243,7 @@ b -&gt; banana
 */
 
 </code></pre>
-<h2><a href="#range-与-通道" aria-hidden="true" class="anchor" id="user-content-range-与-通道"></a>range 与 通道</h2>
+<h2 id="user-content-range-与-通道">range 与 通道<a href="#range-与-通道" aria-label="Link to heading 'range 与 通道'" data-heading-content="range 与 通道" class="anchor"></a></h2>
 <pre><code class="language-go">package main
 
 import (
@@ -2352,9 +2277,9 @@ func main() {
 }
 
 </code></pre>
-<h1><a href="#递归函数" aria-hidden="true" class="anchor" id="user-content-递归函数"></a>递归函数</h1>
+<h1 id="user-content-递归函数">递归函数<a href="#递归函数" aria-label="Link to heading '递归函数'" data-heading-content="递归函数" class="anchor"></a></h1>
 <p>递归操作就是自己调用自己，但是一定要设置退出条件，否则将会一直执行，导致死循环。</p>
-<h2><a href="#阶乘例子" aria-hidden="true" class="anchor" id="user-content-阶乘例子"></a>阶乘（例子）</h2>
+<h2 id="user-content-阶乘例子">阶乘（例子）<a href="#阶乘例子" aria-label="Link to heading '阶乘（例子）'" data-heading-content="阶乘（例子）" class="anchor"></a></h2>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -2373,7 +2298,7 @@ func main() {
 }
 
 </code></pre>
-<h2><a href="#斐波那契数列" aria-hidden="true" class="anchor" id="user-content-斐波那契数列"></a>斐波那契数列</h2>
+<h2 id="user-content-斐波那契数列">斐波那契数列<a href="#斐波那契数列" aria-label="Link to heading '斐波那契数列'" data-heading-content="斐波那契数列" class="anchor"></a></h2>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -2393,8 +2318,8 @@ func main() {
 }
 
 </code></pre>
-<h1><a href="#类型转换" aria-hidden="true" class="anchor" id="user-content-类型转换"></a>类型转换</h1>
-<h2><a href="#数值类型转换" aria-hidden="true" class="anchor" id="user-content-数值类型转换"></a>数值类型转换</h2>
+<h1 id="user-content-类型转换">类型转换<a href="#类型转换" aria-label="Link to heading '类型转换'" data-heading-content="类型转换" class="anchor"></a></h1>
+<h2 id="user-content-数值类型转换">数值类型转换<a href="#数值类型转换" aria-label="Link to heading '数值类型转换'" data-heading-content="数值类型转换" class="anchor"></a></h2>
 <pre><code class="language-go">var a int = 10
 var b float64 = float64(a)
 
@@ -2427,8 +2352,8 @@ func main() {
 }
 
 </code></pre>
-<h2><a href="#字符串类型转换" aria-hidden="true" class="anchor" id="user-content-字符串类型转换"></a>字符串类型转换</h2>
-<h3><a href="#字符串转换为整型" aria-hidden="true" class="anchor" id="user-content-字符串转换为整型"></a>字符串转换为整型</h3>
+<h2 id="user-content-字符串类型转换">字符串类型转换<a href="#字符串类型转换" aria-label="Link to heading '字符串类型转换'" data-heading-content="字符串类型转换" class="anchor"></a></h2>
+<h3 id="user-content-字符串转换为整型">字符串转换为整型<a href="#字符串转换为整型" aria-label="Link to heading '字符串转换为整型'" data-heading-content="字符串转换为整型" class="anchor"></a></h3>
 <p><code>strconv.Atoi</code> 函数可以将整数形式的string字符串，转换成int类型。</p>
 <p><code>strconv.Atoi</code> 函数返回两个参数，第一个参数为转换后的数据，第二个参数为可能发生错误的错误信息，我们可以使用空白标识符 <strong>_</strong> 来忽略这个错误。</p>
 <pre><code class="language-go">package main
@@ -2450,7 +2375,7 @@ func main() {
 }
 
 </code></pre>
-<h3><a href="#整型转换为字符串" aria-hidden="true" class="anchor" id="user-content-整型转换为字符串"></a>整型转换为字符串</h3>
+<h3 id="user-content-整型转换为字符串">整型转换为字符串<a href="#整型转换为字符串" aria-label="Link to heading '整型转换为字符串'" data-heading-content="整型转换为字符串" class="anchor"></a></h3>
 <p><code>strconv.Itoa</code> 函数可以将int类型的整型数字，转换成string类型的字符串。</p>
 <p><code>strconv.Itoa</code> 函数返回一个参数，参数为转换后的数据。</p>
 <pre><code class="language-go">package main
@@ -2467,7 +2392,7 @@ func main() {
 }
 
 </code></pre>
-<h3><a href="#字符串转换为浮点型" aria-hidden="true" class="anchor" id="user-content-字符串转换为浮点型"></a>字符串转换为浮点型</h3>
+<h3 id="user-content-字符串转换为浮点型">字符串转换为浮点型<a href="#字符串转换为浮点型" aria-label="Link to heading '字符串转换为浮点型'" data-heading-content="字符串转换为浮点型" class="anchor"></a></h3>
 <p><code>strconv.ParseFloat</code> 函数返回两个参数，第一个参数为转换后的数据，第二个参数为可能发生错误的错误信息，我们可以使用空白标识符 <strong>_</strong> 来忽略这个错误。</p>
 <pre><code class="language-go">package main
 
@@ -2487,7 +2412,7 @@ func main() {
 }
 
 </code></pre>
-<h3><a href="#浮点型转换为字符串" aria-hidden="true" class="anchor" id="user-content-浮点型转换为字符串"></a>浮点型转换为字符串</h3>
+<h3 id="user-content-浮点型转换为字符串">浮点型转换为字符串<a href="#浮点型转换为字符串" aria-label="Link to heading '浮点型转换为字符串'" data-heading-content="浮点型转换为字符串" class="anchor"></a></h3>
 <pre><code class="language-go">package main
 
 import (
@@ -2502,7 +2427,7 @@ func main() {
 }
 
 </code></pre>
-<h2><a href="#接口类型转换" aria-hidden="true" class="anchor" id="user-content-接口类型转换"></a>接口类型转换</h2>
+<h2 id="user-content-接口类型转换">接口类型转换<a href="#接口类型转换" aria-label="Link to heading '接口类型转换'" data-heading-content="接口类型转换" class="anchor"></a></h2>
 <p>接口类型转换有两种情况：<code>类型断言</code>和<code>类型转换</code>。</p>
 <pre><code class="language-go">value.(type) 
 或者 
@@ -2526,7 +2451,7 @@ func main() {
 }
 
 </code></pre>
-<h1><a href="#接口" aria-hidden="true" class="anchor" id="user-content-接口"></a>接口</h1>
+<h1 id="user-content-接口">接口<a href="#接口" aria-label="Link to heading '接口'" data-heading-content="接口" class="anchor"></a></h1>
 <p>实例</p>
 <pre><code class="language-go">package main
 
@@ -2589,7 +2514,7 @@ errorMsg is:
 
 </code></pre>
 <p>golang中的接口，可以用于实现多态</p>
-<h1><a href="#错误处理" aria-hidden="true" class="anchor" id="user-content-错误处理"></a>错误处理</h1>
+<h1 id="user-content-错误处理">错误处理<a href="#错误处理" aria-label="Link to heading '错误处理'" data-heading-content="错误处理" class="anchor"></a></h1>
 <p>例子</p>
 <pre><code class="language-go">package main
 
@@ -2642,9 +2567,9 @@ func main() {
 }
 
 </code></pre>
-<h1><a href="#高阶" aria-hidden="true" class="anchor" id="user-content-高阶"></a>*高阶</h1>
-<h1><a href="#并发go" aria-hidden="true" class="anchor" id="user-content-并发go"></a>并发（go）</h1>
-<h2><a href="#基本使用" aria-hidden="true" class="anchor" id="user-content-基本使用"></a>基本使用</h2>
+<h1 id="user-content-高阶">*高阶<a href="#高阶" aria-label="Link to heading '*高阶'" data-heading-content="*高阶" class="anchor"></a></h1>
+<h1 id="user-content-并发go">并发（go）<a href="#并发go" aria-label="Link to heading '并发（go）'" data-heading-content="并发（go）" class="anchor"></a></h1>
+<h2 id="user-content-基本使用">基本使用<a href="#基本使用" aria-label="Link to heading '基本使用'" data-heading-content="基本使用" class="anchor"></a></h2>
 <p>golang天然支持高并发，我们只需要通过go关键字来开启 <code>goroutine</code> 即可。</p>
 <pre><code class="language-go">package main
 
@@ -2815,7 +2740,7 @@ func main() {
 
 </code></pre>
 <p>在以上代码中，匿名函数返回了布尔类型的返回值，但是无法通过普通的语法进行获取，需要使用通道来进行协程之间的正常通信，因为协程是异步的，无法同步赋值。</p>
-<h2><a href="#time包" aria-hidden="true" class="anchor" id="user-content-time包"></a>time包</h2>
+<h2 id="user-content-time包">time包<a href="#time包" aria-label="Link to heading 'time包'" data-heading-content="time包" class="anchor"></a></h2>
 <p>在以上的案例中可以看到导入的time包</p>
 <p><code>time.Sleep</code> 是延迟函数，内部传入的参数 <code>time.Second</code> 反射出来时 <code>int64</code> 类型，值是 <code>1s</code>，time.Sleep 函数中好像必须传入 time.Second 。</p>
 <pre><code class="language-go">time.Sleep(1 * time.Second)
@@ -2832,8 +2757,8 @@ fmt.Println(now.Minute())
 fmt.Println(now.Second())
 
 </code></pre>
-<h1><a href="#通道channel" aria-hidden="true" class="anchor" id="user-content-通道channel"></a>通道（channel）</h1>
-<h2><a href="#基本" aria-hidden="true" class="anchor" id="user-content-基本"></a>基本</h2>
+<h1 id="user-content-通道channel">通道（channel）<a href="#通道channel" aria-label="Link to heading '通道（channel）'" data-heading-content="通道（channel）" class="anchor"></a></h1>
+<h2 id="user-content-基本">基本<a href="#基本" aria-label="Link to heading '基本'" data-heading-content="基本" class="anchor"></a></h2>
 <p>通道（channel）是用来传递数据的一个数据结构。</p>
 <p>通道可用于两个 <code>goroutine</code> 之间通过传递一个指定类型的值来同步运行和通讯。操作符 <code>&lt;-</code> 用于指定通道的方向，发送或接收。如果未指定方向，则为双向通道。</p>
 <pre><code class="language-go">ch &lt;- v    // 把 v 发送到通道 ch
@@ -2845,7 +2770,7 @@ v := &lt;-ch  // 从 ch 接收数据
 <pre><code class="language-go">ch := make(chan int)
 
 </code></pre>
-<h2><a href="#无通道缓冲区" aria-hidden="true" class="anchor" id="user-content-无通道缓冲区"></a>无通道缓冲区</h2>
+<h2 id="user-content-无通道缓冲区">无通道缓冲区<a href="#无通道缓冲区" aria-label="Link to heading '无通道缓冲区'" data-heading-content="无通道缓冲区" class="anchor"></a></h2>
 <p><strong>注意</strong>：默认情况下，通道是不带缓冲区的。发送端发送数据，同时必须有接收端相应的接收数据。</p>
 <p>以下实例通过两个 goroutine 来计算数字之和，在 goroutine 完成计算后，它会计算两个结果的和：</p>
 <pre><code class="language-go">package main
@@ -2873,7 +2798,7 @@ func main() {
 }
 
 </code></pre>
-<h2><a href="#通道缓冲区" aria-hidden="true" class="anchor" id="user-content-通道缓冲区"></a>通道缓冲区</h2>
+<h2 id="user-content-通道缓冲区">通道缓冲区<a href="#通道缓冲区" aria-label="Link to heading '通道缓冲区'" data-heading-content="通道缓冲区" class="anchor"></a></h2>
 <p>通道可以设置缓冲区，通过 make 的第二个参数指定缓冲区大小：</p>
 <pre><code class="language-go">ch := make(chan int, 100)
 
@@ -2985,7 +2910,7 @@ main结束
 子go程结束
 
 </code></pre>
-<h2><a href="#关闭通道" aria-hidden="true" class="anchor" id="user-content-关闭通道"></a>关闭通道</h2>
+<h2 id="user-content-关闭通道">关闭通道<a href="#关闭通道" aria-label="Link to heading '关闭通道'" data-heading-content="关闭通道" class="anchor"></a></h2>
 <p>关闭通道是通过 <code>close(ch)</code> 关键字进行关闭的</p>
 <pre><code class="language-go">package main
 
@@ -3113,9 +3038,9 @@ created by main.main
 exit status 2
 
 </code></pre>
-<h2><a href="#通道-与-range" aria-hidden="true" class="anchor" id="user-content-通道-与-range"></a>通道 与 range</h2>
+<h2 id="user-content-通道-与-range">通道 与 range<a href="#通道-与-range" aria-label="Link to heading '通道 与 range'" data-heading-content="通道 与 range" class="anchor"></a></h2>
 <p>[range 与 通道](#range 与 通道)</p>
-<h2><a href="#通道-与-select" aria-hidden="true" class="anchor" id="user-content-通道-与-select"></a>通道 与 select</h2>
+<h2 id="user-content-通道-与-select">通道 与 select<a href="#通道-与-select" aria-label="Link to heading '通道 与 select'" data-heading-content="通道 与 select" class="anchor"></a></h2>
 <p>单流程下，一个go只能监控一个通道的状态，select可以完成监控多个channel的状态</p>
 <pre><code class="language-go">package main
 
@@ -3169,7 +3094,7 @@ quit
 <p>以上代码，main函数中，定义了两个通道，一个用于存放数字，一个用于结束程序。</p>
 <p>当main中的 for循环中 想要读取<code>&lt;-ch</code>通道中的数据，但如果没有读到就会发生阻塞，等待fibonacii函数中，将数据存放到通道<code>ch</code>中即可读到，这个过程执行10次后，跳出main函数中的for循环，然后将一个数存到<code>quit</code>通道内，这个数字可以任意，因为fibonacii中<code>case &lt;-quit:</code>只是检测到<code>quit</code>通道有数据就会<code>return</code>。<code>case ch &lt;- x:</code> 的意思是检测ch通道是否可以存放数据，如果可以存放就将<code>x</code>存放到<code>ch</code>通道内，并进入case内，如果不能则阻塞。</p>
 <p>select具备多路channel的监控状态功能</p>
-<h1><a href="#骚的语法" aria-hidden="true" class="anchor" id="user-content-骚的语法"></a>骚的语法</h1>
+<h1 id="user-content-骚的语法">骚的语法<a href="#骚的语法" aria-label="Link to heading '骚的语法'" data-heading-content="骚的语法" class="anchor"></a></h1>
 <pre><code class="language-go">package main
 
 import &quot;fmt&quot;
@@ -3182,7 +3107,7 @@ func main() {
 
 </code></pre>
 <p><code>s[:index]</code> <code>s[index:]</code>index为数组下标，冒号在前，表示截取0到中间位置，不包含下标处的值；冒号在后，表示截取中介位置到末尾，包含下标处的值。</p>
-<h1><a href="#gopath工作模式的弊端" aria-hidden="true" class="anchor" id="user-content-gopath工作模式的弊端"></a>GOPATH工作模式的弊端</h1>
+<h1 id="user-content-gopath工作模式的弊端">GOPATH工作模式的弊端<a href="#gopath工作模式的弊端" aria-label="Link to heading 'GOPATH工作模式的弊端'" data-heading-content="GOPATH工作模式的弊端" class="anchor"></a></h1>
 <p>GOPATH的弊端：</p>
 <ul>
 <li>无版本控制概念</li>
@@ -3190,9 +3115,9 @@ func main() {
 <li>无法指定当前项目引用的第三方版本号</li>
 </ul>
 <p>正是因为GOPATH有诸多弊端，才有了Go Modules来取代GOPATH</p>
-<h1><a href="#进阶" aria-hidden="true" class="anchor" id="user-content-进阶"></a>*进阶</h1>
-<h1><a href="#go-modules" aria-hidden="true" class="anchor" id="user-content-go-modules"></a>Go Modules</h1>
-<h2><a href="#go-mod命令" aria-hidden="true" class="anchor" id="user-content-go-mod命令"></a>go mod命令</h2>
+<h1 id="user-content-进阶">*进阶<a href="#进阶" aria-label="Link to heading '*进阶'" data-heading-content="*进阶" class="anchor"></a></h1>
+<h1 id="user-content-go-modules">Go Modules<a href="#go-modules" aria-label="Link to heading 'Go Modules'" data-heading-content="Go Modules" class="anchor"></a></h1>
+<h2 id="user-content-go-mod命令">go mod命令<a href="#go-mod命令" aria-label="Link to heading 'go mod命令'" data-heading-content="go mod命令" class="anchor"></a></h2>
 <p>执行一下命令查看go mod支持哪些命令</p>
 <pre><code class="language-sh">go mod help
 
@@ -3247,7 +3172,7 @@ func main() {
 <pre><code class="language-sh">go env -w GO111MODULE=on
 
 </code></pre>
-<h2><a href="#goproxy" aria-hidden="true" class="anchor" id="user-content-goproxy"></a>GOPROXY</h2>
+<h2 id="user-content-goproxy">GOPROXY<a href="#goproxy" aria-label="Link to heading 'GOPROXY'" data-heading-content="GOPROXY" class="anchor"></a></h2>
 <p>这个环境变量主要是用于设置Go模块代理（Go module proxy），其作用是用于使Go在后续拉取模块版本时直接通过镜像站点来快速拉取。</p>
 <p>GOPROXY的默认地址为： <a href="https://proxy.golang.org">https://proxy.golang.org</a> ,direct</p>
 <p>建议改成国内镜像源</p>
@@ -3268,7 +3193,7 @@ func main() {
 go env | grep GOPROXY
 
 </code></pre>
-<h2><a href="#gosumdb" aria-hidden="true" class="anchor" id="user-content-gosumdb"></a>GOSUMDB</h2>
+<h2 id="user-content-gosumdb">GOSUMDB<a href="#gosumdb" aria-label="Link to heading 'GOSUMDB'" data-heading-content="GOSUMDB" class="anchor"></a></h2>
 <p>用来校验拉取的第三方库是否是完整的</p>
 <p>GOSUMDB的默认值为：sum.golang.org，在国内也是无法访问的，但是GOSUMDB可以被Go模块代理所代理（详见：Proxying a Checksum Database）。</p>
 <p>如果设置了GOPROXY，这个就不用设置了</p>
@@ -3281,8 +3206,8 @@ go env | grep GOPROXY
 
 </code></pre>
 <p>一般不建议设置关闭，因为关闭之后无法对拉取的代码进行校验。</p>
-<h2><a href="#gomodules初始化项目" aria-hidden="true" class="anchor" id="user-content-gomodules初始化项目"></a>GoModules初始化项目</h2>
-<h3><a href="#开启go-modules" aria-hidden="true" class="anchor" id="user-content-开启go-modules"></a>开启Go Modules</h3>
+<h2 id="user-content-gomodules初始化项目">GoModules初始化项目<a href="#gomodules初始化项目" aria-label="Link to heading 'GoModules初始化项目'" data-heading-content="GoModules初始化项目" class="anchor"></a></h2>
+<h3 id="user-content-开启go-modules">开启Go Modules<a href="#开启go-modules" aria-label="Link to heading '开启Go Modules'" data-heading-content="开启Go Modules" class="anchor"></a></h3>
 <pre><code class="language-sh">go env -w GO111MODULE=on
 
 </code></pre>
@@ -3302,7 +3227,7 @@ go env | grep GOPROXY
 <pre><code class="language-sh">source ~/.bashrc
 
 </code></pre>
-<h3><a href="#初始化项目" aria-hidden="true" class="anchor" id="user-content-初始化项目"></a>初始化项目</h3>
+<h3 id="user-content-初始化项目">初始化项目<a href="#初始化项目" aria-label="Link to heading '初始化项目'" data-heading-content="初始化项目" class="anchor"></a></h3>
 <p>创建项目文件夹</p>
 <pre><code class="language-sh">mkdir -p ganto/modules_test
 # 进入到项目文件夹内
@@ -3356,11 +3281,11 @@ func main() {
 go get github.com/aceld/zinx/znet
 
 </code></pre>
-<h2><a href="#改变模块依赖关系" aria-hidden="true" class="anchor" id="user-content-改变模块依赖关系"></a>改变模块依赖关系</h2>
+<h2 id="user-content-改变模块依赖关系">改变模块依赖关系<a href="#改变模块依赖关系" aria-label="Link to heading '改变模块依赖关系'" data-heading-content="改变模块依赖关系" class="anchor"></a></h2>
 <pre><code class="language-sh">go mod edit -replace=zinx@v0.0.2=zinx@v0.0.1
 
 </code></pre>
-<h2><a href="#go-mod的基本使用" aria-hidden="true" class="anchor" id="user-content-go-mod的基本使用"></a>go mod的基本使用</h2>
+<h2 id="user-content-go-mod的基本使用">go mod的基本使用<a href="#go-mod的基本使用" aria-label="Link to heading 'go mod的基本使用'" data-heading-content="go mod的基本使用" class="anchor"></a></h2>
 <p>先初始化mod</p>
 <pre><code class="language-sh">go mod init example.com/m/v2
 
@@ -3405,7 +3330,7 @@ func main() {
 
 </code></pre>
 <p>例子调试：<a href="http://localhost:8989/api?msg=iamziyou">http://localhost:8989/api?msg=iamziyou</a></p>
-<h2><a href="#有趣的例子" aria-hidden="true" class="anchor" id="user-content-有趣的例子"></a>有趣的例子</h2>
+<h2 id="user-content-有趣的例子">有趣的例子<a href="#有趣的例子" aria-label="Link to heading '有趣的例子'" data-heading-content="有趣的例子" class="anchor"></a></h2>
 <pre><code class="language-go">package main
 
 import (
@@ -3465,9 +3390,9 @@ func main() {
 <p>通过setNum接口，携带num和password参数，对数据进行设置；</p>
 <p>通过getNum接口，携带num参数，对数据进行验证。</p>
 </blockquote>
-<h1><a href="#使用go-modules初始化项目" aria-hidden="true" class="anchor" id="user-content-使用go-modules初始化项目"></a>使用Go Modules初始化项目</h1>
+<h1 id="user-content-使用go-modules初始化项目">使用Go Modules初始化项目<a href="#使用go-modules初始化项目" aria-label="Link to heading '使用Go Modules初始化项目'" data-heading-content="使用Go Modules初始化项目" class="anchor"></a></h1>
 <p><a href="#GoModules%E5%88%9D%E5%A7%8B%E5%8C%96%E9%A1%B9%E7%9B%AE">GoModules初始化项目</a></p>
-<h1><a href="#连接数据库mysql" aria-hidden="true" class="anchor" id="user-content-连接数据库mysql"></a>连接数据库MySQL</h1>
+<h1 id="user-content-连接数据库mysql">连接数据库MySQL<a href="#连接数据库mysql" aria-label="Link to heading '连接数据库MySQL'" data-heading-content="连接数据库MySQL" class="anchor"></a></h1>
 <p>创建数据库test</p>
 <pre><code class="language-sql">SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
@@ -3603,8 +3528,8 @@ func list() {
 }
 
 </code></pre>
-<h1><a href="#即时通信系统项目" aria-hidden="true" class="anchor" id="user-content-即时通信系统项目"></a>即时通信系统/项目</h1>
-<h2><a href="#即时通信系统v01基础server构建" aria-hidden="true" class="anchor" id="user-content-即时通信系统v01基础server构建"></a>即时通信系统/v0.1基础server构建</h2>
+<h1 id="user-content-即时通信系统项目">即时通信系统/项目<a href="#即时通信系统项目" aria-label="Link to heading '即时通信系统/项目'" data-heading-content="即时通信系统/项目" class="anchor"></a></h1>
+<h2 id="user-content-即时通信系统v01基础server构建">即时通信系统/v0.1基础server构建<a href="#即时通信系统v01基础server构建" aria-label="Link to heading '即时通信系统/v0.1基础server构建'" data-heading-content="即时通信系统/v0.1基础server构建" class="anchor"></a></h2>
 <p>server.go</p>
 <pre><code class="language-go">package main
 
@@ -3676,7 +3601,7 @@ func main() {
 
 </code></pre>
 <p>可以在浏览器访问<code>127.0.0.1:9999</code>，或者终端输入命令<code>nc 127.0.0.1:9999</code>，进行验证服务是否开启成功。</p>
-<h2><a href="#即时通信系统v02用户上线及广播功能" aria-hidden="true" class="anchor" id="user-content-即时通信系统v02用户上线及广播功能"></a>即时通信系统/v0.2用户上线及广播功能</h2>
+<h2 id="user-content-即时通信系统v02用户上线及广播功能">即时通信系统/v0.2用户上线及广播功能<a href="#即时通信系统v02用户上线及广播功能" aria-label="Link to heading '即时通信系统/v0.2用户上线及广播功能'" data-heading-content="即时通信系统/v0.2用户上线及广播功能" class="anchor"></a></h2>
 <p>server.go</p>
 <pre><code class="language-go">package main
 
@@ -3826,25 +3751,24 @@ func main() {
 ./server
 
 </code></pre>
-
-                </div>
-                <div class="series-nav"><div class="series-nav-actions"><a class="series-nav-btn" href="/series/old-docs/">目录页</a></div><details class="series-nav-details"><summary class="series-nav-summary"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Old Docs</span><span class="series-nav-count">共 33 章</span></div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="series-nav-chevron"><path d="m6 9 6 6 6-6"/></svg></summary><div class="series-nav-list"><a class="series-nav-item" href="/post/20250410/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">Rust 案例 - 计算器</span></a><a class="series-nav-item" href="/post/20250313/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">Rust镜像源</span></a><a class="series-nav-item" href="/post/20250220-2/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">Rust所有权</span></a><a class="series-nav-item" href="/post/20250220/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">JavaScript 高阶函数之 reduce</span></a><a class="series-nav-item" href="/post/20241220/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">JavaScript中的&quot;事件冒泡&quot;与&quot;事件捕获&quot;</span></a><a class="series-nav-item" href="/post/20240511/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">今天，学习Web Component</span></a><a class="series-nav-item" href="/post/20240415/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">Gin中间件上下文中的Set、Get函数的用法</span></a><a class="series-nav-item" href="/post/20240412/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">React中forwardRef的用法</span></a><a class="series-nav-item" href="/post/20240402/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">5分钟快速入门Taro</span></a><a class="series-nav-item" href="/post/20240328/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">React中使用Immer编写简洁的更新逻辑</span></a><a class="series-nav-item" href="/post/20240327/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">浅谈React中的mutation</span></a><a class="series-nav-item" href="/post/20240326/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">Go语言高并发编程初探</span></a><a class="series-nav-item" href="/post/20240315/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">windows终端命令受限</span></a><a class="series-nav-item" href="/post/20240313/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">TypeScript类型取反</span></a><a class="series-nav-item" href="/post/20240102/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">实现一个丝滑的暗黑模式切换动画</span></a><a class="series-nav-item" href="/post/20231221-2/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">Vue3.3+ 新特性 defineOptions</span></a><a class="series-nav-item" href="/post/20231221/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">Vue3 实验性特性 defineModel</span></a><a class="series-nav-item" href="/post/20231117-3/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">JavaScript闭包直接修改内部属性</span></a><a class="series-nav-item" href="/post/20231117-2/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">使用class实现评分</span></a><a class="series-nav-item" href="/post/20231117/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">函数柯里化</span></a><a class="series-nav-item" href="/post/20230831/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">自定义Typora主题分享</span></a><a class="series-nav-item" href="/post/20230829/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">git学习教程</span></a><a class="series-nav-item" href="/post/20230827/"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">博客园自定义主题</span></a><a class="series-nav-item active" href="/post/20230816/"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">Golang学习笔记</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/20230301/"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">Java学习笔记</span></a><a class="series-nav-item" href="/post/20230220-6/"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">规范和快捷键</span></a><a class="series-nav-item" href="/post/20230220-5/"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">黑苹果</span></a><a class="series-nav-item" href="/post/20230220-4/"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">防抖函数debounce</span></a><a class="series-nav-item" href="/post/20230220-3/"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">TypeScript学习笔记</span></a><a class="series-nav-item" href="/post/20230220/"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">ES6 标准入门 - 阮一峰</span></a><a class="series-nav-item" href="/post/20230220-2/"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">css常用场景</span></a><a class="series-nav-item" href="/post/20210105/"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">hexo-theme-heri主题开发简记</span></a><a class="series-nav-item" href="/post/20201222/"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">测试文章</span></a></div></details><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/20230827/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">博客园自定义主题</span></a><a class="series-nav-page next" href="/post/20230301/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">Java学习笔记</span></a></div></div>
-            </article>
-        </main>
-<footer class="footer-content">
-    <div class="copyright">
-        <span>2019-2026 </span>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"/></svg>
-        <span> 干徒 / Ganto</span>
-    </div>
-</footer>
-        </div>
-    </div>
-<script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
-try{document.getElementById('main').innerHTML='';}catch(e){}</script>
+</div></div><div class="series-nav"><div class="series-nav-actions"><a href="/series/old-docs" class="series-nav-btn"><span>目录页</span></a></div><details class="series-nav-details"><summary class="series-nav-summary"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg><div class="series-nav-heading"><span class="series-nav-title">Old Docs</span><span class="series-nav-count">共 33 章</span></div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="series-nav-chevron"><path d="m6 9 6 6 6-6"></path></svg></summary><div class="series-nav-list"><a href="/post/20250410" class="series-nav-item"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">Rust 案例 - 计算器</span></a><a href="/post/20250313" class="series-nav-item"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">Rust镜像源</span></a><a href="/post/20250220-2" class="series-nav-item"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">Rust所有权</span></a><a href="/post/20250220" class="series-nav-item"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">JavaScript 高阶函数之 reduce</span></a><a href="/post/20241220" class="series-nav-item"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">JavaScript中的&#34;事件冒泡&#34;与&#34;事件捕获&#34;</span></a><a href="/post/20240511" class="series-nav-item"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">今天，学习Web Component</span></a><a href="/post/20240415" class="series-nav-item"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">Gin中间件上下文中的Set、Get函数的用法</span></a><a href="/post/20240412" class="series-nav-item"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">React中forwardRef的用法</span></a><a href="/post/20240402" class="series-nav-item"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">5分钟快速入门Taro</span></a><a href="/post/20240328" class="series-nav-item"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">React中使用Immer编写简洁的更新逻辑</span></a><a href="/post/20240327" class="series-nav-item"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">浅谈React中的mutation</span></a><a href="/post/20240326" class="series-nav-item"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">Go语言高并发编程初探</span></a><a href="/post/20240315" class="series-nav-item"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">windows终端命令受限</span></a><a href="/post/20240313" class="series-nav-item"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">TypeScript类型取反</span></a><a href="/post/20240102" class="series-nav-item"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">实现一个丝滑的暗黑模式切换动画</span></a><a href="/post/20231221-2" class="series-nav-item"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">Vue3.3+ 新特性 defineOptions</span></a><a href="/post/20231221" class="series-nav-item"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">Vue3 实验性特性 defineModel</span></a><a href="/post/20231117-3" class="series-nav-item"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">JavaScript闭包直接修改内部属性</span></a><a href="/post/20231117-2" class="series-nav-item"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">使用class实现评分</span></a><a href="/post/20231117" class="series-nav-item"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">函数柯里化</span></a><a href="/post/20230831" class="series-nav-item"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">自定义Typora主题分享</span></a><a href="/post/20230829" class="series-nav-item"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">git学习教程</span></a><a href="/post/20230827" class="series-nav-item"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">博客园自定义主题</span></a><a href="/post/20230816" class="series-nav-item active" aria-current="page"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">Golang学习笔记</span><span class="series-nav-item-now">本篇</span></a><a href="/post/20230301" class="series-nav-item"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">Java学习笔记</span></a><a href="/post/20230220-6" class="series-nav-item"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">规范和快捷键</span></a><a href="/post/20230220-5" class="series-nav-item"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">黑苹果</span></a><a href="/post/20230220-4" class="series-nav-item"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">防抖函数debounce</span></a><a href="/post/20230220-3" class="series-nav-item"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">TypeScript学习笔记</span></a><a href="/post/20230220" class="series-nav-item"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">ES6 标准入门 - 阮一峰</span></a><a href="/post/20230220-2" class="series-nav-item"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">css常用场景</span></a><a href="/post/20210105" class="series-nav-item"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">hexo-theme-heri主题开发简记</span></a><a href="/post/20201222" class="series-nav-item"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">测试文章</span></a></div></details><div class="series-nav-pager"><a href="/post/20230827" class="series-nav-page prev"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">博客园自定义主题</span></a><a href="/post/20230301" class="series-nav-page next"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">Java学习笔记</span></a></div></div><div class="blog-tags"><span class="blog-tag"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"></path></svg>Old</span></div><div class="details-sentinel" style="height:1px;"></div><div class="markov-section"><div class="markov-header"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"></path><polyline points="12 12 18 12 18 6"></polyline></svg><span>AI 续写</span><span class="markov-badge">马尔可夫链</span></div><p class="markov-desc">基于本文内容训练的 tri-gram 语言模型，自动生成下文片段。</p><div class="markov-actions"><button class="markov-btn">生成续写</button></div></div></article></div></main><nav class="floating-toolbar" aria-label="页面工具栏"><button class="tool-btn" type="button" aria-label="后退"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.75 19.5 8.25 12l7.5-7.5"></path></svg></button><a href="/" class="tool-btn" aria-label="首页"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"></path></svg></a><a href="/series/old-docs" class="tool-btn" aria-label="系列目录"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"></path></svg></a><button class="tool-btn" type="button" aria-label="宽屏模式"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8m-8 18h8M4 12h16M4 12l3-3m-3 3l3 3m13-3l-3-3m3 3l-3 3"></path></svg></button><span class="tool-divider"></span><button class="tool-btn" type="button" aria-label="回到顶部"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.5v-15m0 0-6.75 6.75M12 4.5l6.75 6.75"></path></svg></button></nav><footer class="footer-content"><div class="copyright"><span>2019-2026 </span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"></path></svg><span> 干徒 / Ganto</span></div></footer></div></div>
+<script>/* 把预渲染正文交给 SPA 后清空 #main，避免重复渲染 */
+try{
+  var main=document.getElementById('main');
+  var content=main?main.querySelector('.blog-content'):null;
+  if(content){
+    var t=document.createElement('template');
+    t.id='prerender-content';
+    t.setAttribute('data-slug', "20230816");
+    t.innerHTML=content.innerHTML;
+    document.body.appendChild(t);
+  }
+  if(main) main.innerHTML='';
+}catch(e){}
+</script>
 <script type="module">
-import init, * as bindings from '/web-rs-ed78e9ed78fe0ba6.js';
-const wasm = await init({ module_or_path: '/web-rs-ed78e9ed78fe0ba6_bg.wasm' });
+import init, * as bindings from '/web-rs-4b7fc77d2e4f841a.js';
+const wasm = await init({ module_or_path: '/web-rs-4b7fc77d2e4f841a_bg.wasm' });
 
 
 window.wasmBindings = bindings;

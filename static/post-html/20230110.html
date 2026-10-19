@@ -1,0 +1,57 @@
+<h2 id="user-content-code">Code<a href="#code" aria-label="Link to heading 'Code'" data-heading-content="Code" class="anchor"></a></h2>
+<p>如上代码所示，中间件<code>middlewareA</code>内部通过<code>c.Set(&quot;middlewareA_key&quot;, str)</code>将参数设置到上下文中
+所以中间件<code>middlewareB</code>可以通过<code>c.Get(&quot;middlewareA_key&quot;)</code>获取到上下文中传递的值，并将值进行了修改，然后继续通过上下文进行了传递
+然后在控制器函数中可以通过上下文<code>c.Keys[&quot;middlewareB_key&quot;]</code>的方式获取</p>
+<pre><code class="language-go">package main
+
+import (
+	&quot;fmt&quot;
+	&quot;github.com/gin-gonic/gin&quot;
+)
+
+func main() {
+	router := gin.Default()
+
+	router.Use(middlewareA(&quot;中间件A传递的值&quot;), middlewareB())
+	router.GET(&quot;/&quot;, func(c *gin.Context) {
+		valueA := c.Keys[&quot;middlewareA_key&quot;]
+		valueB := c.Keys[&quot;middlewareB_key&quot;]
+		c.JSON(200, gin.H{
+			&quot;data&quot;: map[string]any{
+				&quot;middlewareA&quot;: valueA,
+				&quot;middlewareB&quot;: valueB,
+			},
+		})
+	})
+
+	if err := router.Run(&quot;:8090&quot;); err != nil {
+		fmt.Printf(&quot;run server error: %v&quot;, err)
+		panic(err)
+	}
+}
+
+func middlewareA(str string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Set(&quot;middlewareA_key&quot;, str)
+		c.Next()
+	}
+}
+
+func middlewareB() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		middlewareAKey, _ := c.Get(&quot;middlewareA_key&quot;)
+		c.Set(&quot;middlewareB_key&quot;, middlewareAKey.(string)+&quot; *** 我是中间件B&quot;)
+		c.Next()
+	}
+}
+</code></pre>
+<p>需要注意的是，中间件设置的数据，会同时存在在控制器函数的上下文中，均可以获取</p>
+<h2 id="user-content-return">Return<a href="#return" aria-label="Link to heading 'Return'" data-heading-content="Return" class="anchor"></a></h2>
+<p>请求：<a href="http://localhost:8090">http://localhost:8090</a></p>
+<pre><code class="language-json">{
+    &quot;data&quot;: {
+        &quot;middlewareA&quot;: &quot;中间件A传递的值&quot;,
+        &quot;middlewareB&quot;: &quot;中间件A传递的值 *** 我是中间件B&quot;
+    }
+}
+</code></pre>

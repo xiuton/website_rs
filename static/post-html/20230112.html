@@ -1,0 +1,34 @@
+<h1 id="user-content-5分钟快速入门taro">5分钟快速入门Taro<a href="#5分钟快速入门taro" aria-label="Link to heading '5分钟快速入门Taro'" data-heading-content="5分钟快速入门Taro" class="anchor"></a></h1>
+<h2 id="user-content-taro介绍">Taro介绍<a href="#taro介绍" aria-label="Link to heading 'Taro介绍'" data-heading-content="Taro介绍" class="anchor"></a></h2>
+<p>Taro是由凹凸实验室开发的一个开放式跨端跨框架，支持使用 React/Vue/Nerv 等框架来开发 <a href="https://mp.weixin.qq.com/">微信</a> / <a href="https://mp.jd.com/?entrance=taro">京东</a> / <a href="https://smartprogram.baidu.com/">百度</a> / <a href="https://mini.open.alipay.com/">支付宝</a> / <a href="https://developer.open-douyin.com/">字节跳动</a> / <a href="https://q.qq.com/">QQ</a> / <a href="https://open.feishu.cn/document/uYjL24iN/ucDOzYjL3gzM24yN4MjN">飞书</a> 小程序 / H5 / RN 等应用</p>
+<p>Taro类似于uniapp，都是跨端框架，一次开发多端部署</p>
+<p>这是<a href="https://taro-docs.jd.com/">Taro官方文档</a>，可以结合官方文档食用更佳</p>
+<h2 id="user-content-准备">准备<a href="#准备" aria-label="Link to heading '准备'" data-heading-content="准备" class="anchor"></a></h2>
+<p>你需要了解最基本的 HTML + CSS + JS ，俗称前端三件套</p>
+<p>最好会使用Vue React</p>
+<p>node环境（&gt;=16.20.0）</p>
+<h2 id="user-content-安装taro-cli工具">安装Taro CLI工具<a href="#安装taro-cli工具" aria-label="Link to heading '安装Taro CLI工具'" data-heading-content="安装Taro CLI工具" class="anchor"></a></h2>
+<p>安装</p>
+<pre><code class="language-sh">npm install -g @tarojs/cli
+</code></pre>
+<p>查看是否安装成功</p>
+<pre><code class="language-sh">npm info @tarojs/cli
+</code></pre>
+<h2 id="user-content-初始化项目">初始化项目<a href="#初始化项目" aria-label="Link to heading '初始化项目'" data-heading-content="初始化项目" class="anchor"></a></h2>
+<pre><code class="language-sh">taro init myApp
+</code></pre>
+<p><img loading="lazy" src="/static/blog-images/Taro%E5%BF%AB%E9%80%9F%E5%85%A5%E9%97%A8.assets/ecb98df1436cd3d5.jpg" alt="taro init myApp command screenshot" /></p>
+<p>进入到项目根目录，安装依赖</p>
+<pre><code class="language-sh">cd myApp
+
+pnpm i
+</code></pre>
+<h2 id="user-content-启动项目">启动项目<a href="#启动项目" aria-label="Link to heading '启动项目'" data-heading-content="启动项目" class="anchor"></a></h2>
+<p>开发</p>
+<pre><code class="language-sh">pnpm dev:weapp
+</code></pre>
+<p>打包</p>
+<pre><code class="language-sh">pnpm build:weapp
+</code></pre>
+<p>项目启动之后，在微信开发者工具中打开该项目根目录，即可预览项目</p>
+<p>这样Taro项目就启动起来了</p>

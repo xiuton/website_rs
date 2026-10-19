@@ -1,0 +1,693 @@
+<h1 id="user-content-从零用-rust-实现大语言模型--学习计划">从零用 Rust 实现大语言模型 —— 学习计划<a href="#从零用-rust-实现大语言模型--学习计划" aria-label="Link to heading '从零用 Rust 实现大语言模型 —— 学习计划'" data-heading-content="从零用 Rust 实现大语言模型 —— 学习计划" class="anchor"></a></h1>
+<blockquote>
+<p>目标：不使用任何深度学习框架（如 tch-rs / candle / burn），仅用 Rust 标准库，
+从零手写张量、自动微分、神经网络层、Transformer 架构，最终训练出一个能生成文本的可用 Transformer 模型。</p>
+<p>核心理念：<strong>每一步都亲自动手实现，每一步都配套教程文档。</strong>
+每节课的文档都在 <code>docs/</code> 目录下，代码在 <code>src/</code> 目录下，一一对应。</p>
+<p><strong>最终成果</strong>：一个真实可用的 LLM 训练与推理框架，支持训练、评估、生成、对话、监督微调（SFT）、微调、Beam Search、GPU 加速等完整功能。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-为什么从零写">为什么从零写？<a href="#为什么从零写" aria-label="Link to heading '为什么从零写？'" data-heading-content="为什么从零写？" class="anchor"></a></h2>
+<ul>
+<li>学习张量/自动微分/反向传播，才能真正理解 PyTorch 等框架背后的原理。</li>
+<li>理解每一个数学公式如何变成一行行代码。</li>
+<li>训练过程透明可控，随时可以打印中间结果检查正确性。</li>
+</ul>
+<h2 id="user-content-依赖策略">依赖策略<a href="#依赖策略" aria-label="Link to heading '依赖策略'" data-heading-content="依赖策略" class="anchor"></a></h2>
+<ul>
+<li><strong>原则上零依赖</strong>：所有张量、数学运算、自动微分、网络层全部自己写。</li>
+<li>允许极少量工具库，使用时会明确说明并解释其作用（例如 <code>serde_json</code> 做配置序列化、<code>clap</code> 做命令行、<code>rayon</code> 做 CPU 并行、<code>tiny_http</code> 起 HTTP 服务、可选的 <code>wgpu</code> 做 GPU 加速）。</li>
+<li>每新增一个依赖都必须有理由，不能&quot;图省事&quot;。</li>
+</ul>
+<hr />
+<h2 id="user-content-总体路线图12-个阶段50-课">总体路线图（12 个阶段，50 课）<a href="#总体路线图12-个阶段50-课" aria-label="Link to heading '总体路线图（12 个阶段，50 课）'" data-heading-content="总体路线图（12 个阶段，50 课）" class="anchor"></a></h2>
+<blockquote>
+<p><strong>推荐阅读顺序</strong>：按下方阶段顺序阅读，每个阶段内的课程按编号顺序。
+阶段六（训练进阶与正则化）和阶段七（现代 LLM 架构）可以灵活安排——先学 Dropout 等正则化技巧，再学 RoPE / RMSNorm 等现代组件，或反过来。</p>
+</blockquote>
+<h3 id="user-content-阶段一地基--张量与自动微分第-1-4-课">阶段一：地基 —— 张量与自动微分（第 1-4 课）<a href="#阶段一地基--张量与自动微分第-1-4-课" aria-label="Link to heading '阶段一：地基 —— 张量与自动微分（第 1-4 课）'" data-heading-content="阶段一：地基 —— 张量与自动微分（第 1-4 课）" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>01</td>
+<td>张量 Tensor</td>
+<td>数据布局、形状、reshape、逐元素运算、矩阵乘法</td>
+</tr>
+<tr>
+<td>02</td>
+<td>自动微分 Autograd</td>
+<td>计算图、反向传播、梯度链式法则</td>
+</tr>
+<tr>
+<td>03</td>
+<td>张量运算扩展</td>
+<td>广播、sum/mean、softmax、广播减法</td>
+</tr>
+<tr>
+<td>04</td>
+<td>模块化重构</td>
+<td>把张量库整理成独立模块，为上层打基础</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-阶段二神经网络基础第-5-7-课">阶段二：神经网络基础（第 5-7 课）<a href="#阶段二神经网络基础第-5-7-课" aria-label="Link to heading '阶段二：神经网络基础（第 5-7 课）'" data-heading-content="阶段二：神经网络基础（第 5-7 课）" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>05</td>
+<td>线性层与激活函数</td>
+<td>Linear、ReLU、Sigmoid、Tanh、参数管理</td>
+</tr>
+<tr>
+<td>06</td>
+<td>损失函数与优化器</td>
+<td>CrossEntropy、MSE、SGD、梯度下降原理</td>
+</tr>
+<tr>
+<td>07</td>
+<td>第一个 MLP</td>
+<td>用自己写的库训练 XOR / 分类任务，验证反向传播正确性</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-阶段三分词器第-8-课">阶段三：分词器（第 8 课）<a href="#阶段三分词器第-8-课" aria-label="Link to heading '阶段三：分词器（第 8 课）'" data-heading-content="阶段三：分词器（第 8 课）" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>08</td>
+<td>BPE 分词器</td>
+<td>文本→token、字节级编码、词表构建</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-阶段四transformer-架构第-9-12-课">阶段四：Transformer 架构（第 9-12 课）<a href="#阶段四transformer-架构第-9-12-课" aria-label="Link to heading '阶段四：Transformer 架构（第 9-12 课）'" data-heading-content="阶段四：Transformer 架构（第 9-12 课）" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>09</td>
+<td>注意力机制</td>
+<td>Scaled Dot-Product Attention、softmax、mask、融合算子 masked_softmax</td>
+</tr>
+<tr>
+<td>10</td>
+<td>多头注意力</td>
+<td>Multi-Head Attention、权重拼接</td>
+</tr>
+<tr>
+<td>11</td>
+<td>位置编码</td>
+<td>正弦位置编码、LayerNorm、残差连接</td>
+</tr>
+<tr>
+<td>12</td>
+<td>完整 Transformer 模型</td>
+<td>Transformer Block、Embedding、输出头、Dropout</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-阶段五训练与推理第-13-16-课">阶段五：训练与推理（第 13-16 课）<a href="#阶段五训练与推理第-13-16-课" aria-label="Link to heading '阶段五：训练与推理（第 13-16 课）'" data-heading-content="阶段五：训练与推理（第 13-16 课）" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>13</td>
+<td>训练循环</td>
+<td>前向/反向/更新、损失下降观察、梯度裁剪</td>
+</tr>
+<tr>
+<td>14</td>
+<td>数据加载</td>
+<td>数据集处理、batch、序列化样本构造</td>
+</tr>
+<tr>
+<td>15</td>
+<td>推理与采样</td>
+<td>temperature、top-k、top-p 采样</td>
+</tr>
+<tr>
+<td>16</td>
+<td>训练小 Transformer</td>
+<td>在小型数据集上训练并生成有意义的文本</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-阶段六训练进阶与正则化第-17-19-课">阶段六：训练进阶与正则化（第 17-19 课）<a href="#阶段六训练进阶与正则化第-17-19-课" aria-label="Link to heading '阶段六：训练进阶与正则化（第 17-19 课）'" data-heading-content="阶段六：训练进阶与正则化（第 17-19 课）" class="anchor"></a></h3>
+<blockquote>
+<p>本阶段补齐&quot;稳定训练一个能用的 Transformer&quot;所需的最后几块拼图。
+学完本阶段 + 阶段四/五，你就能独立训练一个完整的经典风格模型。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+<th>学习意义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>17</td>
+<td>AdamW 优化器</td>
+<td>动量、自适应学习率、权重衰减</td>
+<td>现代 LLM 标配优化器</td>
+</tr>
+<tr>
+<td>18</td>
+<td>学习率调度</td>
+<td>warmup + cosine decay</td>
+<td>训练稳定性的关键保障</td>
+</tr>
+<tr>
+<td>19</td>
+<td>Dropout</td>
+<td>训练时随机丢弃神经元，防止过拟合</td>
+<td>模型已在用（第 12 课），现在理解原理</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-阶段七现代-llm-架构第-20-24-课">阶段七：现代 LLM 架构（第 20-24 课）<a href="#阶段七现代-llm-架构第-20-24-课" aria-label="Link to heading '阶段七：现代 LLM 架构（第 20-24 课）'" data-heading-content="阶段七：现代 LLM 架构（第 20-24 课）" class="anchor"></a></h3>
+<blockquote>
+<p>本阶段把模型从经典风格升级到 LLaMA/Mistral 风格。
+每一课替换一个组件，学完后你的模型架构与现代 LLM 完全对齐。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+<th>替换了什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>20</td>
+<td>RoPE 旋转位置编码</td>
+<td>把相对位置揉进 Q/K 向量（频率表按 <code>head_dim</code> 逐头重复；相邻配对 / <code>rotate_half</code> 两种配对方式；长度外推 Linear / NTK / YaRN 已落地）</td>
+<td>替换正弦位置编码（第 11 课）</td>
+</tr>
+<tr>
+<td>21</td>
+<td>RMSNorm</td>
+<td>去掉减均值和 β，只保留方差归一化</td>
+<td>替换 LayerNorm（第 11 课）</td>
+</tr>
+<tr>
+<td>22</td>
+<td>SwiGLU</td>
+<td>SiLU + 门控机制的 MLP</td>
+<td>替换 GELU MLP（第 11 课）</td>
+</tr>
+<tr>
+<td>23</td>
+<td>GQA 分组查询注意力</td>
+<td>多个 Q 头共享 K/V 头；<strong>延伸：MLA 低秩压缩 KV Cache</strong>（<code>model.kv_lora_rank</code>，DeepSeek-V2/V3）</td>
+<td>替换标准 MHA（第 10 课）</td>
+</tr>
+<tr>
+<td>24</td>
+<td>Flash Attention</td>
+<td>分块在线 softmax，减少 HBM 访问</td>
+<td>优化标准注意力（第 9 课）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-阶段八工程优化第-25-30-课">阶段八：工程优化（第 25-30 课）<a href="#阶段八工程优化第-25-30-课" aria-label="Link to heading '阶段八：工程优化（第 25-30 课）'" data-heading-content="阶段八：工程优化（第 25-30 课）" class="anchor"></a></h3>
+<blockquote>
+<p>本阶段覆盖训练加速、推理加速和模型微调的工程实践。
+学完本阶段，你掌握从训练到部署的完整技术栈。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+<th>分类</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>25</td>
+<td>KV Cache</td>
+<td>推理时缓存历史 K/V，避免重复计算</td>
+<td>推理</td>
+</tr>
+<tr>
+<td>26</td>
+<td>混合精度训练</td>
+<td>AMP：FP16 前向/反向 + FP32 主权重 + 动态损失缩放</td>
+<td>训练</td>
+</tr>
+<tr>
+<td>27</td>
+<td>GPU 加速（可选）</td>
+<td>wgpu 计算着色器加速热点算子，失败自动回退 CPU</td>
+<td>训练</td>
+</tr>
+<tr>
+<td>28</td>
+<td>梯度累积</td>
+<td>小显存模拟大 batch：多步累积梯度后再更新</td>
+<td>训练</td>
+</tr>
+<tr>
+<td>29</td>
+<td>LoRA 低秩适配</td>
+<td>参数高效微调：冻结主模型，只训练低秩增量矩阵</td>
+<td>微调</td>
+</tr>
+<tr>
+<td>30</td>
+<td>Beam Search</td>
+<td>推理时维护多条候选路径，选择总概率最高的序列</td>
+<td>推理</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-阶段九前沿技术与工程实践第-31-38-课">阶段九：前沿技术与工程实践（第 31-38 课）<a href="#阶段九前沿技术与工程实践第-31-38-课" aria-label="Link to heading '阶段九：前沿技术与工程实践（第 31-38 课）'" data-heading-content="阶段九：前沿技术与工程实践（第 31-38 课）" class="anchor"></a></h3>
+<blockquote>
+<p>下表括号里的『N 个单测』只是写作时的快照，会随代码增长而漂移；<strong>以 <code>cargo test &lt;关键词&gt;</code> 的实际输出为准</strong>。
+本阶段覆盖 LLM 领域最重要的前沿技术和工程知识。
+这些课的<strong>原理、公式、工程取舍与落地要点都写全了</strong>，同时逐课补齐可运行实现
+（真实代码 + 对标 CPU 参考的单测 + 文档同步），做到&quot;能讲清楚，也能跑起来&quot;。
+下表的「状态」列跟踪落地进度。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+<th>分类</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>31</td>
+<td>Scaling Laws</td>
+<td>幂律关系：loss vs 参数量/数据量/算力，Chinchilla 最优配比</td>
+<td>训练理论</td>
+<td>✅ 已落地（<code>src/scaling.rs</code> + <code>scaling</code> 子命令）</td>
+</tr>
+<tr>
+<td>32</td>
+<td>MoE 混合专家模型</td>
+<td>稀疏激活：Router + 多专家，每 token 只走 Top-K 个专家；<strong>延伸：aux-loss-free 均衡偏置 + 共享专家</strong>（DeepSeek-V2/V3）</td>
+<td>架构</td>
+<td>✅ 已落地（<code>src/moe.rs</code>（18 个单测）+ <code>moe</code> 子命令；含 K = 1 门控梯度陷阱、L_aux 退化解、router z-loss 的实测，以及 ① 不均衡 / ② <code>α·L_aux</code> / ③ sign 偏置的<strong>三组隔离对照</strong>；偏置均衡与共享专家都已开成 CLI 开关 <code>--shared-experts</code> / <code>--bias-balance</code> / <code>--bias-lr</code>，默认值与原行为逐位一致且由单测守住）</td>
+</tr>
+<tr>
+<td>33</td>
+<td>量化技术</td>
+<td>INT8/INT4 量化、Hessian 量化、AWQ、GGUF，大幅减少显存占用</td>
+<td>部署</td>
+<td>✅ 已落地（<code>src/quant.rs</code>（28 个单测）+ <code>quant</code> 子命令）</td>
+</tr>
+<tr>
+<td>34</td>
+<td>推测解码</td>
+<td>小模型猜 + 大模型验，无损加速推理 2-4×</td>
+<td>推理</td>
+<td>✅ 已落地（<code>src/speculative.rs</code>：拒绝采样 + 残差修正 + KV cache 回滚）</td>
+</tr>
+<tr>
+<td>35</td>
+<td>多 Token 预测</td>
+<td>同时预测未来 K 个 token，提升表征质量 + 推测解码加速</td>
+<td>训练</td>
+<td>✅ 已落地（<code>src/speculative.rs</code> 的 <code>MtpHeads</code>/<code>MtpDrafter</code>，共 8 个单测）</td>
+</tr>
+<tr>
+<td>36</td>
+<td>RLHF 与对齐</td>
+<td>SFT → 奖励模型 → PPO / DPO，让模型符合人类偏好</td>
+<td>对齐</td>
+<td>✅ 已落地（<code>src/align.rs</code>（17 个单测）+ <code>align</code> 子命令）</td>
+</tr>
+<tr>
+<td>37</td>
+<td>RAG 检索增强生成</td>
+<td>文档分块 → 向量检索 → LLM 基于检索结果生成回答</td>
+<td>应用</td>
+<td>✅ 已落地（<code>src/rag.rs</code>（9 个单测）+ <code>rag</code> 子命令）</td>
+</tr>
+<tr>
+<td>38</td>
+<td>分布式训练</td>
+<td>数据并行、ZeRO、张量并行、流水线并行、3D 并行</td>
+<td>工程</td>
+<td>✅ 已落地（<code>src/distributed.rs</code>（18 个单测）+ <code>distributed</code> 子命令）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-阶段十工程化完善第-3940-课">阶段十：工程化完善（第 39~40 课）<a href="#阶段十工程化完善第-3940-课" aria-label="Link to heading '阶段十：工程化完善（第 39~40 课）'" data-heading-content="阶段十：工程化完善（第 39~40 课）" class="anchor"></a></h3>
+<blockquote>
+<p>本阶段把项目从算法实现升级为真实可用的 LLM 框架。
+覆盖 CLI 工具链、分词器持久化与导入、训练配置预设、微调工作流（全参 SFT + LoRA 低秩微调）、交互式对话、训练指标日志、
+HuggingFace 权重导入（<code>import-hf</code>）、checkpoint 原子写入、
+以及把训练好的模型部署成 OpenAI 兼容 API 服务等工程特性。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+<th>分类</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>39</td>
+<td>工程化完善</td>
+<td>CLI 子命令工具链（本课落地 9 个：train / eval / generate / chat / sft / finetune / preset / demo / bench；后续各课陆续补齐，现共 23 个，含把 HuggingFace 权重转成本仓库原生 <code>LLMCP2</code> 的 <code>import-hf</code>）、分词器序列化（含 HF <code>tokenizer.json</code> 导入）、预设配置、微调工作流（SFT 全参微调 + <code>finetune</code> LoRA 微调：冻结主干只训适配层，可训练参数 1.32%）、SFT 监督微调（对话语料 + loss 掩码）、交互式对话、Beam Search CLI、多文件数据加载、CSV 指标日志、checkpoint 原子写入</td>
+<td>工程</td>
+</tr>
+<tr>
+<td>40</td>
+<td>把模型部署成 API 服务</td>
+<td><code>serve</code> 子命令：OpenAI 兼容的 <code>POST /v1/chat/completions</code>（非流式 + SSE 流式）与 <code>GET /v1/models</code>，生成循环状态机化（<code>Generator</code>）、SSE 背压、客户端断开即中止生成、API key 鉴权、CORS、请求日志、<code>/v1/status</code> 队列状态、<code>/v1/embeddings</code> 向量化、<code>/openapi.json</code> <code>/openapi.yaml</code> 接口规范（<code>serve</code> 启动自动写出 <code>openapi/openapi.json</code> / <code>openapi/openapi.yaml</code>）</td>
+<td>工程</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-阶段十一多模态第-41-课">阶段十一：多模态（第 41 课）<a href="#阶段十一多模态第-41-课" aria-label="Link to heading '阶段十一：多模态（第 41 课）'" data-heading-content="阶段十一：多模态（第 41 课）" class="anchor"></a></h3>
+<blockquote>
+<p>本阶段让模型长出&quot;眼睛&quot;和&quot;画笔&quot;：图片理解（ViT）与图片生成（VQ-VAE）。
+全部复用手写的 Tensor / autograd / TransformerBlock，零新增算法依赖（<code>image</code> crate 只做 PNG 编解码）。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+<th>分类</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>41</td>
+<td>多模态：图片理解与生成</td>
+<td>ViT 视觉塔与 patchify、<code>&lt;|image|&gt;</code> 占位 token 与 <code>forward_mm</code> 像素注入、VQ-VAE 离散码本与三项损失、图文 JSONL（<code>VlmLoader</code>）、<code>generate --image</code>、图片段采样与 serve <code>message.image_url</code></td>
+<td>多模态</td>
+<td>✅ 已落地并实测（<code>src/vision.rs</code> + <code>src/vqvae.rs</code> + <code>vlm_file</code> / <code>vq_steps</code> 训练通路；<code>config/vlm.json</code> + <code>data/vlm/</code> 数据集跑通训练与理解 / 生图验证）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-阶段十二训练进阶与低精度第-4250-课">阶段十二：训练进阶与低精度（第 42~50 课）<a href="#阶段十二训练进阶与低精度第-4250-课" aria-label="Link to heading '阶段十二：训练进阶与低精度（第 42~50 课）'" data-heading-content="阶段十二：训练进阶与低精度（第 42~50 课）" class="anchor"></a></h3>
+<blockquote>
+<p>本阶段补上&quot;用更少的监督、更少的比特训练模型&quot;以及&quot;更聪明的优化与架构微调&quot;这几件事：
+蒸馏把大模型的知识搬给小模型，FP8 / FP4 把数值精度一路压到 8 位、4 位浮点，WSD 换掉 cosine 的调度曲线，
+QK-Norm 钉死注意力 Q/K 的尺度，Muon 把更新矩阵正交化，mHC 把残差流拓宽成多条并用双随机矩阵约束混合，
+CSA + HCA 把长序列注意力在序列维压缩后只对少数块做稀疏打分，
+MLA 解耦 RoPE 把位置信息从压缩 latent 里摘出来，从而解锁 W_UK/W_UV 权重吸收。
+各课都配有可运行实验与数值自检
+（梯度有限差分 / 标准码值对照 / Newton–Schulz 闭式核对 / 双随机投影不变量 / 覆盖不变式 / 吸收数值等价）。
+下表括号里的『N 个单测』同样是写作时的快照，会随代码增长而漂移；<strong>以 <code>cargo test &lt;关键词&gt;</code> 的实际输出为准</strong>。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>课</th>
+<th>主题</th>
+<th>知识点</th>
+<th>分类</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>42</td>
+<td>知识蒸馏</td>
+<td>软标签（dark knowledge）、温度缩放与 <code>T²</code>、top-k 截断、<code>(1-α)·CE + α·KD</code>、KD 梯度有限差分自检</td>
+<td>训练</td>
+<td>✅ 已落地（<code>src/distill.rs</code>（7 个单测）+ <code>distill</code> 子命令；实测学生 CE 5.59 → 3.97）</td>
+</tr>
+<tr>
+<td>43</td>
+<td>FP8 低精度（模拟）</td>
+<td>E4M3 / E5M2 位结构、ties-to-even 舍入、per-block scale（MXFP8 每 32 元素）、模拟 matmul 往返、训练开关 <code>train.fp8</code></td>
+<td>训练</td>
+<td>✅ 已落地（<code>src/fp8.rs</code>（10 个单测）+ <code>fp8</code> 子命令；⚠️ <strong>纯数值模拟，无加速</strong>，真实收益需 GPU FP8 kernel）</td>
+</tr>
+<tr>
+<td>44</td>
+<td>WSD 学习率调度</td>
+<td>warmup → 稳定段（恒定峰值）→ 末段线性退火；退火步数 = <code>round(wsd_decay_frac × (steps − warmup))</code>；稳定段任意时刻可切出退火（总步数不必前置）</td>
+<td>训练</td>
+<td>✅ 已落地（<code>src/train.rs</code> 的 <code>LRScheduler</code> / <code>new_wsd</code> / 工厂 <code>lr_scheduler</code>；开关 <code>lr_schedule</code> / <code>wsd_decay_frac</code>，默认 cosine 逐位不变）</td>
+</tr>
+<tr>
+<td>45</td>
+<td>QK-Norm</td>
+<td>对每个头的 <code>head_dim</code> 向量做 RMSNorm（投影之后、RoPE 之前）；GQA 下 K 侧各 KV 头共用一套 <code>gamma</code>；每层多 <code>2 × head_dim</code> 参数</td>
+<td>架构</td>
+<td>✅ 已落地（<code>src/attention.rs</code> 的 <code>q_norm</code> / <code>k_norm</code> / <code>apply_qk_norm</code> + <code>src/scaling.rs</code> 参数量口径；开关 <code>qk_norm</code>，默认关闭逐位不变）</td>
+</tr>
+<tr>
+<td>46</td>
+<td>Muon 优化器</td>
+<td>二维权重动量矩阵做 Newton–Schulz 正交化（<code>3.4445 / -4.7750 / 2.0315</code>）、标度 <code>√(max(1, r/c))</code>、一维参数交替回退 AdamW；每元素更新量约 <code>lr/√cols</code></td>
+<td>训练</td>
+<td>✅ 已落地（<code>src/optim.rs</code> 的 <code>Muon</code>（NS 正交化、标度 √cols、交替 AdamW 回退）+ <code>OptimizerState</code> trait + <code>src/train.rs</code> 的 <code>make_optimizer</code>；开关 <code>optimizer</code> / <code>muon_momentum</code> / <code>muon_ns_steps</code>）</td>
+</tr>
+<tr>
+<td>47</td>
+<td>mHC 流形约束超连接</td>
+<td>多条并行残差流：读出 <code>Σα_s X_s</code>、写入 <code>A X + β⊗y</code>；混合矩阵经 Sinkhorn–Knopp 投影到<strong>双随机矩阵</strong>（谱范数为 1 ⇒ 信号不放大、列和为 1 ⇒ 保均值）；收敛用可学 <code>γ</code></td>
+<td>架构</td>
+<td>✅ 已落地（<code>src/mhc.rs</code>（10 个单测）+ <code>src/model.rs</code> 接入；开关 <code>model.n_stream</code> / <code>mhc_sinkhorn_iters</code>，默认 <code>n_stream = 1</code> 逐位不变）</td>
+</tr>
+<tr>
+<td>48</td>
+<td>FP4 量化感知训练（模拟）</td>
+<td>E2M1 位结构（16 个码全有限，无 Inf / NaN 码）、饱和到 ±6.0、nibble 打包、per-block scale（MXFP4 每 32 元素 = 5 bit/元素）、训练开关 <code>train.fp4</code></td>
+<td>训练</td>
+<td>✅ 已落地（<code>src/fp4.rs</code>（9 个单测）+ <code>fp4</code> 子命令；⚠️ <strong>纯数值模拟，无加速</strong>，真实收益需 GPU FP4 tensor core）</td>
+</tr>
+<tr>
+<td>49</td>
+<td>CSA + HCA 混合注意力</td>
+<td>序列按块均值压缩（CSA）、query 对已完成块做 top-k 稀疏打分、在细块之上再平均 <code>hca_block</code> 倍做稠密全局覆盖（HCA）、三层并入一次 softmax；关键判据&quot;块末位置 ≤ i&quot;才可见（防泄漏）；覆盖不变式 + KV 字节 / 稀疏算力解析账本</td>
+<td>架构</td>
+<td>✅ 已落地（<code>src/csa.rs</code>（13 个单测）+ <code>csa</code> 子命令；开关 <code>model.csa_block</code> / <code>csa_top_k</code> / <code>hca_block</code>，默认 0 逐位不变）</td>
+</tr>
+<tr>
+<td>50</td>
+<td>MLA 解耦 RoPE + 权重吸收</td>
+<td>decoupled RoPE：<code>head_dim = hd_nope + hd_rope</code>，只对后 <code>hd_rope</code> 维旋转，<code>q_rope</code> / <code>k_rope</code> 由输入直接投影（与压缩 latent 解耦）；W_UK/W_UV 吸收：把 <code>W_UK</code> 折进 Q、对 latent 加权后再升维，注意力在 <code>r + n_head·hd_rope</code> 维完成、K/V 不物化（仅无梯度推理）；<code>b_k</code> 在 softmax 抵消、<code>b_v</code> 必须补回；缓存字节 / 吸收算力解析账本</td>
+<td>架构</td>
+<td>✅ 已落地（<code>src/attention.rs</code> 的 <code>forward_mla_decoupled</code> / <code>absorb_attention</code>（4 个单测）+ <code>mla</code> 子命令；开关 <code>model.mla_rope_dim</code> / <code>mla_absorb</code>，默认 0 / false 逐位不变）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="user-content-推荐阅读顺序文件编号--阶段顺序">推荐阅读顺序（文件编号 → 阶段顺序）<a href="#推荐阅读顺序文件编号--阶段顺序" aria-label="Link to heading '推荐阅读顺序（文件编号 → 阶段顺序）'" data-heading-content="推荐阅读顺序（文件编号 → 阶段顺序）" class="anchor"></a></h2>
+<p>文件编号与阶段顺序的对应关系：</p>
+<pre><code class="language-plaintext">阶段一（地基）：          01 → 02 → 03 → 04
+阶段二（神经网络）：        05 → 06 → 07
+阶段三（分词器）：          08
+阶段四（Transformer）：     09 → 10 → 11 → 12
+阶段五（训练与推理）：       13 → 14 → 15 → 16
+阶段六（训练进阶与正则化）：  17 → 18 → 19
+阶段七（现代 LLM 架构）：    20 → 21 → 22 → 23 → 24
+阶段八（工程优化）：        25 → 26 → 27 → 28 → 29 → 30
+阶段九（前沿技术）：        31 → 32 → 33 → 34 → 35 → 36 → 37 → 38
+阶段十（工程化完善）：      39 → 40
+阶段十一（多模态）：        41
+阶段十二（训练进阶与低精度）：42 → 43 → 44 → 45 → 46 → 47 → 48 → 49 → 50
+</code></pre>
+<blockquote>
+<p>具体学习方法：</p>
+<ol>
+<li>先读每课的教程文档（<code>docs/XX-xxx.md</code>），理解原理。</li>
+<li>再看对应源码（<code>src/</code>），对照实现。</li>
+<li>自己动手改代码、跑实验，验证理解。</li>
+<li>读完每课末尾的「拓展方向」（核心内容已全部实现，那里是进阶拓展）。</li>
+</ol>
+</blockquote>
+<hr />
+<h2 id="user-content-每个阶段会学到的核心数学ml-概念">每个阶段会学到的核心数学/ML 概念<a href="#每个阶段会学到的核心数学ml-概念" aria-label="Link to heading '每个阶段会学到的核心数学/ML 概念'" data-heading-content="每个阶段会学到的核心数学/ML 概念" class="anchor"></a></h2>
+<ul>
+<li><strong>线性代数</strong>：矩阵乘法、转置、点积、低秩分解（第 1、5、29 课；MLA 的 KV 低秩压缩在第 23 课延伸，解耦 RoPE 与权重吸收在第 50 课）、正交化（第 46 课 Muon 的 Newton–Schulz 迭代）</li>
+<li><strong>微积分</strong>：偏导数、链式法则、梯度（第 2 课）</li>
+<li><strong>概率</strong>：softmax、交叉熵、采样、拒绝采样（第 6、15、34 课）</li>
+<li><strong>信息论</strong>：KL 散度、温度缩放、dark knowledge（第 42 课知识蒸馏）</li>
+<li><strong>数值表示</strong>：浮点位结构与动态范围、E4M3/E5M2、E2M1、分块缩放 micro-scaling（第 43、48 课 FP8 / FP4）</li>
+<li><strong>优化</strong>：梯度下降、学习率、动量、AdamW（第 6、7、17 课）、学习率调度曲线（cosine / WSD，第 18、44 课）、Muon 的正交化更新（第 46 课）</li>
+<li><strong>深度学习</strong>：反向传播、正则化、归一化、Dropout（第 2、5、11、19 课；QK-Norm 是 RMSNorm 用在注意力 Q/K 上的变体，第 45 课）、多条并行残差流与双随机混合矩阵（第 47 课 mHC）、序列维块均值压缩与稀疏 / 分层注意力（第 49 课 CSA + HCA）、解耦 RoPE 与线性注意力吸收（第 50 课 MLA）</li>
+<li><strong>NLP</strong>：分词、词嵌入、注意力、Transformer（第 8-12 课）</li>
+<li><strong>信息检索</strong>：向量相似度、近似最近邻搜索（第 37 课）</li>
+<li><strong>强化学习</strong>：策略梯度、PPO、奖励建模、DPO（第 36 课）</li>
+<li><strong>系统工程</strong>：并行计算、通信原语、显存优化（第 38 课）</li>
+</ul>
+<hr />
+<h2 id="user-content-验收标准">验收标准<a href="#验收标准" aria-label="Link to heading '验收标准'" data-heading-content="验收标准" class="anchor"></a></h2>
+<ul>
+<li>每一课结束，<code>cargo run --release -- demo</code>（或对应子命令）能正常运行并输出预期结果。</li>
+<li>每一课都有配套文档，说明原理 + 代码讲解 + 练习。</li>
+<li>第 7 课结束时，我们的 MLP 能在 XOR 任务上收敛（验证自动微分正确）。</li>
+<li>第 16 课结束时，模型能生成通顺的短文本。</li>
+<li>第 30 课结束时，掌握所有现代 LLM 的核心组件（GQA、Flash Attention、LoRA、AMP 等）。</li>
+<li>第 38 课结束时，理解从预训练到对齐、从单卡到分布式的完整 LLM 技术栈。</li>
+<li>第 39 课结束时，项目具备完整的工程化能力：
+<ul>
+<li>23 个 CLI 子命令（本课落地 9 个：train / eval / generate / chat / sft / finetune / preset / demo / bench；
+后续各课陆续接入 <code>serve</code> / <code>scaling</code> / <code>moe</code> / <code>quant</code> / <code>distributed</code> / <code>align</code> / <code>rag</code> / <code>speculative</code> / <code>distill</code> / <code>fp8</code> / <code>fp4</code> / <code>csa</code> / <code>mla</code>，
+以及没有对应课、专做权重导入的 <code>import-hf</code>；完整清单见 <a href="39-%E5%B7%A5%E7%A8%8B%E5%8C%96%E5%AE%8C%E5%96%84.md">docs/39</a> §2.1）</li>
+<li>HuggingFace 权重导入：<code>import-hf</code> 把 <code>config.json</code> + <code>*.safetensors</code> 一次转成本仓库原生 <code>LLMCP2</code>
+（权重 only 档），并把 <code>rope_style</code> / bias 开关 / 输出头是否绑定等<strong>语义</strong>一并写进存档头</li>
+<li>分词器可持久化保存和加载（训练一次，多次使用），也可直接导入 HuggingFace 的 <code>tokenizer.json</code></li>
+<li>预设配置（small / medium / large）一键生成</li>
+<li>监督微调（SFT）：用「提问→回答」语料把只会续写的预训练模型教会应答（带 loss 掩码，输出到 <code>{out_dir}-sft</code>）</li>
+<li>微调工作流（加载预训练模型 → 继续训练）：<code>sft</code> 全参更新；<code>finetune</code> 走 LoRA——冻结主干、只训每层 Q/K/V 的低秩适配层（本项目实测可训练参数 1.32%）</li>
+<li>交互式对话模式（持续输入，模型实时回复）</li>
+<li>Beam Search 生成（通过 <code>generate --beam</code> 命令行参数直接使用）</li>
+<li>多文件数据加载（支持目录路径，自动合并 .txt 文件）</li>
+<li>训练指标 CSV 日志（loss / lr / ppl / tokens_per_sec）</li>
+<li>checkpoint 为二进制 <code>LLMCP2</code> 且<strong>原子写入</strong>（先写 <code>&lt;path&gt;.tmp</code> 再 rename），训练中断不会毁掉上一份完好存档</li>
+</ul>
+</li>
+<li>第 40 课结束时，模型能像主流大模型 API 一样被调用：
+<ul>
+<li><code>serve</code> 子命令起一个 OpenAI 兼容服务，<code>POST /v1/chat/completions</code> 非流式与 SSE 流式都能返回</li>
+<li>任意 OpenAI 兼容客户端把 <code>base_url</code> 指到本服务即可对话（另有 <code>GET /v1/models</code>、<code>GET /v1/embeddings</code>）</li>
+<li><code>--api-key</code> 鉴权、CORS 预检、请求日志、<code>/v1/status</code> 队列状态可查</li>
+<li><code>GET /openapi.json</code> <code>/openapi.yaml</code> 输出 OpenAI 风格的 OpenAPI 3.1 规范，请求体自带能跑通的 <code>example</code>、导入 Postman / Apifox 点 Send 即用（鉴权在 collection 填一次即可）；<code>serve</code> 启动时自动把静态版写进 <code>openapi/</code>（删了会重建）</li>
+<li>客户端断开连接时生成立即中止，不空烧算力</li>
+<li><code>serve</code> 默认顺带启动 <code>web/</code> 前端测试页（vite + React + TS，<code>http://localhost:5173</code>），可视化调流式对话 / embeddings / 状态接口，代理同源转发免 <code>--cors</code>（<code>--no-web</code> 关闭）</li>
+</ul>
+</li>
+<li>第 41 课结束时，模型具备最基础的多模态能力：
+<ul>
+<li>图片理解：<code>generate --image</code> 把图经 ViT 注入占位符，模型围绕它生成文字</li>
+<li>图片生成：<code>vlm_file</code> 图文训练 + <code>vq_steps</code> 预训练 VQ-VAE，采出完整图片段后解码为 <code>gen_image_{i}.png</code></li>
+<li>serve 非流式回包内嵌 <code>message.image_url</code>（data URI），OpenAPI 规范同步声明</li>
+<li>serve 图片理解：末条 user 消息带 <code>message.image_url</code>（data URI / 裸 base64）即传图，服务端解码注入 ViT；流式在 finish 前发一帧 <code>delta.image_url</code> 出图</li>
+<li>web 测试页 📎 上传输入图、气泡内渲染生成图</li>
+<li>不配 <code>model.vision</code> / <code>train.vlm_file</code> 时，行为与纯文本版本逐位一致</li>
+</ul>
+</li>
+<li>第 42 课结束时，理解并用上了知识蒸馏：
+<ul>
+<li><code>cargo run --release -- distill</code> 跑完三节：软标签熵随温度的变化、KD 梯度有限差分核对
+（最大误差 ~1e-4 量级）、「软标签 vs 硬标签」同学生同数据对照</li>
+<li>明白 <code>T²</code> 为什么不能省、为什么 teacher 与学生必须共用分词器</li>
+</ul>
+</li>
+<li>第 43 课结束时，理解 FP8 并量出它的数值代价：
+<ul>
+<li><code>cargo run --release -- fp8</code> 跑完三节：E4M3/E5M2 标准码值对照、分块缩放的误差/开销权衡、
+权重落 FP8 后的 loss 变化</li>
+<li><strong>清楚它的边界</strong>：本仓库是<strong>纯数值模拟</strong>，不带来任何加速；真实收益来自 GPU FP8 tensor core</li>
+<li><code>train.fp8</code> 打开后每步把二维权重按 E4M3 + 每 32 元素一 scale 往返量化，梯度与优化器状态仍是 f32</li>
+</ul>
+</li>
+<li>第 44 课结束时，理解并会用 WSD 调度：
+<ul>
+<li><code>train.lr_schedule = &quot;wsd&quot;</code> + <code>wsd_decay_frac</code> 后曲线呈三段式（warmup 线性上升 → 稳定段恒为 <code>max_lr</code> → 末段线性退火到 <code>min_lr</code>）</li>
+<li>明白&quot;稳定段任意时刻都能切出退火&quot;为什么让总步数不必前置；默认 <code>&quot;cosine&quot;</code> 与加 WSD 之前<strong>逐位相同</strong></li>
+</ul>
+</li>
+<li>第 45 课结束时，明白 QK-Norm 解决什么问题：
+<ul>
+<li><code>model.qk_norm = true</code> 后每个头的 <code>head_dim</code> 向量 RMS = 1（<strong>投影之后、RoPE 之前</strong>），对输入整体缩放不变</li>
+<li>清楚它的代价：每层多 <code>2 × head_dim</code> 参数，且会让 GPU 常驻快路失效、退回逐算子路径</li>
+</ul>
+</li>
+<li>第 46 课结束时，能用 Muon 跑通训练并且知道坑在哪：
+<ul>
+<li><code>train.optimizer = &quot;muon&quot;</code> 后二维权重走 Newton–Schulz 正交化、一维参数自动回退 AdamW</li>
+<li>记住&quot;沿用 AdamW 的学习率 Muon 会几乎不动&quot;——每元素更新量约 <code>lr/√cols</code>，峰值学习率要放大 <code>√cols</code> 倍</li>
+<li>Muon 的状态能进 checkpoint 续训（<code>state</code> / <code>restore_state</code> 往返一致）</li>
+</ul>
+</li>
+<li>第 47 课结束时，理解 mHC 并把残差流真正拓宽过：
+<ul>
+<li><code>model.n_stream = 2</code> 后每层多了 <code>hc_attn</code> / <code>hc_mlp</code> 两组门控参数（<code>α</code> / <code>β</code> / <code>A</code>），
+模型入口把一条残差流扩成 2 条、出口用可学 <code>γ</code> 收敛回一条</li>
+<li>说得清 <strong>双随机矩阵</strong> 为什么能同时保证&quot;谱范数为 1（信号不放大）&quot;与&quot;列和为 1（保均值）&quot;，
+以及 Sinkhorn–Knopp 迭代为什么能当&quot;投影算子&quot;用还照样能反向</li>
+<li>知道两个实测踩过的坑：入口各流雷同会让首层 <code>α</code>/<code>A</code> 拿不到梯度；收敛用<strong>均匀平均</strong>
+会让末层 <code>β</code>/<code>A</code> 变成死参数（所以收敛权重 <code>γ</code> 必须是可学的）</li>
+<li>默认 <code>n_stream = 1</code> 不构造任何超连接参数、前向<strong>逐位不变</strong></li>
+</ul>
+</li>
+<li>第 48 课结束时，理解 FP4 并把&quot;4 位&quot;的账算清楚：
+<ul>
+<li><code>cargo run --release -- fp4</code> 跑完三节：E2M1 全 16 码对照、分块缩放的位宽 / 精度账本、
+f32 / FP8 / FP4 三方验证 CE 对照</li>
+<li>说得清 E2M1 为什么<strong>既没有 Inf 码也没有 NaN 码</strong>——<code>|x| &gt; 6</code> 与 <code>NaN</code> 都只能饱和到 ±6.0</li>
+<li>算得清 <code>5 bit/元素 = 4 bit 码 + 每 32 元素摊 1 bit scale</code>（对 f32 6.4 倍），
+而 FP8 是 <code>9 bit/元素</code>（3.56 倍）；<strong>别把&quot;4 位&quot;直接当成&quot;省 8 倍&quot;</strong></li>
+<li><code>train.fp4</code> 打开后每步把二维权重按 E2M1 + 每 32 元素一个 scale 往返量化回写，
+梯度与优化器状态仍是 f32；与 <code>train.fp8</code> 同开时以 FP4 为准</li>
+</ul>
+</li>
+<li>第 49 课结束时，理解 CSA + HCA 混合注意力并把长序列的账算清楚：
+<ul>
+<li><code>cargo run --release -- csa</code> 跑完三节：三分支覆盖不变式、KV 字节账本、top-k 稀疏算力账本</li>
+<li>说得清三层各自管什么——局部窗口给&quot;最近的 m 个位置&quot;全分辨率，细压缩（CSA）给
+&quot;已完成块&quot;的块均值 + top-k 稀疏，粗压缩（HCA）再平均一遍给出廉价的全局覆盖</li>
+<li>记得住那条唯一的因果判据：<strong>压缩块只有在块末位置 ≤ i 时才可见</strong>（<code>B_i = floor((i+1)/m)</code>）；
+用&quot;块起点 ≤ i&quot;会让块内尚未生成的 token 漏进来，loss 会虚假变好</li>
+<li>算得清两组账：KV 字节 <code>2·(m + T/m)·n_kv·hd·4</code>（存储口径，m ≈ √T 附近最省），
+与每 query 槽位 <code>m + top_k + floor(T/(m·hca))</code>（算力口径），两者互相独立</li>
+<li>知道三层为什么能并进<strong>一次 softmax</strong>：各层只是把不同范围的 key 放进同一行分数，
+掩码逐行对齐后一次归一化，等价于在并集 <code>[0, i]</code> 上做注意力</li>
+<li>默认 <code>csa_block = 0</code> 时注意力仍走 <code>flash_attention</code>，前向<strong>逐位不变</strong>（且不新增任何参数）</li>
+</ul>
+</li>
+<li>第 50 课结束时，理解 MLA 解耦 RoPE 与权重吸收：
+<ul>
+<li><code>cargo run --release -- mla</code> 跑完三节：增量缓存字节账本、吸收的解码算力账本、解耦约束自检</li>
+<li>说得清&quot;把 RoPE 从 K 里摘出来单独走低维通路&quot;为什么是吸收的<strong>前提</strong>——
+旋转会让 K 不再是 latent 的线性函数，而吸收恒等式 <code>q_nope·(c·W_UK) = (q_nope·W_UKᵀ)·c</code> 要求线性</li>
+<li>记得住两处 bias 的不同命运：<code>b_k</code> 是逐 head 常数、softmax 里<strong>自动抵消</strong>；
+<code>b_v</code> 因 <code>Σp = 1</code> 会整体平移输出、<strong>必须补回</strong></li>
+<li>算得清两组账：增量缓存 <code>T·(r + n_head·hd_rope)·4</code>（对照全量 <code>2·T·n_head·head_dim·4</code>），
+与吸收后 T 项系数从 <code>2·n_head·r·hd_nope</code> 降到 <code>2·n_head·r</code>（比值趋近 <code>hd_nope</code>）</li>
+<li>知道吸收的边界：仅<strong>无梯度推理</strong>可用、与 QK-Norm 互斥、解耦要求 <code>n_kv_head ∈ {0, n_head}</code></li>
+<li>默认 <code>mla_rope_dim = 0</code> 时不构造 <code>c_qr</code>/<code>c_kr</code>、不消耗随机数，前向<strong>逐位不变</strong></li>
+</ul>
+</li>
+</ul>

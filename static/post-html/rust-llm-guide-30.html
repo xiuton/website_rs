@@ -1,0 +1,197 @@
+<h1 id="user-content-第-30-课beam-search--贪心搜索的升级版">第 30 课：Beam Search —— 贪心搜索的升级版<a href="#第-30-课beam-search--贪心搜索的升级版" aria-label="Link to heading '第 30 课：Beam Search —— 贪心搜索的升级版'" data-heading-content="第 30 课：Beam Search —— 贪心搜索的升级版" class="anchor"></a></h1>
+<blockquote>
+<p>代码位置：<a href="../src/sample.rs">src/sample.rs</a>（<code>beam_search</code> 函数）</p>
+<p>对比：第 15 课实现了 temperature + top-k + top-p 采样</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>Greedy Search、Beam Search、随机采样三者的区别是什么？</li>
+<li>Beam Search 为什么能生成更&quot;优质&quot;的序列？</li>
+<li>什么是长度惩罚？为什么需要它？</li>
+<li>Beam Search 适合什么场景？不适合什么场景？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-三种解码策略对比">2. 三种解码策略对比<a href="#2-三种解码策略对比" aria-label="Link to heading '2. 三种解码策略对比'" data-heading-content="2. 三种解码策略对比" class="anchor"></a></h2>
+<h3 id="user-content-21-greedy-search贪心搜索">2.1 Greedy Search（贪心搜索）<a href="#21-greedy-search贪心搜索" aria-label="Link to heading '2.1 Greedy Search（贪心搜索）'" data-heading-content="2.1 Greedy Search（贪心搜索）" class="anchor"></a></h3>
+<p>每步选概率最高的 token：</p>
+<pre><code class="language-plaintext">next_token = argmax(P(token | context))
+</code></pre>
+<ul>
+<li>优点：简单、快</li>
+<li>缺点：容易陷入局部最优，生成重复内容</li>
+</ul>
+<h3 id="user-content-22-random-sampling随机采样">2.2 Random Sampling（随机采样）<a href="#22-random-sampling随机采样" aria-label="Link to heading '2.2 Random Sampling（随机采样）'" data-heading-content="2.2 Random Sampling（随机采样）" class="anchor"></a></h3>
+<p>按概率分布随机采样：</p>
+<pre><code class="language-plaintext">next_token ~ P(token | context) / temperature
+</code></pre>
+<p>第 15 课实现了 temperature + top-k + top-p。</p>
+<ul>
+<li>优点：多样性高，有创意</li>
+<li>缺点：可能生成不连贯的内容</li>
+</ul>
+<h3 id="user-content-23-beam-search束搜索">2.3 Beam Search（束搜索）<a href="#23-beam-search束搜索" aria-label="Link to heading '2.3 Beam Search（束搜索）'" data-heading-content="2.3 Beam Search（束搜索）" class="anchor"></a></h3>
+<p>维护 k 个候选序列（beam），每步扩展后保留 top-k：</p>
+<pre><code class="language-plaintext">初始：beam = [prompt]
+每步：
+    对每个 beam，扩展所有可能的 next token
+    从所有候选中选得分最高的 k 个
+返回：得分最高的完整序列
+</code></pre>
+<ul>
+<li>优点：全局最优（在束宽 k 内），生成质量高</li>
+<li>缺点：慢（每步 k 倍计算量），确定性（没有创意）</li>
+</ul>
+<hr />
+<h2 id="user-content-3-beam-search-算法">3. Beam Search 算法<a href="#3-beam-search-算法" aria-label="Link to heading '3. Beam Search 算法'" data-heading-content="3. Beam Search 算法" class="anchor"></a></h2>
+<h3 id="user-content-31-详细步骤">3.1 详细步骤<a href="#31-详细步骤" aria-label="Link to heading '3.1 详细步骤'" data-heading-content="3.1 详细步骤" class="anchor"></a></h3>
+<pre><code class="language-plaintext">beam_size = 4
+初始 beams = [(prompt, log_prob=0)]
+
+Step 1:
+    对每个 beam，计算所有 vocab 的 log_prob
+    保留 top-4 候选：[(prompt+tok1, -0.1), (prompt+tok2, -0.3), ...]
+
+Step 2:
+    对每个 beam，扩展所有 vocab
+    保留 top-4：[(prompt+tok1+tok5, -0.2), ...]
+
+...直到生成 EOS 或达到 max_len
+</code></pre>
+<h3 id="user-content-32-得分计算">3.2 得分计算<a href="#32-得分计算" aria-label="Link to heading '3.2 得分计算'" data-heading-content="3.2 得分计算" class="anchor"></a></h3>
+<p>每个 beam 的得分是<strong>累积 log 概率</strong>：</p>
+<pre><code class="language-plaintext">score = Σ log P(token_i | context)
+</code></pre>
+<p>用 log 概率而不是概率，避免数值下溢（很多小概率相乘会变成 0）。</p>
+<hr />
+<h2 id="user-content-4-长度惩罚">4. 长度惩罚<a href="#4-长度惩罚" aria-label="Link to heading '4. 长度惩罚'" data-heading-content="4. 长度惩罚" class="anchor"></a></h2>
+<p><strong>问题</strong>：短序列天然得分高（累积的 log_prob 项数少）。</p>
+<p><strong>解决</strong>：用长度惩罚归一化：</p>
+<pre><code class="language-plaintext">final_score = log_prob / len^α
+</code></pre>
+<ul>
+<li>α = 0：不惩罚（等价于不归一化，本项目 CLI 的默认值是 0.6）</li>
+<li>α &gt; 0：偏好长序列</li>
+<li>α &lt; 0：偏好短序列</li>
+</ul>
+<p>Google NMT 论文使用 α = 0.6。</p>
+<hr />
+<h2 id="user-content-5-beam-search-vs-采样">5. Beam Search vs 采样<a href="#5-beam-search-vs-采样" aria-label="Link to heading '5. Beam Search vs 采样'" data-heading-content="5. Beam Search vs 采样" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Beam Search</th>
+<th>采样（temperature/top-k/top-p）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>确定性</td>
+<td>✅ 确定性（给定 beam_size）</td>
+<td>❌ 随机性</td>
+</tr>
+<tr>
+<td>多样性</td>
+<td>低</td>
+<td>高</td>
+</tr>
+<tr>
+<td>质量</td>
+<td>高（全局最优）</td>
+<td>中（局部随机）</td>
+</tr>
+<tr>
+<td>速度</td>
+<td>慢（k 倍计算量）</td>
+<td>快</td>
+</tr>
+<tr>
+<td>适用场景</td>
+<td>翻译、摘要、问答</td>
+<td>创意写作、对话</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="user-content-6-实现要点">6. 实现要点<a href="#6-实现要点" aria-label="Link to heading '6. 实现要点'" data-heading-content="6. 实现要点" class="anchor"></a></h2>
+<h3 id="user-content-61-数据结构">6.1 数据结构<a href="#61-数据结构" aria-label="Link to heading '6.1 数据结构'" data-heading-content="6.1 数据结构" class="anchor"></a></h3>
+<pre><code class="language-rust">// 每个 beam: (token_ids, cumulative_log_prob)
+let mut beams: Vec&lt;(Vec&lt;usize&gt;, f64)&gt; = vec![(prompt_ids, 0.0)];
+</code></pre>
+<h3 id="user-content-62-提前终止">6.2 提前终止<a href="#62-提前终止" aria-label="Link to heading '6.2 提前终止'" data-heading-content="6.2 提前终止" class="anchor"></a></h3>
+<p>某个 beam 生成结束标记后就不再扩展；所有 beam 都结束了就提前停止。</p>
+<blockquote>
+<p>本项目现在用的是<strong>真实的 EOS 特殊 token</strong>（<code>tokenizer.eos_id()</code>，见第 1 课的特殊 token 设计）：
+分词器带特殊 token 时它是真实 id，旧 checkpoint 或无特殊 token 的词表下为 <code>None</code>，
+此时不做提前终止。选中的序列末尾若带 EOS，解码前会被摘掉（EOS 是结束符，不是内容）。</p>
+</blockquote>
+<h3 id="user-content-63-kv-cache-兼容">6.3 KV Cache 兼容<a href="#63-kv-cache-兼容" aria-label="Link to heading '6.3 KV Cache 兼容'" data-heading-content="6.3 KV Cache 兼容" class="anchor"></a></h3>
+<p>Beam Search 中每个 beam 的 KV Cache 独立，需要为每个 beam 维护一份。
+本项目实现里每条 beam 持有一份<strong>独立的 KV Cache</strong>（<code>Beam.cache</code>）：新候选的缓存从父路径 <code>fork</code> 出来，
+兄弟路径前缀相同、缓存自然一致，之后每条 beam 只喂自己最后一个 token 做增量前向。
+是否启用由 <code>KvOpts</code> 决定，关闭时退化为全量前向。</p>
+<hr />
+<h2 id="user-content-7-集成状态">7. 集成状态<a href="#7-集成状态" aria-label="Link to heading '7. 集成状态'" data-heading-content="7. 集成状态" class="anchor"></a></h2>
+<p><code>beam_search</code> 函数已完整实现（<code>sample.rs</code>），并通过 <code>generate</code> 子命令的 <code>--beam</code> 参数接入 CLI。</p>
+<h3 id="user-content-71-命令行用法">7.1 命令行用法<a href="#71-命令行用法" aria-label="Link to heading '7.1 命令行用法'" data-heading-content="7.1 命令行用法" class="anchor"></a></h3>
+<pre><code class="language-bash"># 基础 Beam Search（beam_size=5）
+cargo run --release -- generate --config config/config.json --prompt &quot;The fox&quot; --beam 5 --max-new 100
+
+# 带长度惩罚的 Beam Search（偏好长序列）
+cargo run --release -- generate --config config/config.json --prompt &quot;The fox&quot; --beam 8 --length-penalty 0.8 --max-new 100
+</code></pre>
+<h3 id="user-content-72-参数说明">7.2 参数说明<a href="#72-参数说明" aria-label="Link to heading '7.2 参数说明'" data-heading-content="7.2 参数说明" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>类型</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--beam &lt;size&gt;</code></td>
+<td>int</td>
+<td>无（不指定则用采样）</td>
+<td>束宽，通常 4-10</td>
+</tr>
+<tr>
+<td><code>--length-penalty &lt;α&gt;</code></td>
+<td>float</td>
+<td><code>0.6</code></td>
+<td>长度惩罚指数（Google NMT 推荐 0.6）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-73-注意事项">7.3 注意事项<a href="#73-注意事项" aria-label="Link to heading '7.3 注意事项'" data-heading-content="7.3 注意事项" class="anchor"></a></h3>
+<ul>
+<li>指定 <code>--beam</code> 时，temperature / top-k / top-p 参数无效（Beam Search 是确定性的）</li>
+<li>Beam Search 每步需计算 beam_size 倍的前向，速度比采样慢</li>
+<li>不指定 <code>--beam</code> 时默认使用采样生成（temperature + top-k + top-p）</li>
+</ul>
+<hr />
+<h2 id="user-content-8-小结与下一课">8. 小结与下一课<a href="#8-小结与下一课" aria-label="Link to heading '8. 小结与下一课'" data-heading-content="8. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li>Beam Search 维护 k 个候选，每步扩展后保留 top-k</li>
+<li>得分必须是累积 <strong>log 概率</strong>：<code>sample.rs</code> 的 <code>beam_search</code> 先对 logits 做 <code>log_softmax</code>（减最大值做数值稳定化，<code>log_z = max + ln Σ exp(l − max)</code>，被屏蔽的 <code>-inf</code> 自然为 0），再逐 token 累加；直接用原始 logit 累加会带上尺度偏置</li>
+<li>长度惩罚 α 解决短序列天然得分高的偏置</li>
+<li>适合翻译、摘要等&quot;精确&quot;任务；不适合创意写作</li>
+<li>速度是采样的 k 倍（k = beam_size）</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li><strong>扫 <code>--beam</code></strong>：用 <code>--beam 2 / 5 / 10</code> 跑同一个 prompt，对比生成质量与耗时——验证第 5 节&quot;慢 k 倍&quot;的比例。</li>
+<li><strong>扫 <code>--length-penalty</code></strong>：<code>0 / 0.6 / 1.0</code> 各跑一次，观察生成长度是否真的随 α 变长（第 4 节）。</li>
+<li><strong>验 log_softmax 的必要性</strong>：临时把 <code>beam_search</code> 里的 <code>log_softmax</code> 换成直接用原始 logit 累加，对比同一 prompt 的排序结果，体会第 8 节里说的&quot;尺度偏置&quot;。</li>
+<li><strong>看 beam 的缓存分叉</strong>：在 <code>Beam.cache</code> 的 <code>fork</code> 处加一行计数，确认同一前缀的兄弟 beam 没有各自重算一遍历史 K/V（6.3 节）。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="31-Scaling-Laws.md">第 31 课 Scaling Laws（缩放定律）</a> —— 解码策略这条线收尾，下一课跳到训练侧的第一性原理——参数量、数据量、算力与 loss 之间的幂律关系。</p>
+</blockquote>

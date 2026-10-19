@@ -1,0 +1,93 @@
+<h1 id="user-content-react中forwardref的用法">React中forwardRef的用法<a href="#react中forwardref的用法" aria-label="Link to heading 'React中forwardRef的用法'" data-heading-content="React中forwardRef的用法" class="anchor"></a></h1>
+<blockquote>
+<p>官网文档：<a href="https://zh-hans.react.dev/reference/react/forwardRef">https://zh-hans.react.dev/reference/react/forwardRef</a></p>
+</blockquote>
+<p>今天我们就一起学习一下React中的ref怎么获取组件实例，只讨论函数式组件中的ref</p>
+<p>如下代码，我们直接在App根组件中，意图只使用ref就获取Footer组件实例</p>
+<p>细心的同学可能已经发现控制台报错了，提示我们应该使用forwardRef，并且编辑器也提示<code>ref={footRef}</code>类型不对</p>
+<p>这是因为React不会默认暴露组件中的东西，如果开发者想要从组件中暴露出来东西，需要手动挡进行操作，这也是为了组件数据安全的考量</p>
+<p>App.tsx</p>
+<pre><code class="language-tsx">import { useRef } from 'react'
+import { Footer } from '@/components/footer'
+
+const App = () =&gt; {
+  const footRef = useRef(null)
+  const getFootRef = () =&gt; {
+    console.log(footRef.current)
+  }
+  return (
+    &lt;div className='app'&gt;
+      &lt;h1&gt;App&lt;/h1&gt;
+      &lt;button onClick={getFootRef}&gt;Show footRef&lt;/button&gt;
+      &lt;Footer ref={footRef}&gt;&lt;/Footer&gt;
+    &lt;/div&gt;
+  )
+}
+
+export default App
+</code></pre>
+<p>components/Footer/index.tsx</p>
+<pre><code class="language-tsx">import { useState } from 'react'
+
+export const Footer = () =&gt; {
+  const [count, setCount] = useState(0)
+  return (
+    &lt;div className=&quot;footer&quot;&gt;
+      &lt;h1&gt;Footer&lt;/h1&gt;
+      &lt;p&gt;{ count }&lt;/p&gt;
+      &lt;button onClick={() =&gt; setCount(count + 1)}&gt;Click Me&lt;/button&gt;
+    &lt;/div&gt;
+  )
+}
+</code></pre>
+<p>那么我们如何获取组件实例呢</p>
+<p>直接请出forwardRef来对Footer组件进行改造</p>
+<p>App.tsx 不变</p>
+<p>Footer组件改造如下</p>
+<p>components/Footer/index.tsx</p>
+<pre><code class="language-tsx">import { useState, forwardRef } from 'react'
+
+export const Footer = forwardRef&lt;HTMLDivElement&gt;((props, ref) =&gt; {
+  console.log(props)
+  const [count, setCount] = useState(0)
+  return (
+    &lt;div className=&quot;footer&quot;&gt;
+      &lt;h1&gt;Footer&lt;/h1&gt;
+      &lt;p ref={ref}&gt;{ count }&lt;/p&gt;
+      &lt;button onClick={() =&gt; setCount(count + 1)}&gt;Click Me&lt;/button&gt;
+    &lt;/div&gt;
+  )
+})
+</code></pre>
+<p>可以看出已经能打印出来p标签了，等等...为什么ref绑定在了p标签上，是的没错，想将哪个标签暴露给父组件，就绑定给谁身上</p>
+<p>forwardRef的用法就是直接套在组件函数外部，此时组件函数入参的第一个参数依然是props，第二个参数就是ref</p>
+<p>此时更应该注意的是，forwardRef需要编写泛型，该泛型就是需要暴露出去的东东的类型，如上代码，我们将p标签暴露出去了</p>
+<p>如想将组件状态数据暴露出去，需要使用一个Hook，那就是<code>useImperativeHandle</code></p>
+<p>使用方法见以下代码</p>
+<p>App.tsx不变</p>
+<p>Footer组件改造为以下</p>
+<p>components/Footer/index.tsx</p>
+<pre><code class="language-tsx">import { useState, useRef, forwardRef, useImperativeHandle } from 'react'
+
+export const Footer = forwardRef&lt;object&gt;((props, ref) =&gt; {
+  console.log(props)
+  const [count, setCount] = useState(0)
+  const pRef = useRef&lt;HTMLParagraphElement&gt;(null)
+
+  useImperativeHandle(ref, () =&gt; {
+    return {
+      count,
+      pRef
+    }
+  })
+
+  return (
+    &lt;div className=&quot;footer&quot;&gt;
+      &lt;h1&gt;Footer&lt;/h1&gt;
+      &lt;p ref={pRef}&gt;{ count }&lt;/p&gt;
+      &lt;button onClick={() =&gt; setCount(count + 1)}&gt;Click Me&lt;/button&gt;
+    &lt;/div&gt;
+  )
+})
+</code></pre>
+<p>很明显的问题，p标签如要一同暴露，不能直接使用<code>ref={ref}</code>进行暴露，需要将p标签设置一个useRef，然后将其他同其他状态数据一起暴露</p>

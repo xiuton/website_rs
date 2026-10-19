@@ -1,0 +1,27 @@
+<p>读码见意</p>
+<pre><code class="language-ts">function func(arg: number) {}
+func(1)
+func(&quot;zs&quot;) // ERROR Argument of type 'string' is not assignable to parameter of type 'number'.
+
+</code></pre>
+<p>如想要将函数参数定义为非number的其他类型，则可以这样</p>
+<pre><code class="language-ts">function func&lt;T&gt;(arg: T extends number ? never : T) {}
+func(1) // ERROR Argument of type 'number' is not assignable to parameter of type 'never'.
+func(&quot;zs&quot;)
+func(true)
+func([])
+func({})
+func(() =&gt; {})
+
+</code></pre>
+<p>写成一个通用的type类型</p>
+<pre><code class="language-ts">type negationType&lt;T, U&gt; = T extends U ? never : T
+function func&lt;T&gt;(arg: negationType&lt;T, number&gt;) {}
+func(1) // ERROR Argument of type 'number' is not assignable to parameter of type 'never'.
+func(&quot;zs&quot;)
+func(true)
+func([])
+func({})
+func(() =&gt; {})
+
+</code></pre>

@@ -1,0 +1,275 @@
+<h1 id="user-content-第-47-课mhc-流形约束超连接--把残差流拓宽成多条并行通道">第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道<a href="#第-47-课mhc-流形约束超连接--把残差流拓宽成多条并行通道" aria-label="Link to heading '第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道'" data-heading-content="第 47 课：mHC 流形约束超连接 —— 把残差流拓宽成多条并行通道" class="anchor"></a></h1>
+<blockquote>
+<p><strong>本课已落地为可运行代码</strong>：<a href="../src/mhc.rs"><code>src/mhc.rs</code></a>（<code>HyperConnection</code> +
+<code>expand_streams</code> / <code>collapse_streams</code> / <code>sinkhorn</code> / <code>spectral_norm</code>），
+接入点 <a href="../src/model.rs"><code>src/model.rs</code></a> 的 <code>TransformerBlock::forward_streams</code>
+与 <code>Transformer::forward_core</code>。
+配置开关：<code>model.n_stream</code>（默认 <code>1</code> = 关闭）/ <code>model.mhc_sinkhorn_iters</code>（默认 <code>20</code>）。</p>
+<p>与前面各课的衔接：第 4 课起的残差连接一直是<strong>一条</strong>流（<code>x ← x + Sublayer(Norm(x))</code>）；
+本课把它拓宽成 <code>n</code> 条<strong>并行残差流</strong>，层间用一份经 Sinkhorn 投影到<strong>双随机矩阵</strong>的
+混合矩阵耦合。<code>n_stream = 1</code> 时行为与加 mHC 之前<strong>逐位一致</strong>。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>残差流从&quot;一条&quot;变成&quot;多条&quot;，读出 / 写入到底在做什么？</li>
+<li>为什么放开混合矩阵去学会失控？mHC 把它约束到哪个集合里？</li>
+<li>为什么&quot;双随机&quot;能同时给出&quot;信号不放大&quot;和&quot;保均值&quot;两个保证？</li>
+<li>Sinkhorn–Knopp 迭代为什么能当&quot;投影算子&quot;用，还能反向？</li>
+<li><code>n_stream = 1</code> 为什么能<strong>逐位</strong>退化成普通残差？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-动机单条残差流的信息瓶颈">2. 动机：单条残差流的信息瓶颈<a href="#2-动机单条残差流的信息瓶颈" aria-label="Link to heading '2. 动机：单条残差流的信息瓶颈'" data-heading-content="2. 动机：单条残差流的信息瓶颈" class="anchor"></a></h2>
+<p>从 ResNet 到 Transformer，主干骨架一直是：</p>
+<pre><code class="language-text">x ← x + Sublayer(Norm(x))
+</code></pre>
+<p>信息沿唯一的一条通道往前流，层与层之间只有&quot;加法&quot;这一种耦合。想让某一层&quot;少传一点、
+下一层多传一点&quot;，除了改参数没有别的旋钮——<strong>通路的宽度是固定的 1</strong>。</p>
+<p><strong>超连接（Hyper-Connections, HC）</strong> 把这条通道拓宽成 <code>n</code> 条并行残差流
+<code>X₀ … X_{n-1}</code>（本文按 <code>S ∈ R^{n×D}</code> 看，<code>D = b·t·d</code>）。每个子层不再直接读写同一条流：</p>
+<pre><code class="language-text">读出：h     = Σ_s α_s · X_s                  （α 在单纯形上，Σα = 1）
+计算：y     = Sublayer(Norm(h))
+写入：X_s'  = Σ_t A_{s,t} · X_t + β_s · y     （A 是 n×n 混合矩阵，β 在单纯形上）
+</code></pre>
+<p>读出用 <code>α</code> 把多条流压成一条喂给子层；写入先用 <code>A</code> 在<strong>流之间</strong>重新混合，再用 <code>β</code>
+把子层输出按不同强度注入各条流。<code>n = 1</code> 时 <code>α = A = β = 1</code>，上面三行退化成普通残差。</p>
+<hr />
+<h2 id="user-content-3-原理为什么必须约束到双随机矩阵">3. 原理：为什么必须约束到双随机矩阵<a href="#3-原理为什么必须约束到双随机矩阵" aria-label="Link to heading '3. 原理：为什么必须约束到双随机矩阵'" data-heading-content="3. 原理：为什么必须约束到双随机矩阵" class="anchor"></a></h2>
+<h3 id="user-content-31-不约束会怎样">3.1 不约束会怎样<a href="#31-不约束会怎样" aria-label="Link to heading '3.1 不约束会怎样'" data-heading-content="3.1 不约束会怎样" class="anchor"></a></h3>
+<p>放开 <code>A</code> 去学，它很快失控：元素可以任意大，前向一遍遍乘上去，信号指数爆炸（或塌缩）。
+<strong>mHC（Manifold-Constrained Hyper-Connections，DeepSeek-V4）</strong> 的做法是把 <code>A</code> 约束到
+<strong>双随机矩阵</strong>的集合（Birkhoff 多面体）：</p>
+<pre><code class="language-text">A ≥ 0,    A·1 = 1（每行和为 1）,    1ᵀ·A = 1（每列和为 1）
+</code></pre>
+<p>&quot;流形约束&quot;这个词的来历就在这：把可学参数限制在一个能保证数值稳定的<strong>流形</strong>（多面体）上。</p>
+<h3 id="user-content-32-好处一信号不放大谱范数恰为-1">3.2 好处一：信号不放大（谱范数恰为 1）<a href="#32-好处一信号不放大谱范数恰为-1" aria-label="Link to heading '3.2 好处一：信号不放大（谱范数恰为 1）'" data-heading-content="3.2 好处一：信号不放大（谱范数恰为 1）" class="anchor"></a></h3>
+<p>双随机矩阵是置换矩阵的凸组合（<strong>Birkhoff–von Neumann 定理</strong>）。谱范数 <code>‖·‖₂</code> 是凸函数、
+置换矩阵的谱范数恰好是 1，于是</p>
+<pre><code class="language-text">‖A‖₂ = ‖Σ λᵢ Pᵢ‖₂ ≤ Σ λᵢ ‖Pᵢ‖₂ = 1
+</code></pre>
+<p>而 <code>A·1 = 1</code> 说明 <code>1</code> 是 <code>A</code> 的特征值，故 <code>‖A‖₂ ≥ 1</code>。两头一夹：</p>
+<pre><code class="language-text">‖A‖₂ = 1     ——每一步混合都恰好保范，既不放也不缩
+</code></pre>
+<p>这正是单测 <code>test_sinkhorn_spectral_norm_is_one</code> 用幂迭代核对的性质。</p>
+<h3 id="user-content-33-好处二保均值列和为-1">3.3 好处二：保均值（列和为 1）<a href="#33-好处二保均值列和为-1" aria-label="Link to heading '3.3 好处二：保均值（列和为 1）'" data-heading-content="3.3 好处二：保均值（列和为 1）" class="anchor"></a></h3>
+<p><code>Σ_s X_s'</code> 里的混合部分是 <code>1ᵀ A X</code>。列和为 1 即 <code>1ᵀ A = 1ᵀ</code>，于是</p>
+<pre><code class="language-text">Σ_s (A X)_s = Σ_t X_t     ——&quot;所有流的和&quot;在混合前后不变
+</code></pre>
+<p>残差流的整体尺度不会随层数漂移。这条对应单测 <code>test_doubly_stochastic_preserves_total_energy</code>。</p>
+<h3 id="user-content-34-参数化自由参数--sinkhorn-投影">3.4 参数化：自由参数 + Sinkhorn 投影<a href="#34-参数化自由参数--sinkhorn-投影" aria-label="Link to heading '3.4 参数化：自由参数 + Sinkhorn 投影'" data-heading-content="3.4 参数化：自由参数 + Sinkhorn 投影" class="anchor"></a></h3>
+<p>直接把 <code>A</code> 参数化成双随机很难（要自定义梯度）。常用技巧是&quot;<strong>约束流形 + 自由参数化</strong>&quot;：
+让 <code>A</code> 由一份自由矩阵经 <strong>Sinkhorn–Knopp 迭代</strong>投影得到。</p>
+<pre><code class="language-text">A⁰ = softmax_rows(depth_raw)        // 行 softmax 先保证非负、行和为 1
+重复 iters 轮：
+    列归一化  A ← A / (1ᵀ A + ε)     // 每列除以列和（ε = 1e-12 防除零）
+    行归一化  A ← A / (A 1 + ε)      // 每行除以行和（同上）
+</code></pre>
+<blockquote>
+<p>两个 <code>+ ε</code> 不是装饰：softmax 在数值上可以把某一列压成<strong>精确的 0</strong>（例如行 softmax 的
+logits 极差很大时），此时列和 = 0，裸除法会得到 <code>0/0 = NaN</code> 并顺着反向污染整个
+<code>depth_raw</code> 的梯度。加 <code>ε</code> 之后这种列只会被压到 0（而不是 NaN），迭代语义不变。</p>
+</blockquote>
+<p>正矩阵在这个迭代下必收敛到双随机矩阵（Sinkhorn–Knopp 定理）；本来就在流形上的输入
+（单位阵、置换阵）是不动点。因此 <code>A</code> <strong>永远合法</strong>，而可学参数 <code>depth_raw</code> 不受约束。</p>
+<hr />
+<h2 id="user-content-4-本仓库实现要点">4. 本仓库实现要点<a href="#4-本仓库实现要点" aria-label="Link to heading '4. 本仓库实现要点'" data-heading-content="4. 本仓库实现要点" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../src/mhc.rs"><code>src/mhc.rs</code></a> <code>expand_streams</code></td>
+<td><code>[b,t,d] → [n, b·t·d]</code>，用一次 <code>[n,1]×[1,D]</code> 矩阵乘复制各流，再乘静态增益 <code>1 + s·0.01</code></td>
+</tr>
+<tr>
+<td><a href="../src/mhc.rs"><code>src/mhc.rs</code></a> <code>collapse_streams</code></td>
+<td>用<strong>可学</strong> <code>γ = softmax(gamma_raw)</code> 把 <code>[n, D] → [b,t,d]</code></td>
+</tr>
+<tr>
+<td><a href="../src/mhc.rs"><code>src/mhc.rs</code></a> <code>HyperConnection::depth</code></td>
+<td>行 softmax + <code>iters</code> 轮 Sinkhorn，<strong>全在计算图里</strong>，<code>depth_raw</code> 拿得到真梯度</td>
+</tr>
+<tr>
+<td><a href="../src/mhc.rs"><code>src/mhc.rs</code></a> <code>read</code> / <code>write</code></td>
+<td><code>αᵀS</code> 与 <code>A S + β⊗y</code>，各一次 <code>matmul</code> + 一次广播乘加</td>
+</tr>
+<tr>
+<td><a href="../src/mhc.rs"><code>src/mhc.rs</code></a> <code>sinkhorn</code> / <code>doubly_stochastic_error</code> / <code>spectral_norm</code></td>
+<td>f32 参考实现，供单测与文档核对数值口径（不进训练路径）</td>
+</tr>
+<tr>
+<td><a href="../src/model.rs"><code>src/model.rs</code></a> <code>TransformerBlock::forward_streams</code></td>
+<td>每个子层：读出 → 子层 → 写入，两个子层各持一份 <code>HyperConnection</code></td>
+</tr>
+<tr>
+<td><a href="../src/model.rs"><code>src/model.rs</code></a> <code>Transformer::forward_core</code></td>
+<td><code>n_stream &gt; 1</code> 时走多流分支，否则走原来的单流循环</td>
+</tr>
+<tr>
+<td><a href="../src/config.rs"><code>src/config.rs</code></a> → <a href="../src/model.rs"><code>src/model.rs</code></a> <code>TransformerConfig</code></td>
+<td><code>n_stream</code>（默认 1）/ <code>mhc_sinkhorn_iters</code>（默认 20）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>为什么全用矩阵乘</strong>：把多条流看成一个大矩阵后，读出是一次 <code>[1,n]×[n,D]</code>、写入是一次
+<code>[n,n]×[n,D]</code> 加一次 <code>[n,1]×[1,D]</code> 广播乘。全部走已有的、带反向的算子，<code>α</code> / <code>β</code> / <code>A</code>
+都能自动拿到梯度，不必为&quot;逐流相加&quot;另写一套广播 / 求和内核。</p>
+<p><strong>收敛为什么是学出来的 <code>γ</code> 而不是取平均</strong>：均匀平均会让最后一个子层的写入参数
+（<code>β</code>、<code>A</code>）<strong>永久失去梯度</strong>——<code>mean_s(Σ_t A_{s,t}X_t) = Σ_t X_t / n</code> 只用到&quot;列和为 1&quot;，
+<code>mean_s(β_s y) = y / n</code> 只用到&quot;β 和为 1&quot;，两者都与具体取值无关。换成非均匀的 <code>γ</code> 加权求和后
+<code>Σ_s γ_s β_s</code> 重新依赖 <code>β</code>，参数才能被训练（详见 §5 常见坑第 1 条）。</p>
+<h3 id="user-content-默认路径逐位不变">默认路径逐位不变<a href="#默认路径逐位不变" aria-label="Link to heading '默认路径逐位不变'" data-heading-content="默认路径逐位不变" class="anchor"></a></h3>
+<ul>
+<li><code>n_stream = 1</code>（默认）时 <code>TransformerBlock</code> <strong>根本不构造</strong> <code>HyperConnection</code>，
+<code>Transformer</code> 也不构造 <code>hc_collapse</code>：不新增参数、不消耗随机数；</li>
+<li><code>forward_core</code> 的 <code>n_stream &gt; 1</code> 分支整段不执行，残差路径仍是 <code>x = x.add(&amp;h)</code>；</li>
+<li>GPU 常驻整叠快路的守卫里加了 <code>&amp;&amp; n_stream == 1</code>，多流时自动回退逐层路径；</li>
+<li>单测 <code>test_mhc_n_stream_one_is_bitwise_identical</code> 钉住这一点：参数个数与名字完全一致、
+前向输出<strong>逐位相同</strong>；</li>
+<li>即便手动构造 <code>HyperConnection::new(1, _)</code>，<code>softmax(单元素)</code> 与 <code>Sinkhorn(1×1)</code> 都精确等于 1，
+读出 / 写入也与普通残差逐位相同（<code>test_single_stream_degenerates_to_residual_bitwise</code>）。</li>
+</ul>
+<h3 id="user-content-代码地图">代码地图<a href="#代码地图" aria-label="Link to heading '代码地图'" data-heading-content="代码地图" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../src/mhc.rs"><code>src/mhc.rs</code></a></td>
+<td><code>HyperConnection</code>、<code>expand_streams</code> / <code>collapse_streams</code>、Sinkhorn 参考实现</td>
+</tr>
+<tr>
+<td><a href="../src/model.rs"><code>src/model.rs</code></a></td>
+<td><code>TransformerBlock::forward_streams</code>、<code>Transformer::forward_core</code> 的多流分支</td>
+</tr>
+<tr>
+<td><a href="../src/train.rs"><code>src/train.rs</code></a></td>
+<td><code>test_mhc_changes_training_same_seed</code>（同种子账本）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="user-content-5-运行与验证">5. 运行与验证<a href="#5-运行与验证" aria-label="Link to heading '5. 运行与验证'" data-heading-content="5. 运行与验证" class="anchor"></a></h2>
+<pre><code class="language-bash"># mHC 单测（Sinkhorn 不动点 / 行列和 / 谱范数 / 双随机 / n=1 逐位退化 / 参数字典 / 梯度）
+cargo test mhc
+
+# 同种子对照：n_stream = 1 vs 2 走完整训练循环
+cargo test mhc_changes_training_same_seed
+</code></pre>
+<p>配置示例：</p>
+<pre><code class="language-jsonc">{
+  &quot;model&quot;: {
+    &quot;n_stream&quot;: 2,              // 默认 1 = 关闭；2 即启用双残差流
+    &quot;mhc_sinkhorn_iters&quot;: 20    // 默认 20，只对 n_stream &gt; 1 生效
+  }
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>测试</th>
+<th>验证内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_sinkhorn_identity_fixed_point</code></td>
+<td>单位阵（已在流形上）是不动点</td>
+</tr>
+<tr>
+<td><code>test_sinkhorn_rows_and_cols_sum_to_one</code></td>
+<td>任意正矩阵投影后行列和都收敛到 1</td>
+</tr>
+<tr>
+<td><code>test_sinkhorn_spectral_norm_is_one</code></td>
+<td>谱范数恰为 1（§3.2 的理论保证）</td>
+</tr>
+<tr>
+<td><code>test_sinkhorn_mildly_anisotropic_spectral_norm_bounded</code></td>
+<td>强各向异性输入也被钉在 1</td>
+</tr>
+<tr>
+<td><code>test_depth_tensor_is_doubly_stochastic</code></td>
+<td>张量版 <code>depth()</code>（走计算图）同样是双随机</td>
+</tr>
+<tr>
+<td><code>test_single_stream_degenerates_to_residual_bitwise</code></td>
+<td><code>n = 1</code> 逐位退化成普通残差</td>
+</tr>
+<tr>
+<td><code>test_expand_gain_and_collapse_weighted_sum</code></td>
+<td>展开的静态增益与收敛的加权求和口径</td>
+</tr>
+<tr>
+<td><code>test_alpha_beta_on_simplex</code></td>
+<td><code>α</code> / <code>β</code> 落在单纯形上（非负、和为 1）</td>
+</tr>
+<tr>
+<td><code>test_mixing_params_receive_gradient</code></td>
+<td><code>α</code> / <code>β</code> / <code>A</code> 都拿得到非零梯度</td>
+</tr>
+<tr>
+<td><code>test_doubly_stochastic_preserves_total_energy</code></td>
+<td>双随机 ⇒ 混合前后&quot;所有流的和&quot;不变</td>
+</tr>
+<tr>
+<td><code>test_mhc_n_stream_one_is_bitwise_identical</code></td>
+<td>默认关闭时参数表与前向逐位不变</td>
+</tr>
+<tr>
+<td><code>test_mhc_two_streams_changes_forward_and_receives_grad</code></td>
+<td><code>n_stream = 2</code> 改变前向且 mHC 参数拿到梯度</td>
+</tr>
+<tr>
+<td><code>test_mhc_changes_training_same_seed</code></td>
+<td>同种子完整训练循环下 loss 确实改变且有限</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-常见坑实测踩出来的">常见坑（实测踩出来的）<a href="#常见坑实测踩出来的" aria-label="Link to heading '常见坑（实测踩出来的）'" data-heading-content="常见坑（实测踩出来的）" class="anchor"></a></h3>
+<h4 id="user-content-1-均匀平均收敛--最后一层的混合参数是死参数">1. 均匀平均收敛 ⇒ 最后一层的混合参数是&quot;死参数&quot;<a href="#1-均匀平均收敛--最后一层的混合参数是死参数" aria-label="Link to heading '1. 均匀平均收敛 ⇒ 最后一层的混合参数是&quot;死参数&quot;'" data-heading-content="1. 均匀平均收敛 ⇒ 最后一层的混合参数是&quot;死参数&quot;" class="anchor"></a></h4>
+<p>第一版把收敛写成&quot;对 <code>n</code> 条流取平均&quot;。结果 <code>test_mhc_two_streams_changes_forward_and_receives_grad</code>
+失败：缺梯度的恰好是 <code>blocks.0.hc_attn.alpha_raw</code>、<code>blocks.0.hc_attn.depth_raw</code>、
+以及<strong>最后一层</strong>的 <code>hc_mlp.beta_raw</code>。两个独立原因：</p>
+<ul>
+<li><strong>入口对称</strong>：展开时各条流逐位相同（都是同一份输入的复制），于是第一层的读出
+<code>h = Σ α_s X_s</code> 只依赖 <code>Σα_s = 1</code>，与 <code>α</code> 的取值无关；<code>Σ_t A_{s,t}X_t</code> 同理与 <code>A</code> 无关。</li>
+<li><strong>均匀收敛</strong>：最后一层之后立刻取平均，见 §4 末尾的推导，<code>β</code> 与 <code>A</code> 都不可见。</li>
+</ul>
+<p>修法是两处对称性破除，都不引入可学参数、不消耗随机数：</p>
+<ol>
+<li><code>expand_streams</code> 给第 <code>s</code> 条流乘静态增益 <code>1 + s·0.01</code>，各流互不相同；</li>
+<li>收敛改成可学的 <code>γ = softmax(gamma_raw)</code>（<code>concentrated_logits</code> 初始化，首条流为主）。</li>
+</ol>
+<h4 id="user-content-2-均匀损失对混合参数梯度为-0是错的直觉">2. &quot;均匀损失对混合参数梯度为 0&quot;是错的直觉<a href="#2-均匀损失对混合参数梯度为-0是错的直觉" aria-label="Link to heading '2. &quot;均匀损失对混合参数梯度为 0&quot;是错的直觉'" data-heading-content="2. &quot;均匀损失对混合参数梯度为 0&quot;是错的直觉" class="anchor"></a></h4>
+<p>一度想用&quot;均匀损失下 <code>depth_raw</code> 梯度恒为 0&quot;当不变量断言，实测失败。原因是 Sinkhorn 的
+Jacobian 不是正交投影：<code>A</code> 被推离某个非均匀点后，行列归一化的两次除法对自由参数的依赖
+并不是严格抵消的。<strong>不要用&quot;梯度恒为 0&quot;当不变量</strong>；改用<strong>前向值不变量</strong>——
+<code>sum(A @ S) == sum(S)</code>（列和为 1 的直接推论），这就是现在的
+<code>test_doubly_stochastic_preserves_total_energy</code>。</p>
+<hr />
+<h2 id="user-content-6-小结与下一课">6. 小结与下一课<a href="#6-小结与下一课" aria-label="Link to heading '6. 小结与下一课'" data-heading-content="6. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<p>mHC 把单条残差流拓宽成 <code>n</code> 条并行流，用 Sinkhorn 投影到双随机矩阵，换来&quot;步长保范 + 保均值&quot;两个保证；<code>n_stream = 1</code> 时逐位退化成普通残差。</p>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<ul>
+<li><strong><code>n_stream</code> 扫描</strong>：<code>2 / 4 / 8</code> 对照，看&quot;通路变宽&quot;的收益拐点与显存代价（多流会让
+中间激活按 <code>n</code> 倍放大）。</li>
+<li><strong>每层独立的 <code>n</code></strong>：现在全模型统一 <code>n_stream</code>，工程上可以让浅层少、深层多。</li>
+<li><strong>只读不写 / 只写不读</strong>：把 <code>α</code> 或 <code>β</code> 固定成均匀，看哪个方向更关键。</li>
+<li><strong>与 Muon（第 46 课）组合</strong>：<code>A</code> 是二维自由矩阵，Muon 会按谱范数正交化它——
+而双随机约束已经钉住了谱范数，两者的交互值得实测。</li>
+<li><strong>GPU 常驻整叠路径</strong>：多流目前自动回退逐层路径，要吃到整叠快路需要把 <code>forward_streams</code>
+也接进常驻批次（见第 27 课）。</li>
+</ul>
+<blockquote>
+<p><strong>下一课</strong>：<a href="48-FP4%E9%87%8F%E5%8C%96%E6%84%9F%E7%9F%A5%E8%AE%AD%E7%BB%83.md">第 48 课 FP4 量化感知训练</a> —— 把位宽再砍一半：FP4（E2M1）量化感知训练与位宽账本。</p>
+</blockquote>

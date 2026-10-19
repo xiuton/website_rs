@@ -1,0 +1,28 @@
+<p>所有权系统是Rust中的一大特点<br />
+今日靓仔我啊，就来体验一番</p>
+<p>我们先来看一段代码</p>
+<pre><code class="language-rust">fn main() {
+    let s1 = String::from(&quot;hello&quot;);
+    let s2 = s1; // s1 的所有权转移给了 s2
+    println!(&quot;s1: {}, s2: {}&quot;, s1, s2); // 报错，s1 已经被移动了
+}
+
+</code></pre>
+<p><em><strong>你可能不了解rust代码，那么按照你熟悉的语言去理解他，大同小异</strong></em></p>
+<p>代码中先定义了一个String字符串类型的变量 <code>s1</code></p>
+<p>然后紧接着定义了一个变量 <code>s2</code>，此时需要注意，<code>s2</code> 的值是由 <code>s1</code> 赋值所得（可以先简单理解为赋值）<br />
+然后打印出 <code>s1</code>，<code>s2</code> 发现报错了</p>
+<p>问题就出现在 <code>let s2 = s1;</code> 这段代码，这里其实发生了所有权转移，也就是 <code>s1</code> 的所有权发生了向 <code>s2</code> 转移</p>
+<p>那么 <code>s1</code> 变量在所有权发生转移后，再进行访问，那么在rust中将是不合法的访问</p>
+<p>如果不需要所有权转移，而只是简单的拷贝，则可以使用clone函数</p>
+<pre><code class="language-rust">fn main() {
+    let mut s1 = String::from(&quot;hello&quot;);
+    let s2 = s1.clone(); // 深拷贝
+    println!(&quot;s1: {}, s2: {}&quot;, s1, s2);
+    s1.push_str(&quot; world&quot;); // 修改 s1
+    println!(&quot;s1: {}, s2: {}&quot;, s1, s2); // s2 的值没有改变，说明是深拷贝
+}
+
+</code></pre>
+<p>以上代码，通过对 <code>s1</code> 进行修改，会发现 <code>s2</code> 没有被一同修改，说明 <code>clone()</code> 函数是深拷贝</p>
+<p>体验了rust中的所有权，很奇妙，像进了米奇妙妙屋...</p>

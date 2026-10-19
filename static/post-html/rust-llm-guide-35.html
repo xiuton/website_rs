@@ -1,0 +1,280 @@
+<h1 id="user-content-第-35-课多-token-预测multi-token-prediction">第 35 课：多 Token 预测（Multi-Token Prediction）<a href="#第-35-课多-token-预测multi-token-prediction" aria-label="Link to heading '第 35 课：多 Token 预测（Multi-Token Prediction）'" data-heading-content="第 35 课：多 Token 预测（Multi-Token Prediction）" class="anchor"></a></h1>
+<blockquote>
+<p><strong>本课已落地为可运行代码</strong>：<code>src/speculative.rs</code> 的 <code>MtpHeads</code>（K 个 <code>Linear</code> 头 + 各头交叉熵损失）
+与 <code>MtpDrafter</code>（把 MTP 头当推测解码的草稿）+ <code>speculative</code> 子命令的第五节实验。
+与已有代码的衔接：预测头复用 <code>src/layers.rs</code> 的 <code>Linear</code> 层，主干隐状态由 <code>Transformer::forward_hidden_cached</code>
+提供；训练时只更新各头参数（主干可冻结），推理时一次前向即可给出往后 γ 个位置的分布。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-标准自回归的局限">1. 标准自回归的局限<a href="#1-标准自回归的局限" aria-label="Link to heading '1. 标准自回归的局限'" data-heading-content="1. 标准自回归的局限" class="anchor"></a></h2>
+<p>标准 LLM 训练是 <strong>Next-Token Prediction（NTP）</strong>：给定前缀，预测下一个 token。</p>
+<p>$$
+\mathcal{L}<em>{NTP} = -\sum</em>{t=1}^{T} \log P(x_t | x_{&lt;t})
+$$</p>
+<p>这有一个根本问题：<strong>每一步只看到&quot;下一步&quot;的监督信号</strong>，模型无法学到&quot;为了未来 5 步都正确，当前这一步应该怎么选&quot;。</p>
+<blockquote>
+<p><strong>类比</strong>：下棋时，如果你只能看到下一步的胜负，很难学到深谋远虑的策略；但如果能看到未来 5 步的结果，你就能学到更好的走法。</p>
+</blockquote>
+<h2 id="user-content-2-multi-token-predictionmtp">2. Multi-Token Prediction（MTP）<a href="#2-multi-token-predictionmtp" aria-label="Link to heading '2. Multi-Token Prediction（MTP）'" data-heading-content="2. Multi-Token Prediction（MTP）" class="anchor"></a></h2>
+<p>Meta 在 2024 年的论文《Better &amp; Faster Large Language Models via Multi-token Prediction》中提出：</p>
+<p><strong>训练时同时预测未来 K 个 token，而不是只预测 1 个。</strong></p>
+<pre><code class="language-plaintext">输入: &quot;The cat sat on&quot;
+       │
+       ├──→ Head 1: 预测 &quot;cat&quot;     (next-1)
+       ├──→ Head 2: 预测 &quot;sat&quot;     (next-2)
+       ├──→ Head 3: 预测 &quot;on&quot;      (next-3)
+       └──→ Head 4: 预测 &quot;the&quot;     (next-4)
+       │
+       Loss = L_1 + L_2 + L_3 + L_4
+</code></pre>
+<h3 id="user-content-21-架构">2.1 架构<a href="#21-架构" aria-label="Link to heading '2.1 架构'" data-heading-content="2.1 架构" class="anchor"></a></h3>
+<pre><code class="language-plaintext">                共享的 Transformer Backbone
+                         │
+            ┌────────────┼────────────┐
+            │            │            │
+       ┌────▼────┐ ┌────▼────┐ ┌────▼────┐
+       │ Head 1  │ │ Head 2  │ │ Head 3  │
+       │(预测+1) │ │(预测+2) │ │(预测+3) │
+       └─────────┘ └─────────┘ └─────────┘
+</code></pre>
+<p>关键设计：</p>
+<ul>
+<li><strong>共享 Backbone</strong>：所有预测头共用同一个 Transformer 主干</li>
+<li><strong>独立预测头</strong>：每个头是一个独立的线性层（+ 可选的小 Transformer 层）</li>
+<li><strong>自回归依赖</strong>：Head K 的输入包含了 Head K-1 的预测结果（通过 embedding 层传递）</li>
+</ul>
+<h3 id="user-content-22-损失函数">2.2 损失函数<a href="#22-损失函数" aria-label="Link to heading '2.2 损失函数'" data-heading-content="2.2 损失函数" class="anchor"></a></h3>
+<p>$$
+\mathcal{L}<em>{MTP} = \sum</em>{k=1}<sup>{K} \mathcal{L}_{NTP}</sup>{(k)} = -\sum_{k=1}<sup>{K} \sum_{t=1}</sup>{T-k} \log P_k(x_{t+k} | x_{\leq t})
+$$</p>
+<p>其中 $P_k$ 是第 $k$ 个预测头的输出分布。</p>
+<h3 id="user-content-23-训练-vs-推理">2.3 训练 vs 推理<a href="#23-训练-vs-推理" aria-label="Link to heading '2.3 训练 vs 推理'" data-heading-content="2.3 训练 vs 推理" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>使用方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>训练</strong></td>
+<td>所有 K 个头同时训练，损失相加</td>
+</tr>
+<tr>
+<td><strong>标准推理</strong></td>
+<td>只用 Head 1（和标准 NTP 一样）</td>
+</tr>
+<tr>
+<td><strong>推测解码</strong></td>
+<td>Head 2~K 作为&quot;草稿模型&quot;，Head 1 做验证</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>核心价值</strong>：MTP 训练出的 Backbone 表征质量更高（因为要同时预测多个未来 token，被迫学到更好的&quot;计划&quot;能力），推理时可以和推测解码结合实现加速。</p>
+</blockquote>
+<h2 id="user-content-3-deepseek-的-mtp-实现">3. DeepSeek 的 MTP 实现<a href="#3-deepseek-的-mtp-实现" aria-label="Link to heading '3. DeepSeek 的 MTP 实现'" data-heading-content="3. DeepSeek 的 MTP 实现" class="anchor"></a></h2>
+<p>DeepSeek-V3 的 MTP 实现更加精细，引入了 <strong>顺序预测模块（Sequential Prediction Module）</strong>：</p>
+<pre><code class="language-plaintext">位置 t 的表示 h_t
+  │
+  ├──→ Head 1 → 预测 x_{t+1}
+  │         │
+  │         └──→ Embed(x_{t+1}) → 拼接 h_t → MTP Module 2 → Head 2 → 预测 x_{t+2}
+  │                                                                    │
+  │                                                                    └──→ ...
+</code></pre>
+<h3 id="user-content-31-与标准-mtp-的区别">3.1 与标准 MTP 的区别<a href="#31-与标准-mtp-的区别" aria-label="Link to heading '3.1 与标准 MTP 的区别'" data-heading-content="3.1 与标准 MTP 的区别" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>方面</th>
+<th>Meta MTP</th>
+<th>DeepSeek MTP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>头的输入</td>
+<td>独立（都来自 backbone）</td>
+<td>串行（后一个头依赖前一个头的输出）</td>
+</tr>
+<tr>
+<td>训练时</td>
+<td>只用于辅助损失</td>
+<td>同时用于训练和推测解码</td>
+</tr>
+<tr>
+<td>推理时</td>
+<td>丢弃额外头</td>
+<td>用作推测解码的草稿头</td>
+</tr>
+</tbody>
+</table>
+<h2 id="user-content-4-为什么-mtp-能提升质量">4. 为什么 MTP 能提升质量？<a href="#4-为什么-mtp-能提升质量" aria-label="Link to heading '4. 为什么 MTP 能提升质量？'" data-heading-content="4. 为什么 MTP 能提升质量？" class="anchor"></a></h2>
+<h3 id="user-content-41-更好的表征学习">4.1 更好的表征学习<a href="#41-更好的表征学习" aria-label="Link to heading '4.1 更好的表征学习'" data-heading-content="4.1 更好的表征学习" class="anchor"></a></h3>
+<p>同时预测多个未来 token，迫使模型学到的内部表征必须编码更丰富的语义信息。</p>
+<p>类比：</p>
+<ul>
+<li><strong>NTP</strong>：只看一步 → 学到&quot;这个词后面最常见的词是什么&quot;</li>
+<li><strong>MTP</strong>：看多步 → 学到&quot;这个句子接下来要表达什么意思&quot;</li>
+</ul>
+<h3 id="user-content-42-计划能力">4.2 计划能力<a href="#42-计划能力" aria-label="Link to heading '4.2 计划能力'" data-heading-content="4.2 计划能力" class="anchor"></a></h3>
+<p>模型必须在当前位置就&quot;计划&quot;好接下来几个 token 的输出，类似于人类写作时的&quot;提纲&quot;能力。</p>
+<h3 id="user-content-43-推理加速">4.3 推理加速<a href="#43-推理加速" aria-label="Link to heading '4.3 推理加速'" data-heading-content="4.3 推理加速" class="anchor"></a></h3>
+<p>多个预测头可以直接用于推测解码（无需额外的小模型），实现推理加速。</p>
+<h2 id="user-content-5-实验结果">5. 实验结果<a href="#5-实验结果" aria-label="Link to heading '5. 实验结果'" data-heading-content="5. 实验结果" class="anchor"></a></h2>
+<h3 id="user-content-51-meta-论文结果">5.1 Meta 论文结果<a href="#51-meta-论文结果" aria-label="Link to heading '5.1 Meta 论文结果'" data-heading-content="5.1 Meta 论文结果" class="anchor"></a></h3>
+<p>在代码生成任务上（HumanEval），MTP 的提升尤为显著：</p>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>标准 NTP</th>
+<th>MTP (K=4)</th>
+<th>提升</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>7B</td>
+<td>28.7%</td>
+<td>34.2%</td>
+<td>+5.5%</td>
+</tr>
+<tr>
+<td>13B</td>
+<td>35.3%</td>
+<td>40.7%</td>
+<td>+5.4%</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>有趣发现</strong>：MTP 对代码生成的提升大于自然语言，可能因为代码有更强的长程依赖和结构化模式。</p>
+</blockquote>
+<h3 id="user-content-52-deepseek-v3">5.2 DeepSeek-V3<a href="#52-deepseek-v3" aria-label="Link to heading '5.2 DeepSeek-V3'" data-heading-content="5.2 DeepSeek-V3" class="anchor"></a></h3>
+<p>DeepSeek-V3 使用 MTP 作为辅助训练目标，并在推理时用 MTP 头做推测解码，实现约 1.8× 的推理加速。</p>
+<h2 id="user-content-6-与其他方法的对比">6. 与其他方法的对比<a href="#6-与其他方法的对比" aria-label="Link to heading '6. 与其他方法的对比'" data-heading-content="6. 与其他方法的对比" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>训练时</th>
+<th>推理时</th>
+<th>是否需要额外参数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>标准 NTP</td>
+<td>预测 1 个 token</td>
+<td>自回归</td>
+<td>无</td>
+</tr>
+<tr>
+<td>MTP</td>
+<td>预测 K 个 token</td>
+<td>自回归 或 推测解码</td>
+<td>K-1 个预测头</td>
+</tr>
+<tr>
+<td>推测解码</td>
+<td>无变化</td>
+<td>小模型猜 + 大模型验</td>
+<td>需要额外小模型</td>
+</tr>
+<tr>
+<td>Medusa</td>
+<td>加多头</td>
+<td>多头同时猜 + 验证</td>
+<td>多个预测头</td>
+</tr>
+</tbody>
+</table>
+<h2 id="user-content-7-实现要点">7. 实现要点<a href="#7-实现要点" aria-label="Link to heading '7. 实现要点'" data-heading-content="7. 实现要点" class="anchor"></a></h2>
+<h3 id="user-content-71-预测头的参数效率">7.1 预测头的参数效率<a href="#71-预测头的参数效率" aria-label="Link to heading '7.1 预测头的参数效率'" data-heading-content="7.1 预测头的参数效率" class="anchor"></a></h3>
+<p>预测头不应太重——如果每个头都是一个完整 Transformer 层，参数量会暴增。</p>
+<p>推荐配置：</p>
+<pre><code class="language-plaintext">Head K = Linear(d_model → d_model) → TransformerLayer(1层) → Linear(d_model → vocab_size)
+</code></pre>
+<p>或更轻量：</p>
+<pre><code class="language-plaintext">Head K = Linear(d_model → vocab_size)  // 最简单，效果也不错
+</code></pre>
+<h3 id="user-content-72-梯度累积">7.2 梯度累积<a href="#72-梯度累积" aria-label="Link to heading '7.2 梯度累积'" data-heading-content="7.2 梯度累积" class="anchor"></a></h3>
+<p>MTP 的 K 个损失会累加，总梯度比 NTP 大 K 倍。需要：</p>
+<ul>
+<li>调低学习率，或</li>
+<li>对每个头的损失做 $1/K$ 的缩放</li>
+</ul>
+<blockquote>
+<p>梯度累积本身的机制（上游梯度按实际微批数 <code>1/N</code> 缩放、尾窗处理）归属 <a href="28-%E6%A2%AF%E5%BA%A6%E7%B4%AF%E7%A7%AF.md">第 28 课 梯度累积</a>，这里只谈&quot;K 个头叠加&quot;带来的那一档尺度差异。</p>
+</blockquote>
+<h2 id="user-content-8-本仓库实现要点">8. 本仓库实现要点<a href="#8-本仓库实现要点" aria-label="Link to heading '8. 本仓库实现要点'" data-heading-content="8. 本仓库实现要点" class="anchor"></a></h2>
+<p>上面的原理已全部落地为可运行代码。MTP 相关组件与第 34 课共用 <a href="../src/speculative.rs"><code>src/speculative.rs</code></a>（单测跑 <code>cargo test speculative</code> / <code>cargo test mtp</code>，数量以实际输出为准），
+CLI 入口是 <a href="../README.md"><code>speculative</code></a> 子命令（通过 <code>--mtp-heads</code> / <code>--mtp-steps</code> 控制）。</p>
+<h3 id="user-content-81-代码结构">8.1 代码结构<a href="#81-代码结构" aria-label="Link to heading '8.1 代码结构'" data-heading-content="8.1 代码结构" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>位置</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MtpHeads</code></td>
+<td><code>speculative.rs</code></td>
+<td>K 个 <code>Linear</code> 预测头：第 k 个头把位置 i 的隐状态映射到位置 i+k+1 的 token logits。提供 <code>new(k, n_embd, vocab)</code>、<code>logits(hidden)</code>（返回 K+1 个 logits 张量）、<code>loss(hidden, targets)</code>（各头交叉熵之和的均值）</td>
+</tr>
+<tr>
+<td><code>MtpDrafter</code></td>
+<td><code>speculative.rs</code></td>
+<td>拿 MTP 头当推测解码的草稿来源：实现 <code>Drafter</code> trait，一次前向即可给出往后 γ 个位置的候选分布（不必自回归），但各分布彼此条件独立，接受率通常低于小模型草稿</td>
+</tr>
+<tr>
+<td><code>Drafter</code> trait</td>
+<td><code>speculative.rs</code></td>
+<td>草稿来源统一接口：<code>propose()</code>/<code>commit()</code>/<code>reset()</code>，<code>MtpDrafter</code> 和 <code>ModelDrafter</code> 均实现此 trait</td>
+</tr>
+<tr>
+<td><code>SpecDecoder</code></td>
+<td><code>speculative.rs</code></td>
+<td>推测解码执行体，可接受任意 <code>Drafter</code> 实现（包括 <code>MtpDrafter</code>）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-82-cli-用法">8.2 CLI 用法<a href="#82-cli-用法" aria-label="Link to heading '8.2 CLI 用法'" data-heading-content="8.2 CLI 用法" class="anchor"></a></h3>
+<pre><code class="language-bash"># 训练 MTP 头并用于推测解码（K=4 头，80 步训练）
+cargo run --release -- speculative --mtp-heads 4 --mtp-steps 80
+
+# 调整 MTP 头数（K=2 头，更轻量）
+cargo run --release -- speculative --mtp-heads 2 --mtp-steps 80
+
+# 对比：用小模型草稿 vs MTP 头草稿（不传 --mtp-heads 即用 ModelDrafter）
+cargo run --release -- speculative --gamma 4 --max-new 48
+</code></pre>
+<hr />
+<h2 id="user-content-9-小结与下一课">9. 小结与下一课<a href="#9-小结与下一课" aria-label="Link to heading '9. 小结与下一课'" data-heading-content="9. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li>NTP 每步只有一个&quot;下一步&quot;的监督信号；MTP 让模型同时预测未来 K 个 token，逼迫表征编码更长的语义结构</li>
+<li>损失是各头交叉熵之和的均值；训练时 K 个头一起训，标准推理只用 Head 1，推测解码时 Head 2~K 当草稿</li>
+<li>Meta 的版本各头独立、只作辅助损失；DeepSeek-V3 改成串行依赖，并把额外头直接用于推测解码</li>
+<li>实测收益：Meta 论文在 HumanEval 上 7B 从 28.7% → 34.2%（K=4）；DeepSeek-V3 推理约 1.8× 加速</li>
+<li>本仓库的落点是 <code>MtpHeads</code>（K 个 <code>Linear</code> + 各头交叉熵）与 <code>MtpDrafter</code>（当草稿用，各分布条件独立、接受率通常低于小模型草稿）</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现（<code>src/speculative.rs</code> 的 <code>MtpHeads</code> / <code>MtpDrafter</code>），这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li><strong>实现 MTP 训练</strong>：在现有 Transformer 模型上添加 3 个额外预测头，实现 K=4 的多 token 预测。</li>
+<li><strong>对比实验</strong>：在相同数据和步数下，分别用 NTP 和 MTP 训练小模型，对比 loss 曲线和生成质量。</li>
+<li><strong>MTP + 推测解码</strong>：用 MTP 的 Head 2~K 作为草稿头，Head 1 做验证，实现推测解码。</li>
+<li><strong>代码 vs 文本</strong>：分别在代码和自然语言数据上训练 MTP，观察哪种数据获益更大。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="36-RLHF%E4%B8%8E%E5%AF%B9%E9%BD%90.md">第 36 课 RLHF 与人类对齐（Alignment）</a> —— 到这里模型&quot;会预测、会加速&quot;，下一课解决&quot;答得好不好&quot;——用人类偏好把模型对齐到有用、无害、诚实。</p>
+</blockquote>

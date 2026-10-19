@@ -1,0 +1,167 @@
+<h1 id="user-content-第-28-课梯度累积--小显存也能跑大-batch">第 28 课：梯度累积 —— 小显存也能跑大 batch<a href="#第-28-课梯度累积--小显存也能跑大-batch" aria-label="Link to heading '第 28 课：梯度累积 —— 小显存也能跑大 batch'" data-heading-content="第 28 课：梯度累积 —— 小显存也能跑大 batch" class="anchor"></a></h1>
+<blockquote>
+<p>代码位置：<a href="../src/train.rs">src/train.rs</a>（训练循环中的梯度累积逻辑）
+代码位置：<a href="../src/config.rs">src/config.rs</a>（<code>TrainConfig.accum_steps</code>）</p>
+<p>配置开关：<code>config/config.json</code> → <code>train.accum_steps</code>（1 = 不累积；本仓库当前配置就是 1，下文的 <code>4</code> 是示例值）</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>为什么大 batch 训练效果好，但显存放不下？</li>
+<li>梯度累积是怎么用多个小 batch 模拟大 batch 的？</li>
+<li>反向的上游梯度为什么要除以 <code>accum_steps</code>？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-大-batch-的好处与困境">2. 大 batch 的好处与困境<a href="#2-大-batch-的好处与困境" aria-label="Link to heading '2. 大 batch 的好处与困境'" data-heading-content="2. 大 batch 的好处与困境" class="anchor"></a></h2>
+<h3 id="user-content-21-好处">2.1 好处<a href="#21-好处" aria-label="Link to heading '2.1 好处'" data-heading-content="2.1 好处" class="anchor"></a></h3>
+<ul>
+<li>梯度估计更准确（噪声更小）</li>
+<li>训练更稳定</li>
+<li>GPU 利用率更高（大矩阵运算效率更高）</li>
+</ul>
+<h3 id="user-content-22-困境">2.2 困境<a href="#22-困境" aria-label="Link to heading '2.2 困境'" data-heading-content="2.2 困境" class="anchor"></a></h3>
+<p>显存占用 ∝ batch_size：</p>
+<pre><code class="language-plaintext">显存 ≈ 模型参数 + 优化器状态 + 激活值(batch_size * T * D * n_layer)
+</code></pre>
+<p>例如 LLaMA-7B 在 batch_size=32 时需要 ~40GB 显存，单卡放不下。</p>
+<hr />
+<h2 id="user-content-3-梯度累积的原理">3. 梯度累积的原理<a href="#3-梯度累积的原理" aria-label="Link to heading '3. 梯度累积的原理'" data-heading-content="3. 梯度累积的原理" class="anchor"></a></h2>
+<p><strong>核心思想</strong>：不更新参数，累积多个小 batch 的梯度，等效于大 batch。</p>
+<pre><code class="language-plaintext">标准大 batch（batch_size=32）:
+  loss = forward(x[0:32])
+  loss.backward()
+  optimizer.step()
+
+梯度累积（accum_steps=4, micro_batch=8）:
+  for i in 0..4:
+      loss = forward(x[i*8:(i+1)*8])
+      loss.backward()                        # 梯度自动累加（本项目把反向的上游梯度按 1/N 缩放，N = 本窗口实际微批数）
+  clip_grad_norm()
+  optimizer.step()                           # 累积完才更新
+  zero_grad()
+</code></pre>
+<h3 id="user-content-31-为什么要除以-accum_steps">3.1 为什么要除以 <code>accum_steps</code>？<a href="#31-为什么要除以-accum_steps" aria-label="Link to heading '3.1 为什么要除以 accum_steps？'" data-heading-content="3.1 为什么要除以 accum_steps？" class="anchor"></a></h3>
+<p><code>loss.backward()</code> 计算的是 <code>d(loss)/d(param)</code>。</p>
+<p>如果累积 4 次，梯度会是 4 倍大。乘上 <code>1/4</code> 保证最终梯度等于&quot;用完整大 batch 算一次&quot;的结果。</p>
+<pre><code class="language-plaintext">等效 loss = (loss_1 + loss_2 + loss_3 + loss_4) / 4
+</code></pre>
+<blockquote>
+<p>实现细节：本项目<strong>不缩放 loss 张量本身</strong>（打印/日志里的仍是原始 loss），只把 <code>1/N</code>
+作为上游梯度注入反向计算，效果与&quot;先 <code>loss/N</code> 再反向&quot;完全一致。</p>
+</blockquote>
+<blockquote>
+<p>⚠️ 这里的 <code>N</code> 是<strong>本窗口实际的微批个数</strong>，不是无脑的 <code>accum_steps</code>。最后一个窗口可能不满
+（<code>steps % accum_steps != 0</code>），此时若仍按 <code>accum_steps</code> 缩放，尾窗的梯度就被多除了
+<code>accum_steps / 实际值</code>——等效于那一步的学习率被悄悄调小，而且不会有任何报错。
+所以训练循环里传的是 <code>train::accum_window(step, accum, steps)</code>：</p>
+</blockquote>
+<pre><code class="language-rust">pub(crate) fn accum_window(step: usize, accum: usize, steps: usize) -&gt; usize {
+    let accum = accum.max(1);
+    let start = (step / accum) * accum;                  // 窗口按绝对步号切分
+    accum.min(steps.saturating_sub(start)).max(1)        // 尾窗取剩余步数（至少 1）
+}
+</code></pre>
+<p>窗口按<strong>绝对步号</strong>切分（<code>[0,accum) [accum,2·accum) …</code>），所以断点续训从窗口中间开始时
+算出来的窗口大小仍与串行一致（这个语义由 <code>train::tests::test_accum_window_shrinks_only_the_tail</code> 守住）。</p>
+<hr />
+<h2 id="user-content-4-实现要点">4. 实现要点<a href="#4-实现要点" aria-label="Link to heading '4. 实现要点'" data-heading-content="4. 实现要点" class="anchor"></a></h2>
+<h3 id="user-content-41-训练循环修改">4.1 训练循环修改<a href="#41-训练循环修改" aria-label="Link to heading '4.1 训练循环修改'" data-heading-content="4.1 训练循环修改" class="anchor"></a></h3>
+<pre><code class="language-rust">for step in 0..steps {
+    let (x, y) = sample_batch(rng);
+    // accum &gt; 1 时：返回的仍是未缩放的 loss（打印用原始值），
+    // 反向时把 1/N 作为上游梯度注入，等效于 loss/N 的梯度；
+    // N = accum_window(step, accum, steps) 是本窗口**实际**的微批个数（尾窗会小于 accum）
+    let loss = forward_loss(&amp;model, &amp;x, &amp;y, batch_size, block_size,
+                            accum_window(step, accum, cfg.steps));
+    loss.backward();  // 梯度累加到现有梯度上
+
+    // 只在累积窗口结束时裁剪 + 更新 + 清零；
+    // 最后一步即使不满 accum 也强制收尾，否则尾巴那批梯度会被丢掉、从未参与更新
+    if (step + 1) % accum == 0 || step + 1 == cfg.steps {
+        clip_grad_norm(&amp;params, cfg.grad_clip);
+        opt.step();
+        opt.zero_grad();
+        scheduler.step();   // 调度器与优化器同步：只在真正更新后前进
+    }
+}
+</code></pre>
+<blockquote>
+<p>更新条件 <code>(step + 1) % accum == 0 || step + 1 == steps</code> 与 <code>accum_window</code> 是自洽的：
+每个窗口末尾各触发一次更新，且各窗口的微批数之和恰好等于总步数（单测里对多组
+<code>(steps, accum)</code> 逐一核对了这条不变式）。</p>
+</blockquote>
+<h3 id="user-content-42-有效-batch-size">4.2 有效 batch size<a href="#42-有效-batch-size" aria-label="Link to heading '4.2 有效 batch size'" data-heading-content="4.2 有效 batch size" class="anchor"></a></h3>
+<pre><code class="language-plaintext">有效 batch_size = micro_batch_size * accum_steps
+</code></pre>
+<p>例如 <code>batch_size=8, accum_steps=4</code> → 有效 batch_size = 32。</p>
+<h3 id="user-content-43-学习率调度">4.3 学习率调度<a href="#43-学习率调度" aria-label="Link to heading '4.3 学习率调度'" data-heading-content="4.3 学习率调度" class="anchor"></a></h3>
+<p>学习率调度器按&quot;更新次数&quot;计数（不是每个 micro-batch）：<code>scheduler.step()</code> 和 <code>optimizer.step()</code> 一样，
+只在累积窗口结束的那个分支里调用（<a href="../src/train.rs">src/train.rs</a> 的 <code>train_transformer</code>），也就是每 <code>accum_steps</code> 步才前进一次。
+这样 <code>cfg.steps</code> 表示的仍是&quot;总更新步数&quot;，warmup 与 cosine 衰减的进度也都按更新步计算。</p>
+<hr />
+<h2 id="user-content-5-梯度累积-vs-数据并行">5. 梯度累积 vs 数据并行<a href="#5-梯度累积-vs-数据并行" aria-label="Link to heading '5. 梯度累积 vs 数据并行'" data-heading-content="5. 梯度累积 vs 数据并行" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>梯度累积</th>
+<th>数据并行（DDP）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>硬件</td>
+<td>单卡</td>
+<td>多卡</td>
+</tr>
+<tr>
+<td>通信</td>
+<td>无</td>
+<td>AllReduce 梯度</td>
+</tr>
+<tr>
+<td>速度</td>
+<td>线性慢（N 步才更新一次）</td>
+<td>接近线性加速</td>
+</tr>
+<tr>
+<td>映射</td>
+<td>模拟大 batch</td>
+<td>真正的大 batch</td>
+</tr>
+</tbody>
+</table>
+<p>梯度累积是&quot;穷人版&quot;的大 batch 训练：不需要多卡，但训练速度会变慢（每 accum_steps 步才更新一次）。</p>
+<hr />
+<h2 id="user-content-6-配置示例">6. 配置示例<a href="#6-配置示例" aria-label="Link to heading '6. 配置示例'" data-heading-content="6. 配置示例" class="anchor"></a></h2>
+<pre><code class="language-json">{
+  &quot;train&quot;: {
+    &quot;batch_size&quot;: 8,
+    &quot;accum_steps&quot;: 4
+  }
+}
+</code></pre>
+<p>有效 batch_size = 32，但每步只占用 batch_size=8 的显存。</p>
+<hr />
+<h2 id="user-content-7-小结与下一课">7. 小结与下一课<a href="#7-小结与下一课" aria-label="Link to heading '7. 小结与下一课'" data-heading-content="7. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li>梯度累积用多个小 batch 模拟大 batch，解决显存不足问题</li>
+<li>反向的上游梯度乘 <code>1/N</code> 保证梯度等效（<code>N</code> = 本窗口实际微批数，尾窗不足 <code>accum_steps</code> 时按实际值；loss 张量本身不缩放，日志里仍是原始 loss）</li>
+<li>每 <code>accum_steps</code> 步才做一次 optimizer.step() + zero_grad()</li>
+<li>有效 batch_size = micro_batch_size * accum_steps</li>
+<li>代价：训练速度变慢（更新频率降低）</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li><strong>扫 <code>accum_steps</code></strong>：把 <code>train.accum_steps</code> 在 <code>1 / 2 / 4 / 8</code> 各跑一遍（<code>batch_size</code> 固定为 8），对比有效 batch 与实际耗时——验证第 5 节那张表里&quot;线性慢&quot;的结论。</li>
+<li><strong>看尾窗</strong>：把 <code>steps</code> 设成不是 <code>accum_steps</code> 整数倍的值（如 <code>steps = 10, accum_steps = 4</code>），打印 <code>accum_window(step, accum, steps)</code> 的返回序列，确认只有尾窗变小、其余窗口不变。</li>
+<li><strong>核对不变式</strong>：给 <code>accum_window</code> 补一条单测，对多组 <code>(steps, accum)</code> 断言&quot;各窗口微批数之和 == steps&quot;（4.1 节提到已有类似断言）。</li>
+<li><strong>和 scheduler 对齐</strong>：在 <code>scheduler.step()</code> 处打印计数，确认它每 <code>accum_steps</code> 步才前进一次（4.3 节的语义）。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="29-LoRA%E4%BD%8E%E7%A7%A9%E9%80%82%E9%85%8D.md">第 29 课 LoRA 低秩适配</a> —— 梯度累积是&quot;省钱地把 batch 做大&quot;，下一课换另一条省钱路线——只训练 1% 的低秩适配参数。</p>
+</blockquote>

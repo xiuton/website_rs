@@ -1,0 +1,464 @@
+<h1 id="user-content-第-37-课rag-检索增强生成retrieval-augmented-generation">第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）<a href="#第-37-课rag-检索增强生成retrieval-augmented-generation" aria-label="Link to heading '第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）'" data-heading-content="第 37 课：RAG 检索增强生成（Retrieval-Augmented Generation）" class="anchor"></a></h1>
+<blockquote>
+<p><strong>本课已落地为可运行代码</strong>：<code>src/rag.rs</code>（单测跑 <code>cargo test rag</code>，数量以实际输出为准）+ <code>rag</code> 子命令——分块（字符域切分 + 句读对齐 +
+可配重叠）、三种向量化（TF-IDF / FNV 哈希 / 模型隐状态池化）、余弦检索与 MMR 多样化重排、提示组装。
+与已有代码的衔接：生成阶段复用 <code>src/sample.rs</code> 的 <code>generate</code>；稠密向量由 <code>Transformer::forward_hidden</code>
+做均值池化得到，余弦相似度在 L2 归一化后用点积计算。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-llm-的知识局限">1. LLM 的知识局限<a href="#1-llm-的知识局限" aria-label="Link to heading '1. LLM 的知识局限'" data-heading-content="1. LLM 的知识局限" class="anchor"></a></h2>
+<p>大语言模型通过预训练&quot;记住&quot;了大量知识，但存在根本性问题：</p>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>说明</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>知识截止</strong></td>
+<td>训练数据有时间边界</td>
+<td>&quot;2024年美国大选结果？&quot;</td>
+</tr>
+<tr>
+<td><strong>幻觉</strong></td>
+<td>编造不存在的事实</td>
+<td>虚假的论文引用、不存在的API</td>
+</tr>
+<tr>
+<td><strong>无法访问私有数据</strong></td>
+<td>不知道企业内部文档</td>
+<td>&quot;我们公司的报销流程？&quot;</td>
+</tr>
+<tr>
+<td><strong>长尾知识</strong></td>
+<td>低频领域知识不准确</td>
+<td>特定法律条文、技术细节</td>
+</tr>
+</tbody>
+</table>
+<h2 id="user-content-2-rag-的核心思想">2. RAG 的核心思想<a href="#2-rag-的核心思想" aria-label="Link to heading '2. RAG 的核心思想'" data-heading-content="2. RAG 的核心思想" class="anchor"></a></h2>
+<p><strong>不要让模型&quot;凭记忆回答&quot;，而是先检索相关文档，再根据文档回答。</strong></p>
+<pre><code class="language-plaintext">用户提问: &quot;公司2024年Q3的营收是多少？&quot;
+          │
+    ┌─────▼─────┐
+    │ 检索系统   │ ← 在公司财报文档中搜索
+    └─────┬─────┘
+          │ 检索到: &quot;2024年Q3营收58.3亿元，同比增长12%...&quot;
+    ┌─────▼─────┐
+    │ LLM 生成   │ ← 基于检索到的文档生成回答
+    └─────┬─────┘
+          │
+回答: &quot;公司2024年Q3营收为58.3亿元，同比增长12%。&quot;
+</code></pre>
+<h2 id="user-content-3-rag-架构详解">3. RAG 架构详解<a href="#3-rag-架构详解" aria-label="Link to heading '3. RAG 架构详解'" data-heading-content="3. RAG 架构详解" class="anchor"></a></h2>
+<h3 id="user-content-31-整体流程">3.1 整体流程<a href="#31-整体流程" aria-label="Link to heading '3.1 整体流程'" data-heading-content="3.1 整体流程" class="anchor"></a></h3>
+<pre><code class="language-plaintext">离线阶段（索引构建）:
+  文档集合 → 分块(Chunking) → 向量化(Embedding) → 向量数据库
+
+在线阶段（查询）:
+  用户问题 → 向量化 → 相似度检索 Top-K → 拼接上下文 → LLM 生成回答
+</code></pre>
+<h3 id="user-content-32-文档分块chunking">3.2 文档分块（Chunking）<a href="#32-文档分块chunking" aria-label="Link to heading '3.2 文档分块（Chunking）'" data-heading-content="3.2 文档分块（Chunking）" class="anchor"></a></h3>
+<p>长文档需要切分成小块（chunks），因为：</p>
+<ul>
+<li>Embedding 模型有最大长度限制（通常 512~8192 tokens）</li>
+<li>太大的块会稀释关键信息</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>分块策略</th>
+<th>说明</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>固定长度</strong></td>
+<td>按 token/字符数切分</td>
+<td>简单通用</td>
+</tr>
+<tr>
+<td><strong>按段落/章节</strong></td>
+<td>按自然分隔符切分</td>
+<td>结构化文档</td>
+</tr>
+<tr>
+<td><strong>滑动窗口</strong></td>
+<td>有重叠的切分（overlap）</td>
+<td>避免信息被截断</td>
+</tr>
+<tr>
+<td><strong>语义分块</strong></td>
+<td>按语义相似度切分</td>
+<td>精度最高但计算量大</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-plaintext">典型设置:
+  chunk_size = 512 tokens
+  chunk_overlap = 50 tokens  // 前后块有 50 token 重叠，避免边界信息丢失
+</code></pre>
+<h3 id="user-content-33-向量嵌入embedding">3.3 向量嵌入（Embedding）<a href="#33-向量嵌入embedding" aria-label="Link to heading '3.3 向量嵌入（Embedding）'" data-heading-content="3.3 向量嵌入（Embedding）" class="anchor"></a></h3>
+<p>把文本块转化为高维向量，使得语义相似的文本在向量空间中距离近。</p>
+<pre><code class="language-plaintext">&quot;如何退款？&quot; → [0.12, -0.34, 0.56, ..., 0.78]  (768维)
+&quot;退款流程是什么？&quot; → [0.11, -0.33, 0.57, ..., 0.79]  (距离很近)
+&quot;今天天气怎么样？&quot; → [-0.45, 0.67, -0.12, ..., 0.23]  (距离很远)
+</code></pre>
+<p>常用 Embedding 模型：</p>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>维度</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>text-embedding-ada-002 (OpenAI)</td>
+<td>1536</td>
+<td>商用，效果好</td>
+</tr>
+<tr>
+<td>BGE-large (BAAI)</td>
+<td>1024</td>
+<td>开源，中英文优秀</td>
+</tr>
+<tr>
+<td>E5-large-v2 (Microsoft)</td>
+<td>1024</td>
+<td>开源</td>
+</tr>
+<tr>
+<td>GTE-large (Alibaba)</td>
+<td>1024</td>
+<td>开源</td>
+</tr>
+<tr>
+<td>nomic-embed-text</td>
+<td>768</td>
+<td>轻量开源</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-34-向量检索">3.4 向量检索<a href="#34-向量检索" aria-label="Link to heading '3.4 向量检索'" data-heading-content="3.4 向量检索" class="anchor"></a></h3>
+<p>在向量数据库中找到与问题向量最相似的 Top-K 个文档块。</p>
+<h4 id="user-content-相似度度量">相似度度量<a href="#相似度度量" aria-label="Link to heading '相似度度量'" data-heading-content="相似度度量" class="anchor"></a></h4>
+<p><strong>余弦相似度</strong>（最常用）：
+$$
+\text{sim}(a, b) = \frac{a \cdot b}{||a|| \cdot ||b||}
+$$</p>
+<p><strong>L2 距离</strong>：
+$$
+d(a, b) = ||a - b||_2
+$$</p>
+<p><strong>内积</strong>（向量已归一化时等价于余弦相似度）：
+$$
+\text{sim}(a, b) = a \cdot b
+$$</p>
+<h4 id="user-content-ann近似最近邻搜索">ANN（近似最近邻）搜索<a href="#ann近似最近邻搜索" aria-label="Link to heading 'ANN（近似最近邻）搜索'" data-heading-content="ANN（近似最近邻）搜索" class="anchor"></a></h4>
+<p>精确搜索在百万级文档上太慢，实际使用近似算法：</p>
+<table>
+<thead>
+<tr>
+<th>算法</th>
+<th>原理</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>HNSW</strong></td>
+<td>分层可导航小世界图</td>
+<td>精度高速度快，主流方案</td>
+</tr>
+<tr>
+<td><strong>IVF</strong></td>
+<td>倒排索引 + 聚类</td>
+<td>适合大规模数据</td>
+</tr>
+<tr>
+<td><strong>PQ</strong></td>
+<td>乘积量化压缩向量</td>
+<td>节省存储空间</td>
+</tr>
+<tr>
+<td><strong>ScaNN</strong></td>
+<td>各向异性量化</td>
+<td>Google 出品</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-35-上下文拼接与生成">3.5 上下文拼接与生成<a href="#35-上下文拼接与生成" aria-label="Link to heading '3.5 上下文拼接与生成'" data-heading-content="3.5 上下文拼接与生成" class="anchor"></a></h3>
+<p>检索到 Top-K 个相关块后，拼接成 Prompt 发给 LLM：</p>
+<pre><code class="language-plaintext">Prompt 模板:
+&quot;&quot;&quot;
+根据以下参考资料回答问题。如果资料中没有相关信息，请说&quot;我无法从提供的资料中找到答案&quot;。
+
+参考资料:
+[1] {chunk_1}
+[2] {chunk_2}
+[3] {chunk_3}
+
+问题: {user_question}
+
+回答:
+&quot;&quot;&quot;
+</code></pre>
+<h2 id="user-content-4-高级-rag-技术">4. 高级 RAG 技术<a href="#4-高级-rag-技术" aria-label="Link to heading '4. 高级 RAG 技术'" data-heading-content="4. 高级 RAG 技术" class="anchor"></a></h2>
+<h3 id="user-content-41-query-变换query-transformation">4.1 Query 变换（Query Transformation）<a href="#41-query-变换query-transformation" aria-label="Link to heading '4.1 Query 变换（Query Transformation）'" data-heading-content="4.1 Query 变换（Query Transformation）" class="anchor"></a></h3>
+<p>用户的原始问题可能不适合直接检索，需要变换：</p>
+<ul>
+<li><strong>查询扩展（Query Expansion）</strong>：把一个问题拆成多个子问题分别检索</li>
+<li><strong>HyDE（Hypothetical Document Embeddings）</strong>：先让 LLM 生成一个&quot;假设性答案&quot;，用答案的向量去检索（因为答案和文档的语义更接近）</li>
+<li><strong>Step-Back Prompting</strong>：先问一个更抽象的问题，再检索</li>
+</ul>
+<h3 id="user-content-42-重排序re-ranking">4.2 重排序（Re-ranking）<a href="#42-重排序re-ranking" aria-label="Link to heading '4.2 重排序（Re-ranking）'" data-heading-content="4.2 重排序（Re-ranking）" class="anchor"></a></h3>
+<p>向量检索是粗筛，结果可能不精确。用一个**交叉编码器（Cross-Encoder）**对 Top-K 结果重新打分：</p>
+<pre><code class="language-plaintext">向量检索 Top-20 → Cross-Encoder 重排序 → 取 Top-3 → 送入 LLM
+</code></pre>
+<h3 id="user-content-43-多跳推理multi-hop-rag">4.3 多跳推理（Multi-hop RAG）<a href="#43-多跳推理multi-hop-rag" aria-label="Link to heading '4.3 多跳推理（Multi-hop RAG）'" data-heading-content="4.3 多跳推理（Multi-hop RAG）" class="anchor"></a></h3>
+<p>复杂问题需要多步检索：</p>
+<pre><code class="language-plaintext">问题: &quot;写《百年孤独》的作者的出生地在哪个国家？&quot;
+
+Step 1: 检索 &quot;《百年孤独》的作者&quot; → 加西亚·马尔克斯
+Step 2: 检索 &quot;加西亚·马尔克斯 出生地&quot; → 哥伦比亚阿拉卡塔卡
+回答: 哥伦比亚
+</code></pre>
+<h3 id="user-content-44-自适应检索self-rag2023">4.4 自适应检索（Self-RAG，2023）<a href="#44-自适应检索self-rag2023" aria-label="Link to heading '4.4 自适应检索（Self-RAG，2023）'" data-heading-content="4.4 自适应检索（Self-RAG，2023）" class="anchor"></a></h3>
+<p>LLM 自己决定是否需要检索、检索结果是否有用：</p>
+<pre><code class="language-plaintext">LLM 判断: &quot;这个问题我确定知道&quot; → 直接回答
+LLM 判断: &quot;这个问题我不确定&quot; → 触发检索
+检索后判断: &quot;这个结果相关&quot; → 用于生成
+检索后判断: &quot;这个结果不相关&quot; → 重新检索或直接回答
+</code></pre>
+<h2 id="user-content-5-向量数据库">5. 向量数据库<a href="#5-向量数据库" aria-label="Link to heading '5. 向量数据库'" data-heading-content="5. 向量数据库" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th>数据库</th>
+<th>类型</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>FAISS</strong></td>
+<td>库（Meta）</td>
+<td>高性能，本地使用</td>
+</tr>
+<tr>
+<td><strong>Chroma</strong></td>
+<td>轻量数据库</td>
+<td>简单易用，适合原型</td>
+</tr>
+<tr>
+<td><strong>Weaviate</strong></td>
+<td>云原生数据库</td>
+<td>支持混合搜索</td>
+</tr>
+<tr>
+<td><strong>Milvus</strong></td>
+<td>分布式数据库</td>
+<td>大规模生产环境</td>
+</tr>
+<tr>
+<td><strong>Pinecone</strong></td>
+<td>云服务</td>
+<td>全托管，零运维</td>
+</tr>
+<tr>
+<td><strong>Qdrant</strong></td>
+<td>Rust 实现</td>
+<td>高性能，Rust 生态</td>
+</tr>
+</tbody>
+</table>
+<h2 id="user-content-6-rag-的评估">6. RAG 的评估<a href="#6-rag-的评估" aria-label="Link to heading '6. RAG 的评估'" data-heading-content="6. RAG 的评估" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>评估什么</th>
+<th>计算方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>检索精度（Recall@K）</strong></td>
+<td>Top-K 中包含正确文档的比例</td>
+<td>正确文档数 / 总正确文档数</td>
+</tr>
+<tr>
+<td><strong>检索排序（MRR）</strong></td>
+<td>正确文档排在第几位</td>
+<td>1 / 排名</td>
+</tr>
+<tr>
+<td><strong>生成忠实度（Faithfulness）</strong></td>
+<td>回答是否忠于检索到的文档</td>
+<td>LLM-as-Judge</td>
+</tr>
+<tr>
+<td><strong>回答正确性（Correctness）</strong></td>
+<td>回答是否正确</td>
+<td>与标准答案对比</td>
+</tr>
+</tbody>
+</table>
+<h2 id="user-content-7-rag-vs-微调-vs-长上下文">7. RAG vs 微调 vs 长上下文<a href="#7-rag-vs-微调-vs-长上下文" aria-label="Link to heading '7. RAG vs 微调 vs 长上下文'" data-heading-content="7. RAG vs 微调 vs 长上下文" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>适用场景</th>
+<th>优势</th>
+<th>劣势</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>RAG</strong></td>
+<td>知识频繁更新、需要引用来源</td>
+<td>知识可实时更新、可解释</td>
+<td>检索质量影响大</td>
+</tr>
+<tr>
+<td><strong>微调</strong></td>
+<td>特定领域风格、格式要求</td>
+<td>回答质量高、延迟低</td>
+<td>知识不可实时更新</td>
+</tr>
+<tr>
+<td><strong>长上下文</strong></td>
+<td>文档数量少（&lt; 100K tokens）</td>
+<td>实现简单</td>
+<td>成本高、长文本质量下降</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>最佳实践</strong>：三者常组合使用——RAG 提供外部知识，微调适应领域风格，长上下文处理单篇长文档。</p>
+</blockquote>
+<h2 id="user-content-8-本仓库实现要点">8. 本仓库实现要点<a href="#8-本仓库实现要点" aria-label="Link to heading '8. 本仓库实现要点'" data-heading-content="8. 本仓库实现要点" class="anchor"></a></h2>
+<p>上面的原理已全部落地为可运行代码。核心文件是 <a href="../src/rag.rs"><code>src/rag.rs</code></a>（单测跑 <code>cargo test rag</code>，数量以实际输出为准），
+CLI 入口是 <a href="../README.md"><code>rag</code></a> 子命令。</p>
+<h3 id="user-content-81-代码结构">8.1 代码结构<a href="#81-代码结构" aria-label="Link to heading '8.1 代码结构'" data-heading-content="8.1 代码结构" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>位置</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ChunkOpts</code> / <code>Chunk</code></td>
+<td><code>rag.rs</code></td>
+<td>分块参数（<code>size</code>/<code>overlap</code>/<code>align</code>）与文本块（<code>text</code>/<code>start</code>/<code>end</code>/<code>source</code>）</td>
+</tr>
+<tr>
+<td><code>chunk_text</code></td>
+<td><code>rag.rs</code></td>
+<td>将长文本按字符窗口切成带重叠的块，支持可选的句子/段落边界对齐</td>
+</tr>
+<tr>
+<td><code>Embedder</code> trait</td>
+<td><code>rag.rs</code></td>
+<td>向量化器接口：<code>dim()</code> + <code>embed(text) → Vec&lt;f32&gt;</code></td>
+</tr>
+<tr>
+<td><code>TfIdf</code></td>
+<td><code>rag.rs</code></td>
+<td>TF-IDF 向量化器：<code>fit</code> 统计文档频率，<code>embed</code> 生成稀疏向量</td>
+</tr>
+<tr>
+<td><code>HashingEmbedder</code></td>
+<td><code>rag.rs</code></td>
+<td>特征哈希向量化器：FNV-1a 哈希映射到固定维度，无词表、无未登录词问题，符号哈希缓解冲突偏置</td>
+</tr>
+<tr>
+<td><code>ModelEmbedder</code></td>
+<td><code>rag.rs</code></td>
+<td>模型稠密向量化器：Transformer 隐状态均值池化 + 归一化，三者中唯一&quot;懂语义&quot;的检索器</td>
+</tr>
+<tr>
+<td><code>ScoredChunk</code></td>
+<td><code>rag.rs</code></td>
+<td>一条检索结果：<code>index</code> + <code>chunk</code> + 余弦相似度 <code>score</code></td>
+</tr>
+<tr>
+<td><code>Retriever</code></td>
+<td><code>rag.rs</code></td>
+<td>向量检索器：持有嵌入器 + 块向量，提供 <code>build</code>/<code>from_text</code>/<code>from_corpus_dir</code>/<code>search</code>（暴力 top-k）/<code>search_mmr</code>（MMR 去冗余重排）</td>
+</tr>
+<tr>
+<td><code>PromptOpts</code> / <code>RagPrompt</code></td>
+<td><code>rag.rs</code></td>
+<td>提示组装参数与结果：字符预算 <code>max_context_chars</code> + 系统约束指令 + 来源标注</td>
+</tr>
+<tr>
+<td><code>build_rag_prompt</code></td>
+<td><code>rag.rs</code></td>
+<td>将检索命中组装为最终提示文本，带来源标注和字符预算裁剪，强制&quot;只依据资料回答&quot;</td>
+</tr>
+<tr>
+<td><code>l2_norm</code> / <code>l2_normalize</code> / <code>cosine_similarity</code></td>
+<td><code>rag.rs</code></td>
+<td>底层向量工具：L2 范数、归一化、余弦相似度（零向量安全）</td>
+</tr>
+<tr>
+<td><code>truncate_chars</code> / <code>terms</code></td>
+<td><code>rag.rs</code></td>
+<td>文本工具：按字符截断（中文安全）、unigram+bigram 词项切分（无分词器的中文检索）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-82-cli-用法">8.2 CLI 用法<a href="#82-cli-用法" aria-label="Link to heading '8.2 CLI 用法'" data-heading-content="8.2 CLI 用法" class="anchor"></a></h3>
+<pre><code class="language-bash"># 默认配置（chunk_size=120, overlap=30, top_k=4, 特征哈希 512 维）
+cargo run --release -- rag
+
+# 调整分块参数
+cargo run --release -- rag --chunk-size 200 --overlap 50
+
+# 调整检索参数
+cargo run --release -- rag --top-k 6 --mmr-lambda 0.3 --mmr-pool 20
+
+# 自定义查询
+cargo run --release -- rag --query &quot;attention mechanism transformer&quot;
+
+# 使用模型稠密向量（需要先训练小模型）
+cargo run --release -- rag --n-embd 64 --n-layer 4
+
+# 调整提示预算
+cargo run --release -- rag --context-chars 500
+</code></pre>
+<hr />
+<h2 id="user-content-9-小结与下一课">9. 小结与下一课<a href="#9-小结与下一课" aria-label="Link to heading '9. 小结与下一课'" data-heading-content="9. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li>RAG 解决的是&quot;模型不知道/记不准/不能查私有数据&quot;这件事：<strong>先检索，再根据检索到的资料回答</strong></li>
+<li>离线阶段：分块（固定长度 / 段落 / 滑动窗口 / 语义）→ 向量化 → 建向量库；在线阶段：查询向量化 → Top-K 检索 → 拼上下文 → 生成</li>
+<li>三种相似度（余弦 / L2 / 内积）在向量归一化后等价；百万级文档要用 HNSW / IVF / PQ 这类 ANN 索引</li>
+<li>高级技术都在补&quot;召回的精度&quot;：Query 变换（扩展 / HyDE / Step-Back）、Cross-Encoder 重排、多跳检索、自适应的 Self-RAG</li>
+<li>评估要同时看检索侧（Recall@K、MRR）与生成侧（Faithfulness、Correctness）；RAG 与微调、长上下文是互补而非替代关系</li>
+<li>本仓库把整条链路落地为 <code>src/rag.rs</code> + <code>rag</code> 子命令：三种向量化（TF-IDF / FNV 哈希 / 模型隐状态池化）、暴力 top-k 与 MMR 去冗余重排、带字符预算的提示组装</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现（<code>src/rag.rs</code> + <code>rag</code> 子命令），这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li><strong>实现简单向量检索</strong>：给定一组文本的向量表示和一个查询向量，实现余弦相似度 Top-K 检索。</li>
+<li><strong>文本分块</strong>：实现滑动窗口分块算法，支持配置 chunk_size 和 overlap。</li>
+<li><strong>Prompt 拼接</strong>：实现 RAG 的 Prompt 模板，把检索结果和用户问题拼接成完整的输入。</li>
+<li><strong>端到端 RAG</strong>：结合前面的 LLM，实现一个简单的 RAG 系统——加载文档、分块、向量化、检索、生成。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="38-%E5%88%86%E5%B8%83%E5%BC%8F%E8%AE%AD%E7%BB%83.md">第 38 课 分布式训练（Distributed Training）</a> —— 模型再大单卡就装不下了，下一课把训练摊到多卡：数据并行 / ZeRO / 张量并行 / 流水线并行与 3D 切分，外加真多进程的 DP 接线。</p>
+</blockquote>

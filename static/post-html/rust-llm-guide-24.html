@@ -1,0 +1,257 @@
+<h1 id="user-content-第-24-课flash-attention--分块在线-softmaxgpu-显存救星">第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星<a href="#第-24-课flash-attention--分块在线-softmaxgpu-显存救星" aria-label="Link to heading '第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星'" data-heading-content="第 24 课：Flash Attention —— 分块在线 softmax，GPU 显存救星" class="anchor"></a></h1>
+<blockquote>
+<p>代码位置：<a href="../src/tensor.rs">../src/tensor.rs</a>（<code>Tensor::flash_attention</code> 融合算子）</p>
+<p>算法论文：<em>FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness</em> (Tri Dao, 2022)</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>标准 attention 的显存瓶颈在哪里？</li>
+<li>Flash Attention 怎么通过&quot;分块&quot;避免构建完整的 T×T 矩阵？</li>
+<li>&quot;在线 softmax&quot;是什么？为什么可以分块计算 softmax？</li>
+<li>Flash Attention 对训练速度有什么影响？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-标准-attention-的显存问题">2. 标准 Attention 的显存问题<a href="#2-标准-attention-的显存问题" aria-label="Link to heading '2. 标准 Attention 的显存问题'" data-heading-content="2. 标准 Attention 的显存问题" class="anchor"></a></h2>
+<pre><code class="language-plaintext">scores = Q · Kᵀ        # [B*H, T, T]    ← 这个矩阵是瓶颈！
+attn   = softmax(scores) # [B*H, T, T]
+out    = attn · V        # [B*H, T, D]
+</code></pre>
+<p>当 T=2048, B*H=32 时：</p>
+<pre><code class="language-plaintext">scores 矩阵 = 32 * 2048 * 2048 * 4B = 512MB
+</code></pre>
+<p>这个 T×T 矩阵必须完整存在显存里（反向传播需要），是 attention 的主要显存瓶颈。</p>
+<hr />
+<h2 id="user-content-3-flash-attention-的核心思想">3. Flash Attention 的核心思想<a href="#3-flash-attention-的核心思想" aria-label="Link to heading '3. Flash Attention 的核心思想'" data-heading-content="3. Flash Attention 的核心思想" class="anchor"></a></h2>
+<p><strong>问题</strong>：能不能不构建完整的 T×T 矩阵，也能算出正确的结果？</p>
+<p><strong>答案</strong>：可以！用&quot;分块 + 在线 softmax&quot;。</p>
+<h3 id="user-content-31-分块计算">3.1 分块计算<a href="#31-分块计算" aria-label="Link to heading '3.1 分块计算'" data-heading-content="3.1 分块计算" class="anchor"></a></h3>
+<p>把 Q 按行分块（Br 行），K/V 按列分块（Bc 列），逐块计算：</p>
+<pre><code class="language-plaintext">for each Q block (Br rows):
+    for each K/V block (Bc cols):
+        S_ij = Q_i · K_j^T / √d    # [Br, Bc] 小矩阵，不保存！
+        P_ij = softmax(S_ij)        # 局部 softmax
+        O_i += P_ij · V_j           # 累加输出
+</code></pre>
+<p><strong>关键</strong>：每个 <code>[Br, Bc]</code> 的 scores 矩阵算完就丢，只保留累加后的输出。</p>
+<h3 id="user-content-32-在线-softmax">3.2 在线 softmax<a href="#32-在线-softmax" aria-label="Link to heading '3.2 在线 softmax'" data-heading-content="3.2 在线 softmax" class="anchor"></a></h3>
+<p>问题：softmax 需要知道整行的最大值和总和，但分块计算时一次只能看到一部分。</p>
+<p>解决：用&quot;在线&quot;算法，逐块更新最大值和总和：</p>
+<pre><code class="language-plaintext">初始：m = -inf, l = 0, O = 0
+
+for each K/V block:
+    S_ij = Q_i · K_j^T / √d
+    m_new = max(m, rowmax(S_ij))
+    P_ij = exp(S_ij - m_new)
+    l_new = exp(m - m_new) * l + rowsum(P_ij)
+    O = exp(m - m_new) * O + P_ij · V_j
+    m = m_new, l = l_new
+
+O = O / l    # 最终归一化
+</code></pre>
+<p>每块只需要更新三个标量（m, l, O），不需要保存完整 scores。</p>
+<blockquote>
+<p>✅ 本项目的 <strong>CPU 路径实现了这一套在线 softmax</strong> —— 参见 <a href="#6-%E6%9C%AC%E9%A1%B9%E7%9B%AE%E7%9A%84%E5%AE%9E%E7%8E%B0">§6</a>：
+<code>flash_forward_cpu</code> 按输出行分块扫描 K/V、行内在线归一化，中间 P 从不落地；
+GPU 常驻显存路径另算（S/P 留在显存，反向直接读）。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-4-io-复杂度分析">4. IO 复杂度分析<a href="#4-io-复杂度分析" aria-label="Link to heading '4. IO 复杂度分析'" data-heading-content="4. IO 复杂度分析" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>标准 Attention</th>
+<th>Flash Attention</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HBM 读写</td>
+<td>O(N² + Nd)</td>
+<td>O(N²d²/M)</td>
+</tr>
+<tr>
+<td>显存占用</td>
+<td>O(N² + Nd)</td>
+<td>O(N + d)</td>
+</tr>
+</tbody>
+</table>
+<p>M = SRAM 大小（GPU 的 L2 cache，通常几 MB）。当 d² ≪ M 时，Flash Attention 的 IO 复杂度接近 O(Nd)。</p>
+<hr />
+<h2 id="user-content-5-反向传播">5. 反向传播<a href="#5-反向传播" aria-label="Link to heading '5. 反向传播'" data-heading-content="5. 反向传播" class="anchor"></a></h2>
+<p>Flash Attention 的反向需要重新计算 P（注意力权重），但这次有保存的 (m, l) 统计量：</p>
+<pre><code class="language-plaintext">P_ij = exp(S_ij - m_i) / l_i
+</code></pre>
+<p>然后用 P 计算 dQ、dK、dV（和标准 attention 反向一样）。</p>
+<p><strong>权衡</strong>：反向时重新算 P（多一次前向计算），但省掉了存储完整 P 的显存。</p>
+<hr />
+<h2 id="user-content-6-本项目的实现">6. 本项目的实现<a href="#6-本项目的实现" aria-label="Link to heading '6. 本项目的实现'" data-heading-content="6. 本项目的实现" class="anchor"></a></h2>
+<p><code>Tensor::flash_attention</code>（<a href="../src/tensor.rs">src/tensor.rs</a>）按条件三分流：</p>
+<table>
+<thead>
+<tr>
+<th>路径</th>
+<th>条件</th>
+<th>前向</th>
+<th>反向</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GPU 常驻</td>
+<td><code>--features gpu</code> + GPU 可用 + 训练态</td>
+<td>S/P 录成一次提交，留显存</td>
+<td>读驻留 P</td>
+</tr>
+<tr>
+<td>probe 录制</td>
+<td><code>LLM_GPU_PROBE</code></td>
+<td>拆回逐算子，录真实形状</td>
+<td>同标准反向</td>
+</tr>
+<tr>
+<td><strong>CPU 分块</strong>（默认）</td>
+<td>其余</td>
+<td><code>flash_forward_cpu</code>：分块 + 在线 softmax</td>
+<td>matmul 重算 P</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-61-cpu-分块--在线-softmaxflash_forward_cpu">6.1 CPU 分块 + 在线 softmax（<code>flash_forward_cpu</code>）<a href="#61-cpu-分块--在线-softmaxflash_forward_cpu" aria-label="Link to heading '6.1 CPU 分块 + 在线 softmax（flash_forward_cpu）'" data-heading-content="6.1 CPU 分块 + 在线 softmax（flash_forward_cpu）" class="anchor"></a></h3>
+<p>按输出行（<code>B*H × T</code>）rayon 并行，行内按 <code>block_size</code> 扫 K/V 块：</p>
+<ul>
+<li><strong>掩码可以真的传进来</strong>：显式给了 <code>mask</code> 时，行内把掩码行加到打分上，可见性<strong>完全由掩码决定</strong>
+（不再另按因果截断，否则整行 <code>-inf</code> 的行会被&quot;截断&quot;救回来、丢掉掩码的语义）；
+没给掩码时才退回核内因果快路：query i 只算 <code>j &lt; k_end</code>（<code>k_end = i + visible_before + 1</code>），
+与 <code>causal_mask_data</code> 物化的掩码逐位一致，被屏蔽的键根本不进打分与累加。两条路都<strong>不物化</strong> <code>[T, T_total]</code> 掩码；</li>
+<li><strong>整块被屏蔽要短路</strong>：在线 softmax 里 <code>-inf - (-inf) = NaN</code>，所以整块全屏蔽时直接跳过，
+整行全屏蔽时输出全 0（否则 NaN 会顺着反向污染整条链）；</li>
+<li><strong>行内在线归一化</strong>：维护运行最大值 m 与指数和 l，新块并入时旧累计乘 <code>exp(m_old - m_new)</code> 重标定
+（漏掉重标定会指数爆炸——历史 bug，有回归测试）；</li>
+<li><strong>中间 P 从不落地</strong>：每行工作集 O(block_size + head_dim)，前向显存不再随 T² 增长。</li>
+</ul>
+<p>反向<strong>不保留 P</strong>：用矩阵乘重算 <code>scores = Q'·Kᵀ</code>，再由 <code>attn_softmax_cpu</code> 按<strong>同一掩码口径</strong>
+归一化出 P——它接受 <code>Option&lt;&amp;[f32]&gt;</code>：没掩码时按 <code>k_end</code> 截断，有掩码时逐行相加后整行归一化；
+反向必须复用同一张掩码，否则梯度会漏回被屏蔽的键。O(T²) 只作为反向临时工作集
+（dP/dS 本来就是 O(T²)），随后 <code>dV/dP/dS/dQ/dK</code> 全部走 <code>matmul_data</code> 内核
+（旧的标量三重循环只有 0.24 GFLOP/s，慢约 100 倍）。</p>
+<h3 id="user-content-62-mask-参数option两条路径都真的消费">6.2 <code>mask</code> 参数：<code>Option</code>，两条路径都真的消费<a href="#62-mask-参数option两条路径都真的消费" aria-label="Link to heading '6.2 mask 参数：Option，两条路径都真的消费'" data-heading-content="6.2 mask 参数：Option，两条路径都真的消费" class="anchor"></a></h3>
+<p>签名是 <code>flash_attention(q, k, v, mask: Option&lt;&amp;Tensor&gt;, block_size)</code>。</p>
+<ul>
+<li><strong>显式给了掩码</strong>（SFT 的 loss 掩码、视觉塔的全 0 掩码）：CPU 分块核把它逐行加到打分上、GPU 常驻与 probe 录制按真实 buffer 消费——<strong>两条路径语义一致</strong>；</li>
+<li><strong>传 <code>None</code></strong>：CPU 分块核走核内后缀因果快路（不物化掩码）；GPU 路径需要时由算子自己物化一次因果掩码，<code>attn_resident</code> / <code>blocks_resident</code> 收到 <code>None</code> 时也会各自兜底物化（训练态 <code>t_total = t</code>）。</li>
+</ul>
+<p><code>forward_core</code> 只在「gpu feature + GPU 可用 + 无 KV cache + <code>base == 0</code>」时才物化一次供全栈共享
+（见 <a href="25-KV-Cache.md">第 25 课</a> 第 5 节）。⚠️ 所以<strong>不能用 <code>None</code> 表达&quot;不屏蔽&quot;</strong>：
+视觉塔要双向注意力就得显式传一张全 0 掩码（第 41 课）。</p>
+<h3 id="user-content-63-block_size-参数恢复语义">6.3 <code>block_size</code> 参数恢复语义<a href="#63-block_size-参数恢复语义" aria-label="Link to heading '6.3 block_size 参数恢复语义'" data-heading-content="6.3 block_size 参数恢复语义" class="anchor"></a></h3>
+<p>第 5 个参数是 CPU 分块核的行内键块大小（<code>attention.rs</code> 传 32），决定每行工作集大小；
+不再是被忽略的死参数。</p>
+<h3 id="user-content-64-演进史2026-09-16-的-matmul-重写">6.4 演进史：2026-09-16 的 matmul 重写<a href="#64-演进史2026-09-16-的-matmul-重写" aria-label="Link to heading '6.4 演进史：2026-09-16 的 matmul 重写'" data-heading-content="6.4 演进史：2026-09-16 的 matmul 重写" class="anchor"></a></h3>
+<p>最初的实现是标准的「分块 + 在线 softmax」标量三重循环版。逐算子插桩后发现它是<strong>单步最大的瓶颈</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>算子</th>
+<th>耗时</th>
+<th>有效算力</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>flash 前向</td>
+<td>4.6s</td>
+<td>0.12~0.24 GFLOP/s</td>
+</tr>
+<tr>
+<td>flash 反向</td>
+<td>8.7s</td>
+<td>（同上）</td>
+</tr>
+<tr>
+<td>单步合计</td>
+<td>17.1s，其中注意力占 <strong>78%</strong></td>
+<td>比 <code>matmul_data</code> 慢约 100 倍</td>
+</tr>
+</tbody>
+</table>
+<p>瓶颈是<strong>没走上已经分块 / 向量化 / 可走 GPU 的矩阵乘内核</strong>，于是重写为「三次矩阵乘」：</p>
+<pre><code class="language-text">Q' = Q / √d          // 缩放挪到 Q 上，只要 524K 次乘法
+S  = Q'·Kᵀ           // matmul_data [BH,T,T_total]，一次算完
+P  = softmax(S + M)  // 融合内核，每行一遍过
+O  = P·V             // matmul_data
+</code></pre>
+<p>这解决了速度但让前向驻留 O(T²)。<strong>当前实现取两者之长</strong>：前向回到分块在线 softmax
+（<code>flash_forward_cpu</code> 的行内打分是紧凑核，不再是慢的三重循环），反向保留 matmul 路线
+（重算 scores + 矩阵乘反向）。</p>
+<h3 id="user-content-65-集成状态已接入">6.5 集成状态：已接入<a href="#65-集成状态已接入" aria-label="Link to heading '6.5 集成状态：已接入'" data-heading-content="6.5 集成状态：已接入" class="anchor"></a></h3>
+<p><code>MultiHeadAttention::forward</code>（<a href="../src/attention.rs">src/attention.rs</a>）已经调用：</p>
+<pre><code class="language-rust">let out = Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32);
+</code></pre>
+<p><strong>不是</strong>留作练习的独立算子 —— 训练与推理走的都是它。</p>
+<h3 id="user-content-66-常驻显存路径--features-gpu">6.6 常驻显存路径（<code>--features gpu</code>）<a href="#66-常驻显存路径--features-gpu" aria-label="Link to heading '6.6 常驻显存路径（--features gpu）'" data-heading-content="6.6 常驻显存路径（--features gpu）" class="anchor"></a></h3>
+<p>前向的 <code>S = Q'·Kᵀ → P = softmax(S+mask) → O = P·V</code> 三个算子会录进<strong>一次提交</strong>，
+S（33.6MB）与 P（33.6MB）全程留在显存，只把 O（4.2MB）回读给 CPU，P 的显存句柄留到反向用。
+反向的 <code>dV/dP/dS/dQ/dK</code> 同理一次提交，只回读 dQ/dK/dV（各 4.2MB）。</p>
+<p>不这么做的代价很直观：逐算子路径要把 P 回读 33.6MB、下一步再原样传回，一来一回 67MB/层/次纯属白跑
+（实测单步回读 1.46GB，91% 的时间花在等回读）。GPU 不可用或形状太小时自动回退逐算子 / CPU，数值行为不变。</p>
+<h3 id="user-content-67-测试">6.7 测试<a href="#67-测试" aria-label="Link to heading '6.7 测试'" data-heading-content="6.7 测试" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>测试</th>
+<th>验证内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_flash_attention_matches_standard</code></td>
+<td>前向 vs 标准注意力（<code>masked_softmax</code> + matmul）一致性</td>
+</tr>
+<tr>
+<td><code>test_flash_attention_backward_matches_standard</code></td>
+<td>反向 dQ/dK/dV vs 标准注意力反向（matmul 重算 P）</td>
+</tr>
+<tr>
+<td><code>test_flash_attention_resident_path_matches_loop_reference</code></td>
+<td>GPU 常驻显存路径 vs 逐算子参考（仅 <code>--features gpu</code>）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="user-content-7-小结与下一课">7. 小结与下一课<a href="#7-小结与下一课" aria-label="Link to heading '7. 小结与下一课'" data-heading-content="7. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<p><strong>论文侧（§1-5，Flash Attention 的原意）</strong></p>
+<ul>
+<li>通过分块计算避免构建完整的 T×T scores 矩阵，把 attention 的显存从 O(T²) 降到 O(T·d)</li>
+<li>在线 softmax 技巧：逐块更新 running max 与 running sum，不需要一次性看到整行</li>
+<li>反向时用保存的统计量（max、sum）重新计算 P，不需要存储完整 scores</li>
+<li>Tri Dao 的论文是现代 LLM 训练的基石之一</li>
+</ul>
+<p><strong>本项目侧（§6，实际实现）</strong></p>
+<ul>
+<li>本项目 <strong>CPU 路径已实现分块与在线 softmax</strong>（<a href="../src/tensor.rs">src/tensor.rs</a> <code>flash_forward_cpu</code>），
+<code>block_size</code> 恢复为行内键块大小；前向中间 P 不落地，掩码核内屏蔽不物化；
+反向不保留 P，用 matmul 重算 scores 再归一化（O(T²) 仅反向临时工作集，dP/dS 本来就是 O(T²)）</li>
+<li>分块核不走慢的标量三重循环，行内打分是紧凑核、反向全用矩阵乘；
+单步注意力耗时 ~13.3s → 亚秒级，这是本项目<strong>最值得记住的一条经验</strong>：
+优化前先插桩，瓶颈常常不在算法而在「没走上已优化好的内核」</li>
+<li><code>--features gpu</code> 下前向/反向各录成一次提交，S（33.6MB）与 P（33.6MB）留在显存不回读，
+只回读 O（4.2MB）；GPU 不可用或形状过小时自动回退，数值行为不变</li>
+<li>正确性由 3 个测试守住（数量为写作时快照，以 <code>cargo test flash_attention</code> 实际输出为准）：前向、反向各对拍标准注意力，常驻显存路径对拍逐算子参考</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li><strong>扫 <code>block_size</code></strong>：把 <code>flash_attention(..., 32)</code> 的行内键块大小改成 <code>8 / 64 / 128</code>，用 6.4 节的插桩口径量单步注意力耗时，看工作集大小与速度的权衡。</li>
+<li><strong>显式掩码 vs 核内快路</strong>：分别传 <code>Some(mask)</code>（SFT 的 loss 掩码）与 <code>None</code> 各跑一次前向，断言两者输出一致（6.2 节说两条路径语义一致）。</li>
+<li><strong>换掉反向重算</strong>：把反向改成&quot;前向留下 P&quot;的版本，量一次单步显存占用和耗时，对比 6.4 节那张表里的取舍。</li>
+<li><strong>补 GPU 常驻的数值测试</strong>：给 <code>--features gpu</code> 下的常驻路径再加一条与逐算子参考的 <code>assert_close</code>，把 6.6 节的&quot;近似&quot;边界钉得更细。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="25-KV-Cache.md">第 25 课 KV Cache</a> —— 注意力内核搞定之后，解决逐 token 生成时&quot;历史 K/V 被重复计算&quot;的浪费。</p>
+</blockquote>

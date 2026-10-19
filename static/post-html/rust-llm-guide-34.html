@@ -1,0 +1,334 @@
+<h1 id="user-content-第-34-课推测解码speculative-decoding">第 34 课：推测解码（Speculative Decoding）<a href="#第-34-课推测解码speculative-decoding" aria-label="Link to heading '第 34 课：推测解码（Speculative Decoding）'" data-heading-content="第 34 课：推测解码（Speculative Decoding）" class="anchor"></a></h1>
+<blockquote>
+<p><strong>本课已落地为可运行代码</strong>：<code>src/speculative.rs</code>（与第 35 课共用；单测跑 <code>cargo test speculative</code>，数量以实际输出为准）+ <code>speculative</code> 子命令——
+草稿→验证循环、拒绝采样与残差分布修正、<code>TargetStream</code> 的缓存不变量、被拒位置的 <code>rollback_to</code> 对齐。
+与已有代码的衔接：复用 <code>src/sample.rs</code> 的整套采样预处理和 <code>src/attention.rs</code> 的 KV Cache；
+草稿模型直接用 <code>src/model.rs</code> 的 <code>Transformer</code> 结构（<code>ModelDrafter</code>）。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-推理瓶颈自回归的根本问题">1. 推理瓶颈：自回归的根本问题<a href="#1-推理瓶颈自回归的根本问题" aria-label="Link to heading '1. 推理瓶颈：自回归的根本问题'" data-heading-content="1. 推理瓶颈：自回归的根本问题" class="anchor"></a></h2>
+<p>LLM 生成文本是<strong>逐 token 自回归</strong>的——每生成一个 token 都要跑一次完整的前向传播。</p>
+<pre><code class="language-plaintext">输入: &quot;The cat&quot;
+Step 1: 模型前向 → &quot;sat&quot;
+Step 2: 模型前向 → &quot;on&quot;
+Step 3: 模型前向 → &quot;the&quot;
+Step 4: 模型前向 → &quot;mat&quot;
+</code></pre>
+<p>每一步都是一个<strong>内存带宽瓶颈</strong>（memory-bound）操作——需要把数十 GB 的权重从显存读到计算单元，但实际计算量很小（只算一个 token）。GPU 的算力利用率极低（通常 &lt; 5%）。</p>
+<blockquote>
+<p><strong>核心矛盾</strong>：大模型的单 token 推理是 memory-bound，GPU 算力闲置；batch 推理虽然能提高利用率，但交互式场景（聊天、代码补完）只能逐 token 生成。</p>
+</blockquote>
+<h2 id="user-content-2-推测解码的核心思想">2. 推测解码的核心思想<a href="#2-推测解码的核心思想" aria-label="Link to heading '2. 推测解码的核心思想'" data-heading-content="2. 推测解码的核心思想" class="anchor"></a></h2>
+<p><strong>用一个小而快的&quot;草稿模型&quot;（Draft Model）一次性猜出多个 token，再用大模型一次性验证。</strong></p>
+<pre><code class="language-plaintext">传统方式（5 次大模型前向）：
+  大模型 → token1
+  大模型 → token2
+  大模型 → token3
+  大模型 → token4
+  大模型 → token5
+
+推测解码（1 次小模型 + 1 次大模型）：
+  小模型快速猜 → token1, token2, token3, token4, token5
+  大模型一次性验证 → 接受 token1, token2, token3; 拒绝 token4,5 → 大模型自己补 token4'
+</code></pre>
+<p><strong>收益</strong>：如果小模型猜对了 K 个 token，大模型只需一次前向传播就&quot;生成&quot;了 K 个 token。</p>
+<h2 id="user-content-3-数学保证">3. 数学保证<a href="#3-数学保证" aria-label="Link to heading '3. 数学保证'" data-heading-content="3. 数学保证" class="anchor"></a></h2>
+<p>推测解码最关键的设计是：<strong>它的输出分布与纯大模型自回归采样完全一致</strong>（无损）。</p>
+<h3 id="user-content-31-验证算法">3.1 验证算法<a href="#31-验证算法" aria-label="Link to heading '3.1 验证算法'" data-heading-content="3.1 验证算法" class="anchor"></a></h3>
+<p>设大模型概率为 $p(x_t|x_{&lt;t})$，小模型概率为 $q(x_t|x_{&lt;t})$：</p>
+<p>对于草稿模型猜的 token $\hat{x}_t$：</p>
+<ol>
+<li>
+<p><strong>接受概率</strong>：
+$$
+\text{accept_prob} = \min\left(1, \frac{p(\hat{x}<em>t | x</em>{&lt;t})}{q(\hat{x}<em>t | x</em>{&lt;t})}\right)
+$$</p>
+</li>
+<li>
+<p><strong>如果拒绝</strong>：从修正分布中重新采样：
+$$
+x_t \sim \text{norm_max}\left(p(x_t | x_{&lt;t}) - q(x_t | x_{&lt;t})\right)
+$$</p>
+</li>
+</ol>
+<p>其中 $\text{norm_max}(z) = \frac{\max(z, 0)}{\sum_i \max(z_i, 0)}$。</p>
+<p><strong>直觉</strong>：</p>
+<ul>
+<li>如果大模型认为这个 token 的概率比小模型还高（$p/q \geq 1$），一定接受</li>
+<li>如果大模型认为概率偏低（$p/q &lt; 1$），以 $p/q$ 的概率接受</li>
+<li>拒绝时，从&quot;大模型认为好但小模型没猜到&quot;的分布中重新采样</li>
+</ul>
+<h3 id="user-content-32-为什么无损">3.2 为什么无损？<a href="#32-为什么无损" aria-label="Link to heading '3.2 为什么无损？'" data-heading-content="3.2 为什么无损？" class="anchor"></a></h3>
+<p>这本质上是对**拒绝采样（Rejection Sampling）**的巧妙应用：</p>
+<ul>
+<li>接受时，分布是 $q$ 加上 $p$ 的截断——数学上恰好等于 $p$</li>
+<li>拒绝时，从 $p-q$ 的残差分布中采样——补回了 $q$ 低估的部分</li>
+<li>两者合并，最终采样分布严格等于 $p$</li>
+</ul>
+<h2 id="user-content-4-实现框架">4. 实现框架<a href="#4-实现框架" aria-label="Link to heading '4. 实现框架'" data-heading-content="4. 实现框架" class="anchor"></a></h2>
+<pre><code class="language-plaintext">┌─────────────┐
+│  草稿模型 q  │ ← 小模型（如 LLaMA-68M 或模型本身的前几层）
+└──────┬──────┘
+       │ 快速猜 K 个 token
+       │ [t1, t2, t3, t4, t5]
+       ▼
+┌─────────────┐
+│  大模型 p    │ ← 完整模型（如 LLaMA-70B）
+└──────┬──────┘
+       │ 一次前向传播，同时计算 K 个位置的 logits
+       │ 逐个验证：接受/拒绝
+       ▼
+  接受 [t1, t2, t3] + 大模型补充 t4'
+  共生成 4 个 token，但只用了 1 次大模型前向
+</code></pre>
+<h3 id="user-content-41-关键实现细节">4.1 关键实现细节<a href="#41-关键实现细节" aria-label="Link to heading '4.1 关键实现细节'" data-heading-content="4.1 关键实现细节" class="anchor"></a></h3>
+<h4 id="user-content-1-kv-cache-同步">1. KV Cache 同步<a href="#1-kv-cache-同步" aria-label="Link to heading '1. KV Cache 同步'" data-heading-content="1. KV Cache 同步" class="anchor"></a></h4>
+<p>大模型验证时需要一次性处理 K 个 token，KV Cache 需要：</p>
+<ul>
+<li>验证前：追加草稿模型猜的 K 个 token 的 K/V</li>
+<li>接受 n 个后：保留前 n 个，丢弃后面的</li>
+<li>下一轮：从第 n+1 个 token 开始新的草稿</li>
+</ul>
+<pre><code class="language-plaintext">草稿阶段: KV = [已有历史] + [draft1, draft2, draft3, draft4, draft5]
+验证结果: 接受 3 个
+保留:     KV = [已有历史] + [draft1, draft2, draft3]  // 丢弃 4,5
+大模型补:  KV = [已有历史] + [draft1, draft2, draft3] + [大模型输出]
+</code></pre>
+<h4 id="user-content-2-草稿模型的选择">2. 草稿模型的选择<a href="#2-草稿模型的选择" aria-label="Link to heading '2. 草稿模型的选择'" data-heading-content="2. 草稿模型的选择" class="anchor"></a></h4>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>说明</th>
+<th>优缺点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>独立小模型</strong></td>
+<td>训练/蒸馏一个同架构的小模型</td>
+<td>需要额外模型；接受率高</td>
+</tr>
+<tr>
+<td><strong>浅层推测</strong></td>
+<td>用大模型的前 N 层作为草稿模型</td>
+<td>无需额外模型；接受率中等</td>
+</tr>
+<tr>
+<td><strong>N-gram 预测</strong></td>
+<td>用 N-gram 统计模式猜</td>
+<td>极快；接受率低</td>
+</tr>
+<tr>
+<td><strong>Medusa（2024）</strong></td>
+<td>在大模型上加多个预测头</td>
+<td>一次前向猜多个 token；需要训练头</td>
+</tr>
+<tr>
+<td><strong>EAGLE（2024）</strong></td>
+<td>用特征级别的草稿模型</td>
+<td>接受率最高；实现较复杂</td>
+</tr>
+</tbody>
+</table>
+<h4 id="user-content-3-批量验证优化">3. 批量验证优化<a href="#3-批量验证优化" aria-label="Link to heading '3. 批量验证优化'" data-heading-content="3. 批量验证优化" class="anchor"></a></h4>
+<p>大模型验证 K 个 token 时，可以用 <strong>tree attention</strong> 替代线性验证——同时验证多条分支路径：</p>
+<pre><code class="language-plaintext">              root
+            /      \
+         t1_a      t1_b
+        /    \        \
+     t2_a   t2_b     t2_c
+</code></pre>
+<p>树结构让一次大模型前向就能验证多条候选路径，进一步提高接受率。</p>
+<h2 id="user-content-5-性能分析">5. 性能分析<a href="#5-性能分析" aria-label="Link to heading '5. 性能分析'" data-heading-content="5. 性能分析" class="anchor"></a></h2>
+<h3 id="user-content-51-理论加速比">5.1 理论加速比<a href="#51-理论加速比" aria-label="Link to heading '5.1 理论加速比'" data-heading-content="5.1 理论加速比" class="anchor"></a></h3>
+<p>设：</p>
+<ul>
+<li>大模型单步延迟：$T_{\text{large}}$</li>
+<li>小模型单步延迟：$T_{\text{draft}}$</li>
+<li>接受率：$\alpha$（平均每步猜对的比例）</li>
+<li>猜测长度：$K$</li>
+</ul>
+<p>平均每次验证生成的 token 数：
+$$
+\mathbb{E}[\text{tokens}] = \frac{1 - \alpha^{K+1}}{1 - \alpha}
+$$</p>
+<p>总延迟：$K \cdot T_{\text{draft}} + T_{\text{large}}$</p>
+<p>加速比：
+$$
+\text{Speedup} = \frac{\mathbb{E}[\text{tokens}] \cdot T_{\text{large}}}{K \cdot T_{\text{draft}} + T_{\text{large}}}
+$$</p>
+<h3 id="user-content-52-实际效果">5.2 实际效果<a href="#52-实际效果" aria-label="Link to heading '5.2 实际效果'" data-heading-content="5.2 实际效果" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>设置</th>
+<th>加速比</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LLaMA-70B + LLaMA-7B 草稿</td>
+<td>2~3×</td>
+<td>接受率约 70-80%</td>
+</tr>
+<tr>
+<td>LLaMA-70B + 68M 草稿</td>
+<td>1.5~2×</td>
+<td>草稿太快但接受率低</td>
+</tr>
+<tr>
+<td>Medusa（无需额外模型）</td>
+<td>2~2.5×</td>
+<td>需要额外训练多头</td>
+</tr>
+<tr>
+<td>EAGLE-2</td>
+<td>3~4×</td>
+<td>目前最快的方案之一</td>
+</tr>
+</tbody>
+</table>
+<h2 id="user-content-6-与其他加速方法的对比">6. 与其他加速方法的对比<a href="#6-与其他加速方法的对比" aria-label="Link to heading '6. 与其他加速方法的对比'" data-heading-content="6. 与其他加速方法的对比" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>原理</th>
+<th>是否无损</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>推测解码</td>
+<td>小模型猜 + 大模型验</td>
+<td>无损</td>
+<td>延迟敏感的交互场景</td>
+</tr>
+<tr>
+<td>量化</td>
+<td>减少权重精度</td>
+<td>有损（微小）</td>
+<td>显存/带宽受限</td>
+</tr>
+<tr>
+<td>KV Cache</td>
+<td>缓存历史 K/V</td>
+<td>无损</td>
+<td>已是标配</td>
+</tr>
+<tr>
+<td>批量推理</td>
+<td>多请求并行</td>
+<td>无损</td>
+<td>吞吐量优先</td>
+</tr>
+<tr>
+<td>稀疏注意力</td>
+<td>跳过部分 token 的注意力</td>
+<td>有损</td>
+<td>长序列</td>
+</tr>
+</tbody>
+</table>
+<h2 id="user-content-7-本仓库实现要点">7. 本仓库实现要点<a href="#7-本仓库实现要点" aria-label="Link to heading '7. 本仓库实现要点'" data-heading-content="7. 本仓库实现要点" class="anchor"></a></h2>
+<p>上面的原理已全部落地为可运行代码。核心文件是 <a href="../src/speculative.rs"><code>src/speculative.rs</code></a>（单测跑 <code>cargo test speculative</code>，数量以实际输出为准），
+CLI 入口是 <a href="../README.md"><code>speculative</code></a> 子命令。</p>
+<h3 id="user-content-71-代码结构">7.1 代码结构<a href="#71-代码结构" aria-label="Link to heading '7.1 代码结构'" data-heading-content="7.1 代码结构" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>位置</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SpecStats</code></td>
+<td><code>speculative.rs</code></td>
+<td>统计口径：轮次、草稿数、接受数、拒绝修正数、白拿 token 数、目标前向次数；提供 <code>acceptance_rate()</code> 和 <code>tokens_per_forward()</code></td>
+</tr>
+<tr>
+<td><code>Proposal</code></td>
+<td><code>speculative.rs</code></td>
+<td>一个草稿候选：token id + 支撑集 ids + 对应概率分布 q（供拒绝采样使用）</td>
+</tr>
+<tr>
+<td><code>Drafter</code> trait</td>
+<td><code>speculative.rs</code></td>
+<td>草稿来源的统一接口：<code>propose()</code>（提出 γ 个候选）、<code>commit()</code>（对齐内部状态）、<code>reset()</code></td>
+</tr>
+<tr>
+<td><code>TargetStream</code></td>
+<td><code>speculative.rs</code></td>
+<td>单序列增量前向句柄：维护 KV cache，保持&quot;缓存落后序列一格&quot;的不变量；提供 <code>feed</code>/<code>feed_hidden</code>/<code>sync</code>/<code>rollback_to</code>/<code>reset</code></td>
+</tr>
+<tr>
+<td><code>SpecDecoder</code></td>
+<td><code>speculative.rs</code></td>
+<td>推测解码执行体：持有目标模型缓存与统计，核心方法 <code>step()</code> 每轮让草稿提出候选→目标一次前向并行验证，返回 1~γ+1 个 token</td>
+</tr>
+<tr>
+<td><code>ModelDrafter</code></td>
+<td><code>speculative.rs</code></td>
+<td>草稿来源一：用另一个自回归模型按自己的分布猜 γ 个 token，支持 greedy 模式</td>
+</tr>
+<tr>
+<td><code>MtpHeads</code></td>
+<td><code>speculative.rs</code></td>
+<td>多 Token 预测头（第 35 课）：K 个 <code>Linear</code> 层，第 k 个头把位置 i 的隐状态映射到 i+k+1 的 logits；<code>loss()</code> 计算各头交叉熵之和的均值</td>
+</tr>
+<tr>
+<td><code>MtpDrafter</code></td>
+<td><code>speculative.rs</code></td>
+<td>草稿来源二：拿 MTP 头当草稿，一次前向给出往后 γ 个位置的候选分布（不必自回归），但各分布彼此条件独立，接受率通常更低</td>
+</tr>
+<tr>
+<td><code>speculative_generate</code></td>
+<td><code>speculative.rs</code></td>
+<td>文本生成入口：接收目标模型、分词器、prompt、gamma、采样选项、草稿器，返回 <code>(生成文本, 统计)</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-72-cli-用法">7.2 CLI 用法<a href="#72-cli-用法" aria-label="Link to heading '7.2 CLI 用法'" data-heading-content="7.2 CLI 用法" class="anchor"></a></h3>
+<pre><code class="language-bash"># 基本推测解码（γ=4 草稿 + 目标验证，默认 prompt &quot;the key opens&quot;）
+cargo run --release -- speculative
+
+# 调整草稿候选数和生成长度
+cargo run --release -- speculative --gamma 6 --max-new 64
+
+# 自定义 prompt
+cargo run --release -- speculative --prompt &quot;once upon a time&quot;
+
+# MTP 头草稿（训练 MTP 头后用于推测解码）
+cargo run --release -- speculative --mtp-heads 4 --mtp-steps 80
+
+# 调整温度和模型规模
+cargo run --release -- speculative --temperature 0.9 --n-embd 64 --n-layer 4
+</code></pre>
+<hr />
+<h2 id="user-content-8-小结与下一课">8. 小结与下一课<a href="#8-小结与下一课" aria-label="Link to heading '8. 小结与下一课'" data-heading-content="8. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li>自回归逐 token 生成是 <strong>memory-bound</strong> 的：GPU 算力闲置，瓶颈在搬权重</li>
+<li>推测解码用&quot;小模型一次猜 γ 个 + 大模型一次验证&quot;把多次前向压成一次</li>
+<li>无损性有严格数学保证：接受概率 <code>min(1, p/q)</code> + 拒绝时从 <code>norm_max(p − q)</code> 残差分布重采样，合并后分布严格等于 <code>p</code></li>
+<li>加速比取决于接受率与草稿成本；本仓库的落点是 <code>src/speculative.rs</code> 的草稿→验证循环、<code>TargetStream</code> 的缓存不变量与 <code>rollback_to</code> 对齐</li>
+<li>与量化（省带宽）、KV Cache（免重算）、批量推理（提吞吐）是不同维度的加速手段，见 §6 的对比表</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现（<code>src/speculative.rs</code> + <code>speculative</code> 子命令），这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li><strong>理解拒绝采样</strong>：实现一个简单的拒绝采样器，从目标分布 $p$ 中采样，只使用提议分布 $q$ 和均匀随机数。</li>
+<li><strong>模拟推测解码</strong>：用两个不同大小的概率分布模拟大/小模型，实现推测解码的接受/拒绝逻辑，验证输出分布是否等于大模型分布。</li>
+<li><strong>KV Cache 同步</strong>：设计数据结构，支持推测解码中的&quot;追加 → 验证 → 保留/丢弃&quot;操作。</li>
+<li><strong>接受率实验</strong>：用不同温度采样时，推测解码的接受率如何变化？为什么温度越低接受率越高？</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="35-%E5%A4%9Atoken%E9%A2%84%E6%B5%8B.md">第 35 课 多 Token 预测（Multi-Token Prediction）</a> —— 推测解码的瓶颈是&quot;草稿从哪来&quot;，下一课换一种草稿来源——让模型自己长几个预测头。</p>
+</blockquote>

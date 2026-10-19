@@ -1,0 +1,9 @@
+<h2 id="user-content-配置rust镜像源">配置Rust镜像源<a href="#配置rust镜像源" aria-label="Link to heading '配置Rust镜像源'" data-heading-content="配置Rust镜像源" class="anchor"></a></h2>
+<p>配置文件位置<br />
+<code>~/.cargo/config.toml</code></p>
+<p>修改 config.toml</p>
+<pre><code class="language-toml">[source.crates-io]
+replace-with = 'aliyun'
+[source.aliyun]
+registry = &quot;sparse+https://mirrors.aliyun.com/crates.io-index/&quot;
+</code></pre>

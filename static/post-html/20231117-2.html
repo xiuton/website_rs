@@ -1,0 +1,182 @@
+<h1 id="user-content-创建star类">创建Star类<a href="#创建star类" aria-label="Link to heading '创建Star类'" data-heading-content="创建Star类" class="anchor"></a></h1>
+<pre><code class="language-js">class Star {
+  constructor(will, score, dom) {
+    this.will = will;
+    this.score = score;
+    this.dom = dom;
+  }
+  init() {
+    const that = this;
+    this.dom.forEach(element =&gt; {
+      element.onmouseover = e =&gt; {
+        that.point(Number(e.target.innerText));
+      }
+      element.onmouseout = () =&gt; {
+        that.point();
+      }
+      element.onclick = function() {
+        if (that.score === this.innerText) {
+          that.score = 0;
+        } else {
+          that.score = Number(this.innerText);
+        }
+      }
+    })
+  }
+  point(parm) {
+    this.will = parm || this.score;
+    this.dom.forEach((element, i) =&gt; {
+      element.className = i &lt; this.will ? &quot;on&quot; : &quot;&quot;;
+    });
+  }
+}
+
+</code></pre>
+<h1 id="user-content-使用star类">使用Star类<a href="#使用star类" aria-label="Link to heading '使用Star类'" data-heading-content="使用Star类" class="anchor"></a></h1>
+<p>创建Star实例时需要输入成员变量<br />
+will 为 mouseover 的时候保存的星星数，用于鼠标经过星星时进行星星点亮的数据依据<br />
+score 为 click 的时候确定选择的星星数<br />
+dom 为 每组星星的 dom 数组</p>
+<pre><code class="language-js">const star_1 = new Star(0, 0, document.querySelectorAll(&quot;.star_1 ul li&quot;));
+star_1.init();
+
+</code></pre>
+<h1 id="user-content-完整代码">完整代码<a href="#完整代码" aria-label="Link to heading '完整代码'" data-heading-content="完整代码" class="anchor"></a></h1>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+  &lt;title&gt;Document&lt;/title&gt;
+  &lt;style&gt;
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      background-color: #000;
+      color: #fff;
+    }
+    body {
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    main {
+      .star {
+        width: 200px;
+        height: 40px;
+        &amp; ul {
+          display: flex;
+          &amp; li {
+            list-style: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: yellowgreen;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+          }
+          &amp; li.on {
+            background-color: red;
+          }
+        }
+      }
+      .btn {
+        text-align: center;
+        margin-top: 10px;
+        #submit {
+          display: inline-block;
+        }
+      }
+    }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;main&gt;
+    &lt;div class=&quot;star star_1&quot;&gt;
+      &lt;ul&gt;
+        &lt;li&gt;1&lt;/li&gt;
+        &lt;li&gt;2&lt;/li&gt;
+        &lt;li&gt;3&lt;/li&gt;
+        &lt;li&gt;4&lt;/li&gt;
+        &lt;li&gt;5&lt;/li&gt;
+      &lt;/ul&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;star star_2&quot;&gt;
+      &lt;ul&gt;
+        &lt;li&gt;1&lt;/li&gt;
+        &lt;li&gt;2&lt;/li&gt;
+        &lt;li&gt;3&lt;/li&gt;
+        &lt;li&gt;4&lt;/li&gt;
+        &lt;li&gt;5&lt;/li&gt;
+      &lt;/ul&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;star star_3&quot;&gt;
+      &lt;ul&gt;
+        &lt;li&gt;1&lt;/li&gt;
+        &lt;li&gt;2&lt;/li&gt;
+        &lt;li&gt;3&lt;/li&gt;
+        &lt;li&gt;4&lt;/li&gt;
+        &lt;li&gt;5&lt;/li&gt;
+      &lt;/ul&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;btn&quot;&gt;
+      &lt;button id=&quot;submit&quot;&gt;提交&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/main&gt;
+
+  &lt;script&gt;
+    window.onload = function() {
+      class Star {
+        constructor(will, score, dom) {
+          this.will = will;
+          this.score = score;
+          this.dom = dom;
+        }
+        init() {
+          const that = this;
+          this.dom.forEach(element =&gt; {
+            element.onmouseover = e =&gt; {
+              that.point(Number(e.target.innerText));
+            }
+            element.onmouseout = () =&gt; {
+              that.point();
+            }
+            element.onclick = function() {
+              if (that.score === this.innerText) {
+                that.score = 0;
+              } else {
+                that.score = Number(this.innerText);
+              }
+            }
+          })
+        }
+        point(parm) {
+          this.will = parm || this.score;
+          this.dom.forEach((element, i) =&gt; {
+            element.className = i &lt; this.will ? &quot;on&quot; : &quot;&quot;;
+          });
+        }
+      }
+      const star_1 = new Star(0, 0, document.querySelectorAll(&quot;.star_1 ul li&quot;));
+      const star_2 = new Star(0, 0, document.querySelectorAll(&quot;.star_2 ul li&quot;));
+      const star_3 = new Star(0, 0, document.querySelectorAll(&quot;.star_3 ul li&quot;));
+      console.log(star_1, star_2, star_3)
+      star_1.init();
+      star_2.init();
+      star_3.init();
+
+      document.querySelector(&quot;#submit&quot;).onclick = () =&gt; {
+        alert(`${star_1.score}, ${star_2.score}, ${star_3.score}`);
+      }
+    }
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+
+</code></pre>

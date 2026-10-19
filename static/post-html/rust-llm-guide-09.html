@@ -1,0 +1,315 @@
+<h1 id="user-content-第-9-课注意力机制--让-token-互相看">第 9 课：注意力机制 —— 让 token 互相&quot;看&quot;<a href="#第-9-课注意力机制--让-token-互相看" aria-label="Link to heading '第 9 课：注意力机制 —— 让 token 互相&quot;看&quot;'" data-heading-content="第 9 课：注意力机制 —— 让 token 互相&quot;看&quot;" class="anchor"></a></h1>
+<blockquote>
+<p>代码位置：<a href="../src/attention.rs">src/attention.rs</a>（<code>MultiHeadAttention::forward</code> 中的投影与注意力算子调用）
+底层算子：<a href="../src/tensor.rs">src/tensor.rs</a>（<code>flash_attention</code> / <code>permute</code> / <code>matmul</code>）
+掩码构造：<a href="../src/model.rs">src/model.rs</a>（<code>Transformer::forward_core</code>）</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>为什么一个 token 需要&quot;看&quot;别的 token？注意力到底在算什么？</li>
+<li>Query / Key / Value 是什么？为什么不能直接用 x 打分？</li>
+<li>为什么要除以 √d_k？softmax 在干什么？</li>
+<li>为什么 Transformer 只能看过去？<code>-inf</code> 掩码怎么实现？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-从词向量到上下文向量">2. 从词向量到&quot;上下文向量&quot;<a href="#2-从词向量到上下文向量" aria-label="Link to heading '2. 从词向量到&quot;上下文向量&quot;'" data-heading-content="2. 从词向量到&quot;上下文向量&quot;" class="anchor"></a></h2>
+<p>第 12 课会把每个 token 嵌入成一个向量，但 Embedding 查表得到的向量<strong>只代表这个 token 自己</strong>：它不知道周围发生了什么。&quot;bank&quot; 到底是&quot;河岸&quot;还是&quot;银行&quot;，单看它自己无法判断，必须结合上下文。</p>
+<p>注意力要做的事：<strong>让每个位置根据内容，从其他位置&quot;收集&quot;信息</strong>。输出不再是&quot;我自己的向量&quot;，而是&quot;我 + 我关注的别人的向量的加权混合&quot;。</p>
+<hr />
+<h2 id="user-content-3-检索的视角query--key--value">3. 检索的视角：Query / Key / Value<a href="#3-检索的视角query--key--value" aria-label="Link to heading '3. 检索的视角：Query / Key / Value'" data-heading-content="3. 检索的视角：Query / Key / Value" class="anchor"></a></h2>
+<p>注意力最直观的类比是图书馆检索：</p>
+<table>
+<thead>
+<tr>
+<th>角色</th>
+<th>类比</th>
+<th>数学含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Query（查询）Q</td>
+<td>你输入的&quot;关键词&quot;</td>
+<td>我<strong>想要</strong>什么样的信息</td>
+</tr>
+<tr>
+<td>Key（键）K</td>
+<td>每本书的&quot;标签&quot;</td>
+<td>我能<strong>提供</strong>什么样的信息</td>
+</tr>
+<tr>
+<td>Value（值）V</td>
+<td>书的内容</td>
+<td>真正被<strong>取走</strong>的信息</td>
+</tr>
+</tbody>
+</table>
+<p>流程：拿 query 去和所有 key 比对相似度 → 得到权重 → 按权重把 value 加权求和。</p>
+<p>我们的模型里 Q、K、V 都来自同一个输入 x（每个位置既当&quot;提问者&quot;又当&quot;被看者&quot;），这叫<strong>自注意力（Self-Attention）</strong>。</p>
+<hr />
+<h2 id="user-content-4-q--k--v-投影三个角色各学各的表示">4. Q / K / V 投影：三个角色各学各的表示<a href="#4-q--k--v-投影三个角色各学各的表示" aria-label="Link to heading '4. Q / K / V 投影：三个角色各学各的表示'" data-heading-content="4. Q / K / V 投影：三个角色各学各的表示" class="anchor"></a></h2>
+<p>直接用 x 当 Q、K、V 行不行？可以，但不好——三个角色应该学<strong>不同的表示</strong>。所以每个角色先过一层可学习的线性投影（<code>Linear: y = xW + b</code>）：</p>
+<pre><code class="language-rust">// 1. 投影得到 Q、K、V
+let q = self.c_q.forward(x).reshape(vec![b, t, d]); // [B, T, D]
+let k = self.c_k.forward(x).reshape(vec![b, t, d]);
+let v = self.c_v.forward(x).reshape(vec![b, t, d]);
+</code></pre>
+<ul>
+<li><code>c_q</code> / <code>c_k</code> / <code>c_v</code> 是三个独立的 <code>Linear::new(D, D)</code>（<code>MultiHeadAttention</code> 结构体里的字段），各有自己的权重和偏置，在训练中学习</li>
+<li><code>Linear::forward</code> 对 3D 输入会自动展平成 <code>[B*T, D]</code> 计算再还原 3D；这里的 <code>reshape(vec![b, t, d])</code> 保证形状明确是 <code>[B, T, D]</code></li>
+<li>D = n_embd。模型配置 <code>TransformerConfig::tiny</code>：n_embd = 64，n_head = 4 → head_dim = 16（第 10 课讲怎么拆头；<strong>本课先假设只有一个头</strong>，公式层面 H = 1）</li>
+</ul>
+<hr />
+<h2 id="user-content-5-打分scores--qkᵀ--d_k">5. 打分：scores = Q·Kᵀ / √d_k<a href="#5-打分scores--qkᵀ--d_k" aria-label="Link to heading '5. 打分：scores = Q·Kᵀ / √d_k'" data-heading-content="5. 打分：scores = Q·Kᵀ / √d_k" class="anchor"></a></h2>
+<p>query 和 key 的相似度用<strong>点积</strong>衡量：q_i · k_j 越大越相似。一次性算所有两两相似度，就是矩阵乘法：</p>
+<pre><code class="language-plaintext">S = Q · Kᵀ / √d_k
+</code></pre>
+<ul>
+<li>Q: [T, d_k]，K: [T, d_k] → Kᵀ: [d_k, T] → S: [T, T]</li>
+<li>S[i][j] = (q_i · k_j) / √d_k：第 i 个查询对第 j 个键的&quot;原始分数&quot;</li>
+</ul>
+<p>对应代码：</p>
+<pre><code class="language-rust">// 实际实现：打分 → 加掩码 → softmax → 加权求和 被融合成一个算子
+//   （调用点 src/attention.rs，算子定义 src/tensor.rs 的 Tensor::flash_attention）
+let out = Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32);
+</code></pre>
+<ul>
+<li>算子内部依次做：<code>Q' = Q/√d_k</code> → <code>S = Q'·Kᵀ</code>（3D 批量矩阵乘）→ <code>P = softmax(S + M)</code> → <code>O = P·V</code>，与上面的公式逐项等价</li>
+<li>原先分散写的 <code>permute</code>（得到 Kᵀ）/ <code>matmul</code>（Q·Kᵀ）/ <code>mul_scalar</code>（缩放）这一步已经被上面这个融合算子取代；这些基础算子本身仍在 <code>src/tensor.rs</code> 中，只是不再出现在注意力路径上</li>
+</ul>
+<h3 id="user-content-51-手算例子d_k--2两个-token">5.1 手算例子（d_k = 2，两个 token）<a href="#51-手算例子d_k--2两个-token" aria-label="Link to heading '5.1 手算例子（d_k = 2，两个 token）'" data-heading-content="5.1 手算例子（d_k = 2，两个 token）" class="anchor"></a></h3>
+<pre><code class="language-plaintext">Q = [ [1, 0],          K = [ [1, 0],          V = [ [1, 0],
+      [0, 1] ]               [0, 1] ]               [0, 1] ]
+
+Q·Kᵀ = [ [1, 0],
+         [0, 1] ]
+
+除以 √2 后：S = [ [0.707, 0    ],
+                 [0,     0.707] ]
+</code></pre>
+<p>softmax 按行归一化（见第 7 节）后，第 1 行 ≈ [0.670, 0.330]，第 2 行 ≈ [0.330, 0.670]——即&quot;每个位置主要关注自己&quot;（对角线），很符合直觉。</p>
+<hr />
+<h2 id="user-content-6-为什么要除以-d_k">6. 为什么要除以 √d_k<a href="#6-为什么要除以-d_k" aria-label="Link to heading '6. 为什么要除以 √d_k'" data-heading-content="6. 为什么要除以 √d_k" class="anchor"></a></h2>
+<p>假设 q、k 每个维度独立、均值 0、方差 1。两个 d_k 维向量的点积：</p>
+<pre><code class="language-plaintext">Var(q·k) = Var(Σ q_i·k_i) = d_k          →  标准差 = √d_k
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>d_k</th>
+<th>点积的标准差</th>
+<th>后果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>小（如 2）</td>
+<td>1.4</td>
+<td>softmax 分布温和，梯度健康</td>
+</tr>
+<tr>
+<td>大（如 64）</td>
+<td>8</td>
+<td>点积数值大、分布&quot;尖&quot;，softmax 趋向 one-hot（一个 1 其余 0），梯度趋近 0，学不动</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>除以 √d_k 把方差拉回 1，softmax 保持&quot;温和&quot;的分布</li>
+<li>所以这个公式叫 <strong>Scaled</strong> Dot-Product Attention——<strong>缩放</strong>点积注意力</li>
+</ul>
+<hr />
+<h2 id="user-content-7-softmax-归一化把分数变成权重">7. softmax 归一化：把分数变成权重<a href="#7-softmax-归一化把分数变成权重" aria-label="Link to heading '7. softmax 归一化：把分数变成权重'" data-heading-content="7. softmax 归一化：把分数变成权重" class="anchor"></a></h2>
+<p>原始分数可正可负、量纲不定，不能直接当权重。softmax 把每一行变成<strong>非负且和为 1</strong> 的概率分布：</p>
+<pre><code class="language-plaintext">a_ij = exp(S_ij) / Σ_j' exp(S_ij')
+</code></pre>
+<p>含义：第 i 个查询给第 j 个键的&quot;注意力权重&quot;，<strong>一行加起来等于 1</strong>。</p>
+<h3 id="user-content-71-数值稳定技巧">7.1 数值稳定技巧<a href="#71-数值稳定技巧" aria-label="Link to heading '7.1 数值稳定技巧'" data-heading-content="7.1 数值稳定技巧" class="anchor"></a></h3>
+<p><code>exp</code> 对大的正数会爆炸（如 exp(1000) = 无穷大），所以先减去每行最大值——数学上不改变结果（分子分母同除 exp(max)）：</p>
+<pre><code class="language-rust">// softmax_last_dim：沿最后一维逐行独立归一化
+for r in 0..rows {
+    let mut maxv = f32::NEG_INFINITY;
+    for j in 0..d {
+        maxv = maxv.max(sd[r * d + j]);                    // 1. 找行最大值
+    }
+    let mut sum = 0.0;
+    for j in 0..d {
+        out_data[r * d + j] = (sd[r * d + j] - maxv).exp(); // 2. 减 max 再 exp
+        sum += out_data[r * d + j];
+    }
+    for j in 0..d {
+        out_data[r * d + j] /= sum;                        // 3. 归一化
+    }
+}
+</code></pre>
+<p>稳定版公式：</p>
+<pre><code class="language-plaintext">softmax(x)_i = exp(x_i - max x) / Σ_j exp(x_j - max x)
+</code></pre>
+<blockquote>
+<p>反向传播公式（<code>softmax_last_dim</code> 的 backward 里已实现）：∂x_i = s_i·(g_i − Σ_j g_j·s_j)，其中 s 是 softmax 输出、g 是上游梯度。这正是第 2 课自动微分的用武之地。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-8-加权求和out--av">8. 加权求和：out = A·V<a href="#8-加权求和out--av" aria-label="Link to heading '8. 加权求和：out = A·V'" data-heading-content="8. 加权求和：out = A·V" class="anchor"></a></h2>
+<p>把权重矩阵 A 作用到 V 上：</p>
+<pre><code class="language-plaintext">out_i = Σ_j a_ij · v_j
+</code></pre>
+<p>即&quot;每个输出 = 所有位置 V 的<strong>凸组合</strong>&quot;（权重非负、和为 1）。这一步与前面的打分、掩码一起都在同一个融合算子里完成：</p>
+<pre><code class="language-rust">// softmax + 加权求和：融合在 flash_attention 内部（src/tensor.rs 的 Tensor::flash_attention）
+let out = Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32); // [B*H, T, head_dim]
+</code></pre>
+<p>至此，注意力 = <strong>内容相关的可学习加权平均</strong>：每个位置根据 query 与各 key 的相似度，从所有 value 里&quot;取&quot;信息。</p>
+<hr />
+<h2 id="user-content-9-因果掩码为什么-transformer-只能看过去">9. 因果掩码：为什么 Transformer 只能看过去<a href="#9-因果掩码为什么-transformer-只能看过去" aria-label="Link to heading '9. 因果掩码：为什么 Transformer 只能看过去'" data-heading-content="9. 因果掩码：为什么 Transformer 只能看过去" class="anchor"></a></h2>
+<p>Transformer 是<strong>自回归语言模型</strong>：预测第 t 个 token 时，条件只能是它之前的 token：</p>
+<pre><code class="language-plaintext">P(token_t | token_1, ..., token_{t-1})
+</code></pre>
+<ul>
+<li>训练时我们把<strong>整段文本并行</strong>喂入（这样才快！）。如果不加限制，位置 t 会&quot;偷看&quot;位置 t+1 的答案——信息泄漏，模型退化成&quot;抄答案&quot;</li>
+<li>解决办法：让位置 i 的查询<strong>看不到 j &gt; i 的键</strong>——这就是因果掩码（causal mask）</li>
+</ul>
+<h3 id="user-content-91-掩码长什么样">9.1 掩码长什么样<a href="#91-掩码长什么样" aria-label="Link to heading '9.1 掩码长什么样'" data-heading-content="9.1 掩码长什么样" class="anchor"></a></h3>
+<p><code>Transformer::forward_core</code> 里构造（<code>t_total = t + base</code>，训练时 base = 0）：</p>
+<pre><code class="language-rust">let mut mask_data = vec![0.0f32; t * t_total];
+for i in 0..t {
+    for j in 0..t_total {
+        if j &gt; i + base {
+            mask_data[i * t_total + j] = f32::NEG_INFINITY;
+        }
+    }
+}
+let mask = Tensor::from_vec(mask_data, vec![t, t_total]);
+</code></pre>
+<p>以 t = 4 为例，mask 是这样一个矩阵：</p>
+<table>
+<thead>
+<tr>
+<th>查询 i \ 键 j</th>
+<th>j=0</th>
+<th>j=1</th>
+<th>j=2</th>
+<th>j=3</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>i=0</td>
+<td>0</td>
+<td>-inf</td>
+<td>-inf</td>
+<td>-inf</td>
+</tr>
+<tr>
+<td>i=1</td>
+<td>0</td>
+<td>0</td>
+<td>-inf</td>
+<td>-inf</td>
+</tr>
+<tr>
+<td>i=2</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>-inf</td>
+</tr>
+<tr>
+<td>i=3</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>对角线及以下（j ≤ i）是 0，未来位置（j &gt; i）是 <code>-inf</code>。</p>
+<h3 id="user-content-92-为什么是--inf-而不是把列删掉">9.2 为什么是 -inf 而不是把列删掉<a href="#92-为什么是--inf-而不是把列删掉" aria-label="Link to heading '9.2 为什么是 -inf 而不是把列删掉'" data-heading-content="9.2 为什么是 -inf 而不是把列删掉" class="anchor"></a></h3>
+<p>softmax 里 <code>exp(-inf) = 0</code>，被掩码位置的注意力权重<strong>精确为 0</strong>——&quot;看不见&quot;等价于&quot;权重为 0&quot;。同时张量形状保持不变，可以继续走统一的批量矩阵运算。</p>
+<pre><code class="language-rust">// mask 是 Option&lt;&amp;Tensor&gt;：**两条路径都真的消费它**——
+// CPU 分块核在核内把掩码行加到打分上（有掩码时可见性完全由掩码决定，不再另按因果截断）；
+// GPU 常驻 / probe 录制路径按真实掩码 buffer 消费（没传掩码时由算子自己物化一张因果掩码）。
+let out = Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32); // src/attention.rs
+</code></pre>
+<blockquote>
+<p>掩码被消费时同样用到第 3 课的广播：mask 形状 [T, T_total] 自动广播到 [B*H, T, T_total] 的每一个&quot;批&quot;（每个头共享同一张掩码）；<code>-inf</code> 位置 <code>exp(-inf) = 0</code>，注意力权重精确为 0。
+传 <code>None</code> 时 CPU 分块核才退回<strong>核内后缀因果</strong>快路（query i 只看 <code>j &lt;= i + visible_before</code>）——这也是视觉塔必须显式传一张<strong>全 0 掩码</strong>才能拿到真正双向注意力的原因（见 <a href="41-%E5%A4%9A%E6%A8%A1%E6%80%81.md">第 41 课</a>）。
+（代码里的 <code>base</code> 是 KV cache 引入的偏移，第 25 课讲解；训练时 base = 0。）</p>
+</blockquote>
+<hr />
+<h2 id="user-content-10-公式--代码-总对照">10. 公式 ↔ 代码 总对照<a href="#10-公式--代码-总对照" aria-label="Link to heading '10. 公式 ↔ 代码 总对照'" data-heading-content="10. 公式 ↔ 代码 总对照" class="anchor"></a></h2>
+<pre><code class="language-plaintext">Attention(Q, K, V) = softmax( (Q·Kᵀ / √d_k) + M ) · V
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>数学</th>
+<th>Rust 代码（<code>MultiHeadAttention::forward</code>）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Q = x·W_Q</td>
+<td><code>self.c_q.forward(x).reshape(vec![b, t, d])</code></td>
+</tr>
+<tr>
+<td>K = x·W_K，V = x·W_V</td>
+<td><code>c_k</code> / <code>c_v</code> 同理</td>
+</tr>
+<tr>
+<td>Kᵀ</td>
+<td>融合算子内部完成</td>
+</tr>
+<tr>
+<td>Q·Kᵀ / √d_k</td>
+<td>融合算子内部完成（先把 Q 乘 <code>1/√d_k</code>，再做批量矩阵乘）</td>
+</tr>
+<tr>
+<td>+ M（因果掩码）</td>
+<td><code>mask</code> 作为参数传入融合算子</td>
+</tr>
+<tr>
+<td>softmax</td>
+<td>融合算子内部完成</td>
+</tr>
+<tr>
+<td>·V</td>
+<td>融合算子内部完成</td>
+</tr>
+<tr>
+<td>后 5 行整体</td>
+<td><code>Tensor::flash_attention(&amp;q, &amp;k, &amp;v, mask, 32)</code>（调用点 <code>src/attention.rs</code>，算子定义 <code>src/tensor.rs</code>）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="user-content-11-运行与验证">11. 运行与验证<a href="#11-运行与验证" aria-label="Link to heading '11. 运行与验证'" data-heading-content="11. 运行与验证" class="anchor"></a></h2>
+<pre><code class="language-bash">cargo test   # tensor 的 test_softmax / test_matmul_2d / test_matmul_3d 验证本课用到的底层算子
+cargo run --release -- demo    # 演示 3 训练小 Transformer：每一步前向/反向都跑在本课的注意力计算上
+</code></pre>
+<h2 id="user-content-12-小结与下一课">12. 小结与下一课<a href="#12-小结与下一课" aria-label="Link to heading '12. 小结与下一课'" data-heading-content="12. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-融合算子flash_attention">融合算子：<code>flash_attention</code><a href="#融合算子flash_attention" aria-label="Link to heading '融合算子：flash_attention'" data-heading-content="融合算子：flash_attention" class="anchor"></a></h3>
+<p>训练中每步的注意力计算调用的是 <code>Tensor::flash_attention</code>（定义在 <code>src/tensor.rs</code>，调用点 <code>src/attention.rs</code>），
+它把&quot;打分 → 加掩码 → softmax → 加权求和 V&quot;四步融合成一个算子：内部先算 <code>Q' = Q/√d_k</code>，
+再做 <code>S = Q'·Kᵀ</code> → <code>P = softmax(S + M)</code> → <code>O = P·V</code>，全程走矩阵乘内核，反向同样全用矩阵乘。
+（另有融合算子 <code>Tensor::masked_softmax</code>（<code>src/tensor.rs</code>），它把&quot;加掩码 + softmax&quot;合成一个算子，
+用在 MLA 吸收路径与 CSA 稀疏注意力上；整行都被 <code>-inf</code> 淹没时它输出全 0 而不是 <code>NaN</code>。）</p>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li>注意力 = 内容相关的加权平均：Q 问、K 答、V 给内容</li>
+<li>scores = Q·Kᵀ/√d_k：点积打分，缩放防止 d_k 大时 softmax 饱和</li>
+<li>softmax：分数 → 权重（非负、和为 1）；先减 max 保证数值稳定</li>
+<li>因果掩码：未来位置填 <code>-inf</code> → softmax 后权重为 0 → 模型只能看过去</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li>手算：取第 5.1 节的 2×2 例子，写出 softmax 后每一行的权重，再算出最终的加权求和结果，对照公式逐项核对。</li>
+<li>修改 <code>forward_core</code> 里的掩码条件 <code>j &gt; i + base</code> 为 <code>j &gt;= i + base</code>（禁止&quot;看自己&quot;），思考对训练会有什么影响（提示：每个位置的预测将只能依赖更早的 token）。</li>
+<li>临时改 <code>softmax_last_dim</code>：去掉&quot;减最大值&quot;那一步，用大数（如 1000）做输入，观察溢出/精度问题，验证数值稳定技巧的必要性。</li>
+<li>阅读 <code>softmax_last_dim</code> 的反向代码，对照公式 ∂x_i = s_i·(g_i − Σ_j g_j·s_j) 逐行核对。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="10-%E5%A4%9A%E5%A4%B4%E6%B3%A8%E6%84%8F%E5%8A%9B.md">第 10 课 多头注意力</a> —— 把注意力&quot;切成多份&quot;并行计算——多头注意力！</p>
+</blockquote>

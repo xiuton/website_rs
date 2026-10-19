@@ -1,0 +1,209 @@
+<h2 id="user-content-前言">前言<a href="#前言" aria-label="Link to heading '前言'" data-heading-content="前言" class="anchor"></a></h2>
+<p>Capture：事件捕获
+Bubble：事件冒泡</p>
+<p><img loading="lazy" src="/static/blog-images/JavaScript%E4%B8%AD%E7%9A%84%E4%BA%8B%E4%BB%B6%E5%86%92%E6%B3%A1%E4%B8%8E%E4%BA%8B%E4%BB%B6%E6%8D%95%E8%8E%B7_images/2229842-20241220165118171-411205481.png" alt="" />
+如图所示，大致展示了事件冒泡和事件捕获的流程</p>
+<p>可能还有点迷惑，无妨，继续往下看</p>
+<h2 id="user-content-事件冒泡展示">事件冒泡展示<a href="#事件冒泡展示" aria-label="Link to heading '事件冒泡展示'" data-heading-content="事件冒泡展示" class="anchor"></a></h2>
+<p>我们先创建一个嵌套的HTML结构</p>
+<pre><code class="language-html">&lt;div class=&quot;div1&quot;&gt;
+    &lt;p&gt;div1&lt;/p&gt;
+    &lt;div class=&quot;div2&quot;&gt;
+        &lt;p&gt;div2&lt;/p&gt;
+        &lt;button&gt;CLICK ME!&lt;/button&gt;
+    &lt;/div&gt;
+&lt;/div&gt;
+</code></pre>
+<p>并且为他们各自添加点击事件，并给window和document也添加上点击事件</p>
+<pre><code class="language-js">window.addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('Window');
+});
+document.addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('Document');
+});
+document.querySelector(&quot;.div1&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('DIV 1');
+});
+document.querySelector(&quot;.div2&quot;).addEventListener(&quot;click&quot;, () =&gt; { 
+  console.log('DIV 2');
+});
+document.querySelector(&quot;button&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('CLICK ME!');
+});
+</code></pre>
+<p>完整代码</p>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+  &lt;title&gt;Document&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;div class=&quot;div1&quot;&gt;
+    &lt;p&gt;div1&lt;/p&gt;
+    &lt;div class=&quot;div2&quot;&gt;
+        &lt;p&gt;div2&lt;/p&gt;
+        &lt;button&gt;CLICK ME!&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+  &lt;script&gt;
+    window.addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('Window');
+    });
+    document.addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('Document');
+    });
+    document.querySelector(&quot;.div1&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('DIV 1');
+    });
+    document.querySelector(&quot;.div2&quot;).addEventListener(&quot;click&quot;, () =&gt; { 
+      console.log('DIV 2');
+    });
+    document.querySelector(&quot;button&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('CLICK ME!');
+    });
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+<p>在点击<code>CLICK ME!</code>按钮的时候，可以在控制台看到打印结果</p>
+<pre><code class="language-plaintext">CLICK ME!
+DIV 2
+DIV 1
+Document
+Window
+</code></pre>
+<p>以上代码所绑定的所有点击事件，默认都是事件冒泡，所以事件触发会由内往外扩展</p>
+<h2 id="user-content-事件捕获展示">事件捕获展示<a href="#事件捕获展示" aria-label="Link to heading '事件捕获展示'" data-heading-content="事件捕获展示" class="anchor"></a></h2>
+<p>如上代码可知，默认绑定的事件会默认开始事件冒泡，如果想要开始事件捕获，可以通过事件绑定的第三个参数进行设置</p>
+<pre><code class="language-js">document.querySelector(&quot;button&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('CLICK ME!');
+}, true);
+</code></pre>
+<p>因为第三个参数如果不进行传入，则默认为false，也就是事件冒泡模式</p>
+<p>现在我们重新修改代码</p>
+<pre><code class="language-js">window.addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('Window');
+}, true);
+document.addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('Document');
+}, true);
+document.querySelector(&quot;.div1&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('DIV 1');
+}, true);
+document.querySelector(&quot;.div2&quot;).addEventListener(&quot;click&quot;, () =&gt; { 
+  console.log('DIV 2');
+}, true);
+document.querySelector(&quot;button&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('CLICK ME!');
+}, true);
+</code></pre>
+<p>完整代码</p>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+  &lt;title&gt;Document&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;div class=&quot;div1&quot;&gt;
+    &lt;p&gt;div1&lt;/p&gt;
+    &lt;div class=&quot;div2&quot;&gt;
+        &lt;p&gt;div2&lt;/p&gt;
+        &lt;button&gt;CLICK ME!&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+  &lt;script&gt;
+    window.addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('Window');
+    }, true);
+    document.addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('Document');
+    }, true);
+    document.querySelector(&quot;.div1&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('DIV 1');
+    }, true);
+    document.querySelector(&quot;.div2&quot;).addEventListener(&quot;click&quot;, () =&gt; { 
+      console.log('DIV 2');
+    }, true);
+    document.querySelector(&quot;button&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('CLICK ME!');
+    }, true);
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+<p>打印结果</p>
+<pre><code class="language-plaintext">Window
+Document
+DIV 1
+DIV 2
+CLICK ME!
+</code></pre>
+<p>这时再次触发<code>CLICK ME!</code>按钮的点击事件，发现打印结果反过来了</p>
+<p>因为这时已经是通过事件捕获进行了依次触发</p>
+<h2 id="user-content-事件冒泡和事件捕获混用">事件冒泡和事件捕获混用<a href="#事件冒泡和事件捕获混用" aria-label="Link to heading '事件冒泡和事件捕获混用'" data-heading-content="事件冒泡和事件捕获混用" class="anchor"></a></h2>
+<p>如果将两者混用会发生什么？
+依然会遵循两者的执行顺序</p>
+<pre><code class="language-js">window.addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('Window');
+}, true);
+document.addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('Document');
+}, true);
+document.querySelector(&quot;.div1&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('DIV 1');
+}, false);
+document.querySelector(&quot;.div2&quot;).addEventListener(&quot;click&quot;, () =&gt; { 
+  console.log('DIV 2');
+}, false);
+document.querySelector(&quot;button&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+  console.log('CLICK ME!');
+}, true);
+</code></pre>
+<p>完整代码</p>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+  &lt;title&gt;Document&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;div class=&quot;div1&quot;&gt;
+    &lt;p&gt;div1&lt;/p&gt;
+    &lt;div class=&quot;div2&quot;&gt;
+        &lt;p&gt;div2&lt;/p&gt;
+        &lt;button&gt;CLICK ME!&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+  &lt;script&gt;
+    window.addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('Window');
+    }, true);
+    document.addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('Document');
+    }, true);
+    document.querySelector(&quot;.div1&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('DIV 1');
+    }, false);
+    document.querySelector(&quot;.div2&quot;).addEventListener(&quot;click&quot;, () =&gt; { 
+      console.log('DIV 2');
+    }, false);
+    document.querySelector(&quot;button&quot;).addEventListener(&quot;click&quot;, () =&gt; {
+      console.log('CLICK ME!');
+    }, true);
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+<p>打印结果</p>
+<pre><code class="language-plaintext">Window
+Document
+CLICK ME!
+DIV 2
+DIV 1
+</code></pre>
+<p>优先依次执行事件捕获，再从最内部开始依次事件冒泡</p>

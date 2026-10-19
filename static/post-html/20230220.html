@@ -1,0 +1,124 @@
+<h1 id="user-content-objectassign">Object.assign()<a href="#objectassign" aria-label="Link to heading 'Object.assign()'" data-heading-content="Object.assign()" class="anchor"></a></h1>
+<pre><code class="language-js">const a = {name: '小华', age: 19, sex: '女'}
+const b = {name: '小华', age: 20}
+const c = Object.assign(a, b)
+console.log(a)
+console.log(b)
+console.log(c)
+// {name: '小华', age: 20, sex: '女'}
+// {name: '小华', age: 20}
+// {name: '小华', age: 20, sex: '女'}
+
+</code></pre>
+<p>通过上方代码可以看出，通过<code>Object.assign()</code>方法，会修改原对象a，并且返回的c对象和a对象一样，b对象不会修改被对象，<code>Object.assign()</code>第一个对象为目标对象，后边的无论多少都是源对象，目标对象是合并后，要返回的对象，在时机使用过程中一般第一个对象写成一个空对象，这样才不会对其他对象造成影响。</p>
+<pre><code class="language-js">const a = {name: '小华', age: 19, sex: '女'}
+const b = {name: '小华', age: 20}
+Object.assign({}, a, b);
+
+</code></pre>
+<h1 id="user-content-new-set">new set()<a href="#new-set" aria-label="Link to heading 'new set()'" data-heading-content="new set()" class="anchor"></a></h1>
+<h2 id="user-content-去重">去重<a href="#去重" aria-label="Link to heading '去重'" data-heading-content="去重" class="anchor"></a></h2>
+<p>这里用到了Rest参数</p>
+<pre><code class="language-js">let arr = [1,1,2,2,2,2,2,3,3,3,4,4,4]
+let item = [...new Set(arr)] // 这里放在数组里面使用Rest参数将去重后的数值一个一个存放到item数组中
+console.log(item)
+// [1,2,3,4]
+
+</code></pre>
+<h1 id="user-content-新增方法">新增方法<a href="#新增方法" aria-label="Link to heading '新增方法'" data-heading-content="新增方法" class="anchor"></a></h1>
+<h2 id="user-content-arrayfrom">Array.from()<a href="#arrayfrom" aria-label="Link to heading 'Array.from()'" data-heading-content="Array.from()" class="anchor"></a></h2>
+<p>将伪数组转化为真正的数组</p>
+<ul>
+<li>转化后数组会根据伪数组中的<code>length: 2</code>属性进行，也就是如果length的值为2，只会转化伪数组的前两个值</li>
+</ul>
+<pre><code class="language-js">let likeArr  = {
+  0:'React',
+  1:'Vue',
+  2:'Angular',
+  3:'Node',
+  4:'Vant',
+  'length':2
+}
+let arr = Array.from(likeArr);
+console.log(arr); // (2) ['React', 'Vue']
+
+</code></pre>
+<h2 id="user-content-objectfreeze">Object.freeze()<a href="#objectfreeze" aria-label="Link to heading 'Object.freeze()'" data-heading-content="Object.freeze()" class="anchor"></a></h2>
+<pre><code class="language-js">const foo = {name: '小明'}
+foo.name = '小华'
+console.log(foo); // {name: '小华'}
+
+</code></pre>
+<p>如上代码，虽然const声明的为常量，其foo指向的内存地址不可改变，但其内部的属性可以改变，也就是上述代码可以正确执行。</p>
+<p>如果使用<code>Object.freeze()</code>方法，则会把对象冻结，则表示不仅foo指向的内存地址不可改变，其内部的属性也不会被改变。如下代码，在使用了<code>Object.freeze()</code>方法之后，更改foo的属性将不起作用。</p>
+<pre><code class="language-js">const foo = {name: '小明'}
+Object.freeze(foo)
+foo.name = '小华'
+console.log(foo); // {name: '小明'}
+
+</code></pre>
+<p>如果在使用了<code>Object.freeze()</code>方法后，再开启严格模式<code>'use strict'</code>，代码更会报错。</p>
+<pre><code class="language-js">'use strict'
+const foo = {name: '小明'}
+Object.freeze(foo)
+foo.name = '小华'
+console.log(foo); // （报错）
+
+</code></pre>
+<h2 id="user-content-objectkeys">Object.keys()<a href="#objectkeys" aria-label="Link to heading 'Object.keys()'" data-heading-content="Object.keys()" class="anchor"></a></h2>
+<h3 id="user-content-冷知识">冷知识<a href="#冷知识" aria-label="Link to heading '冷知识'" data-heading-content="冷知识" class="anchor"></a></h3>
+<p>对象可以通过以下两种方式获取值。</p>
+<pre><code class="language-js">let obj = {name1: '小强', name2: '小虎', name3: '小华', name4: '小明'}
+console.log(obj['name1'], obj.name1); // 小强 小强
+
+</code></pre>
+<pre><code class="language-js">let obj = {name1: '小强', name2: '小虎', name3: '小华', name4: '小明'}
+const objKeys = Object.keys(obj)
+console.log(objKeys) // (4)['name1', 'name2', 'name3', 'name4']
+
+</code></pre>
+<p>如上代码所示，<code>Object.keys</code>的主要作用就是将对象中的所有<code>key</code>打包成数组进行返回。然后可以通过<code>forEach()</code>对对象的值进行遍历，如下代码所示。</p>
+<pre><code class="language-js">let obj = {name1: '小强', name2: '小虎', name3: '小华', name4: '小明'}
+Object.keys(obj).forEach((key, index) =&gt; {
+  console.log(obj[key]) // 小强 小虎 小华 小明
+})
+
+</code></pre>
+<p><strong>注意</strong>：这里的取值采用<code>obj[key]</code>的方式，因为<code>Object.keys(obj)</code>返回的对象<code>key</code>为字符串，如果取值用<code>obj.'name1'</code>显然不对。</p>
+<h1 id="user-content-es6-声明变量的六种方法">ES6 声明变量的六种方法<a href="#es6-声明变量的六种方法" aria-label="Link to heading 'ES6 声明变量的六种方法'" data-heading-content="ES6 声明变量的六种方法" class="anchor"></a></h1>
+<ol>
+<li>var <strong>[ES5]</strong></li>
+<li>function <strong>[ES5]</strong></li>
+<li>let <strong>[ES6]</strong></li>
+<li>const <strong>[ES6]</strong></li>
+<li>import <strong>[ES6]</strong></li>
+<li>class <strong>[ES6]</strong></li>
+</ol>
+<h1 id="user-content-generator">Generator<a href="#generator" aria-label="Link to heading 'Generator'" data-heading-content="Generator" class="anchor"></a></h1>
+<p><code>yield</code>表达式只能用在Generator函数内，用在其他地方将报错。</p>
+<pre><code class="language-js">function* f() {
+  let a = 0;
+  while(true){
+  	yield a
+    a++
+  }
+}
+
+const [a, b, c, d, e, ff, g] = f()
+console.log(a, b, c, d, e, ff, g)
+
+</code></pre>
+<h1 id="user-content-作用域">作用域<a href="#作用域" aria-label="Link to heading '作用域'" data-heading-content="作用域" class="anchor"></a></h1>
+<p>因为在foo函数作用域中，新声明了一个x变量，而y()函数中的x其实是foo函数参数那里新声明的x，x=2也是改变的foo函数参数那里新声明的x，foo函数内到的打印x，遵循就近原则，先找自己作用域下的x，也就是x=3。在下面代码中声明了三个x变量，根据不同的作用域，改变不同的x变量</p>
+<pre><code class="language-js">var x = 1;
+function foo(x, y = function() { x = 2; }) {
+  let x = 3;
+  console.log('1',x); // 3
+  y();
+  console.log('2',x); // 3
+}
+console.log('3',x); // 1
+foo()
+console.log('4',x); // 1
+
+</code></pre>

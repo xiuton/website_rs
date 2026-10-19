@@ -1,0 +1,564 @@
+<h1 id="user-content-第-29-课lora-低秩适配--用-1-的参数微调大模型">第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型<a href="#第-29-课lora-低秩适配--用-1-的参数微调大模型" aria-label="Link to heading '第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型'" data-heading-content="第 29 课：LoRA 低秩适配 —— 用 1% 的参数微调大模型" class="anchor"></a></h1>
+<blockquote>
+<p>代码位置：<a href="../src/layers.rs">src/layers.rs</a>（<code>LoraAdapter</code> 适配层）、
+<a href="../src/attention.rs">src/attention.rs</a>（<code>MultiHeadAttention::apply_lora</code>）、
+<a href="../src/model.rs">src/model.rs</a>（<code>Transformer::apply_lora</code> 冻结 + 注入）、
+<a href="../src/tensor.rs">src/tensor.rs</a>（<code>Tensor::matmul_frozen</code> 冻结权重的反向）</p>
+<p>算法论文：<em>LoRA: Low-Rank Adaptation of Large Language Models</em> (Hu et al., 2021)</p>
+<p>上手命令：<code>cargo run --release -- finetune --pretrained checkpoints/zh/latest.ckpt --steps 60 --lr 5e-5</code></p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>为什么大模型微调不需要更新全部参数？</li>
+<li>LoRA 是怎么用低秩矩阵近似权重更新的？</li>
+<li>为什么 B 初始化为全零、A 初始化为正态？</li>
+<li>α 缩放因子是干什么的？</li>
+<li>把 LoRA 接进训练循环时，&quot;冻结主干&quot;要在哪几处一起做实才不出错？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-全量微调的问题">2. 全量微调的问题<a href="#2-全量微调的问题" aria-label="Link to heading '2. 全量微调的问题'" data-heading-content="2. 全量微调的问题" class="anchor"></a></h2>
+<p>LLaMA-7B 有 70 亿参数，全量微调需要：</p>
+<pre><code class="language-plaintext">参数显存：7B * 4B = 28GB（FP32）
+优化器状态：7B * 8B = 56GB（AdamW 的 m 和 v）
+梯度：7B * 4B = 28GB
+总计：~112GB
+</code></pre>
+<p>单卡放不下，而且微调数据通常很少（几千条），全量更新容易过拟合。</p>
+<hr />
+<h2 id="user-content-3-lora-的核心思想">3. LoRA 的核心思想<a href="#3-lora-的核心思想" aria-label="Link to heading '3. LoRA 的核心思想'" data-heading-content="3. LoRA 的核心思想" class="anchor"></a></h2>
+<p><strong>关键假设</strong>：微调时的权重变化 ΔW 是<strong>低秩</strong>的（信息集中在少数方向）。</p>
+<pre><code class="language-plaintext">ΔW = (α / r) · B · A
+</code></pre>
+<p>其中：</p>
+<ul>
+<li>A ∈ R^{r × in}：下投影矩阵，把输入压到低秩空间</li>
+<li>B ∈ R^{out × r}：上投影矩阵，再从低秩空间升回输出维</li>
+<li>r ≪ min(in, out)：秩（通常 4-64）</li>
+<li>α：缩放因子（见第 6 节）</li>
+</ul>
+<h3 id="user-content-31-参数量对比">3.1 参数量对比<a href="#31-参数量对比" aria-label="Link to heading '3.1 参数量对比'" data-heading-content="3.1 参数量对比" class="anchor"></a></h3>
+<pre><code class="language-plaintext">全量微调：in × out 参数
+LoRA：    r × (in + out) 参数
+
+例：in=4096, out=4096, r=16
+全量：4096 × 4096 = 16,777,216（16M）
+LoRA：16 × (4096 + 4096) = 131,072（131K）→ 0.78%
+</code></pre>
+<p>本项目实测（<a href="../config/config.json">config/config.json</a>：d=128、4 层、Q/K/V 三处、r=8）：</p>
+<pre><code class="language-plaintext">全量：1,866,496
+LoRA：3 个投影 × 2 个矩阵 × 8 × 128 × 4 层 = 24,576（1.32%）
+</code></pre>
+<h3 id="user-content-32-为什么在层内而不是权重上加适配器">3.2 为什么在「层内」而不是「权重上」加适配器<a href="#32-为什么在层内而不是权重上加适配器" aria-label="Link to heading '3.2 为什么在「层内」而不是「权重上」加适配器'" data-heading-content="3.2 为什么在「层内」而不是「权重上」加适配器" class="anchor"></a></h3>
+<p>本项目把适配器挂成 <a href="../src/layers.rs"><code>Linear</code></a> 的一个字段（<code>lora: Option&lt;LoraAdapter&gt;</code>），
+<strong>不持有、也不复制 W</strong>——<code>LoraAdapter</code> 里只有 A 和 B 两个张量。
+好处：</p>
+<ul>
+<li>冻结主干不用克隆权重，显存里只有一份 W；</li>
+<li><code>Linear::forward</code> 里主干与增量分开算，主干那条路走 <code>matmul_frozen</code>（不产生 <code>dW</code>）；</li>
+<li>checkpoint 只需额外存 A/B，主干仍按原来的名字和形状存，旧存档逻辑不用改。</li>
+</ul>
+<hr />
+<h2 id="user-content-4-前向计算">4. 前向计算<a href="#4-前向计算" aria-label="Link to heading '4. 前向计算'" data-heading-content="4. 前向计算" class="anchor"></a></h2>
+<pre><code class="language-plaintext">y = x @ (W + ΔW) = x @ W + (x @ B) @ A = x @ W + (α/r) · (x @ B) @ A
+</code></pre>
+<ul>
+<li>W 是预训练权重（<strong>冻结</strong>，不更新）</li>
+<li>B 和 A 是可训练参数</li>
+<li>推理时可以把 ΔW 合并到 W 里：<code>W' = W + (α/r)·B·A</code>，没有额外开销</li>
+</ul>
+<p>本项目按上面的形式<strong>分开算两条路</strong>（<a href="../src/layers.rs"><code>Linear::forward</code></a>）：</p>
+<pre><code class="language-rust">let base = if self.weight.requires_grad() {
+    x.matmul(&amp;self.weight)          // 可训练：反向要 dW
+} else {
+    x.matmul_frozen(&amp;self.weight)   // 冻结：反向只算 dx，不算 dW
+};
+let mut y = base.add(&amp;self.bias);
+if let Some(lora) = &amp;self.lora {
+    y = y.add(&amp;lora.forward(&amp;x));   // (α/r)·(x @ Aᵀ) @ Bᵀ
+}
+</code></pre>
+<blockquote>
+<p>注意：<code>Tensor::matmul_frozen</code> 不是&quot;优化技巧&quot;，而是<strong>语义正确性</strong>的一部分——
+冻结参数不该产生梯度，也就没必要为它保留 <code>dW</code> 的计算图和显存。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-5-初始化策略">5. 初始化策略<a href="#5-初始化策略" aria-label="Link to heading '5. 初始化策略'" data-heading-content="5. 初始化策略" class="anchor"></a></h2>
+<h3 id="user-content-51-a正态分布-n0-σ²">5.1 A：正态分布 N(0, σ²)<a href="#51-a正态分布-n0-σ²" aria-label="Link to heading '5.1 A：正态分布 N(0, σ²)'" data-heading-content="5.1 A：正态分布 N(0, σ²)" class="anchor"></a></h3>
+<pre><code class="language-plaintext">σ = 1 / √r
+</code></pre>
+<p>保证初始 ΔW = BA 的方差不会太大。</p>
+<h3 id="user-content-52-b全零">5.2 B：全零<a href="#52-b全零" aria-label="Link to heading '5.2 B：全零'" data-heading-content="5.2 B：全零" class="anchor"></a></h3>
+<pre><code class="language-plaintext">B = 0 → ΔW = (α/r)·B·A = 0
+</code></pre>
+<p><strong>关键</strong>：训练开始时 ΔW = 0，模型行为和预训练模型完全一致。
+这保证了微调不会&quot;破坏&quot;预训练学到的知识。</p>
+<p>本项目的 <code>LoraAdapter::new</code> 就是这么做的：</p>
+<pre><code class="language-rust">let a_scale = 1.0 / (rank as f32).sqrt();                 // σ = 1/√r
+let a = Tensor::param(rng.randn() * a_scale, [r, in]);    // A ~ N(0, 1/r)
+let b = Tensor::param(vec![0.0; out * r], [out, r]);      // B = 0
+</code></pre>
+<p>单测 <code>test_lora_zero_init_keeps_forward_identical</code> 断言：挂上适配器前后，同一输入的前向输出<strong>逐位相同</strong>。</p>
+<h3 id="user-content-53-为什么a-随机b-为零而不是反过来或都随机">5.3 为什么&quot;A 随机、B 为零&quot;，而不是反过来或都随机<a href="#53-为什么a-随机b-为零而不是反过来或都随机" aria-label="Link to heading '5.3 为什么&quot;A 随机、B 为零&quot;，而不是反过来或都随机'" data-heading-content="5.3 为什么&quot;A 随机、B 为零&quot;，而不是反过来或都随机" class="anchor"></a></h3>
+<p>看两个梯度（<code>h = x · Aᵀ</code>，<code>g = ∂L/∂y</code>）：</p>
+<pre><code class="language-plaintext">∂L/∂B = (α/r) · hᵀ · g      ∂L/∂A = (α/r) · xᵀ · (g · B)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>初始化</th>
+<th>ΔW(初始)</th>
+<th>梯度是否为零</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A=0，B=0</td>
+<td>0</td>
+<td><strong>两者都是 0</strong></td>
+<td>永远不动，适配层是死的</td>
+</tr>
+<tr>
+<td>A=随机，B=随机</td>
+<td>≠ 0</td>
+<td>都不为 0</td>
+<td>一上来就偏离预训练，r 大时更明显</td>
+</tr>
+<tr>
+<td><strong>A=随机，B=0</strong></td>
+<td><strong>0</strong></td>
+<td>∂L/∂B ∝ h ≠ 0（A 非零，h 才有值）</td>
+<td><strong>起点等价于原模型，又能正常学</strong></td>
+</tr>
+</tbody>
+</table>
+<p>第三行才是对的：B 为零保证起点不动，而 A 非零让 <code>h</code> 有值、<code>∂L/∂B</code> 非零，于是 B 先动、
+A 随后跟上（B 一动，<code>∂L/∂A</code> 也就不再为零）。若两个都是零，两条梯度同时为零，训练直接卡死。</p>
+<hr />
+<h2 id="user-content-6-α-缩放因子">6. α 缩放因子<a href="#6-α-缩放因子" aria-label="Link to heading '6. α 缩放因子'" data-heading-content="6. α 缩放因子" class="anchor"></a></h2>
+<pre><code class="language-plaintext">ΔW = (α / r) · B · A
+</code></pre>
+<ul>
+<li>α 通常设为 r（即不缩放，scaling = 1）</li>
+<li>增大 α = 放大 LoRA 的影响（学习率等效变大）</li>
+<li>减小 α = 缩小 LoRA 的影响（更保守的微调）</li>
+</ul>
+<p><strong>使用建议</strong>：先用 α = r，如果效果不好再调整。</p>
+<p>实现上就是 <code>LoraAdapter</code> 里的一个乘数——<code>(α/r)</code> 只在最后乘一次，不参与 A/B 的初始化：</p>
+<pre><code class="language-rust">pub fn scaling(&amp;self) -&gt; f32 { self.alpha / self.rank as f32 }
+// forward: (x @ Aᵀ) @ Bᵀ 再 mul_scalar(scaling())
+</code></pre>
+<p>所以改 α <strong>不会</strong>改变适配层的初始状态（ΔW 恒为 0），只是把增量的尺度整体放大/缩小——
+单测 <code>test_lora_forward_matches_formula</code> 断言了&quot;α 翻倍 ⇒ 增量翻倍&quot;。</p>
+<hr />
+<h2 id="user-content-7-应用场景">7. 应用场景<a href="#7-应用场景" aria-label="Link to heading '7. 应用场景'" data-heading-content="7. 应用场景" class="anchor"></a></h2>
+<h3 id="user-content-71-本项目里的调用链">7.1 本项目里的调用链<a href="#71-本项目里的调用链" aria-label="Link to heading '7.1 本项目里的调用链'" data-heading-content="7.1 本项目里的调用链" class="anchor"></a></h3>
+<p>不用手写注入逻辑，<code>finetune</code> 子命令一条命令就走完整条路（见 <a href="#8-%E6%8E%A5%E5%85%A5%E7%B3%BB%E7%BB%9Ffinetune-%E5%AD%90%E5%91%BD%E4%BB%A4">§8</a>）。
+直接调 API 的话是这样：</p>
+<pre><code class="language-rust">// 1. 加载预训练模型（checkpoint 的头里若记了 LoRA 形态，会先按它重建适配层再灌参数）
+let (mut model, tokenizer, _) = load_model_and_tokenizer(&quot;checkpoints/zh/latest.ckpt&quot;, ...)?;
+
+// 2. 先冻结整网，再按 targets 给对应投影挂上适配器（顺序不能反：见 Transformer::apply_lora 的注释）
+let lora = LoRAConfig { rank: 8, alpha: 8.0, targets: LoRATargets::default() };  // 缺省 q,k,v
+model.apply_lora(&amp;lora, &amp;mut rng);
+
+// 2'. 若基座本身就是 LoRA 存档，想接着训存档里那套就改用 resume_lora（保留旧 A/B 并解冻）
+// model.resume_lora();
+
+// 3. 只有适配层是可训练的——trainable_parameters() 就是唯一该喂给优化器的那组
+let trainable = model.trainable_parameters();          // 缺省 24 个张量：3 投影 × 2 矩阵 × 4 层
+let opt = AdamW::new(5e-5, model.parameters(), 0.1);   // 传全集也行，step() 会自动跳过冻结参数
+
+// 4. 反向前向都无需改动：Linear::forward 自己会把增量加上，checkpoint 头会记下 LoRA 形态
+
+// 5. 只想推理的话，可以把增量就地并进主干：model.merge_lora()（不可逆，之后不能再续训）
+</code></pre>
+<h3 id="user-content-72-给哪些层加-lora">7.2 给哪些层加 LoRA<a href="#72-给哪些层加-lora" aria-label="Link to heading '7.2 给哪些层加 LoRA'" data-heading-content="7.2 给哪些层加 LoRA" class="anchor"></a></h3>
+<p>通用的经验分布：</p>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>是否加 LoRA</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Q/K/V 投影</td>
+<td>✅</td>
+<td>注意力是微调的核心</td>
+</tr>
+<tr>
+<td>输出投影</td>
+<td>✅</td>
+<td>影响注意力输出，但收益相对小</td>
+</tr>
+<tr>
+<td>MLP</td>
+<td>可选</td>
+<td>效果有限</td>
+</tr>
+<tr>
+<td>Embedding</td>
+<td>❌</td>
+<td>词表变化少</td>
+</tr>
+<tr>
+<td>LayerNorm</td>
+<td>❌</td>
+<td>参数太少</td>
+</tr>
+</tbody>
+</table>
+<p><strong>本项目缺省只给 Q/K/V 加，但挂载位置是可配的</strong>（<a href="../src/config.rs"><code>LoRATargets</code></a>，由 <code>--lora-targets</code> 决定）：
+Q/K/V 是注意力里信息量最大的一组，缺省选它是因为参数量占比最&quot;划算&quot;；<code>o</code>（<code>c_proj</code>）与 <code>mlp</code>
+缺省关闭，想扩就写 <code>--lora-targets q,k,v,o</code> 或直接 <code>all</code>。</p>
+<table>
+<thead>
+<tr>
+<th><code>--lora-targets</code></th>
+<th>挂哪几个 <code>Linear</code></th>
+<th>每层对数</th>
+<th>实测可训练参数（rank=8）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>q,k,v</code>（缺省）</td>
+<td><code>c_q</code> / <code>c_k</code> / <code>c_v</code></td>
+<td>3</td>
+<td>24,576（1.32%）</td>
+</tr>
+<tr>
+<td><code>q,k,v,o</code></td>
+<td>再加 <code>c_proj</code></td>
+<td>4</td>
+<td>32,768（1.75%）</td>
+</tr>
+<tr>
+<td><code>all</code></td>
+<td>再加 MLP 的两个线性层</td>
+<td>6</td>
+<td>73,728（3.85%）</td>
+</tr>
+</tbody>
+</table>
+<p>（上表数字实跑自 <a href="../config/config.json">config/config.json</a> 的 1.84M 小模型；经典风格 MLP 是 2 个线性层，
+换成 SwiGLU 时是 3 个，<code>all</code> 的每层对数相应变成 8。）
+别名：<code>proj</code> / <code>c_proj</code> → <code>o</code>，<code>ffn</code> / <code>mlp</code> → <code>mlp</code>；大小写与空格随意、重复项自动去重、没命中的词直接报错。
+<strong>挂载结构写进 checkpoint 头部</strong>（<code>lora.targets</code>），推理端按头部记录重建，不需要再传一遍——
+所以训练与推理的挂载位置永远一致，忘了传参也不会静默错配。旧档没有 <code>targets</code> 字段，
+<code>#[serde(default)]</code> 让它回落成 <code>q,k,v</code>，读起来与从前完全一样。</p>
+<hr />
+<h2 id="user-content-8-接入系统finetune-子命令">8. 接入系统：<code>finetune</code> 子命令<a href="#8-接入系统finetune-子命令" aria-label="Link to heading '8. 接入系统：finetune 子命令'" data-heading-content="8. 接入系统：finetune 子命令" class="anchor"></a></h2>
+<p>LoRA <strong>已完整接入</strong>：<code>finetune</code> 就是&quot;LoRA 版的 SFT&quot;——同一套训练循环、同一份对话语料
+（<code>train.sft_file</code>，可用 <code>--sft-file</code> 覆盖），唯一差别是<strong>参数集合</strong>：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>sft</code></th>
+<th><code>finetune</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>可训练参数</td>
+<td>全部（1,866,496）</td>
+<td>只训适配层（24,576，1.32%）</td>
+</tr>
+<tr>
+<td>冻结主干</td>
+<td>❌</td>
+<td>✅（三处一起做实，见下）</td>
+</tr>
+<tr>
+<td>输出目录</td>
+<td><code>checkpoints/zh-sft/</code></td>
+<td><code>checkpoints/zh-lora/</code></td>
+</tr>
+<tr>
+<td>指标 CSV</td>
+<td><code>sft.csv</code></td>
+<td><code>lora.csv</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-81-冻结是真的冻结三处一起做实">8.1 冻结是&quot;真的&quot;冻结，三处一起做实<a href="#81-冻结是真的冻结三处一起做实" aria-label="Link to heading '8.1 冻结是&quot;真的&quot;冻结，三处一起做实'" data-heading-content="8.1 冻结是&quot;真的&quot;冻结，三处一起做实" class="anchor"></a></h3>
+<p>缺任何一处都会出现&quot;以为冻结了、其实没冻&quot;的隐性错误：</p>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>做法</th>
+<th>不做会怎样</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>前向</td>
+<td>冻结权重走 <a href="../src/tensor.rs"><code>Tensor::matmul_frozen</code></a>：反向只求 <code>dx</code>、不算 <code>dW</code></td>
+<td><code>dW</code> 白算白存一遍（4 字节/参数 × 1.87M）</td>
+</tr>
+<tr>
+<td>优化器</td>
+<td><code>AdamW::step</code> / <code>SGD::step</code> 跳过 <code>!requires_grad()</code>，<strong>连带不做权重衰减</strong></td>
+<td>衰减项 <code>lr·wd·θ</code> 与梯度无关，冻结主干会每步朝 0 缩</td>
+</tr>
+<tr>
+<td>GPU 常驻快路</td>
+<td><code>attn_resident</code> / <code>mlp_resident</code> / <code>blocks_resident</code> 整体让路</td>
+<td>它们直接读权重显存、绕过 <code>Linear::forward</code>，适配层增量被<strong>静默丢弃</strong></td>
+</tr>
+</tbody>
+</table>
+<p>还有一个容易踩的坑：<code>requires_grad</code> 必须是<strong>共享标志</strong>。本项目早期它是普通 <code>bool</code>，
+而 <code>Tensor</code> 派生了 <code>Clone</code>——在模型上冻结、优化器手里那份仍是 <code>true</code>，冻结就失效了。
+现在它是 <code>Arc&lt;AtomicBool&gt;</code>，模型与优化器看的是同一个开关。</p>
+<h3 id="user-content-82-命令行用法">8.2 命令行用法<a href="#82-命令行用法" aria-label="Link to heading '8.2 命令行用法'" data-heading-content="8.2 命令行用法" class="anchor"></a></h3>
+<pre><code class="language-bash"># LoRA 微调（缺省 1000 步、lr 1e-4、rank 16、alpha=rank、挂 q,k,v，语料取 config 的 train.sft_file）
+cargo run --release -- finetune --pretrained checkpoints/zh/latest.ckpt
+
+# 本项目实测用的配方：rank=8、alpha=8、60 步、lr=5e-5（与 SFT 的最优配方同量级）
+cargo run --release -- finetune --pretrained checkpoints/zh/latest.ckpt \
+    --lora-rank 8 --lora-alpha 8 --steps 60 --lr 5e-5
+
+# 扩挂载：O 投影 → 再加 MLP（实测 1.32% → 1.75% → 3.85%）
+cargo run --release -- finetune --pretrained checkpoints/zh/latest.ckpt --lora-targets all
+
+# 链式续训：基座是 LoRA 存档时，接着训存档里那套适配层（结构照存档，不能再传 rank/alpha/targets）
+cargo run --release -- finetune --pretrained checkpoints/zh-lora/best.ckpt --resume-lora --steps 60
+
+# 换一份语料 / 指定输出目录
+cargo run --release -- finetune --pretrained checkpoints/zh/latest.ckpt \
+    --sft-file data/sft/ --out-dir checkpoints/zh-lora2
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--config &lt;路径&gt;</code></td>
+<td><code>config/config.json</code></td>
+<td>配置文件路径</td>
+</tr>
+<tr>
+<td><code>--pretrained &lt;路径&gt;</code></td>
+<td>必填</td>
+<td>主干来源 checkpoint</td>
+</tr>
+<tr>
+<td><code>--lora-rank &lt;秩&gt;</code></td>
+<td><code>16</code></td>
+<td>秩 r；越小适配层越少、越不容易过拟合</td>
+</tr>
+<tr>
+<td><code>--lora-alpha &lt;系数&gt;</code></td>
+<td><code>= rank</code></td>
+<td>缩放因子 α（缺省 = rank，即增量不额外缩放）</td>
+</tr>
+<tr>
+<td><code>--lora-targets &lt;位置&gt;</code></td>
+<td><code>q,k,v</code></td>
+<td>挂载位置，逗号分隔：<code>q</code> / <code>k</code> / <code>v</code> / <code>o</code> / <code>mlp</code> / <code>all</code>（见 §7.2）</td>
+</tr>
+<tr>
+<td><code>--resume-lora</code></td>
+<td>关</td>
+<td><strong>链式续训</strong>：接着训存档里那套适配层（保留已学增量），与 rank/alpha/targets 互斥</td>
+</tr>
+<tr>
+<td><code>--sft-file &lt;路径&gt;</code></td>
+<td>config 的 <code>train.sft_file</code></td>
+<td>对话语料，逗号分隔、可含 <code>*</code> 通配</td>
+</tr>
+<tr>
+<td><code>--steps &lt;步数&gt;</code></td>
+<td><code>1000</code></td>
+<td>微调步数</td>
+</tr>
+<tr>
+<td><code>--lr &lt;学习率&gt;</code></td>
+<td><code>1e-4</code></td>
+<td>微调学习率</td>
+</tr>
+<tr>
+<td><code>--out-dir &lt;目录&gt;</code></td>
+<td><code>{out_dir}-lora</code></td>
+<td>输出目录（缺省加 <code>-lora</code> 后缀，绝不覆盖预训练权重）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-83-实测一次真实的-lora-微调">8.3 实测：一次真实的 LoRA 微调<a href="#83-实测一次真实的-lora-微调" aria-label="Link to heading '8.3 实测：一次真实的 LoRA 微调'" data-heading-content="8.3 实测：一次真实的 LoRA 微调" class="anchor"></a></h3>
+<p>命令：<code>finetune --pretrained checkpoints/zh/latest.ckpt --lora-rank 8 --lora-alpha 8 --steps 60 --lr 5e-5</code></p>
+<pre><code class="language-plaintext">LoRA 微调：rank=8 alpha=8 挂载=q,k,v steps=60 lr=0.00005｜冻结主干，只训适配层
+模型参数：1866496（含冻结主干）｜可训练：24576（1.317%）｜12 对低秩矩阵（挂载 q,k,v），共 24 个适配参数张量
+SFT 语料：89 段对话，打包 17898 token | 监督位置（回答段）占 56.1%
+LoRA：rank=8 alpha=8 挂载=q,k,v｜可训练参数 24576 / 1866496（1.32%）｜主干冻结：反向不算 dW、优化器不更新、不吃权重衰减
+...
+step    36 | lr 0.000024 | loss 6.1391 | val 6.5640 (ppl 709.1)
+step    54 | lr 0.000006 | loss 6.2499 | val 6.5596 (ppl 706.0) *
+step    60 | lr 0.000005 | loss 6.3406 | val 6.5813 (ppl 721.5) | 515 tok/s
+[done] checkpoint 已保存到 checkpoints/zh-lora/ | 总耗时 478s | 7.96s/步（共 60 步）
+</code></pre>
+<p>产物（目录自包含，含冻结主干）：</p>
+<pre><code class="language-plaintext">checkpoints/zh-lora/{best,final,latest}.ckpt   tokenizer.json   lora.csv
+</code></pre>
+<p><strong>存档变大了多少</strong>：22,106,657 → 22,402,843 字节，差 296,186 = <code>24,576 个适配参数 × 4 字节 × 3 段数据块 （参数 / m / v）</code> + 1,274 字节（JSON 头里多了 24 个参数条目和 <code>lora</code> 字段）——主干那部分的字节数一个没变。</p>
+<blockquote>
+<p>这只是&quot;体积账&quot;。<strong>数值</strong>真的没动，由两条测试合起来保证：
+<code>model.rs</code> 的 <code>test_apply_lora_freezes_backbone_and_trains_adapters_only</code>（一步真实 AdamW
+训练后，全部冻结参数逐位不变）+ <code>checkpoint.rs</code> 的 <code>test_save_load_roundtrip_is_bit_exact</code>
+（存/读逐位还原）。链路上任何一环有损，这两个断言就先挂。</p>
+</blockquote>
+<blockquote>
+<p>别把这个 val 当成 LoRA 效果好不好：SFT 语料只有 89 段、验证集是切出来的 9 段，
+这个数字<strong>没有判别力</strong>（<a href="39-%E5%B7%A5%E7%A8%8B%E5%8C%96%E5%AE%8C%E5%96%84.md">第 39 课</a> 的 SFT 也是这个坑）。真正要看的是
+① 预训练 val 有没有退化（主干冻结 ⇒ 不会）② <code>chat</code> 聊两句有没有怪字。</p>
+</blockquote>
+<h3 id="user-content-84-配置文件方式">8.4 配置文件方式<a href="#84-配置文件方式" aria-label="Link to heading '8.4 配置文件方式'" data-heading-content="8.4 配置文件方式" class="anchor"></a></h3>
+<p>也可以在 <code>config/config.json</code> 里写好 LoRA 形态（CLI 参数会覆盖它；注意 <code>train</code> 子命令
+<strong>不</strong>注入适配层，它只读这份配置来打印提示）：</p>
+<pre><code class="language-jsonc">{
+  &quot;train&quot;: {
+    &quot;lora&quot;: {
+      &quot;rank&quot;: 16,
+      &quot;alpha&quot;: 16.0,
+      &quot;targets&quot;: { &quot;q&quot;: true, &quot;k&quot;: true, &quot;v&quot;: true, &quot;o&quot;: false, &quot;mlp&quot;: false }
+    }
+  }
+}
+</code></pre>
+<p><code>targets</code> 可以整块省略（回落 <code>q,k,v</code>）；块内也可以只写想改的那几个（缺的字段各自回落缺省）。
+所以旧配置<strong>一个字都不用改</strong>，读进来的行为与从前逐位相同。</p>
+<p><strong>谁覆盖谁</strong>（三个字段各自独立判定，CLI 没传才看配置）：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>判定顺序</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>rank</td>
+<td><code>--lora-rank</code> → <code>config.lora.rank</code> → <code>16</code></td>
+</tr>
+<tr>
+<td>alpha</td>
+<td><code>--lora-alpha</code> → <code>config.lora.alpha</code>（<strong>仅当配置文件里写了 <code>lora</code> 块</strong>）→ <code>rank</code></td>
+</tr>
+<tr>
+<td>targets</td>
+<td><code>--lora-targets</code> → <code>config.lora.targets</code> → <code>q,k,v</code></td>
+</tr>
+</tbody>
+</table>
+<p>alpha 这一档多一个条件，是为了让&quot;没写配置 + 只传 <code>--lora-rank 8</code>&quot;仍然得到 α=8（缺省 α=rank 的直觉），
+而不是被 <code>LoRAConfig::default()</code> 里的 16.0 顶掉。实测：配置写 <code>&quot;rank&quot;: 4, &quot;alpha&quot;: 12.0, &quot;targets&quot;: { &quot;v&quot;: true, &quot;mlp&quot;: true }</code>，
+不传任何 LoRA 参数跑 <code>finetune</code>，日志是 <code>rank=4 alpha=12 挂载=q,k,v,mlp</code>（<code>q,k</code> 由缺省补上）。</p>
+<h3 id="user-content-85-工作流程finetune-实际执行的顺序">8.5 工作流程（<code>finetune</code> 实际执行的顺序）<a href="#85-工作流程finetune-实际执行的顺序" aria-label="Link to heading '8.5 工作流程（finetune 实际执行的顺序）'" data-heading-content="8.5 工作流程（finetune 实际执行的顺序）" class="anchor"></a></h3>
+<ol>
+<li>加载预训练 checkpoint；若该档本身是 LoRA 形态，先按档案头重建适配层再灌参数</li>
+<li>决定怎么挂：
+<ul>
+<li>默认路径 —— 冻结整网 <code>for p in model.parameters() { p.set_requires_grad(false) }</code>，
+再按 <code>targets</code> 给对应投影各挂一对 A/B（<strong>顺序不能反</strong>：冻结要发生在适配层出生之前）</li>
+<li><code>--resume-lora</code> —— 跳过&quot;重挂&quot;，改为解冻档案里已有的 A/B（数值原样保留，不重随机）</li>
+</ul>
+</li>
+<li>只优化 <code>trainable_parameters()</code>，日志如实打印可训练占比</li>
+<li>保存 checkpoint：头部记下 <code>lora: {rank, alpha, targets}</code>，参数块按名字顺序带上 <code>*.lora_a</code> / <code>*.lora_b</code></li>
+<li>推理时 <code>load_model_and_tokenizer</code> 按头部记录<strong>先注入再恢复参数</strong>，名字与形状才能对齐</li>
+</ol>
+<blockquote>
+<p>第 5 步是设计上的一个约束：LoRA 存档<strong>能独立加载</strong>（主干也在文件里，不必再找基座），
+但加载端必须知道&quot;这是个 LoRA 档案&quot;。忘了注入就直接 <code>load_params</code> 会立刻报错，
+而不是悄悄装进去一半——<code>test_lora_checkpoint_roundtrip</code> 专门断言了这个 panic。</p>
+</blockquote>
+<h3 id="user-content-86-链式续训--resume-lora">8.6 链式续训：<code>--resume-lora</code><a href="#86-链式续训--resume-lora" aria-label="Link to heading '8.6 链式续训：--resume-lora'" data-heading-content="8.6 链式续训：--resume-lora" class="anchor"></a></h3>
+<p>把一个 LoRA 存档当基座有两种截然不同的语义，<code>finetune</code> 默认做的是<strong>前者</strong>：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>默认（重挂一套）</th>
+<th><code>--resume-lora</code>（链式续训）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>旧 A/B</td>
+<td><strong>丢弃</strong>，只继承主干</td>
+<td><strong>保留</strong>，从现有数值继续</td>
+</tr>
+<tr>
+<td>rank / alpha / targets</td>
+<td>由 CLI 或 config 决定</td>
+<td>一律照存档，再传就报错</td>
+</tr>
+<tr>
+<td>适用</td>
+<td>换新任务、想清掉旧增量</td>
+<td>同一任务接着磨、多轮迭代</td>
+</tr>
+</tbody>
+</table>
+<p>缺省打&quot;重挂一套&quot;是因为它更符合直觉（&quot;给我在新数据上微调&quot;），但对已经微调过的存档来说，
+不说明就悄悄丢掉旧增量是危险的，所以这条路径会额外打一行 <code>[warn]</code> 提示，
+并把 <code>--resume-lora</code> 的写法直接印出来。</p>
+<p>实现上只有三步差异（<a href="../src/model.rs"><code>Transformer::resume_lora</code></a>）：<strong>不覆盖</strong>（沿用已注入的 A/B）、
+<strong>解冻</strong>（把 <code>lora_parameters()</code> 逐个 <code>set_requires_grad(true)</code>，其余仍是 <code>false</code>）、
+<strong>rank 必须一致</strong>（结构来自存档，想换 rank 只能重挂）。</p>
+<h3 id="user-content-87-推理合并--merge-lora">8.7 推理合并：<code>--merge-lora</code><a href="#87-推理合并--merge-lora" aria-label="Link to heading '8.7 推理合并：--merge-lora'" data-heading-content="8.7 推理合并：--merge-lora" class="anchor"></a></h3>
+<p><code>eval</code> / <code>generate</code> / <code>chat</code> 都接受 <code>--merge-lora</code>，把增量<strong>就地</strong>并进主干权重：</p>
+<pre><code class="language-text">W ← W + (α/r)·AᵀBᵀ
+</code></pre>
+<p>（注意方向：本项目 <code>A</code> 是 <code>[r, in]</code>、<code>B</code> 是 <code>[out, r]</code>，所以是 <code>Aᵀ·Bᵀ</code> 而不是 <code>B·A</code>。）</p>
+<p>两个必须说清的点：</p>
+<ul>
+<li><strong>数值不变</strong>。合并只是把 <code>y = xW + (α/r)(xAᵀ)Bᵀ</code> 里的两项提前相加，前向数学等价。
+实测同一 seed 下合并前后生成结果<strong>逐字相同</strong>；单测 <code>test_merge_lora_matches_two_branch_forward</code>
+断言偏差 <code>&lt; 1e-4</code>（浮点加法次序不同，不是逐位相等）。</li>
+<li><strong>必须就地改</strong>。用 <code>Tensor::set_data</code> 改原有张量的数据，而不是把 <code>Linear.weight</code> 换成一个新张量——
+优化器和其他持有者手里拿的是旧句柄，换了之后它们会各算各的。
+<code>test_merge_lora_into_weight_is_in_place</code> 用旧句柄读新值来钉死这一点。</li>
+</ul>
+<p>合并后适配器被摘除（<code>lora: None</code>），因为增量已经在 <code>W</code> 里了，留着会算两遍。
+所以它是<strong>不可逆的运行时操作</strong>：合并过的模型对象不能再拿来续训，要续训请重新加载存档。
+存档本身不受影响——<code>--merge-lora</code> 只作用于本次进程的内存副本，A/B 仍原样躺在文件里。</p>
+<hr />
+<h2 id="user-content-9-小结与下一课">9. 小结与下一课<a href="#9-小结与下一课" aria-label="Link to heading '9. 小结与下一课'" data-heading-content="9. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li>LoRA 用低秩矩阵 ΔW = (α/r)·B·A 近似权重更新，可训练参数量降到 1% 左右</li>
+<li>冻结预训练权重，只训练 A 和 B；冻结要在<strong>前向 / 优化器 / GPU 快路</strong>三处一起做实</li>
+<li>B 初始化为全零，保证训练开始时模型行为不变（前向逐位相同）</li>
+<li>挂载位置可配（<code>--lora-targets</code>，缺省 Q/K/V，可扩到 O 与 MLP），结构写进存档头部</li>
+<li>把 LoRA 存档当基座时要选语义：默认<strong>重挂一套</strong>（丢旧增量），<code>--resume-lora</code> 则<strong>链式续训</strong>（保留旧增量）</li>
+<li>推理时可以把 ΔW 合并到 W（<code>--merge-lora</code>，切掉每层两次小矩阵乘）：
+合并<strong>必须就地</strong>改权重数据，且是<strong>不可逆</strong>的运行时操作（合并后就再也单独取不出增量了）。
+所以默认<strong>不合并</strong>——保留&quot;主干 + 增量分开算&quot;两条路，代价只是每层两次小矩阵乘</li>
+<li>适配层要能被 checkpoint 记住形态（rank / alpha / targets），否则加载端无法对齐参数名</li>
+<li>适合&quot;在已有大模型上微调特定任务&quot;的场景——本项目实测可训练参数 1.32%，主干零改动</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li><strong>扫 rank</strong>：把 <code>--lora-rank</code> 在 <code>4 / 8 / 16 / 32</code> 各跑一次 <code>finetune</code>，对比可训练参数占比（8.3 节实测 rank=8 时是 1.32%）与 loss 曲线。</li>
+<li><strong>扩挂载点</strong>：<code>--lora-targets q,k,v</code> → <code>o</code> → <code>all</code> 各跑一次，核对 8.2 节括号里的实测占比（1.32% → 1.75% → 3.85%）。</li>
+<li><strong>验&quot;真的冻结&quot;</strong>：跑一轮后对比冻结参数的字节内容是否逐位不变（<code>test_apply_lora_freezes_backbone_and_trains_adapters_only</code> 守的就是这条）。</li>
+<li><strong>量一次合并的收益</strong>：同一 checkpoint 分别带 <code>--merge-lora</code> 与不带跑 <code>generate</code>，对比每步耗时——感受&quot;切掉每层两次小矩阵乘&quot;到底值多少。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="30-Beam-Search.md">第 30 课 Beam Search</a> —— 微调侧收尾，下一课换到解码侧——用束搜索替代贪心与采样。</p>
+</blockquote>

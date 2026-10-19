@@ -1,0 +1,311 @@
+<h1 id="user-content-第-33-课量化技术quantization">第 33 课：量化技术（Quantization）<a href="#第-33-课量化技术quantization" aria-label="Link to heading '第 33 课：量化技术（Quantization）'" data-heading-content="第 33 课：量化技术（Quantization）" class="anchor"></a></h1>
+<blockquote>
+<p><strong>本课已落地为可运行代码</strong>：<code>src/quant.rs</code>（单测跑 <code>cargo test quant</code>，数量以实际输出为准）+ <code>quant</code> 子命令——RTN / Hessian 量化 / AWQ 三种
+weight-only 量化、int8 / int4、校准集（Hessian <code>XᵀX</code>、act-order、阻尼、分块）、逐层误差报告与落盘。
+与已有代码的衔接：量化作用于 <code>src/tensor.rs</code> 中的权重数据（<code>Vec&lt;f32&gt;</code>），
+checkpoint（<code>src/checkpoint.rs</code>，<code>LLMCP2</code>）头部会记一笔 <code>QuantMeta</code>（位宽 + 算法，旧档为 <code>None</code>）：
+存档里写出的仍是 f32 权重，需要省显存时按这份记录调 <code>requantize_after_load</code> 重放一次量化即可。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-为什么需要量化">1. 为什么需要量化？<a href="#1-为什么需要量化" aria-label="Link to heading '1. 为什么需要量化？'" data-heading-content="1. 为什么需要量化？" class="anchor"></a></h2>
+<p>一个 7B 参数的模型，以 FP32 存储需要 <strong>28GB</strong> 显存（7B × 4字节），以 FP16 也需要 <strong>14GB</strong>。
+这意味着普通消费级显卡（如 RTX 3060 12GB）根本放不下一个 7B 模型。</p>
+<p>量化的核心思想：<strong>用更少的比特数表示每个参数</strong>。</p>
+<table>
+<thead>
+<tr>
+<th>精度</th>
+<th>每参数字节</th>
+<th>7B 模型大小</th>
+<th>精度损失</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FP32</td>
+<td>4</td>
+<td>28 GB</td>
+<td>无</td>
+</tr>
+<tr>
+<td>FP16/BF16</td>
+<td>2</td>
+<td>14 GB</td>
+<td>极小</td>
+</tr>
+<tr>
+<td>INT8</td>
+<td>1</td>
+<td>7 GB</td>
+<td>小</td>
+</tr>
+<tr>
+<td>INT4</td>
+<td>0.5</td>
+<td>3.5 GB</td>
+<td>中等</td>
+</tr>
+<tr>
+<td>INT2</td>
+<td>0.25</td>
+<td>1.75 GB</td>
+<td>较大</td>
+</tr>
+</tbody>
+</table>
+<h2 id="user-content-2-量化的基本原理">2. 量化的基本原理<a href="#2-量化的基本原理" aria-label="Link to heading '2. 量化的基本原理'" data-heading-content="2. 量化的基本原理" class="anchor"></a></h2>
+<h3 id="user-content-21-线性量化公式">2.1 线性量化公式<a href="#21-线性量化公式" aria-label="Link to heading '2.1 线性量化公式'" data-heading-content="2.1 线性量化公式" class="anchor"></a></h3>
+<p>$$
+x_q = \text{round}\left(\frac{x}{s}\right) + z
+$$</p>
+<p>其中：</p>
+<ul>
+<li>$s$ 是<strong>缩放因子（scale）</strong></li>
+<li>$z$ 是<strong>零点（zero point）</strong></li>
+<li>$x_q$ 是量化后的整数值</li>
+</ul>
+<p>反量化（从整数恢复浮点近似值）：</p>
+<p>$$
+\hat{x} = s \cdot (x_q - z)
+$$</p>
+<h3 id="user-content-22-对称量化-vs-非对称量化">2.2 对称量化 vs 非对称量化<a href="#22-对称量化-vs-非对称量化" aria-label="Link to heading '2.2 对称量化 vs 非对称量化'" data-heading-content="2.2 对称量化 vs 非对称量化" class="anchor"></a></h3>
+<p><strong>对称量化</strong>（Symmetric）：零点固定为 0，数据范围关于 0 对称
+$$
+s = \frac{\max(|x|)}{2^{b-1} - 1}, \quad z = 0
+$$</p>
+<p><strong>非对称量化</strong>（Asymmetric）：零点可变，适合数据分布不对称的情况
+$$
+s = \frac{\max(x) - \min(x)}{2^b - 1}, \quad z = \text{round}\left(\frac{-\min(x)}{s}\right)
+$$</p>
+<h2 id="user-content-3-量化粒度">3. 量化粒度<a href="#3-量化粒度" aria-label="Link to heading '3. 量化粒度'" data-heading-content="3. 量化粒度" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th>粒度</th>
+<th>说明</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Per-Tensor</strong></td>
+<td>整个张量共享一组 scale/zero_point</td>
+<td>简单但精度低</td>
+</tr>
+<tr>
+<td><strong>Per-Channel</strong></td>
+<td>每个输出通道一组 scale/zero_point</td>
+<td>权重量化常用</td>
+</tr>
+<tr>
+<td><strong>Per-Group</strong></td>
+<td>每 g 个元素一组（如 g=128）</td>
+<td>Hessian 量化/AWQ 常用</td>
+</tr>
+<tr>
+<td><strong>Per-Token</strong></td>
+<td>每个 token 的激活值一组</td>
+<td>激活值量化</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>直觉</strong>：张量不同位置的数值范围差异很大。Per-Group 量化给每 128 个元素一个独立的 scale，比整个张量共用一个 scale 精度高得多。</p>
+</blockquote>
+<h2 id="user-content-4-量化方法分类">4. 量化方法分类<a href="#4-量化方法分类" aria-label="Link to heading '4. 量化方法分类'" data-heading-content="4. 量化方法分类" class="anchor"></a></h2>
+<h3 id="user-content-41-训练后量化post-training-quantization-ptq">4.1 训练后量化（Post-Training Quantization, PTQ）<a href="#41-训练后量化post-training-quantization-ptq" aria-label="Link to heading '4.1 训练后量化（Post-Training Quantization, PTQ）'" data-heading-content="4.1 训练后量化（Post-Training Quantization, PTQ）" class="anchor"></a></h3>
+<p>模型训练完后直接量化，<strong>不需要重新训练</strong>。</p>
+<h4 id="user-content-round-to-nearestrtn">Round-to-Nearest（RTN）<a href="#round-to-nearestrtn" aria-label="Link to heading 'Round-to-Nearest（RTN）'" data-heading-content="Round-to-Nearest（RTN）" class="anchor"></a></h4>
+<p>最简单的量化方法：直接四舍五入到最近的整数格点。</p>
+<p>$$
+W_q = \text{round}(W / s) \cdot s
+$$</p>
+<p><strong>缺点</strong>：INT4 下精度损失大（误差是逐列独立的，没有误差补偿）。</p>
+<h4 id="user-content-hessian-量化2022">Hessian 量化（2022）<a href="#hessian-量化2022" aria-label="Link to heading 'Hessian 量化（2022）'" data-heading-content="Hessian 量化（2022）" class="anchor"></a></h4>
+<p>基于**二阶信息（Hessian）**的逐层量化：量化某一列时，用 Hessian 信息补偿剩余列的误差。</p>
+<p>核心思想（OBQ/OBS 方法）：</p>
+<ol>
+<li>量化权重 $w_q$ 的某一列</li>
+<li>未量化的列用 Hessian 逆矩阵调整，补偿量化误差</li>
+<li>逐列推进，每列量化后都更新剩余列</li>
+</ol>
+<p>$$
+\delta_{\text{col}} = -\frac{w_q - \text{quant}(w_q)}{[H^{-1}]<em>{qq}} \cdot (H^{-1})</em>{:,q}
+$$</p>
+<p><strong>优势</strong>：INT4 下精度远好于 RTN，是目前最广泛使用的 PTQ 方法之一。</p>
+<h4 id="user-content-awqactivation-aware-weight-quantization2023">AWQ（Activation-aware Weight Quantization，2023）<a href="#awqactivation-aware-weight-quantization2023" aria-label="Link to heading 'AWQ（Activation-aware Weight Quantization，2023）'" data-heading-content="AWQ（Activation-aware Weight Quantization，2023）" class="anchor"></a></h4>
+<p>核心洞察：<strong>不是所有权重同等重要</strong>。对应激活值大的权重通道更重要（对输出影响更大）。</p>
+<p>做法：量化前先对权重按激活值的重要性做缩放（per-channel scaling），再量化。</p>
+<p>$$
+W' = W \cdot \text{diag}(s), \quad s_j = \left(\frac{|X_j|<em>{\text{mean}}}{\max(|X|</em>{\text{mean}})}\right)^{\alpha}
+$$</p>
+<h4 id="user-content-gguf--llamacpp">GGUF / llama.cpp<a href="#gguf--llamacpp" aria-label="Link to heading 'GGUF / llama.cpp'" data-heading-content="GGUF / llama.cpp" class="anchor"></a></h4>
+<p>实际部署中最流行的量化格式（由 llama.cpp 项目定义）：</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Q4_0</td>
+<td>4-bit 对称量化，每 32 个权重一组</td>
+</tr>
+<tr>
+<td>Q4_K_M</td>
+<td>4-bit，K-quant，中等质量</td>
+</tr>
+<tr>
+<td>Q5_K_M</td>
+<td>5-bit，K-quant，较高质量</td>
+</tr>
+<tr>
+<td>Q8_0</td>
+<td>8-bit 对称量化</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-42-量化感知训练quantization-aware-training-qat">4.2 量化感知训练（Quantization-Aware Training, QAT）<a href="#42-量化感知训练quantization-aware-training-qat" aria-label="Link to heading '4.2 量化感知训练（Quantization-Aware Training, QAT）'" data-heading-content="4.2 量化感知训练（Quantization-Aware Training, QAT）" class="anchor"></a></h3>
+<p>在训练过程中模拟量化效果，让模型&quot;学会&quot;适应低精度表示。</p>
+<pre><code class="language-plaintext">前向传播：
+  W_fake = quantize(W_real)   // 前向用量化权重（模拟推理）
+  y = x @ W_fake
+
+反向传播：
+  grad 通过 STE (Straight-Through Estimator) 传回 W_real
+  W_real -= lr * grad         // 更新原始高精度权重
+</code></pre>
+<p><strong>STE（直通估计器）</strong>：量化操作的梯度在数学上是 0（round 不可微），STE 假设梯度直接穿过量化层，即 $\frac{\partial W_q}{\partial W} \approx 1$。</p>
+<h3 id="user-content-43-量化在-llm-推理中的实际应用">4.3 量化在 LLM 推理中的实际应用<a href="#43-量化在-llm-推理中的实际应用" aria-label="Link to heading '4.3 量化在 LLM 推理中的实际应用'" data-heading-content="4.3 量化在 LLM 推理中的实际应用" class="anchor"></a></h3>
+<pre><code class="language-plaintext">原始 FP16 模型 (14GB)
+  ↓ Hessian 量化 / AWQ / GGUF 量化
+INT4 模型 (3.5GB)
+  ↓ 在 RTX 3060 (12GB) 上加载
+  ↓ 推理时反量化到 FP16 做矩阵乘
+  ↓ 性能损失 &lt; 2%（perplexity 增加 &lt; 0.5）
+</code></pre>
+<h2 id="user-content-5-int8-量化详细过程">5. INT8 量化详细过程<a href="#5-int8-量化详细过程" aria-label="Link to heading '5. INT8 量化详细过程'" data-heading-content="5. INT8 量化详细过程" class="anchor"></a></h2>
+<p>以权重矩阵 $W \in \mathbb{R}^{m \times n}$ 的 Per-Channel INT8 量化为例：</p>
+<pre><code class="language-plaintext">对于每个输出通道 j (共 n 个):
+  1. 计算该通道的最大绝对值: max_j = max(|W[:, j]|)
+  2. 计算缩放因子: scale_j = max_j / 127
+  3. 量化: W_q[:, j] = round(W[:, j] / scale_j)   // 范围 [-127, 127]
+  4. 存储: W_q (INT8) + scale (FP32, 每通道一个)
+
+推理时:
+  1. 反量化: W_hat[:, j] = W_q[:, j] * scale_j    // 恢复到 FP16
+  2. 正常矩阵乘: Y = X @ W_hat
+</code></pre>
+<h2 id="user-content-6-混合精度量化mixed-precision-quantization">6. 混合精度量化（Mixed-Precision Quantization）<a href="#6-混合精度量化mixed-precision-quantization" aria-label="Link to heading '6. 混合精度量化（Mixed-Precision Quantization）'" data-heading-content="6. 混合精度量化（Mixed-Precision Quantization）" class="anchor"></a></h2>
+<p>不同层对量化的敏感度不同：</p>
+<ul>
+<li><strong>Embedding 层</strong>和<strong>输出层</strong>对精度敏感（直接影响词预测），通常保持 FP16</li>
+<li><strong>注意力层</strong>中等敏感，可用 INT8</li>
+<li><strong>FFN 层</strong>参数量最大但相对鲁棒，可用 INT4</li>
+</ul>
+<pre><code class="language-plaintext">Embedding (FP16) → Attention (INT8) → FFN (INT4) → ... → Output (FP16)
+</code></pre>
+<h2 id="user-content-7-本仓库实现要点">7. 本仓库实现要点<a href="#7-本仓库实现要点" aria-label="Link to heading '7. 本仓库实现要点'" data-heading-content="7. 本仓库实现要点" class="anchor"></a></h2>
+<p>上面的原理已全部落地为可运行代码。核心文件是 <a href="../src/quant.rs"><code>src/quant.rs</code></a>（单测跑 <code>cargo test quant</code>，数量以实际输出为准），
+CLI 入口是 <a href="../README.md"><code>quant</code></a> 子命令。</p>
+<h3 id="user-content-71-代码结构">7.1 代码结构<a href="#71-代码结构" aria-label="Link to heading '7.1 代码结构'" data-heading-content="7.1 代码结构" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>位置</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>QBits</code> / <code>QAxis</code> / <code>QuantMeta</code></td>
+<td><code>quant.rs</code></td>
+<td>位宽、量化轴、元信息（位宽 + 算法名）</td>
+</tr>
+<tr>
+<td><code>quantize_channel_sym</code> / <code>quantize_row_sym</code></td>
+<td><code>quant.rs</code></td>
+<td>对称量化 + 反量化（逐通道 / 逐 token）</td>
+</tr>
+<tr>
+<td><code>pack_u8</code> / <code>unpack_u8</code> / <code>pack_u4</code> / <code>unpack_u4</code></td>
+<td><code>quant.rs</code></td>
+<td>位打包与往返</td>
+</tr>
+<tr>
+<td><code>hess_quantize_with_hinv</code></td>
+<td><code>quant.rs</code></td>
+<td>Hessian 量化：Cholesky 逆 + 逐通道误差补偿 + 分块 + act-order</td>
+</tr>
+<tr>
+<td><code>awq_best_alpha</code></td>
+<td><code>quant.rs</code></td>
+<td>AWQ：按代理误差在 0~1 网格搜索最优缩放指数 α</td>
+</tr>
+<tr>
+<td><code>Calibration</code></td>
+<td><code>quant.rs</code></td>
+<td>Hessian <code>XᵀX</code> + 激活均值 + 合并，供 Hessian 量化/AWQ 校准</td>
+</tr>
+<tr>
+<td><code>Transformer::quantize_weights</code> / <code>dequantize_weights</code></td>
+<td><code>model.rs</code></td>
+<td>逐层量化 / 反量化（挂到模型权重上）</td>
+</tr>
+<tr>
+<td><code>requantize_after_load</code></td>
+<td><code>checkpoint.rs</code></td>
+<td>加载后按 <code>QuantMeta</code> 重放量化（存档写 f32，省显存时重放）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>退化诚实性</strong>：只有拿到<strong>全矩阵 Hessian</strong> 才是真 Hessian 量化——对角 Hessian 的 $H^{-1}$ 是对角阵，
+补偿量恒为 0，<code>hess_quantize</code> 内部直接走 <code>hinv = None</code>，码值与 RTN 逐位相同；缺校准统计同样退回 RTN。
+因此 <code>Linear::quantize_weight</code> 只在 <code>HessianKind::Full</code> 时才把该层记成 <code>QuantMethod::Hess</code>，
+否则如实记 <code>Rtn</code>；<code>QuantSummary::degraded</code> 统计&quot;请求的算法没真正生效&quot;的层数，
+<code>describe()</code> 会在摘要里追加警告（见 <code>src/layers.rs</code> 的 <code>real_hess</code> 判定）。
+校准规模默认 <code>CalibOpts::max_tokens = 4096</code>（该量化论文常用量级）：512 时 Hessian 的
+通道协方差估计噪声明显，补偿质量打折。</p>
+<h3 id="user-content-72-cli-用法">7.2 CLI 用法<a href="#72-cli-用法" aria-label="Link to heading '7.2 CLI 用法'" data-heading-content="7.2 CLI 用法" class="anchor"></a></h3>
+<pre><code class="language-bash"># RTN 直接取整（不需要校准集）
+cargo run --release -- quant --bits int8 --method rtn
+
+# Hessian 量化（默认 64 样本校准 + act-order + 阻尼）
+cargo run --release -- quant --bits int4 --method hess --eval
+
+# AWQ（逐层搜索最优 α）
+cargo run --release -- quant --bits int8 --method awq --eval
+
+# 落盘量化权重（out_dir/quant.ckpt）
+cargo run --release -- quant --bits int8 --method hess --out out_dir/quant.ckpt
+</code></pre>
+<hr />
+<h2 id="user-content-8-小结与下一课">8. 小结与下一课<a href="#8-小结与下一课" aria-label="Link to heading '8. 小结与下一课'" data-heading-content="8. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li>量化的本质是&quot;用更少的比特表示每个参数&quot;：FP32 的 7B 模型 28GB，INT8 掉到 7GB、INT4 掉到 3.5GB</li>
+<li>两条基本口径：对称量化（<code>z = 0</code>，权重常用）与非对称量化（<code>z</code> 可变，适合分布不对称的激活）</li>
+<li>粒度决定精度：Per-Tensor → Per-Channel → Per-Group（Hessian / AWQ 常用）→ Per-Token</li>
+<li>PTQ 三条路线：RTN（最简单）、Hessian（逐列误差补偿，INT4 下远好于 RTN）、AWQ（按激活重要性缩放）</li>
+<li>QAT 用 STE 让梯度穿过 <code>round</code>，让模型&quot;学会&quot;适应低精度</li>
+<li>本仓库把上面原理全部落地为 <code>src/quant.rs</code> + <code>quant</code> 子命令，并有<strong>退化诚实性</strong>约束：只有拿到全矩阵 Hessian 才记成 <code>Hess</code>，否则如实记 <code>Rtn</code> 并由 <code>degraded</code> 统计（§7.1）</li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现（<code>src/quant.rs</code> + <code>quant</code> 子命令），这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li><strong>实现 INT8 量化</strong>：写一个函数，接受 FP32 张量，输出 INT8 量化值 + scale，再实现反量化。</li>
+<li><strong>量化误差分析</strong>：对比原始 FP32 权重和 INT8 反量化后的权重，计算 MSE 和最大误差。</li>
+<li><strong>Per-Channel vs Per-Tensor</strong>：分别用两种粒度量化同一个权重矩阵，对比精度差异。</li>
+<li><strong>PTQ 推理对比</strong>：将模型权重 INT8 量化后做推理，对比量化前后的 loss / 困惑度。</li>
+<li><strong>换一套数值表示</strong>：本课的量化是&quot;整数码 + scale&quot;这条线（int8 / int4）；训练侧还有另一条线——
+<strong>8 位浮点（FP8，E4M3 / E5M2）</strong>，见<a href="43-FP8%E4%BD%8E%E7%B2%BE%E5%BA%A6.md">第 43 课</a>。对比两者在误差分布上的差别：
+定点量化的误差是绝对均匀的，浮点的相对误差才均匀，所以 FP8 能装下跨越几个数量级的梯度。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="34-%E6%8E%A8%E6%B5%8B%E8%A7%A3%E7%A0%81.md">第 34 课 推测解码（Speculative Decoding）</a> —— 量化省的是显存与带宽，下一课从&quot;一次生成多个 token&quot;的角度解决同一个 memory-bound 瓶颈。</p>
+</blockquote>

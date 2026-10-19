@@ -25,54 +25,22 @@
     <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"BlogPosting","headline":"5分钟快速入门Taro","description":"旧文档归档","url":"https://ganto.me/post/20240402","datePublished":"2024-04-02","dateModified":"2024-04-02","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Old, JavaScript, React, TypeScript, Vue, 前端, 技术","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
     </script>
-    <link rel="stylesheet" href="/styles-c3674ec134f9a612.css">
-<link rel="modulepreload" href="/web-rs-ed78e9ed78fe0ba6.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous">
-<link rel="preload" href="/web-rs-ed78e9ed78fe0ba6_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm">
+    <link rel="stylesheet" href="/styles-7299efb8f2a4d60.css">
+<link rel="modulepreload" href="/web-rs-4b7fc77d2e4f841a.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-web-eae67878b22d6805/inline0.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-cli-config-74c4aa43f52789a0/inline0.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/inline0.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/hydrate.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/patch_console.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/set_attribute.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-web-eae67878b22d6805/src/js/eval.js" crossorigin="anonymous">
+<link rel="preload" href="/web-rs-4b7fc77d2e4f841a_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm">
 
     <style>
-:root {
-            --bg-base: #f8f4ed;
-            --bg-elevated: #fdfbf7;
-            --bg-subtle: #f0ebe0;
-            --text-primary: #3e3327;
-            --text-secondary: #7a6c5a;
-            --text-tertiary: #a49480;
-            --border-default: #e0d6c5;
-            --border-subtle: #ede4d5;
-            --accent: #6a9b50;
-            --accent-rgb: 106, 155, 80;
-            --accent-soft: rgba(106, 155, 80, 0.1);
-            --radius-sm: 6px;
-            --radius-md: 10px;
-            --radius-lg: 14px;
-            --radius-full: 999px;
-        }
-.dark {
-            --bg-base: #1b1612;
-            --bg-elevated: #241e19;
-            --bg-subtle: #2d2620;
-            --text-primary: #ede4d6;
-            --text-secondary: #b0a290;
-            --text-tertiary: #7d7060;
-            --border-default: #3a3229;
-            --border-subtle: #2a241f;
-            --accent: #78b860;
-            --accent-rgb: 120, 184, 96;
-            --accent-soft: rgba(120, 184, 96, 0.12);
-        }
+.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
 
     </style>
     <style>
-        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
-        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
         .theme-toggle .icon-sun { display: none; }
         .dark .theme-toggle .icon-sun { display: inline; }
         .dark .theme-toggle .icon-moon { display: none; }
@@ -98,58 +66,15 @@
     </script>
 </head>
 <body>
-    <div id="main">
-        <div class="app">
-<div class="navbar-content">
-    <div class="navbar-ui">
-        <div class="navbar-title-wrapper">
-            <h1 class="navbar-title">干徒</h1>
-            <div class="navbar-glow"></div>
-        </div>
-        <div class="navbar-subtitle">这很酷</div>
-    </div>
-</div>
-<div class="navbar-sticky-wrap">
-    <div class="navbar-links">
-        <a class="nav-link nav-active" href="/">首页</a>
-        <a class="nav-link" href="/about">关于</a>
-        <a class="nav-link" href="/tags">书签</a>
-        <a class="nav-link" href="/search">搜索</a>
-        <a class="nav-link" href="/knowledge-graph">图谱</a>
-        <a class="nav-link" href="/ai-summary">AI摘要</a>
-        <div class="nav-item-with-sub">
-            <a class="nav-link" href="/dev">开发</a>
-            <div class="nav-submenu">
-                <a class="nav-sub-link" href="/circle-generator">圆形生成器</a>
-            </div>
-        </div>
-        <a class="nav-icon-btn rss-toggle" href="/rss" title="RSS 订阅" aria-label="RSS 订阅">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"/></svg>
-        </a>
-        <button class="nav-icon-btn theme-toggle" id="prerender-theme-toggle" aria-label="切换主题" title="切换主题">
-            <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
-            <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="16" height="16" fill="currentColor"><path d="M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"/></svg>
-        </button>
-    </div>
-</div>
-        <main class="main-content">
-            <article class="blog-post prerender-article">
-                <h1>5分钟快速入门Taro</h1>
-                <div class="prerender-meta">
-                    <span>2024-04-02</span>
-                    <span>干徒</span>
-                </div>
-                <div class="blog-tags"><span class="blog-tag">Old</span><span class="blog-tag">JavaScript</span><span class="blog-tag">React</span><span class="blog-tag">TypeScript</span><span class="blog-tag">Vue</span><span class="blog-tag">前端</span><span class="blog-tag">技术</span></div>
-                <div class="blog-content">
-<h2><a href="#taro介绍" aria-hidden="true" class="anchor" id="user-content-taro介绍"></a>Taro介绍</h2>
+    <div id="main"><div class="app"><div class="navbar-content"><div class="navbar-ui"><div class="navbar-title-wrapper"><h1 class="navbar-title">干徒</h1><div class="navbar-glow"></div></div><div class="navbar-subtitle">这很酷</div></div></div><div class="navbar-sticky-wrap"><div class="navbar-links"><a href="/" class="nav-link nav-active">首页</a><a href="/about" class="nav-link">关于</a><a href="/tags" class="nav-link">书签</a><a href="/search" class="nav-link">搜索</a><a href="/knowledge-graph" class="nav-link">图谱</a><a href="/ai-summary" class="nav-link">AI摘要</a><div class="nav-item-with-sub"><a href="/dev" class="nav-link">开发</a><button class="nav-sub-trigger"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5 L5 6.5 L8 3.5"></path></svg></button></div><a href="/playground" class="nav-link">操场</a><a href="/test" class="nav-link">测试</a><a href="/rss" class="nav-icon-btn rss-toggle" title="RSS 订阅"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"></path></svg></a><button class="nav-icon-btn theme-toggle"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"></path></svg></button></div></div><main class="main-content" id="main-content"><div class="blog-container"><article class="blog-post" aria-label="文章：5分钟快速入门Taro"><div class="blog-title-wrapper"><div class="blog-title"><h2>5分钟快速入门Taro</h2><span class="blog-category">old-docs</span></div><div class="blog-meta"><span class="blog-date">2024-04-02 20:47:00</span><span class="blog-author">干徒</span></div></div><div class="blog-content"><div><h2 id="user-content-taro介绍">Taro介绍<a href="#taro介绍" aria-label="Link to heading 'Taro介绍'" data-heading-content="Taro介绍" class="anchor"></a></h2>
 <p>Taro是由凹凸实验室开发的一个开放式跨端跨框架，支持使用 React/Vue/Nerv 等框架来开发 <a href="https://mp.weixin.qq.com/">微信</a> / <a href="https://mp.jd.com/?entrance=taro">京东</a> / <a href="https://smartprogram.baidu.com/">百度</a> / <a href="https://mini.open.alipay.com/">支付宝</a> / <a href="https://developer.open-douyin.com/">字节跳动</a> / <a href="https://q.qq.com/">QQ</a> / <a href="https://open.feishu.cn/document/uYjL24iN/ucDOzYjL3gzM24yN4MjN">飞书</a> 小程序 / H5 / RN 等应用</p>
 <p>Taro类似于uniapp，都是跨端框架，一次开发多端部署</p>
 <p>这是<a href="https://taro-docs.jd.com/">Taro官方文档</a>，可以结合官方文档食用更佳</p>
-<h2><a href="#准备" aria-hidden="true" class="anchor" id="user-content-准备"></a>准备</h2>
+<h2 id="user-content-准备">准备<a href="#准备" aria-label="Link to heading '准备'" data-heading-content="准备" class="anchor"></a></h2>
 <p>你需要了解最基本的 HTML + CSS + JS ，俗称前端三件套</p>
 <p>最好会使用Vue React</p>
 <p>node环境（&gt;=16.20.0）</p>
-<h2><a href="#安装taro-cli工具" aria-hidden="true" class="anchor" id="user-content-安装taro-cli工具"></a>安装Taro CLI工具</h2>
+<h2 id="user-content-安装taro-cli工具">安装Taro CLI工具<a href="#安装taro-cli工具" aria-label="Link to heading '安装Taro CLI工具'" data-heading-content="安装Taro CLI工具" class="anchor"></a></h2>
 <p>安装</p>
 <pre><code class="language-sh">npm install -g @tarojs/cli
 
@@ -158,18 +83,18 @@
 <pre><code class="language-sh">npm info @tarojs/cli
 
 </code></pre>
-<h2><a href="#初始化项目" aria-hidden="true" class="anchor" id="user-content-初始化项目"></a>初始化项目</h2>
+<h2 id="user-content-初始化项目">初始化项目<a href="#初始化项目" aria-label="Link to heading '初始化项目'" data-heading-content="初始化项目" class="anchor"></a></h2>
 <pre><code class="language-sh">taro init myApp
 
 </code></pre>
-<p><img src="https://img30.360buyimg.com/ling/jfs/t1/121270/15/15083/672721/5f89357dEf36b7fe2/ecb98df1436cd3d5.jpg" alt="taro init myApp command screenshot" /></p>
+<p><img loading="lazy" src="https://img30.360buyimg.com/ling/jfs/t1/121270/15/15083/672721/5f89357dEf36b7fe2/ecb98df1436cd3d5.jpg" alt="taro init myApp command screenshot" /></p>
 <p>进入到项目根目录，安装依赖</p>
 <pre><code class="language-sh">cd myApp
 
 pnpm i
 
 </code></pre>
-<h2><a href="#启动项目" aria-hidden="true" class="anchor" id="user-content-启动项目"></a>启动项目</h2>
+<h2 id="user-content-启动项目">启动项目<a href="#启动项目" aria-label="Link to heading '启动项目'" data-heading-content="启动项目" class="anchor"></a></h2>
 <p>开发</p>
 <pre><code class="language-sh">pnpm dev:weapp
 
@@ -180,25 +105,24 @@ pnpm i
 </code></pre>
 <p>项目启动之后，在微信开发者工具中打开该项目根目录，即可预览项目</p>
 <p>这样Taro项目就启动起来了</p>
-
-                </div>
-                <div class="series-nav"><div class="series-nav-actions"><a class="series-nav-btn" href="/series/old-docs/">目录页</a></div><details class="series-nav-details"><summary class="series-nav-summary"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Old Docs</span><span class="series-nav-count">共 33 章</span></div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="series-nav-chevron"><path d="m6 9 6 6 6-6"/></svg></summary><div class="series-nav-list"><a class="series-nav-item" href="/post/20250410/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">Rust 案例 - 计算器</span></a><a class="series-nav-item" href="/post/20250313/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">Rust镜像源</span></a><a class="series-nav-item" href="/post/20250220-2/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">Rust所有权</span></a><a class="series-nav-item" href="/post/20250220/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">JavaScript 高阶函数之 reduce</span></a><a class="series-nav-item" href="/post/20241220/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">JavaScript中的&quot;事件冒泡&quot;与&quot;事件捕获&quot;</span></a><a class="series-nav-item" href="/post/20240511/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">今天，学习Web Component</span></a><a class="series-nav-item" href="/post/20240415/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">Gin中间件上下文中的Set、Get函数的用法</span></a><a class="series-nav-item" href="/post/20240412/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">React中forwardRef的用法</span></a><a class="series-nav-item active" href="/post/20240402/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">5分钟快速入门Taro</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/20240328/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">React中使用Immer编写简洁的更新逻辑</span></a><a class="series-nav-item" href="/post/20240327/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">浅谈React中的mutation</span></a><a class="series-nav-item" href="/post/20240326/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">Go语言高并发编程初探</span></a><a class="series-nav-item" href="/post/20240315/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">windows终端命令受限</span></a><a class="series-nav-item" href="/post/20240313/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">TypeScript类型取反</span></a><a class="series-nav-item" href="/post/20240102/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">实现一个丝滑的暗黑模式切换动画</span></a><a class="series-nav-item" href="/post/20231221-2/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">Vue3.3+ 新特性 defineOptions</span></a><a class="series-nav-item" href="/post/20231221/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">Vue3 实验性特性 defineModel</span></a><a class="series-nav-item" href="/post/20231117-3/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">JavaScript闭包直接修改内部属性</span></a><a class="series-nav-item" href="/post/20231117-2/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">使用class实现评分</span></a><a class="series-nav-item" href="/post/20231117/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">函数柯里化</span></a><a class="series-nav-item" href="/post/20230831/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">自定义Typora主题分享</span></a><a class="series-nav-item" href="/post/20230829/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">git学习教程</span></a><a class="series-nav-item" href="/post/20230827/"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">博客园自定义主题</span></a><a class="series-nav-item" href="/post/20230816/"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">Golang学习笔记</span></a><a class="series-nav-item" href="/post/20230301/"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">Java学习笔记</span></a><a class="series-nav-item" href="/post/20230220-6/"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">规范和快捷键</span></a><a class="series-nav-item" href="/post/20230220-5/"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">黑苹果</span></a><a class="series-nav-item" href="/post/20230220-4/"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">防抖函数debounce</span></a><a class="series-nav-item" href="/post/20230220-3/"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">TypeScript学习笔记</span></a><a class="series-nav-item" href="/post/20230220/"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">ES6 标准入门 - 阮一峰</span></a><a class="series-nav-item" href="/post/20230220-2/"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">css常用场景</span></a><a class="series-nav-item" href="/post/20210105/"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">hexo-theme-heri主题开发简记</span></a><a class="series-nav-item" href="/post/20201222/"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">测试文章</span></a></div></details><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/20240412/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">React中forwardRef的用法</span></a><a class="series-nav-page next" href="/post/20240328/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">React中使用Immer编写简洁的更新逻辑</span></a></div></div>
-            </article>
-        </main>
-<footer class="footer-content">
-    <div class="copyright">
-        <span>2019-2026 </span>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"/></svg>
-        <span> 干徒 / Ganto</span>
-    </div>
-</footer>
-        </div>
-    </div>
-<script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
-try{document.getElementById('main').innerHTML='';}catch(e){}</script>
+</div></div><div class="series-nav"><div class="series-nav-actions"><a href="/series/old-docs" class="series-nav-btn"><span>目录页</span></a></div><details class="series-nav-details"><summary class="series-nav-summary"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg><div class="series-nav-heading"><span class="series-nav-title">Old Docs</span><span class="series-nav-count">共 33 章</span></div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="series-nav-chevron"><path d="m6 9 6 6 6-6"></path></svg></summary><div class="series-nav-list"><a href="/post/20250410" class="series-nav-item"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">Rust 案例 - 计算器</span></a><a href="/post/20250313" class="series-nav-item"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">Rust镜像源</span></a><a href="/post/20250220-2" class="series-nav-item"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">Rust所有权</span></a><a href="/post/20250220" class="series-nav-item"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">JavaScript 高阶函数之 reduce</span></a><a href="/post/20241220" class="series-nav-item"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">JavaScript中的&#34;事件冒泡&#34;与&#34;事件捕获&#34;</span></a><a href="/post/20240511" class="series-nav-item"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">今天，学习Web Component</span></a><a href="/post/20240415" class="series-nav-item"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">Gin中间件上下文中的Set、Get函数的用法</span></a><a href="/post/20240412" class="series-nav-item"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">React中forwardRef的用法</span></a><a href="/post/20240402" class="series-nav-item active" aria-current="page"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">5分钟快速入门Taro</span><span class="series-nav-item-now">本篇</span></a><a href="/post/20240328" class="series-nav-item"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">React中使用Immer编写简洁的更新逻辑</span></a><a href="/post/20240327" class="series-nav-item"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">浅谈React中的mutation</span></a><a href="/post/20240326" class="series-nav-item"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">Go语言高并发编程初探</span></a><a href="/post/20240315" class="series-nav-item"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">windows终端命令受限</span></a><a href="/post/20240313" class="series-nav-item"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">TypeScript类型取反</span></a><a href="/post/20240102" class="series-nav-item"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">实现一个丝滑的暗黑模式切换动画</span></a><a href="/post/20231221-2" class="series-nav-item"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">Vue3.3+ 新特性 defineOptions</span></a><a href="/post/20231221" class="series-nav-item"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">Vue3 实验性特性 defineModel</span></a><a href="/post/20231117-3" class="series-nav-item"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">JavaScript闭包直接修改内部属性</span></a><a href="/post/20231117-2" class="series-nav-item"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">使用class实现评分</span></a><a href="/post/20231117" class="series-nav-item"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">函数柯里化</span></a><a href="/post/20230831" class="series-nav-item"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">自定义Typora主题分享</span></a><a href="/post/20230829" class="series-nav-item"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">git学习教程</span></a><a href="/post/20230827" class="series-nav-item"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">博客园自定义主题</span></a><a href="/post/20230816" class="series-nav-item"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">Golang学习笔记</span></a><a href="/post/20230301" class="series-nav-item"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">Java学习笔记</span></a><a href="/post/20230220-6" class="series-nav-item"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">规范和快捷键</span></a><a href="/post/20230220-5" class="series-nav-item"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">黑苹果</span></a><a href="/post/20230220-4" class="series-nav-item"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">防抖函数debounce</span></a><a href="/post/20230220-3" class="series-nav-item"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">TypeScript学习笔记</span></a><a href="/post/20230220" class="series-nav-item"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">ES6 标准入门 - 阮一峰</span></a><a href="/post/20230220-2" class="series-nav-item"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">css常用场景</span></a><a href="/post/20210105" class="series-nav-item"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">hexo-theme-heri主题开发简记</span></a><a href="/post/20201222" class="series-nav-item"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">测试文章</span></a></div></details><div class="series-nav-pager"><a href="/post/20240412" class="series-nav-page prev"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">React中forwardRef的用法</span></a><a href="/post/20240328" class="series-nav-page next"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">React中使用Immer编写简洁的更新逻辑</span></a></div></div><div class="blog-tags"><span class="blog-tag"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"></path></svg>Old</span><span class="blog-tag"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"></path></svg>JavaScript</span><span class="blog-tag"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"></path></svg>React</span><span class="blog-tag"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"></path></svg>TypeScript</span><span class="blog-tag"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"></path></svg>Vue</span><span class="blog-tag"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"></path></svg>前端</span><span class="blog-tag"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"></path></svg>技术</span></div><div class="details-sentinel" style="height:1px;"></div><div class="markov-section"><div class="markov-header"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"></path><polyline points="12 12 18 12 18 6"></polyline></svg><span>AI 续写</span><span class="markov-badge">马尔可夫链</span></div><p class="markov-desc">基于本文内容训练的 tri-gram 语言模型，自动生成下文片段。</p><div class="markov-actions"><button class="markov-btn">生成续写</button></div></div></article></div></main><nav class="floating-toolbar" aria-label="页面工具栏"><button class="tool-btn" type="button" aria-label="后退"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.75 19.5 8.25 12l7.5-7.5"></path></svg></button><a href="/" class="tool-btn" aria-label="首页"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"></path></svg></a><a href="/series/old-docs" class="tool-btn" aria-label="系列目录"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"></path></svg></a><button class="tool-btn" type="button" aria-label="宽屏模式"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8m-8 18h8M4 12h16M4 12l3-3m-3 3l3 3m13-3l-3-3m3 3l-3 3"></path></svg></button><span class="tool-divider"></span><button class="tool-btn" type="button" aria-label="回到顶部"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.5v-15m0 0-6.75 6.75M12 4.5l6.75 6.75"></path></svg></button></nav><footer class="footer-content"><div class="copyright"><span>2019-2026 </span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"></path></svg><span> 干徒 / Ganto</span></div></footer></div></div>
+<script>/* 把预渲染正文交给 SPA 后清空 #main，避免重复渲染 */
+try{
+  var main=document.getElementById('main');
+  var content=main?main.querySelector('.blog-content'):null;
+  if(content){
+    var t=document.createElement('template');
+    t.id='prerender-content';
+    t.setAttribute('data-slug', "20240402");
+    t.innerHTML=content.innerHTML;
+    document.body.appendChild(t);
+  }
+  if(main) main.innerHTML='';
+}catch(e){}
+</script>
 <script type="module">
-import init, * as bindings from '/web-rs-ed78e9ed78fe0ba6.js';
-const wasm = await init({ module_or_path: '/web-rs-ed78e9ed78fe0ba6_bg.wasm' });
+import init, * as bindings from '/web-rs-4b7fc77d2e4f841a.js';
+const wasm = await init({ module_or_path: '/web-rs-4b7fc77d2e4f841a_bg.wasm' });
 
 
 window.wasmBindings = bindings;

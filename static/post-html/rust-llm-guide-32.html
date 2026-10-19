@@ -1,0 +1,670 @@
+<h1 id="user-content-第-32-课moe-混合专家模型mixture-of-experts">第 32 课：MoE 混合专家模型（Mixture of Experts）<a href="#第-32-课moe-混合专家模型mixture-of-experts" aria-label="Link to heading '第 32 课：MoE 混合专家模型（Mixture of Experts）'" data-heading-content="第 32 课：MoE 混合专家模型（Mixture of Experts）" class="anchor"></a></h1>
+<blockquote>
+<p><strong>本课已落地为可运行代码</strong>：核心实现在 <a href="../src/moe.rs"><code>src/moe.rs</code></a>（单测跑 <code>cargo test moe</code>，数量以实际输出为准），
+接线在 <a href="../src/model.rs"><code>src/model.rs</code></a>（<code>TransformerConfig.n_expert</code> / <code>moe_top_k</code> 等 9 个字段 +
+<code>Ffn</code> 枚举二选一），演示在 <code>cargo run --release -- moe</code>（见文末「本项目实现」）。
+专家网络直接复用 <code>src/layers.rs</code> 的 <code>MLPEnum</code>（GELU 或 SwiGLU）。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-为什么需要-moe">1. 为什么需要 MoE？<a href="#1-为什么需要-moe" aria-label="Link to heading '1. 为什么需要 MoE？'" data-heading-content="1. 为什么需要 MoE？" class="anchor"></a></h2>
+<blockquote>
+<p>本课按四条线展开：<strong>为什么要 MoE</strong>（§1）→ <strong>原理与架构</strong>（§2–§5：数学定义、负载均衡、真实模型对比）
+→ <strong>实现要点</strong>（§6）→ <strong>本仓库实现要点</strong>（§8：本项目落地了哪些形态、以及实测到的坑）
+→ <strong>运行与验证</strong>（§10：<code>moe</code> 子命令四节输出的跑法与口径）。</p>
+</blockquote>
+<p>当模型参数量从 7B 增长到 175B乃至万亿级别时，<strong>每个 token 都经过全部参数</strong>的 Dense 模型面临两个根本瓶颈：</p>
+<ol>
+<li><strong>计算成本</strong>：FLOPs 与参数量成正比，训练一个 175B 模型需要数千 GPU 运行数月。</li>
+<li><strong>推理延迟</strong>：每生成一个 token 都要跑完所有参数，延迟不可接受。</li>
+</ol>
+<p>MoE 的核心思想是<strong>稀疏激活</strong>——模型有很多参数（专家），但每次只激活其中一小部分。</p>
+<blockquote>
+<p><strong>类比</strong>：Dense 模型像一个&quot;全能医生&quot;什么都要看；MoE 像一家&quot;医院&quot;——有内科、外科、眼科等专家，门急诊（Router）根据症状把你分到对应科室，你只占用其中一个专家的时间。</p>
+</blockquote>
+<h2 id="user-content-2-数学定义">2. 数学定义<a href="#2-数学定义" aria-label="Link to heading '2. 数学定义'" data-heading-content="2. 数学定义" class="anchor"></a></h2>
+<p>设模型有 $N$ 个专家网络 ${E_1, E_2, ..., E_N}$，输入为 $x$：</p>
+<p>$$
+y = \sum_{i=1}^{N} g_i(x) \cdot E_i(x)
+$$</p>
+<p>其中 $g(x)$ 是<strong>门控网络（Router / Gate）</strong>，输出一个概率分布，决定每个专家的权重。</p>
+<h3 id="user-content-21-稀疏-moeswitch-transformer--mixtral-风格">2.1 稀疏 MoE（Switch Transformer / Mixtral 风格）<a href="#21-稀疏-moeswitch-transformer--mixtral-风格" aria-label="Link to heading '2.1 稀疏 MoE（Switch Transformer / Mixtral 风格）'" data-heading-content="2.1 稀疏 MoE（Switch Transformer / Mixtral 风格）" class="anchor"></a></h3>
+<p>不是所有专家都参与——只选 Top-K 个（通常 K=1 或 K=2）：</p>
+<p>$$
+\text{TopK}(g(x)) = \text{softmax}(\text{TopK}(W_g \cdot x))
+$$</p>
+<ul>
+<li><strong>K=1</strong>：每个 token 只走一个专家（Switch Transformer）</li>
+<li><strong>K=2</strong>：每个 token 走两个专家（Mixtral 8x7B、Grok-1）</li>
+</ul>
+<h2 id="user-content-3-架构详解">3. 架构详解<a href="#3-架构详解" aria-label="Link to heading '3. 架构详解'" data-heading-content="3. 架构详解" class="anchor"></a></h2>
+<pre><code class="language-plaintext">输入 x
+  │
+  ├──→ Router (门控网络): W_g @ x → logits → TopK → weights
+  │         │
+  │         ├──→ Expert 0 (FFN): W_up / W_gate / W_down
+  │         ├──→ Expert 1 (FFN)
+  │         ├──→ ...
+  │         └──→ Expert N-1 (FFN)
+  │
+  └──→ 加权求和 → y = Σ weight_i * Expert_i(x)
+</code></pre>
+<h3 id="user-content-31-关键组件">3.1 关键组件<a href="#31-关键组件" aria-label="Link to heading '3.1 关键组件'" data-heading-content="3.1 关键组件" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Router / Gate</strong></td>
+<td>一个线性层：<code>W_g ∈ R^{d_model × n_experts}</code>，输入 token 表示，输出各专家的得分</td>
+</tr>
+<tr>
+<td><strong>Expert</strong></td>
+<td>通常是 FFN（SwiGLU），每个专家是独立的 MLP</td>
+</tr>
+<tr>
+<td><strong>Auxiliary Loss</strong></td>
+<td>辅助损失，防止路由器把所有 token 都送到同一个专家（负载均衡）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="user-content-4-负载均衡load-balancing">4. 负载均衡（Load Balancing）<a href="#4-负载均衡load-balancing" aria-label="Link to heading '4. 负载均衡（Load Balancing）'" data-heading-content="4. 负载均衡（Load Balancing）" class="anchor"></a></h2>
+<p>MoE 最大的工程挑战是<strong>专家负载不均</strong>——路由器倾向于反复选同一个&quot;好&quot;专家（赢者通吃），导致其他专家闲置。</p>
+<h3 id="user-content-41-switch-transformer-的辅助损失">4.1 Switch Transformer 的辅助损失<a href="#41-switch-transformer-的辅助损失" aria-label="Link to heading '4.1 Switch Transformer 的辅助损失'" data-heading-content="4.1 Switch Transformer 的辅助损失" class="anchor"></a></h3>
+<p>$$
+\mathcal{L}<em>{aux} = \alpha \cdot N \cdot \sum</em>{i=1}^{N} f_i \cdot p_i
+$$</p>
+<p>其中：</p>
+<ul>
+<li>$f_i$ = 专家 $i$ 被分配到的 token 比例（实际负载）</li>
+<li>$p_i$ = 专家 $i$ 的平均路由概率</li>
+<li>$\alpha$ = 系数（通常 0.01）</li>
+<li>$N$ = 专家数</li>
+</ul>
+<p><strong>直觉</strong>：当所有专家的 $f_i$ 和 $p_i$ 都相等时，$\mathcal{L}_{aux}$ 最小（完美均衡）。</p>
+<blockquote>
+<p><strong>⚠️ 一个常见误读（本课实测修正过）</strong>：$f_i$ 来自 argmax，是<strong>常数、不可导</strong>；$p_i$ 是可导的
+softmax 平均概率。所以<strong>当 $p_i$ 均匀时，无论 $f$ 长什么样都有 $\mathcal{L}_{aux} = 1$</strong>
+（$\sum f_i p_i = \frac{1}{N}\sum f_i = \frac{1}{N}$）。也就是说「$\mathcal{L}<em>{aux}$ 降到 1」
+<strong>不是</strong>负载均衡的证书——硬路由可以照样压在少数专家上。另外 $\mathcal{L}</em>{aux}$ 的<strong>下界不是 1</strong>：
+$f$ 与 $p$ 支撑集不交时 $\sum f_i p_i = 0$，$\mathcal{L}_{aux}$ 可以低到 0。
+详见文末「本项目实现」里的隔离实验。</p>
+</blockquote>
+<h3 id="user-content-42-mixtral-的实现">4.2 Mixtral 的实现<a href="#42-mixtral-的实现" aria-label="Link to heading '4.2 Mixtral 的实现'" data-heading-content="4.2 Mixtral 的实现" class="anchor"></a></h3>
+<p>Mixtral 8x7B 没有显式辅助损失，而是靠 <strong>Top-2 + softmax</strong> 的隐式均衡（两个专家分担一个 token 的权重，自然比 Top-1 更分散）。</p>
+<h2 id="user-content-5-真实-moe-模型对比">5. 真实 MoE 模型对比<a href="#5-真实-moe-模型对比" aria-label="Link to heading '5. 真实 MoE 模型对比'" data-heading-content="5. 真实 MoE 模型对比" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>专家数</th>
+<th>激活专家</th>
+<th>总参数</th>
+<th>激活参数</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Switch Transformer</td>
+<td>128</td>
+<td>1</td>
+<td>1.6T</td>
+<td>~1/128</td>
+<td>Google，2021</td>
+</tr>
+<tr>
+<td>Mixtral 8x7B</td>
+<td>8</td>
+<td>2</td>
+<td>46.7B</td>
+<td>12.9B</td>
+<td>Mistral AI，2023</td>
+</tr>
+<tr>
+<td>Grok-1</td>
+<td>8</td>
+<td>2</td>
+<td>314B</td>
+<td>~86B</td>
+<td>xAI，2024</td>
+</tr>
+<tr>
+<td>DeepSeek-V2</td>
+<td>160</td>
+<td>6</td>
+<td>236B</td>
+<td>21B</td>
+<td>DeepSeek，2024</td>
+</tr>
+<tr>
+<td>Qwen2-57B-A14B</td>
+<td>64</td>
+<td>8</td>
+<td>57B</td>
+<td>14B</td>
+<td>Alibaba，2024</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>核心洞察</strong>：Mixtral 8x7B 总参数 46.7B，但推理时只激活 12.9B（约 27%），性能接近 LLaMA-2 70B，但推理成本只有其约 1/5。</p>
+</blockquote>
+<h2 id="user-content-6-实现要点">6. 实现要点<a href="#6-实现要点" aria-label="Link to heading '6. 实现要点'" data-heading-content="6. 实现要点" class="anchor"></a></h2>
+<h3 id="user-content-61-router-实现">6.1 Router 实现<a href="#61-router-实现" aria-label="Link to heading '6.1 Router 实现'" data-heading-content="6.1 Router 实现" class="anchor"></a></h3>
+<pre><code class="language-rust">pub struct Router {
+    pub gate: Linear,  // [n_experts, d_model] 或 [d_model, n_experts]
+    pub n_experts: usize,
+    pub top_k: usize,
+}
+
+impl Router {
+    pub fn forward(&amp;self, x: &amp;Tensor) -&gt; (Tensor, Vec&lt;usize&gt;) {
+        // logits = x @ W_g
+        let logits = self.gate.forward(x);
+        // TopK 选择
+        let (weights, indices) = topk(logits, self.top_k);
+        // 在被选中的专家上做 softmax
+        let weights = softmax(weights);
+        (weights, indices)
+    }
+}
+</code></pre>
+<h3 id="user-content-62-moe-layer">6.2 MoE Layer<a href="#62-moe-layer" aria-label="Link to heading '6.2 MoE Layer'" data-heading-content="6.2 MoE Layer" class="anchor"></a></h3>
+<pre><code class="language-rust">pub struct MoELayer {
+    pub router: Router,
+    pub experts: Vec&lt;FFN&gt;,  // N 个独立的 FFN
+}
+
+impl MoELayer {
+    pub fn forward(&amp;self, x: &amp;Tensor) -&gt; Tensor {
+        let (weights, indices) = self.router.forward(x);
+        let mut y = Tensor::zeros(x.shape());
+        for (k, &amp;expert_idx) in indices.iter().enumerate() {
+            let expert_out = self.experts[expert_idx].forward(x);
+            y = y + weights[k] * expert_out;
+        }
+        y
+    }
+}
+</code></pre>
+<h3 id="user-content-63-token-路由的工程挑战">6.3 Token 路由的工程挑战<a href="#63-token-路由的工程挑战" aria-label="Link to heading '6.3 Token 路由的工程挑战'" data-heading-content="6.3 Token 路由的工程挑战" class="anchor"></a></h3>
+<p>实际实现中，MoE 面临的关键工程问题是<strong>并行效率</strong>：</p>
+<ul>
+<li><strong>Expert Parallelism</strong>：不同专家放在不同 GPU 上，token 通过 All-to-All 通信发送到对应专家</li>
+<li><strong>Token Dropping</strong>：超过专家容量的 token 被丢弃（Switch Transformer 的做法）</li>
+<li><strong>Capacity Factor</strong>：每个专家处理 token 的上限，通常设为平均负载的 1.25× ～ 2×</li>
+</ul>
+<h2 id="user-content-7-moe-的优缺点">7. MoE 的优缺点<a href="#7-moe-的优缺点" aria-label="Link to heading '7. MoE 的优缺点'" data-heading-content="7. MoE 的优缺点" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th>优点</th>
+<th>缺点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>训练/推理 FLOPs 远小于同参数量 Dense 模型</td>
+<td>显存占用仍是全量参数（所有专家都要加载）</td>
+</tr>
+<tr>
+<td>可以在不增加推理成本的前提下扩大模型容量</td>
+<td>负载不均导致部分专家&quot;浪费&quot;</td>
+</tr>
+<tr>
+<td>不同专家可自发学到不同&quot;专长&quot;</td>
+<td>需要 All-to-All 通信，对网络带宽要求高</td>
+</tr>
+<tr>
+<td>适合大规模预训练</td>
+<td>微调时容易过拟合（只更新部分专家）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="user-content-8-本仓库实现要点">8. 本仓库实现要点<a href="#8-本仓库实现要点" aria-label="Link to heading '8. 本仓库实现要点'" data-heading-content="8. 本仓库实现要点" class="anchor"></a></h2>
+<p>核心代码在 <a href="../src/moe.rs"><code>src/moe.rs</code></a>，接线在 <a href="../src/model.rs"><code>src/model.rs</code></a>，
+演示命令是 <code>cargo run --release -- moe</code>（<a href="../src/cmd/experiments.rs"><code>src/cmd/experiments.rs</code></a> 的 <code>cmd_moe</code>）。
+<code>cargo test moe</code> 的单测全部与 CPU 参考实现对齐（其中若干专测 aux-loss-free 均衡偏置与共享专家）。</p>
+<h3 id="user-content-81-公开-api">8.1 公开 API<a href="#81-公开-api" aria-label="Link to heading '8.1 公开 API'" data-heading-content="8.1 公开 API" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>top_k_gate</code></td>
+<td>纯函数路由：<code>logits → Top-K</code>（并列按下标、<strong>确定性</strong>），返回 <code>RoutePlan</code>；选择用 <code>select_nth_unstable_by</code> O(E) 部分选择 + 对前 K 排序，不做全排序</td>
+</tr>
+<tr>
+<td><code>RoutePlan</code></td>
+<td>一次路由的完整结果：<code>sel</code>（各专家实际处理的 token 行号，已按容量截断）、<code>penalty</code>（未选中 −∞）、<code>mask</code>（选中 1 / 其余 0）、<code>f</code>（分配比例）、<code>dropped</code> / <code>routed</code></td>
+</tr>
+<tr>
+<td><code>expert_capacity</code></td>
+<td><code>ceil(cf · n·K/E)</code>；<code>cf ≤ 0</code> → <code>usize::MAX</code>（不限）</td>
+</tr>
+<tr>
+<td><code>MoELayer</code></td>
+<td>专家集合 + 路由器（+ 可选的共享专家 <code>shared_experts</code>）；<code>forward</code> / <code>forward_with_aux</code> / <code>route_plan</code> / <code>stats</code> / <code>update_balance_bias</code>（推进 aux-loss-free 偏置）/ <code>balance_bias</code>（只读诊断）</td>
+</tr>
+<tr>
+<td><code>RouteStats</code></td>
+<td>诊断：各专家被路由到的次数、<code>aux</code>、<code>imbalance()</code>、<code>dropped_ratio()</code></td>
+</tr>
+<tr>
+<td><code>sparse_stats</code></td>
+<td>参数 / 激活量口径：<code>total_params</code> / <code>active_params</code> / <code>param_ratio</code> / <code>flops_saving</code>；末位参数 <code>n_shared</code> 决定共享专家 <code>shared_params()</code>（同时计入总参数与激活参数，见下文「共享专家」）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-82-稀疏前向gather--expert--weighted--scatter">8.2 稀疏前向：gather → expert → weighted → scatter<a href="#82-稀疏前向gather--expert--weighted--scatter" aria-label="Link to heading '8.2 稀疏前向：gather → expert → weighted → scatter'" data-heading-content="8.2 稀疏前向：gather → expert → weighted → scatter" class="anchor"></a></h3>
+<p>逐专家跑，而不是「全跑一遍再用掩码筛掉」：</p>
+<ol>
+<li><code>gather_rows(x2, &amp;sel[e])</code> 取出分到专家 <code>e</code> 的 token（<code>[n_e, d]</code>）；</li>
+<li>过该专家的 FFN（<code>MLPEnum</code>，GELU / SwiGLU 与 <code>TransformerConfig</code> 保持一致）；</li>
+<li>取门控权重矩阵 <code>w</code> 的第 <code>e</code> 列——实现上是 <code>w.gather_rows(sel).select_col(e)</code>，
+两步都是<strong>带梯度的索引算子</strong>（直接读显存会把送回路由器的那条梯度掐断，
+早先的 <code>w.matmul(one_hot_col(e, E))</code> 语义等价但要多算 n×E 次乘加）；</li>
+<li><code>we.mul(&amp;ye)</code> 加权（<code>[n_e,1]</code> 广播到 <code>[n_e,d]</code>）；</li>
+<li><code>scatter_add_rows(sel, n)</code> 散射回原位累加。</li>
+</ol>
+<p><code>sel[e]</code> 为空就 <code>continue</code> 整段跳过——稀疏激活省下的正是这一段。
+全部 token 的分配都被容量丢掉时输出是全零张量，这正是「被丢弃」的正确语义（该层贡献为 0、
+残差照常直通）。</p>
+<h3 id="user-content-83-门控口径k--1-的梯度陷阱">8.3 门控口径：K = 1 的梯度陷阱<a href="#83-门控口径k--1-的梯度陷阱" aria-label="Link to heading '8.3 门控口径：K = 1 的梯度陷阱'" data-heading-content="8.3 门控口径：K = 1 的梯度陷阱" class="anchor"></a></h3>
+<p>由 <code>TransformerConfig.moe_switch_gate</code> 切换：</p>
+<table>
+<thead>
+<tr>
+<th>口径</th>
+<th>做法</th>
+<th><code>Σw</code></th>
+<th>K = 1 时</th>
+<th>代表模型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>重归一化</strong>（默认）</td>
+<td>未选中置 −∞ 后 softmax</td>
+<td>1</td>
+<td><code>w ≡ 1</code>，<strong>对 logits 的雅可比恒为 0</strong></td>
+<td>Mixtral / DeepSeek / Qwen</td>
+</tr>
+<tr>
+<td><strong>原概率</strong></td>
+<td>全部专家上的 softmax 原概率，未选中置 0</td>
+<td>&lt; 1</td>
+<td><code>w = p_0</code>（非 0 非 1），路由器拿得到梯度</td>
+<td>Switch Transformer</td>
+</tr>
+</tbody>
+</table>
+<p>第一条看似天经地义（<code>w_j = 0</code> 时 <code>∂w_j/∂logit_i = w_j(δ_ij − w_i) ≡ 0</code>，梯度天然干净），
+但 K = 1 时只剩一个非零权重、而它必然等于 1，雅可比整体是 0——<strong>主损失给不了路由器任何梯度</strong>。
+单测 <code>test_k1_renorm_gate_has_no_router_gradient</code> 直接对比了两条口径下路由器的梯度范数：
+同一输入下重归一化 &lt; 1e-7，原概率 &gt; 1e-4。所以 K = 1 必须配 <code>switch_gate = true</code>，
+否则路由器只能靠辅助损失训练。</p>
+<h3 id="user-content-84-负载均衡辅助损失实测到的退化解">8.4 负载均衡辅助损失：实测到的退化解<a href="#84-负载均衡辅助损失实测到的退化解" aria-label="Link to heading '8.4 负载均衡辅助损失：实测到的退化解'" data-heading-content="8.4 负载均衡辅助损失：实测到的退化解" class="anchor"></a></h3>
+<p><code>L_aux = α·E·Σ f_i·p_i</code> 的性质用 <code>moe</code> 子命令第二节的<strong>隔离实验</strong>验证过。这里有<strong>三组对照</strong>，
+从<strong>同一个塌缩起点</strong>（前 K 个专家的门控偏置 +3.0 ⇒ 负载全压在它们身上）出发，
+分别 ① 什么都不做 ② 只优化 <code>α·L_aux</code> ③ 只推进 aux-loss-free 均衡偏置：</p>
+<pre><code class="language-text">K=1（E=8）
+① 不均衡（塌缩起点）：不均衡度 8.00（用 1/8），L_aux 5.932
+② α·L_aux（300 步梯度）：不均衡度 3.12（用 7/8，比 ① 摊平 69.8%），L_aux 5.932 → 1.053
+③ sign 偏置（2000 步、γ = 0.001、不算梯度）：不均衡度 1.32（用 8/8，比 ① 摊平 95.5%），L_aux 0.929
+K=2（E=8）
+① 不均衡（塌缩起点）：不均衡度 4.00（用 2/8），L_aux 3.114
+② α·L_aux（300 步梯度）：不均衡度 3.81（用 7/8，比 ① 摊平 59.8%），L_aux 3.114 → 1.025
+③ sign 偏置（2000 步、γ = 0.001、不算梯度）：不均衡度 1.11（用 8/8，比 ① 摊平 98.4%），L_aux 1.036
+</code></pre>
+<p><code>L_aux</code> 确实被压到 1.0，但<strong>硬路由最多只被摊平一部分</strong>：K = 2 组 4.00 → 3.81 几乎原地不动；
+K = 1 组 8.00 → 3.12 看着动了，其实是梯度顺手把路由器权重从 0 抬了起来（② 组的权重是被清零的
+——见下），而<strong>一次梯度都不算</strong>的 ③ 组反而压到了 1.32 / 1.11。原因就是软/硬错配：</p>
+<ul>
+<li><code>f</code> 由 argmax 给出，不可导；<code>p</code> 由 softmax 给出，可导。</li>
+<li>梯度 <code>∂L/∂logit_j ∝ p_j·(f_j − Σ f_i p_i)</code> 的<strong>大小正比于 <code>p_j</code></strong>：<code>p</code> 越平梯度越小。
+于是最快的下降路径是<strong>先把 <code>p</code> 摊平</strong>（<code>L_aux</code> 一步到位到 1），而不是把硬路由摊平。</li>
+<li>而 <code>p</code> 均匀时 <code>Σ f_i p_i = (1/E)·Σ f_i = 1/E</code> ⇒ <code>L_aux = 1</code>，<strong>与 <code>f</code> 无关</strong>。</li>
+</ul>
+<p>所以「<code>L_aux</code> 掉到 1」<strong>不是</strong>负载均衡的证书；并且 1 也<strong>不是下界</strong>——<code>f</code> 与 <code>p</code> 支撑集不交时
+<code>Σ f_i p_i = 0</code>，<code>L_aux</code> 可以低到 0（<code>test_aux_loss_minimum_at_uniform</code> 覆盖了这三种情形：
+<code>p = f</code> 时 <code>≥ α</code>、支撑集不交时 <code>= 0</code>、<code>p</code> 均匀时 <code>= 1</code>）。</p>
+<p>这正是后续工作（DeepSeek-V3 的 loss-free 均衡偏置、expert-choice 路由）要绕开的软/硬错配，
+也是「辅助损失系数要调小」的真实原因：它压的是概率分布，不是分配结果。</p>
+<h3 id="user-content-85-aux-loss-free-均衡偏置deepseek-v3">8.5 aux-loss-free 均衡偏置（DeepSeek-V3）<a href="#85-aux-loss-free-均衡偏置deepseek-v3" aria-label="Link to heading '8.5 aux-loss-free 均衡偏置（DeepSeek-V3）'" data-heading-content="8.5 aux-loss-free 均衡偏置（DeepSeek-V3）" class="anchor"></a></h3>
+<p>软辅助损失的病根是&quot;软/硬错配&quot;：<code>L_aux</code> 压的是可导的<strong>路由概率</strong> <code>p</code>，而真正决定负载的是
+不可导的<strong>硬路由</strong> argmax。DeepSeek-V3 换了个思路：<strong>不动损失、不动梯度，直接给每个专家加一个
+只用于选路的偏置 <code>b_i</code></strong>。选 Top-K 时看 <code>logits + b</code>，门控权重、<code>L_aux</code>、z-loss 一律仍看原始
+<code>logits</code>——于是偏置既不进梯度也不进损失，均衡&quot;免费&quot;。</p>
+<p><strong>更新规则</strong>（目标负载取平均 <code>Σcount_i / E</code>，按<strong>符号</strong>更新，固定步长 γ）：</p>
+<pre><code class="language-text">target = Σ_i count_i / E
+count_i &gt; target  ⇒  b_i ← b_i − γ      # 过载的专家：压低它的选路得分
+count_i &lt; target  ⇒  b_i ← b_i + γ      # 欠载的专家：抬高它的选路得分
+</code></pre>
+<p>用<strong>符号</strong>而不是按失衡幅度成比例，是因为偏置的职责只是&quot;把负载推平、推平了就停住&quot;；
+按幅度更新会在接近均衡时来回过冲、长期震荡（DeepSeek-V3 用的就是 sign）。</p>
+<p><strong>与 <code>α·L_aux</code> 的对照</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th><code>α·L_aux</code>（软辅助损失）</th>
+<th>aux-loss-free 偏置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>作用对象</td>
+<td>路由<strong>概率</strong> <code>p</code>（可导）</td>
+<td><strong>硬路由</strong> argmax（<code>logits + b</code> 的排序）</td>
+</tr>
+<tr>
+<td>是否进损失 / 梯度</td>
+<td>进，占训练目标里的一项</td>
+<td><strong>不进</strong>，偏置不是可导路径上的任何一环</td>
+</tr>
+<tr>
+<td>代价</td>
+<td>拿主损失做交易（α 要调小）</td>
+<td>免费；但只能压 argmax，管不了概率形状</td>
+</tr>
+<tr>
+<td>与主损失的关系</td>
+<td>会扰动路由器梯度</td>
+<td>完全不碰主损失</td>
+</tr>
+</tbody>
+</table>
+<p><strong>作用前提：<code>logits</code> 必须对 token 有区分度</strong>。偏置改的是 <code>logits + b</code> 的<strong>排序</strong>，所以只有当
+<code>logits</code> 本身随 token 变化时，偏置才可能把不同的 token 分给不同的专家。极端例子是上面的隔离实验
+② 组：路由器权重被清零后所有 token 的 <code>logits</code> 完全相同，argmax 只由偏置决定，于是&quot;赢家&quot;只会
+在专家之间<strong>轮转</strong>、任一时刻的负载仍全压在那 K 个专家上——偏置再推也摊不平（③ 组因此改用
+&quot;权重整体缩小&quot;而不是清零）。</p>
+<p>反过来，把权重<strong>原样留着</strong>也不行：实测 <code>logits</code> 的极差 &gt; 3.0，会盖过 <code>+3.0</code> 的偏置，K = 1 时
+8 个专家里 7 个都能抢到 token，起点根本没塌缩。所以&quot;起点塌缩&quot;与&quot;区分度还在&quot;必须同时成立——
+这也是为什么真实训练里偏置是从 0 开始、伴随训练长期推进的，而不是像 demo 里那样一次摆到塌缩点
+再往回推。</p>
+<p><strong>代码接线</strong>：</p>
+<ul>
+<li><a href="../src/moe.rs"><code>src/moe.rs</code></a> <code>MoELayer</code> 的 <code>bias: Shared&lt;Vec&lt;f32&gt;&gt;</code>（长度 <code>E</code>）、
+<code>bias_balance: bool</code>、<code>bias_lr: f32</code>；<code>forward_with_aux</code> 里&quot;选路用 <code>logits + bias</code> 的副本、
+门控权重仍用原始 <code>logits</code>&quot;那段就是题眼。</li>
+<li><a href="../src/moe.rs"><code>src/moe.rs</code></a> <code>MoELayer::update_balance_bias()</code>：读<strong>最近一次前向</strong>的路由统计
+（<code>RouteStats::counts</code>）按符号推进偏置；未开 <code>moe_bias_balance</code> 或没跑过前向时返回 <code>false</code>
+（空操作）。<code>MoELayer::balance_bias()</code> 是只读诊断入口。</li>
+<li><a href="../src/model.rs"><code>src/model.rs</code></a> <code>Transformer::update_moe_balance_bias()</code>：遍历所有 MoE 层调用。</li>
+<li><a href="../src/train.rs"><code>src/train.rs</code></a>：训练循环在 <code>opt.step()</code> <strong>之后、下一次前向之前</strong>调用
+<code>model.update_moe_balance_bias()</code>（注释标为 <code>8b.</code>）。</li>
+<li>配置：<code>moe_bias_balance</code>（默认 <code>false</code>）/ <code>moe_bias_lr</code>（默认 <code>0.001</code>，DeepSeek-V3 的取值）。</li>
+</ul>
+<p><strong>两个使用约束</strong>：</p>
+<ul>
+<li><strong>必须在 <code>opt.step()</code> 之后、下一次前向（含评估前向）之前调用</strong>：偏置靠的是&quot;上一步实际把 token
+分给了谁&quot;这份统计，而统计只保留最近一次前向；中间夹一次评估前向会把它覆盖成验证集的负载。</li>
+<li><strong>梯度累积下只反映最后一个微批</strong>：每步只前向一次并记录统计，所以偏置看到的是最后那个微批的负载。</li>
+<li>偏置<strong>不参与 checkpoint</strong>：它不在 <code>named_parameters</code> 里（不是被梯度训练的量、也不该进优化器），
+续训时从 0 重新平衡，几百万 token 的语料下可忽略。</li>
+</ul>
+<p><strong>默认路径逐位不变</strong>：<code>moe_bias_balance = false</code>（默认）时 <code>update_balance_bias</code> 是空操作；
+偏置全 0 时&quot;选路看 <code>logits + 0</code>&quot;与直接看 <code>logits</code> 完全等价。单测
+<code>test_balance_bias_is_free_of_params_and_graph</code> 断言：偏置全 0 时，开与不开的参数表、输出、
+梯度<strong>逐位相同</strong>。<code>test_balance_bias_update_direction</code> 验证更新方向（过载 −γ、欠载 +γ），
+<code>test_balance_bias_converges_load_without_gradients</code> 验证&quot;只做前向 + 偏置更新、完全不碰梯度&quot;
+也能把不均衡度显著推平。</p>
+<h3 id="user-content-86-共享专家deepseek-v2v3">8.6 共享专家（DeepSeek-V2/V3）<a href="#86-共享专家deepseek-v2v3" aria-label="Link to heading '8.6 共享专家（DeepSeek-V2/V3）'" data-heading-content="8.6 共享专家（DeepSeek-V2/V3）" class="anchor"></a></h3>
+<p>路由专家有个隐含问题：总有一些<strong>所有 token 都要用的常识</strong>（高频语法、常见搭配），
+如果每个专家都各学一遍，就是在浪费容量。共享专家的做法是：额外放 <code>n_shared</code> 个专家，
+<strong>全部 token 都过它们</strong>，输出以权重 1 与路由部分<strong>并行相加</strong>，且<strong>不参与路由</strong>：</p>
+<pre><code class="language-text">y = Σ_{e ∈ TopK} w_e · Expert_e(x)   +   Σ_{s ∈ shared} SharedExpert_s(x)
+                      ↑ 路由部分（稀疏）              ↑ 共享部分（稠密，每 token 必算）
+</code></pre>
+<ul>
+<li><strong>作用</strong>：让共享专家承接&quot;常识&quot;，路由专家腾出来专心分工，减少专家冗余。</li>
+<li><strong>代价</strong>：这部分参数<strong>没有稀疏性可言</strong>——每 token 都要算，所以它<strong>同时进总参数与激活参数</strong>，
+会按比例吃掉 MoE 省下的 FLOPs、拉低稀疏比（总参数 / 激活参数）。
+用 <a href="../src/moe.rs"><code>src/moe.rs</code></a> 的 <code>SparseStats::shared_params()</code> / <code>param_ratio()</code> 可以精确量化：
+<code>shared_params = n_shared × expert_params</code>，同时计入 <code>total_params()</code> 与 <code>active_params()</code>。</li>
+</ul>
+<p><strong>代码接线</strong>：</p>
+<ul>
+<li><a href="../src/moe.rs"><code>src/moe.rs</code></a> <code>MoELayer::shared_experts: Vec&lt;MLPEnum&gt;</code>，与路由专家同规模
+（DeepSeek-V2 口径：共享专家的中间维 = 路由专家之一倍）；<code>forward_with_aux</code> 第 3b 步把它们的
+输出直接累加到路由输出上（即使路由把某些 token 全丢了，共享专家仍照常贡献——容量只管路由专家）。</li>
+<li>参数命名前缀为 <code>{prefix}.shared_experts.{i}</code>；<code>SparseStats</code> 的 <code>n_shared</code> 字段承载个数。</li>
+<li>配置：<code>moe_shared_experts</code>（默认 <code>0</code> = 不启用，行为与加它之前逐位相同）。</li>
+</ul>
+<p>单测 <code>test_shared_experts_add_parallel_and_count_params</code> 断言：摘掉共享专家后的输出，
+加上共享专家输出之和，恰好等于完整前向（证明是&quot;并行相加&quot;）；且两个共享专家各贡献一个路由专家的
+参数量，<code>param_ratio()</code> 相对纯路由版本下降。</p>
+<h3 id="user-content-87-router-z-loss压-logits-的幅度">8.7 Router z-loss：压 logits 的幅度<a href="#87-router-z-loss压-logits-的幅度" aria-label="Link to heading '8.7 Router z-loss：压 logits 的幅度'" data-heading-content="8.7 Router z-loss：压 logits 的幅度" class="anchor"></a></h3>
+<p>与 <code>L_aux</code> 互补的第二项：<code>L_z = β·mean(logsumexp(logits)²)</code>
+（<code>TransformerConfig.moe_z_loss_coef</code>，默认 0，CLI <code>--z-loss</code>）。</p>
+<ul>
+<li><code>L_aux</code> 压的是<strong>概率</strong>有多平（α），<code>L_z</code> 压的是 <strong>logits 幅度</strong>有多小（β）——
+logits 越大 <code>logsumexp</code> 越大，z-loss 直接罚它；</li>
+<li>数值上走 <code>Tensor::logsumexp_last_dim()</code>（减行 max 稳定化），反向即 <code>g·softmax</code>；</li>
+<li>对 K = 1 重归一化口径尤其有意义：那里主损失给不了路由器梯度，
+z-loss 是不依赖路由结果的额外训练信号（单测 <code>test_z_loss_value_and_router_gradient</code>
+手算对拍数值并断言路由器拿得到非零梯度）；</li>
+<li>与 α 项合并进 <code>forward_with_aux</code> 的第二个返回值，任一为 0 就不加。</li>
+</ul>
+<h3 id="user-content-88-容量因子与-token-dropping">8.8 容量因子与 Token Dropping<a href="#88-容量因子与-token-dropping" aria-label="Link to heading '8.8 容量因子与 Token Dropping'" data-heading-content="8.8 容量因子与 Token Dropping" class="anchor"></a></h3>
+<p><code>capacity = ceil(cf · n·K/E)</code>，超出的分配按 token 顺序<strong>先到先得</strong>地丢弃（Switch 的做法：
+不退而求其次——否则同一 token 的去向会依赖批次里其他 token，路由变得不可预测）。
+实测（每批 512 token，K = 2，平均每专家 128）：</p>
+<pre><code class="language-text">cf = 0     → 每专家容量 不限         丢弃 0/32768 = 0.00% ｜读到 token 的专家 8/8
+cf = 1     → 每专家容量 128        丢弃 9257/32768 = 28.25% ｜读到 token 的专家 8/8
+cf = 1.25  → 每专家容量 160        丢弃 6016/32768 = 18.36% ｜读到 token 的专家 8/8
+cf = 2     → 每专家容量 256        丢弃 1059/32768 = 3.23% ｜读到 token 的专家 8/8
+</code></pre>
+<p><code>cf = 1.0</code> 在偏斜路由上照样丢近 28%——容量按<strong>平均负载</strong>算，而负载根本不均。
+<strong>推理时必须 <code>cf = 0</code></strong>，否则同一句话换个批大小就换个答案（<code>TransformerConfig</code> 默认就是 0）。</p>
+<h3 id="user-content-89-参数--计算量口径">8.9 参数 / 计算量口径<a href="#89-参数--计算量口径" aria-label="Link to heading '8.9 参数 / 计算量口径'" data-heading-content="8.9 参数 / 计算量口径" class="anchor"></a></h3>
+<pre><code class="language-text">每个专家就是一个普通 FFN（SwiGLU 版 3dh+2h+d = 49728 参数，d = 64）
+稠密基线（n_expert=1）实测参数：135488
+E=8   K=2 | 单层 总 398344 / 激活 99976（3.98× / 省 74.9% FLOPs）
+          | 模型 总 832720 / 激活 235984（3.53× / 省 71.7% FLOPs）
+</code></pre>
+<p><code>total = E·expert + router</code>（全部专家驻显存），<code>active = K·expert + router</code>（每 token 只算 K 个）。
+启用共享专家后，<code>total</code> 与 <code>active</code> 都要再加 <code>n_shared × expert</code>——共享部分每 token 必算、不稀疏，
+所以它等量地吃掉&quot;省下的 FLOPs&quot;（<code>SparseStats::shared_params()</code> 单独列出这一项）：
+实测 <code>--shared-experts 2</code> 时单层 <code>总 497800 / 激活 199432</code>（2.50× / 省 59.9%），
+稀疏比从 3.98× 掉到 2.50×——这就是&quot;用稀疏性换质量&quot;的量化形式。
+单层口径 GELU 版 <code>8d²+5d</code>、SwiGLU 版 <code>3dh+2h+d</code>（<code>h = swiglu_hidden(d)</code>）；<code>moe</code> 子命令
+<strong>显式钉死 SwiGLU</strong>（<code>moe_model_full</code> 里写死的 <code>use_swiglu: true</code>），免得默认值一变就静默漂移。
+CLI 里有一处 <code>assert_eq!</code> 把「公式算出的参数」与「建层实测的参数」对账，防止公式随代码漂移。
+<strong>MoE 省的是 FLOPs 不是显存</strong>——卖点是「同样的 FLOPs 预算下能塞进更多参数」。</p>
+<h3 id="user-content-810-接线方式">8.10 接线方式<a href="#810-接线方式" aria-label="Link to heading '8.10 接线方式'" data-heading-content="8.10 接线方式" class="anchor"></a></h3>
+<p><code>TransformerConfig</code> 新增 9 个 MoE 字段（都带 <code>#[serde(default)]</code>，旧 <code>config.json</code> 无需改动）：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>n_expert</code></td>
+<td>1</td>
+<td>专家数；<strong>1 = 稠密 FFN</strong>，行为与加 MoE 之前逐位相同</td>
+</tr>
+<tr>
+<td><code>moe_top_k</code></td>
+<td>1</td>
+<td>Top-K（须 <code>1 ≤ K ≤ E</code>）</td>
+</tr>
+<tr>
+<td><code>moe_capacity_factor</code></td>
+<td>0.0</td>
+<td>容量因子，0 = 不限（推理必须 0）</td>
+</tr>
+<tr>
+<td><code>moe_aux_coef</code></td>
+<td>0.0</td>
+<td>辅助损失系数 α</td>
+</tr>
+<tr>
+<td><code>moe_z_loss_coef</code></td>
+<td>0.0</td>
+<td>router z-loss 系数 β（<code>β·mean(logsumexp(logits)²)</code>）</td>
+</tr>
+<tr>
+<td><code>moe_switch_gate</code></td>
+<td>false</td>
+<td>门控口径（见上表；<code>moe_top_k = 1</code> 时应置 <code>true</code>）</td>
+</tr>
+<tr>
+<td><code>moe_shared_experts</code></td>
+<td>0</td>
+<td>共享专家数 <code>E_s</code>（DeepSeek-V2/V3 式）；0 = 关闭，&gt;0 时每个 token 都过这 <code>E_s</code> 个专家、输出与路由部分并行相加（不参与路由）</td>
+</tr>
+<tr>
+<td><code>moe_bias_balance</code></td>
+<td>false</td>
+<td>aux-loss-free 均衡偏置开关（DeepSeek-V3 式）；true 时选 Top-K 看 <code>logits + b</code>，按 <strong>sign</strong> 以 <code>moe_bias_lr</code> 推进偏置</td>
+</tr>
+<tr>
+<td><code>moe_bias_lr</code></td>
+<td>0.001</td>
+<td>均衡偏置的更新步长 γ，只对 <code>moe_bias_balance = true</code> 生效</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>后三个字段是 DeepSeek-V2/V3 的两项改进，默认值下与加它们之前<strong>逐位相同</strong>——细节见下文
+「aux-loss-free 均衡偏置」与「共享专家」两节。它们也已开成 <code>moe</code> 子命令的命令行开关
+（<code>--shared-experts</code> / <code>--bias-balance</code> / <code>--bias-lr</code>，默认值与上表一致），不必改 <code>config.json</code> 就能做实验。</p>
+</blockquote>
+<p><code>TransformerBlock</code> 的前馈子层是一个 <code>Ffn</code> 枚举（<code>MLPEnum</code> 或 <code>MoELayer</code>）。两者接口一致
+（<code>forward</code> / <code>parameters</code> / <code>named_parameters</code>），所以残差、dropout、GPU 常驻快路全都不用改。
+<code>Transformer::aux_loss()</code> 把各层 <code>L_aux</code> 累加（每层已在 <code>MoELayer</code> 内乘过 α），训练侧用
+<code>scale_grad_only(a, 1/accum)</code> 只缩放梯度、不改数值——与交叉熵在梯度累积下的处理手法一致。
+另有 <code>Transformer::route_stats()</code>（合并各层统计，训练日志用）与 <code>Transformer::set_moe_capacity_factor()</code>。</p>
+<h2 id="user-content-9-运行与验证">9. 运行与验证<a href="#9-运行与验证" aria-label="Link to heading '9. 运行与验证'" data-heading-content="9. 运行与验证" class="anchor"></a></h2>
+<p><code>moe</code> 子命令可以完整跑通本课的四个实验节；参数默认值与 <code>TransformerConfig</code> 的默认<strong>逐位一致</strong>。</p>
+<h3 id="user-content-91-运行方式">9.1 运行方式<a href="#91-运行方式" aria-label="Link to heading '9.1 运行方式'" data-heading-content="9.1 运行方式" class="anchor"></a></h3>
+<pre><code class="language-bash">cargo run --release -- moe                        # 默认 E=8 K=2，端到端 300 步
+cargo run --release -- moe --steps 60             # 快速跑通
+cargo run --release -- moe --experts 4,8,16 --aux-coef 0.01
+cargo run --release -- moe --shared-experts 2 --bias-balance --bias-lr 0.001   # 共享专家 + 偏置臂
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--experts</code></td>
+<td><code>8</code></td>
+<td>专家数网格（逗号分隔，逐个跑对照实验）</td>
+</tr>
+<tr>
+<td><code>--top-k</code></td>
+<td><code>2</code></td>
+<td>每个 token 激活的专家数</td>
+</tr>
+<tr>
+<td><code>--steps</code></td>
+<td><code>300</code></td>
+<td>端到端对照的训练步数</td>
+</tr>
+<tr>
+<td><code>--batch-size</code> / <code>--block-size</code> / <code>--lr</code></td>
+<td><code>8</code> / <code>64</code> / <code>3e-3</code></td>
+<td>训练超参</td>
+</tr>
+<tr>
+<td><code>--n-embd</code> / <code>--n-layer</code></td>
+<td><code>64</code> / <code>2</code></td>
+<td>模型规模</td>
+</tr>
+<tr>
+<td><code>--aux-coef</code></td>
+<td><code>0.01</code></td>
+<td>辅助损失系数 α（对照组固定为 0）</td>
+</tr>
+<tr>
+<td><code>--z-loss</code></td>
+<td><code>0.0</code></td>
+<td>router z-loss 系数 β（0 = 不加）</td>
+</tr>
+<tr>
+<td><code>--capacity-factors</code></td>
+<td><code>0,1.0,1.25,2.0</code></td>
+<td>容量因子扫描（0 = 不限）</td>
+</tr>
+<tr>
+<td><code>--shared-experts</code></td>
+<td><code>0</code></td>
+<td>共享专家数 <code>E_s</code>（对应 <code>model.moe_shared_experts</code>）；作用于第一节口径与第三节端到端</td>
+</tr>
+<tr>
+<td><code>--bias-balance</code></td>
+<td>关</td>
+<td>给第三节<strong>追加</strong>一条 sign 偏置均衡臂（对应 <code>model.moe_bias_balance</code>）；第二节隔离实验恒含该臂</td>
+</tr>
+<tr>
+<td><code>--bias-lr</code></td>
+<td><code>0.001</code></td>
+<td>偏置更新步长 γ（对应 <code>model.moe_bias_lr</code>）；只被偏置臂使用</td>
+</tr>
+<tr>
+<td><code>--seed</code></td>
+<td><code>42</code></td>
+<td>各组共用，保证初始权重逐位一致、可比</td>
+</tr>
+</tbody>
+</table>
+<p>三个新开关的默认值与 <code>TransformerConfig</code> 的默认<strong>逐位一致</strong>，所以不传它们时建出的模型与旧版本完全相同
+（单测 <code>test_moe_switches_default_to_config_defaults</code> 守住这条）。</p>
+<p>输出分四节：① 参数 / 计算量口径；② 负载均衡<strong>三组对照</strong>隔离实验（① 不均衡 vs ② α·L_aux vs ③ sign 偏置）；
+③ 端到端对照（α = 0 vs α &gt; 0，<code>--bias-balance</code> 时再加偏置臂）；④ 容量因子与 Token Dropping。</p>
+<blockquote>
+<p><strong>关于端到端对照的诚实读法</strong>：这个规模（2 层 × 64 维、几十步）下 α = 0 那一份<strong>不会</strong>塌缩——
+随机初始化的路由器在几百步内大体保持对称，路由塌缩是「富者愈富」的<strong>长期</strong>动力学。
+所以第二节才改用隔离实验（把路由器直接摆到塌缩点）。但塌缩的<strong>代价</strong>在任何规模下都一样：
+主损失只关心算得准不准、完全不关心是谁在算，未被选中的专家拿不到任何梯度（等于白占显存），
+而 loss 曲线看不出异常——所以必须有别的东西盯着路由分布。</p>
+</blockquote>
+<h2 id="user-content-10-小结与下一课">10. 小结与下一课<a href="#10-小结与下一课" aria-label="Link to heading '10. 小结与下一课'" data-heading-content="10. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<ul>
+<li>MoE 用&quot;稀疏激活&quot;把参数量与计算量解绑：<code>total = E·expert + router</code> 全部驻显存，<code>active = K·expert + router</code> 才是每 token 实算的</li>
+<li>省的是 <strong>FLOPs 不是显存</strong>——卖点是&quot;同样的 FLOPs 预算下能塞进更多参数&quot;（§8.9）</li>
+<li>负载均衡是 MoE 的核心难点：辅助损失 <code>L_aux</code>、aux-loss-free 偏置、共享专家、router z-loss 都是为了让路由别塌缩</li>
+<li>本课最值钱的两条是<strong>实测</strong>：<code>moe</code> 子命令第二节的&quot;退化解&quot;（α 越大不一定越好）与端到端对照的诚实读法（小规模下 α = 0 不会塌缩，塌缩是长期动力学）</li>
+<li>所有新开关（<code>--shared-experts</code> / <code>--bias-balance</code> / <code>--bias-lr</code>）默认值与旧行为<strong>逐位相同</strong></li>
+</ul>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<blockquote>
+<p>核心内容已全部实现，这里是进阶拓展。</p>
+</blockquote>
+<ol>
+<li><strong>实现 Router</strong>：用 <code>Linear</code> 层实现门控网络，输入 token 向量，输出 Top-K 专家索引和权重。
+—— 已实现：<code>src/moe.rs</code> 的 <code>top_k_gate</code> + <code>MoELayer::router</code>。</li>
+<li><strong>实现 MoE Layer</strong>：将 Router 和 N 个 FFN 组合，实现稀疏前向传播。
+—— 已实现：<code>MoELayer::forward_with_aux</code>（gather → expert → weighted → scatter，逐专家跳过空集）。</li>
+<li><strong>负载均衡实验</strong>：训练一个简单的 MoE-MLP，观察各专家的被选频率，加入辅助损失后观察均衡效果。
+—— 已实现：<code>moe</code> 子命令第二、三节。<strong>注意结论与直觉相反</strong>（见上文「实测到的退化解」）。</li>
+<li><strong>专家分化观察</strong>：在小数据集上训练 MoE，检查不同专家是否学到了不同的模式。
+—— 已实现（路由侧）：<code>RouteStats::imbalance</code> / <code>dropped_ratio</code> / <code>merge_stats</code>，
+<code>moe</code> 子命令的 <code>print_route_report</code> 会逐专家打印被选次数直方图与均衡度。
+进一步的「语义功能分化」（统计每个专家高激活 token 的分布、看是否各管一类模式）仍可自己加。</li>
+</ol>
+<blockquote>
+<p><strong>下一课</strong>：<a href="33-%E9%87%8F%E5%8C%96%E6%8A%80%E6%9C%AF.md">第 33 课 量化技术（Quantization）</a> —— MoE 省的是 FLOPs，下一课换一条更直接的省法——把权重本身的比特数降下来。</p>
+</blockquote>

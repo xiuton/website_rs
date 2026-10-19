@@ -1,0 +1,422 @@
+<h1 id="user-content-第-43-课fp8-低精度训练模拟">第 43 课：FP8 低精度训练（模拟）<a href="#第-43-课fp8-低精度训练模拟" aria-label="Link to heading '第 43 课：FP8 低精度训练（模拟）'" data-heading-content="第 43 课：FP8 低精度训练（模拟）" class="anchor"></a></h1>
+<blockquote>
+<p><strong>本课已落地为可运行代码</strong>：<code>src/fp8.rs</code>（E4M3 / E5M2 编解码 + per-block scale +
+模拟 matmul 往返；单测跑 <code>cargo test fp8</code>，数量以实际输出为准）+ <code>fp8</code> 子命令 + 训练开关 <code>train.fp8</code>。</p>
+<p>⚠️ <strong>必须说清的边界</strong>：本模块是<strong>纯数值模拟</strong>——把张量编成 FP8 的比特再解码回来，
+量&quot;若按 FP8 存，数值会差多少、loss 会变差多少&quot;。它<strong>不带来任何速度或显存收益</strong>：
+本仓库的算子全部跑在 CPU 的 f32 上，编解码反而更慢。真实 FP8 训练的收益来自 GPU 的
+FP8 tensor core（一条 <code>mma</code> 吃 8 位操作数、吞吐是 bf16 的两倍），本仓库没有 FP8 kernel，
+<strong>这份收益一分也拿不到</strong>。请勿把本课的数字当成性能数据。</p>
+<p>与第 33 课的衔接：第 33 课的量化走&quot;整数码 + 缩放因子&quot;（int8/int4，用于<strong>推理</strong>）；
+本课走&quot;浮点码 + 分块缩放&quot;（FP8，用于<strong>训练</strong>）。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>FP8 与 int8 有什么本质区别？为什么训练侧偏爱 FP8？</li>
+<li>E4M3 与 E5M2 各自适合存什么？为什么 E4M3 <strong>没有 Inf</strong>？</li>
+<li>整张矩阵共用一个 scale 会出什么问题？MXFP8 的&quot;每 32 元素一个 scale&quot;是怎么来的？</li>
+<li>权重掉到 8 位，loss 会差多少？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-fp8-不是8-位整数是8-位浮点">2. FP8 不是&quot;8 位整数&quot;，是&quot;8 位浮点&quot;<a href="#2-fp8-不是8-位整数是8-位浮点" aria-label="Link to heading '2. FP8 不是&quot;8 位整数&quot;，是&quot;8 位浮点&quot;'" data-heading-content="2. FP8 不是&quot;8 位整数&quot;，是&quot;8 位浮点&quot;" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th>精度</th>
+<th>每参数字节</th>
+<th>结构</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FP32</td>
+<td>4</td>
+<td>1 符号 + 8 指数 + 23 尾数</td>
+</tr>
+<tr>
+<td>BF16</td>
+<td>2</td>
+<td>1 符号 + 8 指数 + 7 尾数</td>
+</tr>
+<tr>
+<td>FP16</td>
+<td>2</td>
+<td>1 符号 + 5 指数 + 10 尾数</td>
+</tr>
+<tr>
+<td><strong>FP8 (E4M3)</strong></td>
+<td>1</td>
+<td>1 符号 + <strong>4 指数 + 3 尾数</strong></td>
+</tr>
+<tr>
+<td><strong>FP8 (E5M2)</strong></td>
+<td>1</td>
+<td>1 符号 + <strong>5 指数 + 2 尾数</strong></td>
+</tr>
+</tbody>
+</table>
+<p>FP8 沿用浮点的&quot;符号 + 指数 + 尾数&quot;结构，只是把总位宽砍到 8 位。这带来一个对训练
+至关重要的性质：<strong>它是指数定长的浮点，相对精度在很大范围内恒定</strong>（3 位尾数恒给约
+<code>2^-4</code> 的舍入上界），不像 int8 那样&quot;范围一大、精度就一律变粗&quot;。</p>
+<h3 id="user-content-21-两种格式的分工">2.1 两种格式的分工<a href="#21-两种格式的分工" aria-label="Link to heading '2.1 两种格式的分工'" data-heading-content="2.1 两种格式的分工" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>格式</th>
+<th>指数位</th>
+<th>尾数位</th>
+<th>最大值</th>
+<th>最小正规数</th>
+<th>最小非规格化</th>
+<th>Inf 码</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E4M3</td>
+<td>4</td>
+<td>3</td>
+<td>448</td>
+<td>2⁻⁶ ≈ 1.562e-2</td>
+<td>2⁻⁹ ≈ 1.953e-3</td>
+<td><strong>无</strong></td>
+</tr>
+<tr>
+<td>E5M2</td>
+<td>5</td>
+<td>2</td>
+<td>57344</td>
+<td>2⁻¹⁴ ≈ 6.104e-5</td>
+<td>2⁻¹⁶ ≈ 1.526e-5</td>
+<td>有（0x7C）</td>
+</tr>
+</tbody>
+</table>
+<p>分工原则：</p>
+<ul>
+<li><strong>权重 / 激活用 E4M3</strong>：数值集中在 1 附近，范围够用，优先要精度（多一位尾数）。</li>
+<li><strong>梯度用 E5M2</strong>：反向的梯度跨好几个数量级，优先要动态范围（多一位指数）。</li>
+</ul>
+<p><strong>E4M3 没有 Inf 码</strong>是最容易被忽略的特性：它把&quot;指数全 1 + 尾数全 1&quot;这个位置留给了
+NaN，所以<strong>溢出只能饱和到最大值 448</strong>（OCP 规范如此），而不是报 Inf。E5M2 才保留 Inf。</p>
+<h3 id="user-content-22-标准码值对照">2.2 标准码值对照<a href="#22-标准码值对照" aria-label="Link to heading '2.2 标准码值对照'" data-heading-content="2.2 标准码值对照" class="anchor"></a></h3>
+<p><code>cargo run --release -- fp8</code> 第一节打印的代表性数值（与 OCP / NVIDIA 文档一致）：</p>
+<table>
+<thead>
+<tr>
+<th>数值</th>
+<th>E4M3 码</th>
+<th>解码值</th>
+<th>E5M2 码</th>
+<th>解码值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1.0</td>
+<td>0x38</td>
+<td>1.000000</td>
+<td>0x3C</td>
+<td>1.000000</td>
+</tr>
+<tr>
+<td>1.5</td>
+<td>0x3C</td>
+<td>1.500000</td>
+<td>0x3E</td>
+<td>1.500000</td>
+</tr>
+<tr>
+<td>0.1</td>
+<td>0x1D</td>
+<td>0.101562（+1.56%）</td>
+<td>0x2E</td>
+<td>0.093750（−6.25%）</td>
+</tr>
+<tr>
+<td>2⁻⁹</td>
+<td>0x01</td>
+<td>0.001953</td>
+<td>0x18</td>
+<td>0.001953</td>
+</tr>
+<tr>
+<td>448</td>
+<td>0x7E</td>
+<td>448.000000</td>
+<td>0x5F</td>
+<td>448.000000</td>
+</tr>
+<tr>
+<td>57344</td>
+<td><strong>0x7E</strong></td>
+<td><strong>448.000000</strong>（饱和）</td>
+<td>0x7B</td>
+<td>57344.000000</td>
+</tr>
+<tr>
+<td>1e9</td>
+<td><strong>0x7E</strong></td>
+<td><strong>448.000000</strong>（饱和）</td>
+<td><strong>0x7C</strong></td>
+<td><strong>inf</strong></td>
+</tr>
+</tbody>
+</table>
+<p>读法：<code>0.1</code> 在 E4M3 里只能落到 0.1016（3 位尾数就这个精度）；<code>1e9</code> 在两种格式里都
+超范围——E4M3 饱和到 448，E5M2 报 Inf。<strong>同一个数在两种格式下的码完全不同</strong>，
+所以解码必须知道用的是哪种格式。</p>
+<p>实现上舍入用手写的 round-to-nearest-ties-to-even（硬件做浮点舍入用的就是这个规则）：</p>
+<pre><code class="language-rust">fn round_ties_even(v: f32) -&gt; f32 {
+    let f = v.floor();
+    let d = v - f;
+    if d &gt; 0.5 { f + 1.0 }
+    else if d &lt; 0.5 { f }
+    else if (f as i64) % 2 == 0 { f }   // 正好在中间：往偶数靠
+    else { f + 1.0 }
+}
+</code></pre>
+<hr />
+<h2 id="user-content-3-分块缩放让-8-位装下真实分布">3. 分块缩放：让 8 位装下真实分布<a href="#3-分块缩放让-8-位装下真实分布" aria-label="Link to heading '3. 分块缩放：让 8 位装下真实分布'" data-heading-content="3. 分块缩放：让 8 位装下真实分布" class="anchor"></a></h2>
+<h3 id="user-content-31-整张一个-scale-的问题">3.1 整张一个 scale 的问题<a href="#31-整张一个-scale-的问题" aria-label="Link to heading '3.1 整张一个 scale 的问题'" data-heading-content="3.1 整张一个 scale 的问题" class="anchor"></a></h3>
+<p>FP8 的指数是定长的，没有&quot;非规格化到任意小&quot;的余地。如果整张矩阵共用一个 scale：</p>
+<p>$$
+\text{scale} = \frac{\max|x|}{\text{fmt.max()}}, \quad q = \text{encode}(x / \text{scale}), \quad x' = \text{decode}(q) \cdot \text{scale}
+$$</p>
+<p>那么只要有几个离群大的元素，<code>scale</code> 就被撑大，其余小量级的元素全被压进非规格化区间、
+甚至压成 0。</p>
+<h3 id="user-content-32-per-block-scalemicro-scaling">3.2 per-block scale（micro-scaling）<a href="#32-per-block-scalemicro-scaling" aria-label="Link to heading '3.2 per-block scale（micro-scaling）'" data-heading-content="3.2 per-block scale（micro-scaling）" class="anchor"></a></h3>
+<p>解法是 <strong>per-block scale</strong>（也叫 micro-scaling，MXFP8 规定每 32 个元素一个 scale）：</p>
+<pre><code class="language-plaintext">块内：scale = max|x_block| / fmt.max()
+      q     = encode(x / scale)     // 每元素 1 字节
+      x'    = decode(q) * scale
+</code></pre>
+<p>存储开销：32 元素共享一个 f32 scale = 4 字节 / 32 元素 = <strong>1 bit/元素</strong>，
+总位宽 <strong>9 bit</strong>，相比 f32 仍是<strong>约 3.6 倍压缩</strong>。</p>
+<h3 id="user-content-33-实测块大小怎么选">3.3 实测：块大小怎么选<a href="#33-实测块大小怎么选" aria-label="Link to heading '3.3 实测：块大小怎么选'" data-heading-content="3.3 实测：块大小怎么选" class="anchor"></a></h3>
+<p><code>cargo run --release -- fp8</code> 第二节构造了一个&quot;第 1 行尺度 1.0、最后一行 1e-6&quot;的
+合成权重 <code>[256×256]</code>（真实权重不同通道的尺度差异就这么大）：</p>
+<table>
+<thead>
+<tr>
+<th>块大小</th>
+<th>SNR (dB)</th>
+<th>平均绝对误差</th>
+<th>最大绝对误差</th>
+<th>占用（f32 的 %）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>整张</td>
+<td>31.4</td>
+<td>1.344e-3</td>
+<td>1.332e-1</td>
+<td>25.0%</td>
+</tr>
+<tr>
+<td>128</td>
+<td>31.8</td>
+<td>1.292e-3</td>
+<td>1.036e-1</td>
+<td>25.8%</td>
+</tr>
+<tr>
+<td><strong>32</strong></td>
+<td><strong>32.5</strong></td>
+<td><strong>1.200e-3</strong></td>
+<td><strong>9.497e-2</strong></td>
+<td><strong>28.1%</strong></td>
+</tr>
+<tr>
+<td>1</td>
+<td>154.8</td>
+<td>3.082e-10</td>
+<td>1.192e-7</td>
+<td><strong>125.0%</strong></td>
+</tr>
+</tbody>
+</table>
+<p>两个必须一起看的点：</p>
+<ul>
+<li>块越小误差越小，但 scale 的存储开销越大（块 1 时每个元素配一个 f32 scale，
+5 字节/元素，<strong>比 f32 还大</strong>——那不是量化，只是把 f32 换了个地方存）。
+<strong>收益与开销必须一起看，这是量化最容易自欺的地方。</strong></li>
+<li>注意&quot;整张&quot;与&quot;块 32&quot;的 SNR 只差 1.1 dB。因为 FP8 是浮点、相对精度与 scale 基本
+无关；单 scale 的真正代价是把小量级的元素压进非规格化区间直至压成 0，而这在
+<strong>平均</strong>误差里不显眼。要看出差别，得单独统计小量级那半段的相对误差。</li>
+</ul>
+<h3 id="user-content-34-模拟矩阵乘">3.4 模拟矩阵乘<a href="#34-模拟矩阵乘" aria-label="Link to heading '3.4 模拟矩阵乘'" data-heading-content="3.4 模拟矩阵乘" class="anchor"></a></h3>
+<p>操作数先各自往返量化、再相乘（累加仍在 f32）：</p>
+<table>
+<thead>
+<tr>
+<th>格式</th>
+<th>相对 Frobenius 误差</th>
+<th>最大绝对误差</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E4M3</td>
+<td>3.38%</td>
+<td>2.740</td>
+</tr>
+<tr>
+<td>E5M2</td>
+<td>6.73%</td>
+<td>4.632</td>
+</tr>
+</tbody>
+</table>
+<p>E4M3 的误差明显更小（3 位尾数 vs 2 位），代价是动态范围小两个数量级。这正是
+&quot;前向 E4M3 / 反向 E5M2&quot;的由来。</p>
+<hr />
+<h2 id="user-content-4-权重落-fp8-之后loss-差多少">4. 权重落 FP8 之后，loss 差多少<a href="#4-权重落-fp8-之后loss-差多少" aria-label="Link to heading '4. 权重落 FP8 之后，loss 差多少'" data-heading-content="4. 权重落 FP8 之后，loss 差多少" class="anchor"></a></h2>
+<p><code>cargo run --release -- fp8</code> 第三节：训一个小模型（<code>n_embd = 32</code>、<code>n_layer = 2</code>，60064 参数；
+默认 300 步：交叉熵 3.6363 → 0.7696），备份全部参数，然后把同一份权重分别按
+E4M3 / E5M2（+ 分块 32）往返量化，在同一评测集上重算 loss：</p>
+<table>
+<thead>
+<tr>
+<th>权重要求</th>
+<th>验证 CE</th>
+<th>困惑度</th>
+<th>相对变化</th>
+<th>量化张量/元素</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E4M3（+ 分块 32）</td>
+<td>2.8546</td>
+<td>17.368</td>
+<td>+0.07%</td>
+<td>15 / 58560</td>
+</tr>
+<tr>
+<td>E5M2（+ 分块 32）</td>
+<td>2.8689</td>
+<td>17.617</td>
+<td>+0.57%</td>
+<td>15 / 58560</td>
+</tr>
+<tr>
+<td>f32（原始）</td>
+<td>2.8526</td>
+<td>17.333</td>
+<td>0.00%</td>
+<td>0 / 60064</td>
+</tr>
+</tbody>
+</table>
+<p>（步数不同数字会略变；关键是量级——<strong>权重掉到 8 位只让 loss 动了不到 1%</strong>，
+这正是 FP8 训练可行的前提。）</p>
+<p>注意口径：</p>
+<ul>
+<li>这里只量化了<strong>权重</strong>。真实 FP8 训练还要把激活也压到 8 位（前向 E4M3），那是一份额外误差。</li>
+<li>只量化 <code>rank == 2</code> 的矩阵权重：RMSNorm 增益、bias 是一维的，尺度与矩阵权重差几个
+数量级，真实 FP8 训练也把它们留在高精度（bf16/f32）。</li>
+<li>小的相对变化（甚至略微变好）是正常波动——评测集小、量化扰动小；单测里因此断言的是
+<code>|Δ| / before &lt; 5%</code>，而不是&quot;只能变差&quot;。</li>
+</ul>
+<hr />
+<h2 id="user-content-5-本仓库实现要点训练开关-trainfp8">5. 本仓库实现要点：训练开关 <code>train.fp8</code><a href="#5-本仓库实现要点训练开关-trainfp8" aria-label="Link to heading '5. 本仓库实现要点：训练开关 train.fp8'" data-heading-content="5. 本仓库实现要点：训练开关 train.fp8" class="anchor"></a></h2>
+<pre><code class="language-jsonc">{
+  &quot;train&quot;: {
+    &quot;fp8&quot;: true   // 默认 false
+  }
+}
+</code></pre>
+<p>打开后，训练循环在<strong>每步 <code>opt.step()</code> 之后、下次前向之前</strong>，把所有二维权重矩阵按
+E4M3 + 每 32 元素一个 scale 往返量化回写。语义等价于&quot;权重以 FP8 精度存放，梯度与
+优化器状态仍是 f32&quot;。</p>
+<p>格式与块大小固定为模块常量 <code>TRAIN_FORMAT</code> / <code>TRAIN_BLOCK</code>（不做成配置项，
+避免过度配置化）。<strong>再次强调：只做数值模拟，不带来任何加速。</strong></p>
+<h3 id="user-content-代码地图">代码地图<a href="#代码地图" aria-label="Link to heading '代码地图'" data-heading-content="代码地图" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../src/fp8.rs"><code>src/fp8.rs</code></a> <code>Fp8Format</code></td>
+<td>两种格式的位数 / bias / 极值 / 码值规则</td>
+</tr>
+<tr>
+<td><a href="../src/fp8.rs"><code>src/fp8.rs</code></a> <code>encode</code> / <code>decode</code></td>
+<td>单值编解码（含 ties-to-even 舍入、饱和 / Inf / NaN 处理）</td>
+</tr>
+<tr>
+<td><a href="../src/fp8.rs"><code>src/fp8.rs</code></a> <code>Fp8Tensor</code></td>
+<td><code>[n]</code> 码 + <code>[n/block]</code> scale；<code>quantize</code> / <code>dequantize</code> / <code>errors</code> / <code>bytes</code></td>
+</tr>
+<tr>
+<td><a href="../src/fp8.rs"><code>src/fp8.rs</code></a> <code>simulate_matmul</code></td>
+<td>操作数先往返量化再乘</td>
+</tr>
+<tr>
+<td><a href="../src/fp8.rs"><code>src/fp8.rs</code></a> <code>roundtrip_params_in_place</code></td>
+<td>训练侧：原地量化二维权重（一维 norm/bias 保持高精度）</td>
+</tr>
+<tr>
+<td><a href="../src/train.rs"><code>src/train.rs</code></a></td>
+<td><code>train.fp8</code> 开关：每步更新后量化回写</td>
+</tr>
+<tr>
+<td><a href="../src/config.rs"><code>src/config.rs</code></a> <code>TrainConfig::fp8</code></td>
+<td>配置字段（默认 false，<code>#[serde(default)]</code> 兼容旧配置）</td>
+</tr>
+<tr>
+<td><a href="../src/cmd/experiments.rs"><code>src/cmd/experiments.rs</code></a> <code>cmd_fp8</code></td>
+<td><code>fp8</code> 子命令三节实验</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="user-content-6-运行与验证">6. 运行与验证<a href="#6-运行与验证" aria-label="Link to heading '6. 运行与验证'" data-heading-content="6. 运行与验证" class="anchor"></a></h2>
+<p>本课的实测数据在 <code>cargo run --release -- fp8</code> 的三节演示里（标准码值对照 → 分块大小 SNR → 权重落 FP8 后的验证 CE），单测跑 <code>cargo test fp8</code>。</p>
+<h3 id="user-content-常见坑实测踩出来的">常见坑（实测踩出来的）<a href="#常见坑实测踩出来的" aria-label="Link to heading '常见坑（实测踩出来的）'" data-heading-content="常见坑（实测踩出来的）" class="anchor"></a></h3>
+<h4 id="user-content-1-舍入误差让-amax-元素溢出成-inf">1. 舍入误差让 amax 元素溢出成 Inf<a href="#1-舍入误差让-amax-元素溢出成-inf" aria-label="Link to heading '1. 舍入误差让 amax 元素溢出成 Inf'" data-heading-content="1. 舍入误差让 amax 元素溢出成 Inf" class="anchor"></a></h4>
+<p>第一版实现先出现 E5M2 的模拟 matmul 输出 <code>NaN</code>、E5M2 权重量化后验证 CE 变成 NaN。
+根因：<code>scale = amax / max</code> 之后 <code>inv = 1.0 / scale</code> 的舍入误差，会让&quot;恰好等于 amax&quot;
+的那个元素算出来比 <code>max</code> <strong>大一丁点</strong>，E5M2 于是把它编成 Inf——<strong>一个元素溢出就把
+整张张量污染成 inf/NaN</strong>。</p>
+<p>修法是编码前先饱和（真实的 FP8 kernel 也是&quot;先按 amax 定 scale 再饱和&quot;）：</p>
+<pre><code class="language-rust">let lim = fmt.max();
+chunk[k] = encode((data[base + k] * inv).clamp(-lim, lim), fmt);
+</code></pre>
+<p>并补了回归测试 <code>test_block_scale_saturates_instead_of_overflowing_to_inf</code>
+（E4M3/32、E5M2/32、E5M2/7 × 64 轮随机数据，断言全部有限）。</p>
+<h4 id="user-content-2-逐元素相对误差会被近-0-元素放大">2. 逐元素相对误差会被近 0 元素放大<a href="#2-逐元素相对误差会被近-0-元素放大" aria-label="Link to heading '2. 逐元素相对误差会被近 0 元素放大'" data-heading-content="2. 逐元素相对误差会被近 0 元素放大" class="anchor"></a></h4>
+<p><code>test_simulate_matmul_error_is_in_fp8_range</code> 第一版报&quot;单元素相对误差 27295%&quot;。
+原因是输出里有接近 0 的元素，逐元素相对误差被除零放大。改用<strong>相对输出峰值的绝对误差</strong>
+（<code>max_abs &lt; 0.2 × peak</code>）后就是干净的。</p>
+<h4 id="user-content-3-整张-snr-会被大元素主导">3. 整张 SNR 会被大元素主导<a href="#3-整张-snr-会被大元素主导" aria-label="Link to heading '3. 整张 SNR 会被大元素主导'" data-heading-content="3. 整张 SNR 会被大元素主导" class="anchor"></a></h4>
+<p><code>test_per_block_beats_single_scale_on_wide_dynamic_range</code> 第一版失败：单 scale 与
+分块都是 31.8 dB。两个原因：动态范围不够大；以及整张 SNR 被大元素主导，看不出
+小量级被压平。修法是加大动态范围，<strong>并只统计小量级那半段的平均相对误差</strong>。</p>
+<blockquote>
+<p><strong>教训</strong>：量化实验里，&quot;用什么指标&quot;比&quot;跑什么数据&quot;更容易出错。同时用 SNR、
+相对 Frobenius 误差、相对峰值绝对误差三种口径互相印证，才不容易被单一指标骗过去。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-7-小结与下一课">7. 小结与下一课<a href="#7-小结与下一课" aria-label="Link to heading '7. 小结与下一课'" data-heading-content="7. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<p>本课给出的是一份&quot;若按 FP8 存，数值会差多少&quot;的数值基准：权重掉到 8 位只让验证 CE 动了 +0.07%（E4M3 + 分块 32）；但本仓库没有 FP8 kernel，这份收益一分也拿不到。</p>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<ul>
+<li><strong>接真 kernel</strong>：本课留下的是&quot;可对照的数值基准&quot;。要在 GPU 上拿到真收益，需要把
+<code>matmul</code> 换成吃 FP8 操作数的 tensor core kernel（CUDA / Triton 的 <code>float8_e4m3fn</code>），
+并做 per-block scale 的融合。</li>
+<li><strong>延迟缩放（delayed scaling）</strong>：用历史 amax 的滑动统计来定 scale，比&quot;本块现算&quot;更省。</li>
+<li><strong>梯度用 E5M2</strong>：本课只覆盖前向的舍入往返；真实 FP8 训练里反向梯度走 E5M2。</li>
+<li><strong>FP8 与 AMP 共存</strong>：本项目的 <code>train.amp</code>（动态损失缩放）与 <code>train.fp8</code> 相互独立，可同时开。</li>
+</ul>
+<blockquote>
+<p><strong>下一课</strong>：<a href="44-WSD%E5%AD%A6%E4%B9%A0%E7%8E%87%E8%B0%83%E5%BA%A6.md">第 44 课 WSD 学习率调度（warmup-stable-decay）</a> —— 换学习率曲线：WSD（warmup-stable-decay）在同一个 <code>LRScheduler</code> 上加三段式调度。</p>
+</blockquote>

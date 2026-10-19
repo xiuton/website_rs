@@ -1,0 +1,217 @@
+<h1 id="user-content-第-45-课qk-norm--把注意力的-qk-尺度钉死">第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死<a href="#第-45-课qk-norm--把注意力的-qk-尺度钉死" aria-label="Link to heading '第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死'" data-heading-content="第 45 课：QK-Norm —— 把注意力的 Q/K 尺度钉死" class="anchor"></a></h1>
+<blockquote>
+<p><strong>本课已落地为可运行代码</strong>：<a href="../src/attention.rs"><code>src/attention.rs</code></a> 的
+<code>MultiHeadAttention</code>（字段 <code>q_norm</code> / <code>k_norm: Option&lt;RMSNorm&gt;</code> + 辅助方法
+<code>apply_qk_norm</code>）+ 配置开关 <code>model.qk_norm</code>（默认 <code>false</code>）。
+参数量口径在 <a href="../src/scaling.rs"><code>src/scaling.rs</code></a> 的 <code>params_per_layer</code> 里同步（<code>2 × head_dim</code>）。</p>
+<p>与第 21/23 课的衔接：RMSNorm 是第 21 课的主角，GQA 是第 23 课的主角；QK-Norm 把 RMSNorm
+<strong>逐头</strong>用到 Q/K 上，并且与 GQA / MLA 都能组合。</p>
+</blockquote>
+<hr />
+<h2 id="user-content-1-本课要搞懂的问题">1. 本课要搞懂的问题<a href="#1-本课要搞懂的问题" aria-label="Link to heading '1. 本课要搞懂的问题'" data-heading-content="1. 本课要搞懂的问题" class="anchor"></a></h2>
+<ol>
+<li>注意力打分 <code>q·k/√d</code> 的幅度为什么需要约束？它会怎么伤害训练？</li>
+<li>QK-Norm 归一化的到底是哪一维？为什么是 <code>head_dim</code> 而不是 <code>n_embd</code>？</li>
+<li>它加在流水线的哪一步？放在 RoPE 之前还是之后、KV 缓存之前还是之后？</li>
+<li>默认关闭时，为什么能保证与加它之前逐位一致？</li>
+</ol>
+<hr />
+<h2 id="user-content-2-动机不受约束的-logit-幅度">2. 动机：不受约束的 logit 幅度<a href="#2-动机不受约束的-logit-幅度" aria-label="Link to heading '2. 动机：不受约束的 logit 幅度'" data-heading-content="2. 动机：不受约束的 logit 幅度" class="anchor"></a></h2>
+<p>单头注意力的打分是 <code>s = q·k / √head_dim</code>，再做 softmax。问题在于 <strong>Q/K 的尺度没有天然约束</strong>：</p>
+<ul>
+<li>训练中 Q/K 投影的权重会漂移，<code>‖q‖</code>、<code>‖k‖</code> 一起变大或变小；</li>
+<li><code>s</code> 的幅度随之漂移，softmax 被推到<strong>饱和区</strong>——最大项接近 1、其余接近 0，
+反向梯度 <code>∝ p_i(δ − p_j)</code> 趋近 0，这一层&quot;学不动了&quot;；</li>
+<li>这是长训练里&quot;训练到一半突然发散 / 变成平台&quot;最常见的原因之一。</li>
+</ul>
+<p>解法很直接：在 Q/K 进入注意力之前，把每个头的向量归一化到<strong>单位 RMS</strong>，让 <code>s</code> 的尺度
+只由 <code>head_dim</code> 和 <code>gamma</code> 决定，不再随投影权重漂移。Gemma 2 / Chameleon / ViT-22B
+都用它换来了更稳的训练（允许更大学习率、更短 warmup）。</p>
+<hr />
+<h2 id="user-content-3-原理与公式">3. 原理与公式<a href="#3-原理与公式" aria-label="Link to heading '3. 原理与公式'" data-heading-content="3. 原理与公式" class="anchor"></a></h2>
+<p>RMSNorm（第 21 课）对向量 <code>x</code> 做：</p>
+<pre><code class="language-text">RMSNorm(x) = x / sqrt(mean(x²) + eps) · γ
+</code></pre>
+<p>QK-Norm 就是<strong>对每个头的 <code>head_dim</code> 向量</strong>各做一次 RMSNorm：</p>
+<pre><code class="language-text">q_head = RMSNorm(q_head)，   k_head = RMSNorm(k_head)
+</code></pre>
+<p>以 4 头、<code>head_dim = 4</code>、<code>gamma = 1</code> 为例，归一化后每个头的 RMS 恒为 1，且对任意正尺度输入
+都不变（<code>RMSNorm(c·x) = RMSNorm(x)</code>）——这正是它&quot;钉死尺度&quot;的原理。</p>
+<p>GQA 下 Q 有 <code>n_head</code> 个头、K 只有 <code>n_kv_head</code> 个头：Q 侧逐头归一化 <code>n_head</code> 次，
+K 侧逐头归一化 <code>n_kv_head</code> 次，<strong>所有 KV 头共用同一套 <code>gamma</code></strong>（与 Gemma 2 一致——
+它也是每个注意力层一套 QK 归一化）。</p>
+<hr />
+<h2 id="user-content-4-本仓库实现要点">4. 本仓库实现要点<a href="#4-本仓库实现要点" aria-label="Link to heading '4. 本仓库实现要点'" data-heading-content="4. 本仓库实现要点" class="anchor"></a></h2>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../src/attention.rs"><code>src/attention.rs</code></a> <code>MultiHeadAttention::q_norm</code> / <code>k_norm</code></td>
+<td><code>Option&lt;RMSNorm&gt;</code>；<code>Some</code> 时各是一根长度 <strong><code>head_dim</code></strong> 的 <code>gamma</code></td>
+</tr>
+<tr>
+<td><a href="../src/attention.rs"><code>src/attention.rs</code></a> <code>MultiHeadAttention::new</code></td>
+<td>参数 <code>qk_norm: bool</code>；为 <code>true</code> 时在<strong>所有投影之后</strong>构造 <code>RMSNorm::new(head_dim, LN_EPS)</code></td>
+</tr>
+<tr>
+<td><a href="../src/attention.rs"><code>src/attention.rs</code></a> <code>apply_qk_norm(q_or_k, &amp;norm, n_head)</code></td>
+<td>把 <code>[..., n_head·head_dim]</code> 摊成 <code>[rows·n_head, head_dim]</code> → <code>rmsnorm</code> → 还原形状；<code>norm = None</code> 时<strong>原样返回，不产生任何算子</strong></td>
+</tr>
+<tr>
+<td><a href="../src/attention.rs"><code>src/attention.rs</code></a> <code>forward</code></td>
+<td>第 1.5 步：投影之后、RoPE 之前调 <code>apply_qk_norm</code>；之后才做 RoPE、才能进 KV 缓存</td>
+</tr>
+<tr>
+<td><a href="../src/attention.rs"><code>src/attention.rs</code></a> <code>forward_mla</code></td>
+<td>MLA 路径同样在第 3.5 步（升维出 K/V 之后、旋转之前）调 <code>apply_qk_norm</code></td>
+</tr>
+<tr>
+<td><a href="../src/model.rs"><code>src/model.rs</code></a> <code>TransformerConfig::qk_norm</code></td>
+<td>配置字段，默认 <code>false</code></td>
+</tr>
+<tr>
+<td><a href="../src/scaling.rs"><code>src/scaling.rs</code></a> <code>params_per_layer</code></td>
+<td><code>let qk = if cfg.qk_norm { 2 * hd } else { 0 };</code>——每层多 Q、K 两根长度 <code>head_dim</code> 的 <code>gamma</code></td>
+</tr>
+</tbody>
+</table>
+<p>流水线位置（普通路径）：</p>
+<pre><code class="language-text">x ──c_q──▶ q ──QK-Norm──▶ q ──RoPE──▶ q ┐
+x ──c_k──▶ k ──QK-Norm──▶ k ──RoPE──▶ k ┤─▶ KV cache ──▶ attention
+x ──c_v──▶ v ────────────────────────▶ v ┘
+                 ↑
+        归一化在 RoPE 与缓存**之前**
+</code></pre>
+<p>两个位置选择都有理由：</p>
+<ul>
+<li><strong>在 RoPE 之前</strong>：RoPE 是正交变换、不改变向量范数，&quot;旋转前归一化&quot;就等于&quot;旋转后归一化&quot;，
+先做少一次旋转开销。</li>
+<li><strong>在 KV 缓存之前</strong>：缓存里存的仍是&quot;归一化 + 旋转&quot;后的 K，历史复用不受影响——
+逐 token 增量前向与全量重算结果一致（<code>test_qk_norm_incremental_cache_matches_full_recompute</code>）。</li>
+</ul>
+<p>MLA 路径的细节不同：缓存里存的是<strong>未归一化</strong>的 latent，所以归一化每步在&quot;升维出 K/V 之后&quot;
+重做一次，保证 latent 增量与全量重算一致
+（<code>test_qk_norm_with_mla_latent_cache_matches_full_recompute</code>）。</p>
+<h3 id="user-content-默认路径逐位不变">默认路径逐位不变<a href="#默认路径逐位不变" aria-label="Link to heading '默认路径逐位不变'" data-heading-content="默认路径逐位不变" class="anchor"></a></h3>
+<ul>
+<li>默认 <code>qk_norm = false</code>：<code>q_norm</code> / <code>k_norm</code> 都是 <code>None</code>；</li>
+<li><code>apply_qk_norm</code> 在 <code>None</code> 时<strong>直接返回输入张量</strong>，不产生任何算子（只是一次所有权转移）；</li>
+<li><code>RMSNorm</code> 的 <code>gamma</code> 初始化为全 1，<strong>不消耗随机数</strong>；而且 QK-Norm 在所有投影之后才构造，
+所以老路径的随机数顺序一字未动；</li>
+<li>因此老配置（<code>config.json</code> 里没有 <code>qk_norm</code> 字段、serde 取默认 <code>false</code>）训出来的权重与
+加 QK-Norm 之前<strong>逐位一致</strong>。</li>
+</ul>
+<p>单测 <code>test_qk_norm_does_not_change_weight_initialization</code> 直接钉住了这一点：同 seed 下
+<code>c_q/c_k/c_v/c_proj</code> 的权重与偏置逐位相同，多出来的只有每层 Q、K 两个 <code>gamma</code>
+（<code>parameters().len()</code> 从 8 变 10，<code>gamma.numel() == d / n_head</code>）。</p>
+<h3 id="user-content-代码地图">代码地图<a href="#代码地图" aria-label="Link to heading '代码地图'" data-heading-content="代码地图" class="anchor"></a></h3>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../src/attention.rs"><code>src/attention.rs</code></a></td>
+<td><code>q_norm</code> / <code>k_norm</code> 字段、<code>apply_qk_norm</code>、两条前向里的调用点</td>
+</tr>
+<tr>
+<td><a href="../src/model.rs"><code>src/model.rs</code></a></td>
+<td><code>TransformerConfig::qk_norm</code> 字段、常驻快路的绕行条件</td>
+</tr>
+<tr>
+<td><a href="../src/scaling.rs"><code>src/scaling.rs</code></a></td>
+<td><code>params_per_layer</code> 的 <code>2 * hd</code> 参数量口径</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="user-content-5-运行与验证">5. 运行与验证<a href="#5-运行与验证" aria-label="Link to heading '5. 运行与验证'" data-heading-content="5. 运行与验证" class="anchor"></a></h2>
+<pre><code class="language-bash"># QK-Norm 单测（逐头单位 RMS 与尺度不变、不扰动初始化、梯度到 gamma、与增量缓存一致）
+cargo test qk_norm
+
+# 同种子对照：开 QK-Norm 确实改变训练（否则说明开关没接进前向），且 loss 仍有限
+cargo test test_qk_norm_changes_training_same_seed
+</code></pre>
+<p>配置示例：</p>
+<pre><code class="language-jsonc">{
+  &quot;model&quot;: {
+    &quot;qk_norm&quot;: true   // 默认 false；开启后每层多 2 × head_dim 个 gamma
+  }
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>测试</th>
+<th>验证内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_qk_norm_makes_each_head_unit_rms_and_is_scale_invariant</code></td>
+<td>每个头的 RMS 落到 1；输入放大 1000 倍结果不变；<code>None</code> 时逐位原样返回</td>
+</tr>
+<tr>
+<td><code>test_qk_norm_does_not_change_weight_initialization</code></td>
+<td>开启后四个投影权重/偏置与关闭时逐位相同，只多两根 <code>gamma</code>（长度 <code>head_dim</code>）</td>
+</tr>
+<tr>
+<td><code>test_qk_norm_gradients_reach_gamma</code></td>
+<td><code>q_norm.gamma</code> / <code>k_norm.gamma</code> 都拿得到非零梯度（否则归一化学不动）</td>
+</tr>
+<tr>
+<td><code>test_qk_norm_incremental_cache_matches_full_recompute</code></td>
+<td>普通路径下逐 token 增量前向与全量重算一致</td>
+</tr>
+<tr>
+<td><code>test_qk_norm_with_mla_latent_cache_matches_full_recompute</code></td>
+<td>MLA latent 缓存下两条路径仍一致</td>
+</tr>
+<tr>
+<td><code>test_qk_norm_changes_training_same_seed</code></td>
+<td>同种子对照：开了确实改变 loss，且 loss 有限（新参数不破坏训练）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="user-content-常见坑实测踩出来的">常见坑（实测踩出来的）<a href="#常见坑实测踩出来的" aria-label="Link to heading '常见坑（实测踩出来的）'" data-heading-content="常见坑（实测踩出来的）" class="anchor"></a></h3>
+<h4 id="user-content-1-归一化的是-head_dim不是-n_embd">1. 归一化的是 <code>head_dim</code>，不是 <code>n_embd</code><a href="#1-归一化的是-head_dim不是-n_embd" aria-label="Link to heading '1. 归一化的是 head_dim，不是 n_embd'" data-heading-content="1. 归一化的是 head_dim，不是 n_embd" class="anchor"></a></h4>
+<p>QK-Norm 的口径是<strong>每个头内部</strong>的 <code>head_dim</code> 向量，所以 <code>gamma</code> 长度是 <code>head_dim = n_embd / n_head</code>，
+不是 <code>n_embd</code>。实现里必须先把 <code>[B, T, n_head·head_dim]</code> 摊成 <code>[B·T·n_head, head_dim]</code> 再归一化、
+再还原形状（<code>apply_qk_norm</code> 做的就是这个）。</p>
+<p>写成对 <code>n_embd</code> 整体归一化会同时犯两个错：参数形状不对（<code>scaling.rs</code> 里 <code>2 * hd</code> 会对不上），
+以及<strong>跨头</strong>求均值——那会把不同头的信息混在一起，语义完全变了。GQA 下 K 侧尤其容易写错：
+它只有 <code>n_kv_head</code> 个头，但 <code>gamma</code> 仍然只有一套，各 KV 头共用。</p>
+<h4 id="user-content-2-开-qk-norm-会让-gpu-常驻快路失效性能取舍不是数值问题">2. 开 QK-Norm 会让 GPU 常驻快路失效（性能取舍，不是数值问题）<a href="#2-开-qk-norm-会让-gpu-常驻快路失效性能取舍不是数值问题" aria-label="Link to heading '2. 开 QK-Norm 会让 GPU 常驻快路失效（性能取舍，不是数值问题）'" data-heading-content="2. 开 QK-Norm 会让 GPU 常驻快路失效（性能取舍，不是数值问题）" class="anchor"></a></h4>
+<p><a href="../src/model.rs"><code>src/model.rs</code></a> 里判断是否走&quot;GPU 常驻快路&quot;的条件包含 <code>|| self.cfg.qk_norm</code>：</p>
+<pre><code class="language-rust">|| self.cfg.kv_lora_rank &gt; 0
+|| self.cfg.qk_norm      // QK-Norm 让路：内核把 Q/K 投影与 RoPE 融成一段
+</code></pre>
+<p>原因是常驻内核把 Q/K 投影与 RoPE 融成一段，中间插不进&quot;逐头 RMSNorm&quot;这一步。
+<strong>强行走常驻路径会静默丢掉归一化</strong>（前向照跑、数值却与逐算子路径不一致），所以这里直接
+让常驻快路返回 <code>None</code>、退回逐算子路径。代价是开了 QK-Norm 后 GPU 加速吃不到那条快路——
+这是明确的性能取舍，别把它误当成数值 bug。</p>
+<hr />
+<h2 id="user-content-6-小结与下一课">6. 小结与下一课<a href="#6-小结与下一课" aria-label="Link to heading '6. 小结与下一课'" data-heading-content="6. 小结与下一课" class="anchor"></a></h2>
+<h3 id="user-content-本课小结">本课小结<a href="#本课小结" aria-label="Link to heading '本课小结'" data-heading-content="本课小结" class="anchor"></a></h3>
+<p>QK-Norm 把每个头的 <code>head_dim</code> 向量归一化到单位 RMS，让注意力 logit 的尺度只由 <code>head_dim</code> 与 <code>gamma</code> 决定；默认关闭时参数表与前向逐位不变。</p>
+<h3 id="user-content-拓展方向">拓展方向<a href="#拓展方向" aria-label="Link to heading '拓展方向'" data-heading-content="拓展方向" class="anchor"></a></h3>
+<ul>
+<li><strong>与 warmup 的关系</strong>：QK-Norm 的卖点之一是&quot;允许更短 warmup、更大学习率&quot;，
+可以做一个&quot;开/关 QK-Norm × 不同 warmup 长度&quot;的对照，看谁在短 warmup 下先发散。</li>
+<li><strong>可学习 vs 不可学习缩放</strong>：本实现是标准 RMSNorm（<code>gamma</code> 可学习、初始化全 1）；
+也可以试&quot;归一化后乘一个固定温度 <code>τ</code>&quot;的变体，显式调 logit 温度。</li>
+<li><strong>只归一化一侧</strong>：本实现 Q、K 两侧都归一化；也可以只归一化 Q（参数减半）看稳定性差多少。</li>
+<li><strong>与 MLA 组合</strong>：见 <code>test_qk_norm_with_mla_latent_cache_matches_full_recompute</code>，
+两者正交、可同时开启。</li>
+</ul>
+<blockquote>
+<p><strong>下一课</strong>：<a href="46-Muon%E4%BC%98%E5%8C%96%E5%99%A8.md">第 46 课 Muon 优化器</a> —— 换优化器：Muon 用 Newton–Schulz 正交化动量矩阵。</p>
+</blockquote>

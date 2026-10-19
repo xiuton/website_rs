@@ -25,54 +25,22 @@
     <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"BlogPosting","headline":"Java学习笔记","description":"旧文档归档","url":"https://ganto.me/post/20230301","datePublished":"2023-03-01","dateModified":"2023-03-01","inLanguage":"zh-CN","image":"https://ganto.me/static/images/og-image.png","author":{"@type":"Person","name":"干徒"},"keywords":"Old","publisher":{"@type":"Organization","name":"干徒的博客","url":"https://ganto.me/"}}
     </script>
-    <link rel="stylesheet" href="/styles-c3674ec134f9a612.css">
-<link rel="modulepreload" href="/web-rs-ed78e9ed78fe0ba6.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/common.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/src/js/eval.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-cli-config-24e80746d3c500cd/inline0.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-web-bf44d47c344f35d0/inline1.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/hydrate.js" crossorigin="anonymous">
-<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-53424282ea002554/src/js/patch_console.js" crossorigin="anonymous">
-<link rel="preload" href="/web-rs-ed78e9ed78fe0ba6_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm">
+    <link rel="stylesheet" href="/styles-7299efb8f2a4d60.css">
+<link rel="modulepreload" href="/web-rs-4b7fc77d2e4f841a.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-web-eae67878b22d6805/inline0.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-cli-config-74c4aa43f52789a0/inline0.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/inline0.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/hydrate.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/patch_console.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/set_attribute.js" crossorigin="anonymous">
+<link rel="modulepreload" href="/snippets/dioxus-web-eae67878b22d6805/src/js/eval.js" crossorigin="anonymous">
+<link rel="preload" href="/web-rs-4b7fc77d2e4f841a_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm">
 
     <style>
-:root {
-            --bg-base: #f8f4ed;
-            --bg-elevated: #fdfbf7;
-            --bg-subtle: #f0ebe0;
-            --text-primary: #3e3327;
-            --text-secondary: #7a6c5a;
-            --text-tertiary: #a49480;
-            --border-default: #e0d6c5;
-            --border-subtle: #ede4d5;
-            --accent: #6a9b50;
-            --accent-rgb: 106, 155, 80;
-            --accent-soft: rgba(106, 155, 80, 0.1);
-            --radius-sm: 6px;
-            --radius-md: 10px;
-            --radius-lg: 14px;
-            --radius-full: 999px;
-        }
-.dark {
-            --bg-base: #1b1612;
-            --bg-elevated: #241e19;
-            --bg-subtle: #2d2620;
-            --text-primary: #ede4d6;
-            --text-secondary: #b0a290;
-            --text-tertiary: #7d7060;
-            --border-default: #3a3229;
-            --border-subtle: #2a241f;
-            --accent: #78b860;
-            --accent-rgb: 120, 184, 96;
-            --accent-soft: rgba(120, 184, 96, 0.12);
-        }
+.dark .skeleton-nav-item { color: rgba(176, 162, 144, 0.4); }
 
     </style>
     <style>
-        .prerender-article { max-width: 760px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
-        .prerender-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 0.5rem; }
         .theme-toggle .icon-sun { display: none; }
         .dark .theme-toggle .icon-sun { display: inline; }
         .dark .theme-toggle .icon-moon { display: none; }
@@ -98,52 +66,9 @@
     </script>
 </head>
 <body>
-    <div id="main">
-        <div class="app">
-<div class="navbar-content">
-    <div class="navbar-ui">
-        <div class="navbar-title-wrapper">
-            <h1 class="navbar-title">干徒</h1>
-            <div class="navbar-glow"></div>
-        </div>
-        <div class="navbar-subtitle">这很酷</div>
-    </div>
-</div>
-<div class="navbar-sticky-wrap">
-    <div class="navbar-links">
-        <a class="nav-link nav-active" href="/">首页</a>
-        <a class="nav-link" href="/about">关于</a>
-        <a class="nav-link" href="/tags">书签</a>
-        <a class="nav-link" href="/search">搜索</a>
-        <a class="nav-link" href="/knowledge-graph">图谱</a>
-        <a class="nav-link" href="/ai-summary">AI摘要</a>
-        <div class="nav-item-with-sub">
-            <a class="nav-link" href="/dev">开发</a>
-            <div class="nav-submenu">
-                <a class="nav-sub-link" href="/circle-generator">圆形生成器</a>
-            </div>
-        </div>
-        <a class="nav-icon-btn rss-toggle" href="/rss" title="RSS 订阅" aria-label="RSS 订阅">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"/></svg>
-        </a>
-        <button class="nav-icon-btn theme-toggle" id="prerender-theme-toggle" aria-label="切换主题" title="切换主题">
-            <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
-            <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="16" height="16" fill="currentColor"><path d="M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"/></svg>
-        </button>
-    </div>
-</div>
-        <main class="main-content">
-            <article class="blog-post prerender-article">
-                <h1>Java学习笔记</h1>
-                <div class="prerender-meta">
-                    <span>2023-03-01</span>
-                    <span>干徒</span>
-                </div>
-                <div class="blog-tags"><span class="blog-tag">Old</span></div>
-                <div class="blog-content">
-<h1><a href="#基础" aria-hidden="true" class="anchor" id="user-content-基础"></a>基础👇</h1>
-<h1><a href="#简单java类" aria-hidden="true" class="anchor" id="user-content-简单java类"></a>简单Java类</h1>
-<h3><a href="#第一种开发要求" aria-hidden="true" class="anchor" id="user-content-第一种开发要求"></a>第一种开发要求</h3>
+    <div id="main"><div class="app"><div class="navbar-content"><div class="navbar-ui"><div class="navbar-title-wrapper"><h1 class="navbar-title">干徒</h1><div class="navbar-glow"></div></div><div class="navbar-subtitle">这很酷</div></div></div><div class="navbar-sticky-wrap"><div class="navbar-links"><a href="/" class="nav-link nav-active">首页</a><a href="/about" class="nav-link">关于</a><a href="/tags" class="nav-link">书签</a><a href="/search" class="nav-link">搜索</a><a href="/knowledge-graph" class="nav-link">图谱</a><a href="/ai-summary" class="nav-link">AI摘要</a><div class="nav-item-with-sub"><a href="/dev" class="nav-link">开发</a><button class="nav-sub-trigger"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5 L5 6.5 L8 3.5"></path></svg></button></div><a href="/playground" class="nav-link">操场</a><a href="/test" class="nav-link">测试</a><a href="/rss" class="nav-icon-btn rss-toggle" title="RSS 订阅"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27zm0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93z"></path></svg></a><button class="nav-icon-btn theme-toggle"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"></path></svg></button></div></div><main class="main-content" id="main-content"><div class="blog-container"><article class="blog-post" aria-label="文章：Java学习笔记"><div class="blog-title-wrapper"><div class="blog-title"><h2>Java学习笔记</h2><span class="blog-category">old-docs</span></div><div class="blog-meta"><span class="blog-date">2023-03-01 01:21:00</span><span class="blog-author">干徒</span></div></div><div class="blog-content"><div><h1 id="user-content-基础">基础👇<a href="#基础" aria-label="Link to heading '基础👇'" data-heading-content="基础👇" class="anchor"></a></h1>
+<h1 id="user-content-简单java类">简单Java类<a href="#简单java类" aria-label="Link to heading '简单Java类'" data-heading-content="简单Java类" class="anchor"></a></h1>
+<h3 id="user-content-第一种开发要求">第一种开发要求<a href="#第一种开发要求" aria-label="Link to heading '第一种开发要求'" data-heading-content="第一种开发要求" class="anchor"></a></h3>
 <ul>
 <li>类名称必须存在有意义，例如：Book、Emp；</li>
 <li>类之中所有的属性必须private封装，封装后的属性必须提供有setter、getter方法；</li>
@@ -151,7 +76,7 @@
 <li>类之中不允许出现任何的输出语句，所有的信息输出必须交给被调用处输出；</li>
 <li>类之中需要提供有一个取得对象完整信息的方法，暂定为：getInfo()，而且返回String型数据；</li>
 </ul>
-<h3><a href="#范例" aria-hidden="true" class="anchor" id="user-content-范例"></a>范例</h3>
+<h3 id="user-content-范例">范例<a href="#范例" aria-label="Link to heading '范例'" data-heading-content="范例" class="anchor"></a></h3>
 <pre><code class="language-java">class Emp{ // 定义一个有意义的类
 
     // 用private封装
@@ -222,8 +147,8 @@ public class Demo{
 }
 
 </code></pre>
-<h1><a href="#数组的定义与使用" aria-hidden="true" class="anchor" id="user-content-数组的定义与使用"></a>数组的定义与使用</h1>
-<h3><a href="#数组的基本概念" aria-hidden="true" class="anchor" id="user-content-数组的基本概念"></a>数组的基本概念</h3>
+<h1 id="user-content-数组的定义与使用">数组的定义与使用<a href="#数组的定义与使用" aria-label="Link to heading '数组的定义与使用'" data-heading-content="数组的定义与使用" class="anchor"></a></h1>
+<h3 id="user-content-数组的基本概念">数组的基本概念<a href="#数组的基本概念" aria-label="Link to heading '数组的基本概念'" data-heading-content="数组的基本概念" class="anchor"></a></h3>
 <ul>
 <li>
 <p>声明并开辟数组：</p>
@@ -242,7 +167,7 @@ public class Demo{
 </ul>
 </li>
 </ul>
-<h3><a href="#定义数组" aria-hidden="true" class="anchor" id="user-content-定义数组"></a>定义数组</h3>
+<h3 id="user-content-定义数组">定义数组<a href="#定义数组" aria-label="Link to heading '定义数组'" data-heading-content="定义数组" class="anchor"></a></h3>
 <pre><code class="language-java">public class Demo{
     public static void main(String args[]){
         // 声明并开辟了一个三个长度的数组
@@ -278,7 +203,7 @@ public class Demo{
 </ul>
 </li>
 </ul>
-<h3><a href="#定义数组-1" aria-hidden="true" class="anchor" id="user-content-定义数组-1"></a>定义数组</h3>
+<h3 id="user-content-定义数组-1">定义数组<a href="#定义数组-1" aria-label="Link to heading '定义数组'" data-heading-content="定义数组" class="anchor"></a></h3>
 <pre><code class="language-java">public class Demo{
     public static void main(String args[]){
         int data[] = new int[]{1,2,3,4,5};
@@ -289,13 +214,13 @@ public class Demo{
 }
 
 </code></pre>
-<h1><a href="#二维数组" aria-hidden="true" class="anchor" id="user-content-二维数组"></a>二维数组</h1>
-<h3><a href="#语法" aria-hidden="true" class="anchor" id="user-content-语法"></a>语法</h3>
+<h1 id="user-content-二维数组">二维数组<a href="#二维数组" aria-label="Link to heading '二维数组'" data-heading-content="二维数组" class="anchor"></a></h1>
+<h3 id="user-content-语法">语法<a href="#语法" aria-label="Link to heading '语法'" data-heading-content="语法" class="anchor"></a></h3>
 <pre><code class="language-java">动态初始化：数据类型 数组名称[][] = new 数据类型[行的个数][列的个数];
 静态初始化：数据类型 数组名称[][] = new 数据类型[][]{{值,值,值,...},{值,值,值,...}};
 
 </code></pre>
-<h3><a href="#范例-1" aria-hidden="true" class="anchor" id="user-content-范例-1"></a>范例</h3>
+<h3 id="user-content-范例-1">范例<a href="#范例-1" aria-label="Link to heading '范例'" data-heading-content="范例" class="anchor"></a></h3>
 <pre><code class="language-java">public class Demo{
     public static void main(String args[]){
         int data[][] = new int[][]{
@@ -313,8 +238,8 @@ public class Demo{
 }
 
 </code></pre>
-<h1><a href="#数组与方法参数的传递" aria-hidden="true" class="anchor" id="user-content-数组与方法参数的传递"></a>数组与方法参数的传递</h1>
-<h3><a href="#范例一个数组传递的程序" aria-hidden="true" class="anchor" id="user-content-范例一个数组传递的程序"></a>范例：一个数组传递的程序</h3>
+<h1 id="user-content-数组与方法参数的传递">数组与方法参数的传递<a href="#数组与方法参数的传递" aria-label="Link to heading '数组与方法参数的传递'" data-heading-content="数组与方法参数的传递" class="anchor"></a></h1>
+<h3 id="user-content-范例一个数组传递的程序">范例：一个数组传递的程序<a href="#范例一个数组传递的程序" aria-label="Link to heading '范例：一个数组传递的程序'" data-heading-content="范例：一个数组传递的程序" class="anchor"></a></h3>
 <pre><code class="language-java">public class Demo{
     public static void main(String args[]){
         int data[] = new int[]{1,2,3};
@@ -331,7 +256,7 @@ public class Demo{
 }
 
 </code></pre>
-<h3><a href="#实现一个数组排序" aria-hidden="true" class="anchor" id="user-content-实现一个数组排序"></a>实现一个数组排序</h3>
+<h3 id="user-content-实现一个数组排序">实现一个数组排序<a href="#实现一个数组排序" aria-label="Link to heading '实现一个数组排序'" data-heading-content="实现一个数组排序" class="anchor"></a></h3>
 <pre><code class="language-java">public class Demo{
     public static void main(String args[]){
         int data[] = new int[]{2,1,9,0,5,4,3,7,6,8};
@@ -346,8 +271,8 @@ public class Demo{
 }
 
 </code></pre>
-<h1><a href="#方法" aria-hidden="true" class="anchor" id="user-content-方法"></a>方法</h1>
-<h2><a href="#重载" aria-hidden="true" class="anchor" id="user-content-重载"></a>重载</h2>
+<h1 id="user-content-方法">方法<a href="#方法" aria-label="Link to heading '方法'" data-heading-content="方法" class="anchor"></a></h1>
+<h2 id="user-content-重载">重载<a href="#重载" aria-label="Link to heading '重载'" data-heading-content="重载" class="anchor"></a></h2>
 <p>方法重载又被称为：overload</p>
 <p>在同一个类中，方法名相同，参数列表（参数数量、参数类型、参数顺序）不同，就是方法重载。</p>
 <pre><code class="language-java">// 参数数量不同
@@ -407,7 +332,7 @@ public class Hello
 }
 
 </code></pre>
-<h2><a href="#封装" aria-hidden="true" class="anchor" id="user-content-封装"></a>封装</h2>
+<h2 id="user-content-封装">封装<a href="#封装" aria-label="Link to heading '封装'" data-heading-content="封装" class="anchor"></a></h2>
 <ul>
 <li>所有属性私有化，使用<code>private</code>关键字斤西瓜修饰，private表示私有的，修饰的所有数据只能在本类中访问。</li>
 <li>对外提供简单的操作入口，也就是说以后外部程序想要访问age属性，必须通过这些简单的入口进行访问。</li>
@@ -451,7 +376,7 @@ public class Main {
 }
 
 </code></pre>
-<h3><a href="#构造方法" aria-hidden="true" class="anchor" id="user-content-构造方法"></a>构造方法</h3>
+<h3 id="user-content-构造方法">构造方法<a href="#构造方法" aria-label="Link to heading '构造方法'" data-heading-content="构造方法" class="anchor"></a></h3>
 <ul>
 <li>构造方法又被称作构造函数、构造器、Constructor</li>
 <li>构造方法的语法结构：<code>修饰符列表 构造方法名(形参列表){构造方法体};</code></li>
@@ -478,12 +403,12 @@ public class User {
 }
 
 </code></pre>
-<h3><a href="#this关键字" aria-hidden="true" class="anchor" id="user-content-this关键字"></a>this关键字</h3>
+<h3 id="user-content-this关键字">this关键字<a href="#this关键字" aria-label="Link to heading 'this关键字'" data-heading-content="this关键字" class="anchor"></a></h3>
 <p>实例化对象的对象中才有this：<code>User u = new User();</code></p>
-<h3><a href="#static关键字" aria-hidden="true" class="anchor" id="user-content-static关键字"></a>static关键字</h3>
+<h3 id="user-content-static关键字">static关键字<a href="#static关键字" aria-label="Link to heading 'static关键字'" data-heading-content="static关键字" class="anchor"></a></h3>
 <p>通过static关键字声明的方法，通过<code>类名.方法名</code>进行调用</p>
 <p>没有通过static关键字声明的方法，通过<code>引用.方法名</code>进行调用</p>
-<h2><a href="#继承" aria-hidden="true" class="anchor" id="user-content-继承"></a>继承</h2>
+<h2 id="user-content-继承">继承<a href="#继承" aria-label="Link to heading '继承'" data-heading-content="继承" class="anchor"></a></h2>
 <p>(1) Java是一门面向对象的编程语言，有三大特性：封装、继承、多态</p>
 <p>(2) 继承基本的作用是：代码复用。但是继承最重要的作用是：有了继承才有了以后方法的覆盖和多态机制</p>
 <p>(3) 继承的语法格式：</p>
@@ -507,9 +432,9 @@ public class User {
 <p>A extends T {}</p>
 <p>其中C类直接继承B类，但是C类间接继承B类、T类</p>
 <p>(8) java语言中假设一个类没有显示继承任何自定义类，则该类默认继承JavaSE库中提供的java.lang.Object类。</p>
-<h3><a href="#方法重写" aria-hidden="true" class="anchor" id="user-content-方法重写"></a>方法重写</h3>
+<h3 id="user-content-方法重写">方法重写<a href="#方法重写" aria-label="Link to heading '方法重写'" data-heading-content="方法重写" class="anchor"></a></h3>
 <p>当父类中的方法已经不能满足子类中的需求了，就需要在子类中将继承过来的方法进行重写/覆盖。</p>
-<h2><a href="#多态" aria-hidden="true" class="anchor" id="user-content-多态"></a>多态</h2>
+<h2 id="user-content-多态">多态<a href="#多态" aria-label="Link to heading '多态'" data-heading-content="多态" class="anchor"></a></h2>
 <p>关于多态中涉及到的几个概念：</p>
 <ul>
 <li>
@@ -625,7 +550,7 @@ public class Test {
 }
 
 </code></pre>
-<h3><a href="#多态作用" aria-hidden="true" class="anchor" id="user-content-多态作用"></a>多态作用</h3>
+<h3 id="user-content-多态作用">多态作用<a href="#多态作用" aria-label="Link to heading '多态作用'" data-heading-content="多态作用" class="anchor"></a></h3>
 <p>多态的作用：面向抽象编程，尽量不要面向具体编程。</p>
 <blockquote>
 <p>降低程序的耦合度，提高程序的扩展力。</p>
@@ -700,7 +625,7 @@ public class Test {
 }
 
 </code></pre>
-<h2><a href="#final关键字" aria-hidden="true" class="anchor" id="user-content-final关键字"></a>final关键字</h2>
+<h2 id="user-content-final关键字">final关键字<a href="#final关键字" aria-label="Link to heading 'final关键字'" data-heading-content="final关键字" class="anchor"></a></h2>
 <p>1、final是一个关键字，表示最终的，不可变的</p>
 <p>2、final修饰的类无法被继承</p>
 <p>3、final修饰的方法无法被覆盖</p>
@@ -728,7 +653,7 @@ class Chinese{
 }
 
 </code></pre>
-<h1><a href="#package和import" aria-hidden="true" class="anchor" id="user-content-package和import"></a>package和import</h1>
+<h1 id="user-content-package和import">package和import<a href="#package和import" aria-label="Link to heading 'package和import'" data-heading-content="package和import" class="anchor"></a></h1>
 <p>关于java语言中的包机制：</p>
 <p>1、包又称为package，java中引入package这种语法机制只要是为了方便程序的管理。不同功能的类被分门别类放到不同的软件包当中，查找比较方便，管理比较方便，以维护。</p>
 <p>2、怎么定义package呢？</p>
@@ -776,7 +701,7 @@ public class Test {
 
 </code></pre>
 <p>import需要写在package之下class之上。</p>
-<h1><a href="#访问控制权限" aria-hidden="true" class="anchor" id="user-content-访问控制权限"></a>访问控制权限</h1>
+<h1 id="user-content-访问控制权限">访问控制权限<a href="#访问控制权限" aria-label="Link to heading '访问控制权限'" data-heading-content="访问控制权限" class="anchor"></a></h1>
 <p>1、访问控制权限修饰符来控制元素的访问范围。</p>
 <p>2、访问控制权限修饰符包括：</p>
 <table>
@@ -810,9 +735,9 @@ public class Test {
 <p>4、当某个数据希望子类使用，使用protected进行修饰。</p>
 <p>5、修饰符的权限关系：<code>private &lt; 缺省 &lt; protected &lt; public</code></p>
 <p>6、类、接口只能采用public和缺省(default)的修饰符进行修饰。（内部类除外）</p>
-<h1><a href="#基础-1" aria-hidden="true" class="anchor" id="user-content-基础-1"></a>基础👆</h1>
-<h1><a href="#-----------------------------------" aria-hidden="true" class="anchor" id="user-content------------------------------------"></a>-----------------------------------</h1>
-<h1><a href="#进阶" aria-hidden="true" class="anchor" id="user-content-进阶"></a>进阶👇</h1>
+<h1 id="user-content-基础-1">基础👆<a href="#基础-1" aria-label="Link to heading '基础👆'" data-heading-content="基础👆" class="anchor"></a></h1>
+<h1 id="user-content------------------------------------">-----------------------------------<a href="#-----------------------------------" aria-label="Link to heading '-----------------------------------'" data-heading-content="-----------------------------------" class="anchor"></a></h1>
+<h1 id="user-content-进阶">进阶👇<a href="#进阶" aria-label="Link to heading '进阶👇'" data-heading-content="进阶👇" class="anchor"></a></h1>
 <p>汽车例子：</p>
 <pre><code class="language-java">package com.ganto.www;
 
@@ -902,7 +827,7 @@ class Vehicle {
 }
 
 </code></pre>
-<h1><a href="#抽象类" aria-hidden="true" class="anchor" id="user-content-抽象类"></a>抽象类</h1>
+<h1 id="user-content-抽象类">抽象类<a href="#抽象类" aria-label="Link to heading '抽象类'" data-heading-content="抽象类" class="anchor"></a></h1>
 <blockquote>
 <p>类到对象是实例化；对象到类是抽象。</p>
 <p>抽象类：</p>
@@ -944,8 +869,8 @@ class CreditAccount extends Account{
 }
 
 </code></pre>
-<h1><a href="#接口" aria-hidden="true" class="anchor" id="user-content-接口"></a>接口</h1>
-<h2><a href="#接口中的基础语法" aria-hidden="true" class="anchor" id="user-content-接口中的基础语法"></a>接口中的基础语法</h2>
+<h1 id="user-content-接口">接口<a href="#接口" aria-label="Link to heading '接口'" data-heading-content="接口" class="anchor"></a></h1>
+<h2 id="user-content-接口中的基础语法">接口中的基础语法<a href="#接口中的基础语法" aria-label="Link to heading '接口中的基础语法'" data-heading-content="接口中的基础语法" class="anchor"></a></h2>
 <blockquote>
 <p>1、接口也是一种引用数据类型。编译之后也是一个class字节码文件。</p>
 <p>2、接口是完全抽象的。抽象类是半抽象的。或者说接口是特殊的抽象类。</p>
@@ -1083,7 +1008,7 @@ class Cat extends Animal implements Flyable{
 }
 
 </code></pre>
-<h2><a href="#接口在开发中的作用" aria-hidden="true" class="anchor" id="user-content-接口在开发中的作用"></a>接口在开发中的作用</h2>
+<h2 id="user-content-接口在开发中的作用">接口在开发中的作用<a href="#接口在开发中的作用" aria-label="Link to heading '接口在开发中的作用'" data-heading-content="接口在开发中的作用" class="anchor"></a></h2>
 <blockquote>
 <p>接口在开发中的作用，类似于多态在开发中的作用。</p>
 </blockquote>
@@ -1179,25 +1104,25 @@ public class Test {
 }
 
 </code></pre>
-<h1><a href="#is-ahas-alike-a类型与类型之间的关系" aria-hidden="true" class="anchor" id="user-content-is-ahas-alike-a类型与类型之间的关系"></a>is a、has a、like a类型与类型之间的关系</h1>
-<h2><a href="#is-a" aria-hidden="true" class="anchor" id="user-content-is-a"></a>is a</h2>
+<h1 id="user-content-is-ahas-alike-a类型与类型之间的关系">is a、has a、like a类型与类型之间的关系<a href="#is-ahas-alike-a类型与类型之间的关系" aria-label="Link to heading 'is a、has a、like a类型与类型之间的关系'" data-heading-content="is a、has a、like a类型与类型之间的关系" class="anchor"></a></h1>
+<h2 id="user-content-is-a">is a<a href="#is-a" aria-label="Link to heading 'is a'" data-heading-content="is a" class="anchor"></a></h2>
 <p>Cat is a Animal（猫是一个动物），凡是能满足is a的，表示“继承关系”</p>
 <pre><code class="language-css">A extends B
 
 </code></pre>
-<h2><a href="#has-a" aria-hidden="true" class="anchor" id="user-content-has-a"></a>has a</h2>
+<h2 id="user-content-has-a">has a<a href="#has-a" aria-label="Link to heading 'has a'" data-heading-content="has a" class="anchor"></a></h2>
 <p>I has a Pen（我有一支笔），凡是能满足has a关系的，表示“关联关系”，关联关系通常以“属性”的形式存在。</p>
 <pre><code class="language-css">A{
 	B b;
 }
 
 </code></pre>
-<h2><a href="#like-a" aria-hidden="true" class="anchor" id="user-content-like-a"></a>like a</h2>
+<h2 id="user-content-like-a">like a<a href="#like-a" aria-label="Link to heading 'like a'" data-heading-content="like a" class="anchor"></a></h2>
 <p>Cooker like a FoodMenu（厨师像一个菜单一样），凡是能满足like a关系的，表示“实现关系”，实现关系通常是：类实现接口。</p>
 <pre><code class="language-css">A implements B
 
 </code></pre>
-<h1><a href="#抽象类和接口有什么区别" aria-hidden="true" class="anchor" id="user-content-抽象类和接口有什么区别"></a>抽象类和接口有什么区别？</h1>
+<h1 id="user-content-抽象类和接口有什么区别">抽象类和接口有什么区别？<a href="#抽象类和接口有什么区别" aria-label="Link to heading '抽象类和接口有什么区别？'" data-heading-content="抽象类和接口有什么区别？" class="anchor"></a></h1>
 <p>在这里我们只说一下抽象类和接口在语法上的区别。</p>
 <p>至于以后抽象类和接口应该怎么进行选择，通过后面的项目去体会/学习。</p>
 <blockquote>
@@ -1221,7 +1146,7 @@ public class Test {
 </blockquote>
 <p>以后接口使用的比抽象类多。一般抽象类使用的比较少。</p>
 <p>接口一般都是对“行为”的抽象。</p>
-<h1><a href="#scanner" aria-hidden="true" class="anchor" id="user-content-scanner"></a>Scanner</h1>
+<h1 id="user-content-scanner">Scanner<a href="#scanner" aria-label="Link to heading 'Scanner'" data-heading-content="Scanner" class="anchor"></a></h1>
 <p>输入内容</p>
 <pre><code class="language-java">java.util.*;
 public class Test {
@@ -1234,7 +1159,7 @@ public class Test {
 
 </code></pre>
 <p><code>java.lang.*</code>这个包是Java默认自动导入的，如String、System等 都是java.lang包下的模块。</p>
-<h1><a href="#object类" aria-hidden="true" class="anchor" id="user-content-object类"></a>Object类</h1>
+<h1 id="user-content-object类">Object类<a href="#object类" aria-label="Link to heading 'Object类'" data-heading-content="Object类" class="anchor"></a></h1>
 <p>JDK类库中的根类：Object</p>
 <p>1、这个老祖宗类中的方法我们需要先研究一下，因为这些方法都是所有子类通用的。任何一个类默认继承Object。就算没有直接继承，最终也会间接继承。</p>
 <p>2、Object类中有哪些常用的方法？</p>
@@ -1249,7 +1174,7 @@ public class Test {
 <li>String toString() // 将对象转换成字符串形式</li>
 <li>protected void finalize() // 垃圾回收器负责调用的方法</li>
 </ul>
-<h2><a href="#关于object类中的tostring方法" aria-hidden="true" class="anchor" id="user-content-关于object类中的tostring方法"></a>关于Object类中的toString()方法</h2>
+<h2 id="user-content-关于object类中的tostring方法">关于Object类中的toString()方法<a href="#关于object类中的tostring方法" aria-label="Link to heading '关于Object类中的toString()方法'" data-heading-content="关于Object类中的toString()方法" class="anchor"></a></h2>
 <p>1、源代码</p>
 <pre><code class="language-java">public String toString() {
   	return getClass().getName() + &quot;@&quot; + Integer.toHexString(hashCode());
@@ -1287,7 +1212,7 @@ class MyTime {
 
 </code></pre>
 <p>如上代码，如果直接打印对象，会自动调用实例化对象类中的toString()方法。</p>
-<h2><a href="#关于object类中的equals方法" aria-hidden="true" class="anchor" id="user-content-关于object类中的equals方法"></a>关于Object类中的equals()方法</h2>
+<h2 id="user-content-关于object类中的equals方法">关于Object类中的equals()方法<a href="#关于object类中的equals方法" aria-label="Link to heading '关于Object类中的equals()方法'" data-heading-content="关于Object类中的equals()方法" class="anchor"></a></h2>
 <p>1、源代码</p>
 <pre><code class="language-java">public boolean equals(Object obj) {
 	return(this == obj);
@@ -1338,7 +1263,7 @@ class MyTime {
 
 </code></pre>
 <p>以上的equals()方法是IDEA生成的，感觉写的很好。</p>
-<h2><a href="#javalangstring源码中重写了tostringequals方法" aria-hidden="true" class="anchor" id="user-content-javalangstring源码中重写了tostringequals方法"></a>java.lang.String源码中重写了toString、equals方法</h2>
+<h2 id="user-content-javalangstring源码中重写了tostringequals方法">java.lang.String源码中重写了toString、equals方法<a href="#javalangstring源码中重写了tostringequals方法" aria-label="Link to heading 'java.lang.String源码中重写了toString、equals方法'" data-heading-content="java.lang.String源码中重写了toString、equals方法" class="anchor"></a></h2>
 <p>java中的字符串java.lang.String类中也重写了toString方法和equals方法。</p>
 <pre><code class="language-java">package com.ganto.www;
 
@@ -1368,7 +1293,7 @@ public class Test {
 <li>java中的所有的引用数据类型统一使用<code>equals()</code>方法来判断是否相等。</li>
 </ul>
 </blockquote>
-<h2><a href="#finalize方法-看看了解就好新版本被弃用了" aria-hidden="true" class="anchor" id="user-content-finalize方法-看看了解就好新版本被弃用了"></a>finalize()方法 （看看了解就好，新版本被弃用了）</h2>
+<h2 id="user-content-finalize方法-看看了解就好新版本被弃用了">finalize()方法 （看看了解就好，新版本被弃用了）<a href="#finalize方法-看看了解就好新版本被弃用了" aria-label="Link to heading 'finalize()方法 （看看了解就好，新版本被弃用了）'" data-heading-content="finalize()方法 （看看了解就好，新版本被弃用了）" class="anchor"></a></h2>
 <p>1、这个方法是protected修饰的，在Object类中的源代码：</p>
 <pre><code class="language-java">protected void finalize() throws Throwable{ }
 
@@ -1422,7 +1347,7 @@ class Person {
 }
 
 </code></pre>
-<h2><a href="#hashcode方法" aria-hidden="true" class="anchor" id="user-content-hashcode方法"></a>hashCode方法</h2>
+<h2 id="user-content-hashcode方法">hashCode方法<a href="#hashcode方法" aria-label="Link to heading 'hashCode方法'" data-heading-content="hashCode方法" class="anchor"></a></h2>
 <p>在Object中的hashCode方法是<code>public native int hashCode();</code>，这个方法不是抽象方法，带有native关键字，底层调用C++程序。</p>
 <p>hashCode()方法返回的是哈希码/哈希值：实际上就是一个java对象的内存地址，经过哈希算法，得出的一个值。所以hashCode()方法的执行结果可以等同看做一个java对象的内存地址。</p>
 <pre><code class="language-java">package org.example;
@@ -1442,7 +1367,7 @@ class myClass{
 }
 
 </code></pre>
-<h1><a href="#内部类" aria-hidden="true" class="anchor" id="user-content-内部类"></a>内部类</h1>
+<h1 id="user-content-内部类">内部类<a href="#内部类" aria-label="Link to heading '内部类'" data-heading-content="内部类" class="anchor"></a></h1>
 <p>1、内部类：在类的内部又定义了一个新的类。被称为内部类。</p>
 <p>2、内部类的分类：</p>
 <ul>
@@ -1536,7 +1461,7 @@ class MyMath {
 }
 
 </code></pre>
-<h1><a href="#数组" aria-hidden="true" class="anchor" id="user-content-数组"></a>数组</h1>
+<h1 id="user-content-数组">数组<a href="#数组" aria-label="Link to heading '数组'" data-heading-content="数组" class="anchor"></a></h1>
 <p>1、Java中的数组是一种引用数据类型，不属于基本数据类型。数组的父类是Object。</p>
 <p>2、数组实际上是一个容器，可以同时容纳多个元素。</p>
 <p>3、数组当中可以存储“基本数据类型”的数据，也可以存储“引用数据类型”的数据。</p>
@@ -1549,7 +1474,7 @@ class MyMath {
 <p>10、数组在内存方面存储的时候，数组中的元素内存地址（存储的每一个元素都是有规则的挨着排列的）是连续的。内存地址连续这是数组存储元素的特点/特色。数组实际上是一种简单的数据结构。</p>
 <p>11、所有的数组都是用第一个元素的内存地址当作整个数组对象的内存地址</p>
 <p>12、数组中每一个元素都有下标，下标从0开始，以1递增。最后一个元素的下标为length-1</p>
-<h2><a href="#定义数组-2" aria-hidden="true" class="anchor" id="user-content-定义数组-2"></a>定义数组</h2>
+<h2 id="user-content-定义数组-2">定义数组<a href="#定义数组-2" aria-label="Link to heading '定义数组'" data-heading-content="定义数组" class="anchor"></a></h2>
 <pre><code class="language-java">int[] arr1;
 double[] arr2;
 boolean[] arr3;
@@ -1557,13 +1482,13 @@ String[] arr4;
 Object[] arr5;
 
 </code></pre>
-<h2><a href="#初始化数组" aria-hidden="true" class="anchor" id="user-content-初始化数组"></a>初始化数组</h2>
-<h3><a href="#静态初始化一维数组" aria-hidden="true" class="anchor" id="user-content-静态初始化一维数组"></a>静态初始化一维数组</h3>
+<h2 id="user-content-初始化数组">初始化数组<a href="#初始化数组" aria-label="Link to heading '初始化数组'" data-heading-content="初始化数组" class="anchor"></a></h2>
+<h3 id="user-content-静态初始化一维数组">静态初始化一维数组<a href="#静态初始化一维数组" aria-label="Link to heading '静态初始化一维数组'" data-heading-content="静态初始化一维数组" class="anchor"></a></h3>
 <pre><code class="language-java">int[] arr = {1,2,3,4};
 int[] arr1 = new int[]{1,2,3,4};
 
 </code></pre>
-<h3><a href="#动态初始化一维数组" aria-hidden="true" class="anchor" id="user-content-动态初始化一维数组"></a>动态初始化一维数组</h3>
+<h3 id="user-content-动态初始化一维数组">动态初始化一维数组<a href="#动态初始化一维数组" aria-label="Link to heading '动态初始化一维数组'" data-heading-content="动态初始化一维数组" class="anchor"></a></h3>
 <pre><code class="language-java">int[] arr = new int[5]; // 这里的5表示数组的元素个数，初始化一个5个长度int类型的数组，每个元素默认为0
 
 String[] names = new String[3]; // 初始化一个3个长度String类型的数组，每个元素默认为null
@@ -1630,7 +1555,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#main方法上面的string-args有什么用" aria-hidden="true" class="anchor" id="user-content-main方法上面的string-args有什么用"></a>main方法上面的String[] args有什么用？</h2>
+<h2 id="user-content-main方法上面的string-args有什么用">main方法上面的String[] args有什么用？<a href="#main方法上面的string-args有什么用" aria-label="Link to heading 'main方法上面的String[] args有什么用？'" data-heading-content="main方法上面的String[] args有什么用？" class="anchor"></a></h2>
 <p>通过命令行执行java程序</p>
 <pre><code class="language-sh">javac *.java
 java Main admin admin
@@ -1660,7 +1585,7 @@ public class Main {
 
 </code></pre>
 <p>IDEA通过点击run-Edit Configurations-Program arguments配置参数</p>
-<h2><a href="#数组中存储引用数据类型" aria-hidden="true" class="anchor" id="user-content-数组中存储引用数据类型"></a>数组中存储引用数据类型</h2>
+<h2 id="user-content-数组中存储引用数据类型">数组中存储引用数据类型<a href="#数组中存储引用数据类型" aria-label="Link to heading '数组中存储引用数据类型'" data-heading-content="数组中存储引用数据类型" class="anchor"></a></h2>
 <pre><code class="language-java">package org.example;
 
 public class Main {
@@ -1689,9 +1614,9 @@ class Cat extends Animal {
 }
 
 </code></pre>
-<h2><a href="#数组扩容" aria-hidden="true" class="anchor" id="user-content-数组扩容"></a>数组扩容</h2>
+<h2 id="user-content-数组扩容">数组扩容<a href="#数组扩容" aria-label="Link to heading '数组扩容'" data-heading-content="数组扩容" class="anchor"></a></h2>
 <p>在Java开发中，数组长度一旦确定不可变，那么数组满了，就需要对数组进行扩容。Java中的数组扩容是先新建一个大容量的数组，然后将小容量数组中的数据一个一个拷贝到大数组当中。</p>
-<h3><a href="#数组拷贝" aria-hidden="true" class="anchor" id="user-content-数组拷贝"></a>数组拷贝</h3>
+<h3 id="user-content-数组拷贝">数组拷贝<a href="#数组拷贝" aria-label="Link to heading '数组拷贝'" data-heading-content="数组拷贝" class="anchor"></a></h3>
 <p>System.arraycopy()</p>
 <pre><code class="language-java">package org.example;
 
@@ -1706,9 +1631,9 @@ public class Main {
 
 
 </code></pre>
-<h2><a href="#二维数组-1" aria-hidden="true" class="anchor" id="user-content-二维数组-1"></a>二维数组</h2>
+<h2 id="user-content-二维数组-1">二维数组<a href="#二维数组-1" aria-label="Link to heading '二维数组'" data-heading-content="二维数组" class="anchor"></a></h2>
 <p>二维数组是特殊的一维数组，特殊在这个一维数组当中的每一个元素是一个一维数组。</p>
-<h3><a href="#二维数组静态初始化" aria-hidden="true" class="anchor" id="user-content-二维数组静态初始化"></a>二维数组静态初始化</h3>
+<h3 id="user-content-二维数组静态初始化">二维数组静态初始化<a href="#二维数组静态初始化" aria-label="Link to heading '二维数组静态初始化'" data-heading-content="二维数组静态初始化" class="anchor"></a></h3>
 <pre><code class="language-java">package org.example;
 
 public class Main {
@@ -1724,7 +1649,7 @@ public class Main {
 }
 
 </code></pre>
-<h3><a href="#二维数组动态初始化" aria-hidden="true" class="anchor" id="user-content-二维数组动态初始化"></a>二维数组动态初始化</h3>
+<h3 id="user-content-二维数组动态初始化">二维数组动态初始化<a href="#二维数组动态初始化" aria-label="Link to heading '二维数组动态初始化'" data-heading-content="二维数组动态初始化" class="anchor"></a></h3>
 <pre><code class="language-java">package org.example;
 
 public class Main {
@@ -1769,8 +1694,8 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#作业" aria-hidden="true" class="anchor" id="user-content-作业"></a>作业</h2>
-<h3><a href="#使用一维数组模拟栈数据结构" aria-hidden="true" class="anchor" id="user-content-使用一维数组模拟栈数据结构"></a>使用一维数组，模拟栈数据结构</h3>
+<h2 id="user-content-作业">作业<a href="#作业" aria-label="Link to heading '作业'" data-heading-content="作业" class="anchor"></a></h2>
+<h3 id="user-content-使用一维数组模拟栈数据结构">使用一维数组，模拟栈数据结构<a href="#使用一维数组模拟栈数据结构" aria-label="Link to heading '使用一维数组，模拟栈数据结构'" data-heading-content="使用一维数组，模拟栈数据结构" class="anchor"></a></h3>
 <p><strong>要求：</strong></p>
 <p>1、这个栈可以存储Java中的任何引用类型的数据。</p>
 <p>2、在栈中提供push方法模拟压栈。（栈满了，要有提示信息）</p>
@@ -1853,7 +1778,7 @@ class Animal {
 }
 
 </code></pre>
-<h3><a href="#酒店" aria-hidden="true" class="anchor" id="user-content-酒店"></a>酒店</h3>
+<h3 id="user-content-酒店">酒店<a href="#酒店" aria-label="Link to heading '酒店'" data-heading-content="酒店" class="anchor"></a></h3>
 <p>酒店管理系统，模拟订房、退房、打印所有房间状态。</p>
 <p>1、该系统的用户是：酒店前台。</p>
 <p>2、酒店使用一个二位数组来模拟。<code>Room[][] romms</code></p>
@@ -2064,7 +1989,7 @@ public class HotelMgtSystem {
 }
 
 </code></pre>
-<h2><a href="#冒泡排序算法排序算法" aria-hidden="true" class="anchor" id="user-content-冒泡排序算法排序算法"></a>冒泡排序算法（排序算法）</h2>
+<h2 id="user-content-冒泡排序算法排序算法">冒泡排序算法（排序算法）<a href="#冒泡排序算法排序算法" aria-label="Link to heading '冒泡排序算法（排序算法）'" data-heading-content="冒泡排序算法（排序算法）" class="anchor"></a></h2>
 <pre><code class="language-java">package org.example;
 
 /**
@@ -2115,7 +2040,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#选择排序算法排序算法" aria-hidden="true" class="anchor" id="user-content-选择排序算法排序算法"></a>选择排序算法（排序算法）</h2>
+<h2 id="user-content-选择排序算法排序算法">选择排序算法（排序算法）<a href="#选择排序算法排序算法" aria-label="Link to heading '选择排序算法（排序算法）'" data-heading-content="选择排序算法（排序算法）" class="anchor"></a></h2>
 <pre><code class="language-java">package org.example;
 
 /**
@@ -2142,7 +2067,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#二分法查找查找算法" aria-hidden="true" class="anchor" id="user-content-二分法查找查找算法"></a>二分法查找（查找算法）</h2>
+<h2 id="user-content-二分法查找查找算法">二分法查找（查找算法）<a href="#二分法查找查找算法" aria-label="Link to heading '二分法查找（查找算法）'" data-heading-content="二分法查找（查找算法）" class="anchor"></a></h2>
 <p>二分法查找是建立在排序过后的数据上，才可以使用的算法。</p>
 <pre><code class="language-java">package org.example;
 
@@ -2174,7 +2099,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#arrays工具类" aria-hidden="true" class="anchor" id="user-content-arrays工具类"></a>Arrays工具类</h2>
+<h2 id="user-content-arrays工具类">Arrays工具类<a href="#arrays工具类" aria-label="Link to heading 'Arrays工具类'" data-heading-content="Arrays工具类" class="anchor"></a></h2>
 <p>即：java.util.Arrays工具类</p>
 <p>Arrays.sort()</p>
 <pre><code class="language-java">package org.example;
@@ -2192,8 +2117,8 @@ public class Main {
 }
 
 </code></pre>
-<h1><a href="#常用类" aria-hidden="true" class="anchor" id="user-content-常用类"></a>常用类</h1>
-<h2><a href="#string" aria-hidden="true" class="anchor" id="user-content-string"></a>String</h2>
+<h1 id="user-content-常用类">常用类<a href="#常用类" aria-label="Link to heading '常用类'" data-heading-content="常用类" class="anchor"></a></h1>
+<h2 id="user-content-string">String<a href="#string" aria-label="Link to heading 'String'" data-heading-content="String" class="anchor"></a></h2>
 <p>1、String表示字符串类型，属于引用数据类型，不属于基本数据类型</p>
 <p>2、在Java中随便使用双引号括起来的都是String对象。</p>
 <p>3、Java中规定，双引号括起来的字符串，是不可变的。</p>
@@ -2219,7 +2144,7 @@ public class Main {
 <p>以上代码证明，字符串之间的比较不能使用<code>==</code>，使用equals比较保险，因为String比较特殊，使用简易的方式定义 和 使用对象的方式定义 情况有所不同，简易方式定义是栈内存直接保存方法区常量池中的值的内存地址；而对象方式定义是堆内存保存方法区常量池中的值的内存地址，然后栈内存保存堆内存的内存地址。</p>
 <p>==String类中的equals()方法是官方已经重写过的，所以不需要再重写，可以直接使用。</p>
 </blockquote>
-<h3><a href="#string类中的构造方法" aria-hidden="true" class="anchor" id="user-content-string类中的构造方法"></a>String类中的构造方法</h3>
+<h3 id="user-content-string类中的构造方法">String类中的构造方法<a href="#string类中的构造方法" aria-label="Link to heading 'String类中的构造方法'" data-heading-content="String类中的构造方法" class="anchor"></a></h3>
 <p>将byte数组中的元素全部转换成字符串</p>
 <p>将byte数组中的一部分元素转换成字符串 第二个参数是从哪个下标开始 第三个参数是元素长度</p>
 <pre><code class="language-java">package org.example;
@@ -2256,9 +2181,9 @@ public class Main {
 }
 
 </code></pre>
-<p><img src="images%5CJava%5CString%E4%B8%AD%E7%9A%84%E6%9E%84%E9%80%A0%E6%96%B9%E6%B3%95.png" alt="" /></p>
-<h3><a href="#string类中的常用方法" aria-hidden="true" class="anchor" id="user-content-string类中的常用方法"></a>String类中的常用方法</h3>
-<h4><a href="#1char-charatint-index" aria-hidden="true" class="anchor" id="user-content-1char-charatint-index"></a>1、char charAt(int index)</h4>
+<p><img loading="lazy" src="images%5CJava%5CString%E4%B8%AD%E7%9A%84%E6%9E%84%E9%80%A0%E6%96%B9%E6%B3%95.png" alt="" /></p>
+<h3 id="user-content-string类中的常用方法">String类中的常用方法<a href="#string类中的常用方法" aria-label="Link to heading 'String类中的常用方法'" data-heading-content="String类中的常用方法" class="anchor"></a></h3>
+<h4 id="user-content-1char-charatint-index">1、char charAt(int index)<a href="#1char-charatint-index" aria-label="Link to heading '1、char charAt(int index)'" data-heading-content="1、char charAt(int index)" class="anchor"></a></h4>
 <p><strong>返回某个下标的字符</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2271,7 +2196,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#2int-comparetostring-anotherstring" aria-hidden="true" class="anchor" id="user-content-2int-comparetostring-anotherstring"></a>2、int compareTo(String anotherString)</h4>
+<h4 id="user-content-2int-comparetostring-anotherstring">2、int compareTo(String anotherString)<a href="#2int-comparetostring-anotherstring" aria-label="Link to heading '2、int compareTo(String anotherString)'" data-heading-content="2、int compareTo(String anotherString)" class="anchor"></a></h4>
 <p><strong>两个字符串按照字典的顺序进行比较</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2287,7 +2212,7 @@ public class Main {
 <blockquote>
 <p>比较规则是，相同下标的字符先进行比较，从下标零开始，如果没有比较出大小，则继续下标加一进行比较，比较出来大小后，则返回比较相同下标的两个字符的字典顺序的相减的值。</p>
 </blockquote>
-<h4><a href="#3boolean-contains" aria-hidden="true" class="anchor" id="user-content-3boolean-contains"></a>3、boolean contains</h4>
+<h4 id="user-content-3boolean-contains">3、boolean contains<a href="#3boolean-contains" aria-label="Link to heading '3、boolean contains'" data-heading-content="3、boolean contains" class="anchor"></a></h4>
 <p><strong>判断前面的内容是否包含后面的内容，返回Boolean值</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2298,7 +2223,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#4boolean-endswithstring-suffix" aria-hidden="true" class="anchor" id="user-content-4boolean-endswithstring-suffix"></a>4、boolean endsWith(String suffix)</h4>
+<h4 id="user-content-4boolean-endswithstring-suffix">4、boolean endsWith(String suffix)<a href="#4boolean-endswithstring-suffix" aria-label="Link to heading '4、boolean endsWith(String suffix)'" data-heading-content="4、boolean endsWith(String suffix)" class="anchor"></a></h4>
 <p><strong>判断当前字符串是否以某个字符串结尾</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2309,7 +2234,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#5boolean-equalsobject-anobject" aria-hidden="true" class="anchor" id="user-content-5boolean-equalsobject-anobject"></a>5、boolean equals(Object anObject)</h4>
+<h4 id="user-content-5boolean-equalsobject-anobject">5、boolean equals(Object anObject)<a href="#5boolean-equalsobject-anobject" aria-label="Link to heading '5、boolean equals(Object anObject)'" data-heading-content="5、boolean equals(Object anObject)" class="anchor"></a></h4>
 <p><strong>比较两个字符串必须使用equals方法，不能使用<code>==</code></strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2320,7 +2245,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#6boolean-equalsignorecasestring-anotherstring" aria-hidden="true" class="anchor" id="user-content-6boolean-equalsignorecasestring-anotherstring"></a>6、boolean equalsIgnoreCase(String anotherString)</h4>
+<h4 id="user-content-6boolean-equalsignorecasestring-anotherstring">6、boolean equalsIgnoreCase(String anotherString)<a href="#6boolean-equalsignorecasestring-anotherstring" aria-label="Link to heading '6、boolean equalsIgnoreCase(String anotherString)'" data-heading-content="6、boolean equalsIgnoreCase(String anotherString)" class="anchor"></a></h4>
 <p><strong>判断两个字符串是否相等，并且同时忽略大小写</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2331,7 +2256,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#7byte-getbytes" aria-hidden="true" class="anchor" id="user-content-7byte-getbytes"></a>7、byte[] getBytes()</h4>
+<h4 id="user-content-7byte-getbytes">7、byte[] getBytes()<a href="#7byte-getbytes" aria-label="Link to heading '7、byte[] getBytes()'" data-heading-content="7、byte[] getBytes()" class="anchor"></a></h4>
 <p><strong>将字符串对象转换成字节数组</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2345,7 +2270,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#8int-indexofstring-str" aria-hidden="true" class="anchor" id="user-content-8int-indexofstring-str"></a>8、int indexOf(String str)</h4>
+<h4 id="user-content-8int-indexofstring-str">8、int indexOf(String str)<a href="#8int-indexofstring-str" aria-label="Link to heading '8、int indexOf(String str)'" data-heading-content="8、int indexOf(String str)" class="anchor"></a></h4>
 <p><strong>判断某个子字符串在当前字符串中第一次出现处的索引，如果没有该子字符串则返回<code>-1</code></strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2357,7 +2282,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#9boolean-isempty" aria-hidden="true" class="anchor" id="user-content-9boolean-isempty"></a>9、boolean isEmpty()</h4>
+<h4 id="user-content-9boolean-isempty">9、boolean isEmpty()<a href="#9boolean-isempty" aria-label="Link to heading '9、boolean isEmpty()'" data-heading-content="9、boolean isEmpty()" class="anchor"></a></h4>
 <p><strong>判断某个字符串是否为空</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2369,7 +2294,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#10int-length" aria-hidden="true" class="anchor" id="user-content-10int-length"></a>10、int length()</h4>
+<h4 id="user-content-10int-length">10、int length()<a href="#10int-length" aria-label="Link to heading '10、int length()'" data-heading-content="10、int length()" class="anchor"></a></h4>
 <p><strong>返回字符串的长度</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2380,7 +2305,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#11int-lastindexofstring-str" aria-hidden="true" class="anchor" id="user-content-11int-lastindexofstring-str"></a>11、int lastIndexOf(String str)</h4>
+<h4 id="user-content-11int-lastindexofstring-str">11、int lastIndexOf(String str)<a href="#11int-lastindexofstring-str" aria-label="Link to heading '11、int lastIndexOf(String str)'" data-heading-content="11、int lastIndexOf(String str)" class="anchor"></a></h4>
 <p><strong>判断某个子字符串在当前字符串中最后一次出现的索引</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2391,7 +2316,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#12string-replacecharsequence-target-charsequence-replacement" aria-hidden="true" class="anchor" id="user-content-12string-replacecharsequence-target-charsequence-replacement"></a>12、String replace(CharSequence target, CharSequence replacement)</h4>
+<h4 id="user-content-12string-replacecharsequence-target-charsequence-replacement">12、String replace(CharSequence target, CharSequence replacement)<a href="#12string-replacecharsequence-target-charsequence-replacement" aria-label="Link to heading '12、String replace(CharSequence target, CharSequence replacement)'" data-heading-content="12、String replace(CharSequence target, CharSequence replacement)" class="anchor"></a></h4>
 <p><strong>String的父接口就是CharSequence；将字符串中的某个子字符串进行替换操作</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2403,7 +2328,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#13string-splitstring-regex" aria-hidden="true" class="anchor" id="user-content-13string-splitstring-regex"></a>13、String[] split(String regex)</h4>
+<h4 id="user-content-13string-splitstring-regex">13、String[] split(String regex)<a href="#13string-splitstring-regex" aria-label="Link to heading '13、String[] split(String regex)'" data-heading-content="13、String[] split(String regex)" class="anchor"></a></h4>
 <p><strong>以某个字符或者字符串进行拆分字符串成字符串数组</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2417,7 +2342,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#14boolean-startswithstring-prefix" aria-hidden="true" class="anchor" id="user-content-14boolean-startswithstring-prefix"></a>14、boolean startsWith(String prefix)</h4>
+<h4 id="user-content-14boolean-startswithstring-prefix">14、boolean startsWith(String prefix)<a href="#14boolean-startswithstring-prefix" aria-label="Link to heading '14、boolean startsWith(String prefix)'" data-heading-content="14、boolean startsWith(String prefix)" class="anchor"></a></h4>
 <p><strong>判断某个字符串是否以某个子字符串开始</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2428,7 +2353,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#15string-substringint-beginindex" aria-hidden="true" class="anchor" id="user-content-15string-substringint-beginindex"></a>15、String substring(int beginIndex)</h4>
+<h4 id="user-content-15string-substringint-beginindex">15、String substring(int beginIndex)<a href="#15string-substringint-beginindex" aria-label="Link to heading '15、String substring(int beginIndex)'" data-heading-content="15、String substring(int beginIndex)" class="anchor"></a></h4>
 <p><strong>截取字符串，参数为起始下标（包含），截取到最后</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2439,7 +2364,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#16string-substringint-beginindex-int-endindex" aria-hidden="true" class="anchor" id="user-content-16string-substringint-beginindex-int-endindex"></a>16、String substring(int beginIndex, int endIndex)</h4>
+<h4 id="user-content-16string-substringint-beginindex-int-endindex">16、String substring(int beginIndex, int endIndex)<a href="#16string-substringint-beginindex-int-endindex" aria-label="Link to heading '16、String substring(int beginIndex, int endIndex)'" data-heading-content="16、String substring(int beginIndex, int endIndex)" class="anchor"></a></h4>
 <p><strong>截取字符串，第一个参数是起始下标（包含），第二个参数为结束下标（不包含）。包前不包后，左闭右开</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2450,7 +2375,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#17char-tochararray" aria-hidden="true" class="anchor" id="user-content-17char-tochararray"></a>17、char[] toCharArray()</h4>
+<h4 id="user-content-17char-tochararray">17、char[] toCharArray()<a href="#17char-tochararray" aria-label="Link to heading '17、char[] toCharArray()'" data-heading-content="17、char[] toCharArray()" class="anchor"></a></h4>
 <p><strong>将字符串转换成char数组</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2472,7 +2397,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#18string-tolowercase" aria-hidden="true" class="anchor" id="user-content-18string-tolowercase"></a>18、String toLowerCase()</h4>
+<h4 id="user-content-18string-tolowercase">18、String toLowerCase()<a href="#18string-tolowercase" aria-label="Link to heading '18、String toLowerCase()'" data-heading-content="18、String toLowerCase()" class="anchor"></a></h4>
 <p><strong>全部转换成小写</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2483,7 +2408,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#19string-touppercase" aria-hidden="true" class="anchor" id="user-content-19string-touppercase"></a>19、String toUpperCase()</h4>
+<h4 id="user-content-19string-touppercase">19、String toUpperCase()<a href="#19string-touppercase" aria-label="Link to heading '19、String toUpperCase()'" data-heading-content="19、String toUpperCase()" class="anchor"></a></h4>
 <p><strong>全部转换成大写</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2494,7 +2419,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#20string-trim" aria-hidden="true" class="anchor" id="user-content-20string-trim"></a>20、String trim()</h4>
+<h4 id="user-content-20string-trim">20、String trim()<a href="#20string-trim" aria-label="Link to heading '20、String trim()'" data-heading-content="20、String trim()" class="anchor"></a></h4>
 <p><strong>去除字符串前后空白，中间的空白不会去除</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2505,7 +2430,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#21stringvalueof" aria-hidden="true" class="anchor" id="user-content-21stringvalueof"></a>21、String.valueOf()</h4>
+<h4 id="user-content-21stringvalueof">21、String.valueOf()<a href="#21stringvalueof" aria-label="Link to heading '21、String.valueOf()'" data-heading-content="21、String.valueOf()" class="anchor"></a></h4>
 <p><strong>String中只有一个方法是静态的，不需要new对象，将非字符串转换成字符串</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2534,7 +2459,7 @@ class Customer{
 }
 
 </code></pre>
-<h2><a href="#stringbuffer" aria-hidden="true" class="anchor" id="user-content-stringbuffer"></a>StringBuffer</h2>
+<h2 id="user-content-stringbuffer">StringBuffer<a href="#stringbuffer" aria-label="Link to heading 'StringBuffer'" data-heading-content="StringBuffer" class="anchor"></a></h2>
 <p>因为方法区字符串常量池的特性是一旦创建无法修改，会导致频繁拼字符串而占用大量的常量池空间，从而导致常量池浪费。</p>
 <p>如果以后需要进行大量的字符串拼接操作，建议使用JDK中自带的：java.lang.StringBuffer、java.lang.StringBuilder</p>
 <p><em>StringBuffer</em></p>
@@ -2578,7 +2503,7 @@ public class Main {
 <p><em><strong>StringBuffer</strong></em>是线程安全的。</p>
 <p><em><strong>StringBuilder</strong></em>是非线程安全的。</p>
 </blockquote>
-<h2><a href="#8个基本数据类型对应的8个包装类" aria-hidden="true" class="anchor" id="user-content-8个基本数据类型对应的8个包装类"></a>8个基本数据类型对应的8个包装类</h2>
+<h2 id="user-content-8个基本数据类型对应的8个包装类">8个基本数据类型对应的8个包装类<a href="#8个基本数据类型对应的8个包装类" aria-label="Link to heading '8个基本数据类型对应的8个包装类'" data-heading-content="8个基本数据类型对应的8个包装类" class="anchor"></a></h2>
 <table>
 <thead>
 <tr>
@@ -2757,7 +2682,7 @@ public class Main {
 }
 
 </code></pre>
-<h3><a href="#在jdk15之后支持自动装箱和自动拆箱" aria-hidden="true" class="anchor" id="user-content-在jdk15之后支持自动装箱和自动拆箱"></a>在JDK1.5之后，支持自动装箱和自动拆箱。</h3>
+<h3 id="user-content-在jdk15之后支持自动装箱和自动拆箱">在JDK1.5之后，支持自动装箱和自动拆箱。<a href="#在jdk15之后支持自动装箱和自动拆箱" aria-label="Link to heading '在JDK1.5之后，支持自动装箱和自动拆箱。'" data-heading-content="在JDK1.5之后，支持自动装箱和自动拆箱。" class="anchor"></a></h3>
 <p>自动装箱：基本数据类型自动转换成包装类。</p>
 <p>自动拆箱：包装类自动转换成基本数据类型。</p>
 <pre><code class="language-java">package org.example;
@@ -2792,8 +2717,8 @@ public class Main {
 <p>放到了一个方法区的 “整数型常量池” 当中了，目的是只要用这个区间的数据，则不需要再new对象了，直接从 “整数型常量池” 中取出来。</p>
 <p>原理：x变量中保存的对象的内存地址和y变量中保存的对象的内存地址是一样的。</p>
 </blockquote>
-<h3><a href="#integer常用方法" aria-hidden="true" class="anchor" id="user-content-integer常用方法"></a>Integer常用方法</h3>
-<h4><a href="#int-intvalue" aria-hidden="true" class="anchor" id="user-content-int-intvalue"></a>int intValue()</h4>
+<h3 id="user-content-integer常用方法">Integer常用方法<a href="#integer常用方法" aria-label="Link to heading 'Integer常用方法'" data-heading-content="Integer常用方法" class="anchor"></a></h3>
+<h4 id="user-content-int-intvalue">int intValue()<a href="#int-intvalue" aria-label="Link to heading 'int intValue()'" data-heading-content="int intValue()" class="anchor"></a></h4>
 <p><strong>以 int 类型返回该 Integer 的值</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2806,7 +2731,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#static-int-parseintstring-s" aria-hidden="true" class="anchor" id="user-content-static-int-parseintstring-s"></a>static int parseInt(String s)</h4>
+<h4 id="user-content-static-int-parseintstring-s">static int parseInt(String s)<a href="#static-int-parseintstring-s" aria-label="Link to heading 'static int parseInt(String s)'" data-heading-content="static int parseInt(String s)" class="anchor"></a></h4>
 <p><strong>将字符串参数作为有符号的十进制整数进行解析</strong></p>
 <pre><code class="language-java">package org.example;
 
@@ -2824,7 +2749,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#string-int-integer之间的互相转换" aria-hidden="true" class="anchor" id="user-content-string-int-integer之间的互相转换"></a>String int Integer之间的互相转换</h2>
+<h2 id="user-content-string-int-integer之间的互相转换">String int Integer之间的互相转换<a href="#string-int-integer之间的互相转换" aria-label="Link to heading 'String int Integer之间的互相转换'" data-heading-content="String int Integer之间的互相转换" class="anchor"></a></h2>
 <pre><code class="language-java">package org.example;
 
 public class Main {
@@ -2860,7 +2785,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#java对日期的处理" aria-hidden="true" class="anchor" id="user-content-java对日期的处理"></a>Java对日期的处理</h2>
+<h2 id="user-content-java对日期的处理">Java对日期的处理<a href="#java对日期的处理" aria-label="Link to heading 'Java对日期的处理'" data-heading-content="Java对日期的处理" class="anchor"></a></h2>
 <p>java.util.Date类的toString()方法已经被官方重写了，输出的是一个日期字符串，但是不符合中国人的阅读习惯~</p>
 <pre><code class="language-java">package org.example;
 
@@ -2874,8 +2799,8 @@ public class Main {
 }
 
 </code></pre>
-<h3><a href="#javatextsimpledateformat" aria-hidden="true" class="anchor" id="user-content-javatextsimpledateformat"></a>java.text.SimpleDateFormat</h3>
-<h3><a href="#format" aria-hidden="true" class="anchor" id="user-content-format"></a>format()</h3>
+<h3 id="user-content-javatextsimpledateformat">java.text.SimpleDateFormat<a href="#javatextsimpledateformat" aria-label="Link to heading 'java.text.SimpleDateFormat'" data-heading-content="java.text.SimpleDateFormat" class="anchor"></a></h3>
+<h3 id="user-content-format">format()<a href="#format" aria-label="Link to heading 'format()'" data-heading-content="format()" class="anchor"></a></h3>
 <p>Date =&gt; String</p>
 <p>如果需要将日期格式化使用<code>SimpleDateFormat</code></p>
 <pre><code class="language-java">package org.example;
@@ -2903,7 +2828,7 @@ public class Main {
 }
 
 </code></pre>
-<h3><a href="#parse" aria-hidden="true" class="anchor" id="user-content-parse"></a>parse()</h3>
+<h3 id="user-content-parse">parse()<a href="#parse" aria-label="Link to heading 'parse()'" data-heading-content="parse()" class="anchor"></a></h3>
 <p>String =&gt; Date</p>
 <p>日期字符串String转换成Date类型</p>
 <pre><code class="language-java">package org.example;
@@ -2920,7 +2845,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#数字格式化" aria-hidden="true" class="anchor" id="user-content-数字格式化"></a>数字格式化</h2>
+<h2 id="user-content-数字格式化">数字格式化<a href="#数字格式化" aria-label="Link to heading '数字格式化'" data-heading-content="数字格式化" class="anchor"></a></h2>
 <p>java.text.DecimalFormat专门负责数字格式化</p>
 <p>DecimalFormat df = new DecimalFormat(&quot;数字格式&quot;);</p>
 <p>数字格式：<code># 代表任意数字</code> <code>, 代表千分位</code> <code>. 小数位</code> <code>0 不够位数自动补0</code></p>
@@ -2951,7 +2876,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#bigdecimal" aria-hidden="true" class="anchor" id="user-content-bigdecimal"></a>BigDecimal</h2>
+<h2 id="user-content-bigdecimal">BigDecimal<a href="#bigdecimal" aria-label="Link to heading 'BigDecimal'" data-heading-content="BigDecimal" class="anchor"></a></h2>
 <p>java.math.BigDecimal</p>
 <p>BigDecimal属于大数据，精度极高。不属于基本数据类型，属于java对象（引用数据类型），这是官方提供的一个类。专门用在财务软件当中。</p>
 <p>注意：财务软件中double是不够用的。</p>
@@ -2976,7 +2901,7 @@ public class Main {
 <p>multiply() 乘法</p>
 <p>divide() 除法</p>
 <hr />
-<h2><a href="#随机数" aria-hidden="true" class="anchor" id="user-content-随机数"></a>随机数</h2>
+<h2 id="user-content-随机数">随机数<a href="#随机数" aria-label="Link to heading '随机数'" data-heading-content="随机数" class="anchor"></a></h2>
 <p>java.util.Random</p>
 <p>nextInt()内不传入参数，则表示产生int类型范围内的随机数。</p>
 <pre><code class="language-java">package org.example;
@@ -3045,7 +2970,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#enum枚举" aria-hidden="true" class="anchor" id="user-content-enum枚举"></a>enum枚举</h2>
+<h2 id="user-content-enum枚举">enum枚举<a href="#enum枚举" aria-label="Link to heading 'enum枚举'" data-heading-content="enum枚举" class="anchor"></a></h2>
 <blockquote>
 <p>枚举也是一种引用数据类型。</p>
 <p>枚举中的每一个值，可以看做是“常量”，即使用全大写。</p>
@@ -3093,7 +3018,7 @@ public enum Result {
 
 
 </code></pre>
-<h1><a href="#异常处理" aria-hidden="true" class="anchor" id="user-content-异常处理"></a>异常处理</h1>
+<h1 id="user-content-异常处理">异常处理<a href="#异常处理" aria-label="Link to heading '异常处理'" data-heading-content="异常处理" class="anchor"></a></h1>
 <p>Java中异常以类和对象形式存在</p>
 <pre><code class="language-java">package org.example;
 
@@ -3185,7 +3110,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#上抛" aria-hidden="true" class="anchor" id="user-content-上抛"></a>上抛</h2>
+<h2 id="user-content-上抛">上抛<a href="#上抛" aria-label="Link to heading '上抛'" data-heading-content="上抛" class="anchor"></a></h2>
 <p>处理异常的第一种方式：在方法声明的位置上使用<code>throws</code>关键字抛出，谁调用我这个方法，我就抛给谁。抛给调用者来处理。</p>
 <pre><code class="language-java">package org.example;
 
@@ -3222,7 +3147,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#捕捉" aria-hidden="true" class="anchor" id="user-content-捕捉"></a>捕捉</h2>
+<h2 id="user-content-捕捉">捕捉<a href="#捕捉" aria-label="Link to heading '捕捉'" data-heading-content="捕捉" class="anchor"></a></h2>
 <pre><code class="language-java">package org.example;
 
 import java.io.FileInputStream;
@@ -3276,7 +3201,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#异常对象的常用方法" aria-hidden="true" class="anchor" id="user-content-异常对象的常用方法"></a>异常对象的常用方法</h2>
+<h2 id="user-content-异常对象的常用方法">异常对象的常用方法<a href="#异常对象的常用方法" aria-label="Link to heading '异常对象的常用方法'" data-heading-content="异常对象的常用方法" class="anchor"></a></h2>
 <p>异常对象有两个非常重要的方法：</p>
 <ul>
 <li>获取异常简单的描述信息：String msg = exception.getMessage();</li>
@@ -3299,7 +3224,7 @@ public class Main {
 
 </code></pre>
 <p>异常追踪信息的查看方式：异常追踪信息，从上往下一行一行的看；SUN公司官方代码不用看，可以直接跳过，因为官方的代码不会有问题；主要看自己编写的代码出现什么问题；看自己的代码报错的第一行，因为往往是第一个异常，导致的后续的异常。</p>
-<h2><a href="#finally" aria-hidden="true" class="anchor" id="user-content-finally"></a>finally</h2>
+<h2 id="user-content-finally">finally<a href="#finally" aria-label="Link to heading 'finally'" data-heading-content="finally" class="anchor"></a></h2>
 <ul>
 <li>在finally子句中的代码是最后执行的，并且是一定会执行的，即使try语句块中的代码出现了异常。finally子句必须和try一起出现，不能单独编写。</li>
 </ul>
@@ -3377,8 +3302,8 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#final-finally-finalize-之间的区别" aria-hidden="true" class="anchor" id="user-content-final-finally-finalize-之间的区别"></a>final finally finalize 之间的区别</h2>
-<h3><a href="#final" aria-hidden="true" class="anchor" id="user-content-final"></a>final</h3>
+<h2 id="user-content-final-finally-finalize-之间的区别">final finally finalize 之间的区别<a href="#final-finally-finalize-之间的区别" aria-label="Link to heading 'final finally finalize 之间的区别'" data-heading-content="final finally finalize 之间的区别" class="anchor"></a></h2>
+<h3 id="user-content-final">final<a href="#final" aria-label="Link to heading 'final'" data-heading-content="final" class="anchor"></a></h3>
 <p>final是一个关键字，用于修饰常量、方法、类。<a href="#final%E5%85%B3%E9%94%AE%E5%AD%97">详情</a></p>
 <pre><code class="language-java">package org.example;
 
@@ -3390,7 +3315,7 @@ public class Main {
 }
 
 </code></pre>
-<h3><a href="#finally-1" aria-hidden="true" class="anchor" id="user-content-finally-1"></a>finally</h3>
+<h3 id="user-content-finally-1">finally<a href="#finally-1" aria-label="Link to heading 'finally'" data-heading-content="finally" class="anchor"></a></h3>
 <p>finally也是一个关键字，和try联合使用，使用在异常处理机制中，在finally语句块中的代码是一定会被执行的</p>
 <pre><code class="language-java">try{
   ...
@@ -3399,9 +3324,9 @@ public class Main {
 }
 
 </code></pre>
-<h3><a href="#finalize" aria-hidden="true" class="anchor" id="user-content-finalize"></a>finalize</h3>
+<h3 id="user-content-finalize">finalize<a href="#finalize" aria-label="Link to heading 'finalize'" data-heading-content="finalize" class="anchor"></a></h3>
 <p>finalize()是Object类中的一个方法.作为方法名出现。所以finalize是标识符。</p>
-<h2><a href="#自定义异常" aria-hidden="true" class="anchor" id="user-content-自定义异常"></a>自定义异常</h2>
+<h2 id="user-content-自定义异常">自定义异常<a href="#自定义异常" aria-label="Link to heading '自定义异常'" data-heading-content="自定义异常" class="anchor"></a></h2>
 <p>SUN官方提供的JDK内置的异常肯定是不够用的。在实际开发中，有很多业务，这些业务出现异常之后，JDK中都是没有的。和业务挂钩的异常程序员可以自己定义。</p>
 <p>自定义异常：</p>
 <ul>
@@ -3448,7 +3373,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#自定义异常在实际开发中的使用" aria-hidden="true" class="anchor" id="user-content-自定义异常在实际开发中的使用"></a>自定义异常在实际开发中的使用：</h2>
+<h2 id="user-content-自定义异常在实际开发中的使用">自定义异常在实际开发中的使用：<a href="#自定义异常在实际开发中的使用" aria-label="Link to heading '自定义异常在实际开发中的使用：'" data-heading-content="自定义异常在实际开发中的使用：" class="anchor"></a></h2>
 <p>MyStackOperationException.java</p>
 <pre><code class="language-java">package org.example;
 
@@ -3562,12 +3487,12 @@ class Animal{
 }
 
 </code></pre>
-<h2><a href="#异常与方法的覆盖" aria-hidden="true" class="anchor" id="user-content-异常与方法的覆盖"></a>异常与方法的覆盖</h2>
+<h2 id="user-content-异常与方法的覆盖">异常与方法的覆盖<a href="#异常与方法的覆盖" aria-label="Link to heading '异常与方法的覆盖'" data-heading-content="异常与方法的覆盖" class="anchor"></a></h2>
 <p>之前在讲解方法覆盖的时候，当时遗留了一个问题？</p>
 <ul>
 <li>重写之后的方法<em>不能</em>比重写之前的方法抛出更多（更宽泛）的异常，可以更少（范围更小）。</li>
 </ul>
-<h2><a href="#总结" aria-hidden="true" class="anchor" id="user-content-总结"></a>总结</h2>
+<h2 id="user-content-总结">总结<a href="#总结" aria-label="Link to heading '总结'" data-heading-content="总结" class="anchor"></a></h2>
 <p>总结异常中的关键字：</p>
 <p>异常捕获：</p>
 <p>try</p>
@@ -3613,7 +3538,7 @@ class Cat extends Animal {
 
 </code></pre>
 <p>在实际开发中，父类方法抛出什么异常，子类重写的方法也抛出一样的异常。</p>
-<h2><a href="#异常作业" aria-hidden="true" class="anchor" id="user-content-异常作业"></a>异常作业</h2>
+<h2 id="user-content-异常作业">异常作业<a href="#异常作业" aria-label="Link to heading '异常作业'" data-heading-content="异常作业" class="anchor"></a></h2>
 <p>IllegalNameException.java</p>
 <pre><code class="language-java"> package com.ganto.homework;
  /**
@@ -3670,7 +3595,7 @@ class Cat extends Animal {
  }
 
 </code></pre>
-<h2><a href="#其他作业" aria-hidden="true" class="anchor" id="user-content-其他作业"></a>其他作业</h2>
+<h2 id="user-content-其他作业">其他作业<a href="#其他作业" aria-label="Link to heading '其他作业'" data-heading-content="其他作业" class="anchor"></a></h2>
 <p>Moveable.java</p>
 <pre><code class="language-java">package org.example.homework;
 
@@ -3911,8 +3836,8 @@ public class Test {
 
 
 </code></pre>
-<h1><a href="#集合" aria-hidden="true" class="anchor" id="user-content-集合"></a>集合</h1>
-<h2><a href="#集合概述" aria-hidden="true" class="anchor" id="user-content-集合概述"></a>集合概述</h2>
+<h1 id="user-content-集合">集合<a href="#集合" aria-label="Link to heading '集合'" data-heading-content="集合" class="anchor"></a></h1>
+<h2 id="user-content-集合概述">集合概述<a href="#集合概述" aria-label="Link to heading '集合概述'" data-heading-content="集合概述" class="anchor"></a></h2>
 <p>1.1、数组其实就是一个集合。集合实际上就是一个容器。可以来容纳其他类型的数据。</p>
 <p>集合为什么说在开发中使用较多？</p>
 <p>集合是一个容器，是一个载体，可以一次容纳多个对象。</p>
@@ -3943,7 +3868,7 @@ public class Test {
 <p>一类是以键值对的方式存储元素：以键值对的方式存储元素，这一类集合中超级父接口：java.util.Map;</p>
 </li>
 </ul>
-<h2><a href="#collection" aria-hidden="true" class="anchor" id="user-content-collection"></a>Collection</h2>
+<h2 id="user-content-collection">Collection<a href="#collection" aria-label="Link to heading 'Collection'" data-heading-content="Collection" class="anchor"></a></h2>
 <pre><code class="language-java">package com.ganto;
 
 import java.util.ArrayList;
@@ -4019,7 +3944,7 @@ class Stu {
 }
 
 </code></pre>
-<h3><a href="#boolean-containsobject-o" aria-hidden="true" class="anchor" id="user-content-boolean-containsobject-o"></a>boolean contains(Object o)</h3>
+<h3 id="user-content-boolean-containsobject-o">boolean contains(Object o)<a href="#boolean-containsobject-o" aria-label="Link to heading 'boolean contains(Object o)'" data-heading-content="boolean contains(Object o)" class="anchor"></a></h3>
 <p>判断当前集合中是否包含元素o，包含返回true，不包含返回false</p>
 <pre><code class="language-java">package com.ganto;
 
@@ -4051,7 +3976,7 @@ public class Main {
 </code></pre>
 <p>以上代码中的contains会返回true，因为contains源码是使用String的equals进行比较的，而String的equals是官方重写过的，只比较内容，不比较内存地址。</p>
 <p>根据以上内容，可以得出结论：放在集合里的元素需要重写equals方法</p>
-<h3><a href="#boolean-removeobject-o" aria-hidden="true" class="anchor" id="user-content-boolean-removeobject-o"></a>boolean remove(Object o)</h3>
+<h3 id="user-content-boolean-removeobject-o">boolean remove(Object o)<a href="#boolean-removeobject-o" aria-label="Link to heading 'boolean remove(Object o)'" data-heading-content="boolean remove(Object o)" class="anchor"></a></h3>
 <p>删除集合中的某个元素</p>
 <pre><code class="language-java">package com.ganto;
 
@@ -4083,8 +4008,8 @@ public class Main {
 
 </code></pre>
 <p>以上代码打印为0，因为remove依然是调用equals方法，而s1.equals(x)是返回true的。</p>
-<h2><a href="#集合遍历迭代" aria-hidden="true" class="anchor" id="user-content-集合遍历迭代"></a>集合遍历（迭代）</h2>
-<p><img src="images%5CJava%5C%E8%BF%AD%E4%BB%A3%E5%99%A8%E6%89%A7%E8%A1%8C%E5%8E%9F%E7%90%86.png" alt="" /></p>
+<h2 id="user-content-集合遍历迭代">集合遍历（迭代）<a href="#集合遍历迭代" aria-label="Link to heading '集合遍历（迭代）'" data-heading-content="集合遍历（迭代）" class="anchor"></a></h2>
+<p><img loading="lazy" src="images%5CJava%5C%E8%BF%AD%E4%BB%A3%E5%99%A8%E6%89%A7%E8%A1%8C%E5%8E%9F%E7%90%86.png" alt="" /></p>
 <pre><code class="language-java">package com.ganto;
 
 import java.util.ArrayList;
@@ -4204,7 +4129,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#list接口" aria-hidden="true" class="anchor" id="user-content-list接口"></a>List接口</h2>
+<h2 id="user-content-list接口">List接口<a href="#list接口" aria-label="Link to heading 'List接口'" data-heading-content="List接口" class="anchor"></a></h2>
 <p>List接口中常用方法：</p>
 <ul>
 <li>
@@ -4279,7 +4204,7 @@ public class Main {
 }
 
 </code></pre>
-<h3><a href="#arraylist" aria-hidden="true" class="anchor" id="user-content-arraylist"></a>ArrayList</h3>
+<h3 id="user-content-arraylist">ArrayList<a href="#arraylist" aria-label="Link to heading 'ArrayList'" data-heading-content="ArrayList" class="anchor"></a></h3>
 <p>ArrayList集合底层采用了数组这种数据结构。</p>
 <p>ArrayList集合是非线程安全的。</p>
 <p>1、ArrayList集合默认初始化容量是10（底层先创建了一个长度为0的数组，当添加第一个元素的时候，初始化容量10）</p>
@@ -4320,7 +4245,7 @@ public class Main {
 }
 
 </code></pre>
-<h4><a href="#arraylist的构造方法" aria-hidden="true" class="anchor" id="user-content-arraylist的构造方法"></a>ArrayList的构造方法</h4>
+<h4 id="user-content-arraylist的构造方法">ArrayList的构造方法<a href="#arraylist的构造方法" aria-label="Link to heading 'ArrayList的构造方法'" data-heading-content="ArrayList的构造方法" class="anchor"></a></h4>
 <pre><code class="language-java">package com.ganto;
 
 import java.util.ArrayList;
@@ -4349,7 +4274,7 @@ public class Main {
 }
 
 </code></pre>
-<h3><a href="#单项链表数据结构" aria-hidden="true" class="anchor" id="user-content-单项链表数据结构"></a>单项链表数据结构</h3>
+<h3 id="user-content-单项链表数据结构">单项链表数据结构<a href="#单项链表数据结构" aria-label="Link to heading '单项链表数据结构'" data-heading-content="单项链表数据结构" class="anchor"></a></h3>
 <p>单链表中的节点</p>
 <p>节点是单向链表中基本的单元</p>
 <p>每一个节点Node都有两个属性：</p>
@@ -4460,8 +4385,8 @@ public class Test {
 </code></pre>
 <p>链表优点：随机增删元素效率较高，因为增删元素不会涉及到大量元素位移</p>
 <p>链表缺点：查询效率较低，每一次查找某个元素的时候都需要从头节点开始往下遍历</p>
-<p><img src="images%5CJava%5C%E5%8D%95%E5%90%91%E9%93%BE%E8%A1%A8.png" alt="" /></p>
-<h3><a href="#双向链表数据结构" aria-hidden="true" class="anchor" id="user-content-双向链表数据结构"></a>双向链表数据结构</h3>
+<p><img loading="lazy" src="images%5CJava%5C%E5%8D%95%E5%90%91%E9%93%BE%E8%A1%A8.png" alt="" /></p>
+<h3 id="user-content-双向链表数据结构">双向链表数据结构<a href="#双向链表数据结构" aria-label="Link to heading '双向链表数据结构'" data-heading-content="双向链表数据结构" class="anchor"></a></h3>
 <p>双向链表中的节点</p>
 <p>节点是双向链表中基本的单元</p>
 <p>每一个节点Node都有三个属性：</p>
@@ -4470,8 +4395,8 @@ public class Test {
 <li>一个属性是存储的数据</li>
 <li>一个属性是下一个节点的内存地址</li>
 </ul>
-<p><img src="images%5CJava%5C%E5%8F%8C%E5%90%91%E9%93%BE%E8%A1%A8.png" alt="" /></p>
-<h4><a href="#linkedlist" aria-hidden="true" class="anchor" id="user-content-linkedlist"></a>LinkedList</h4>
+<p><img loading="lazy" src="images%5CJava%5C%E5%8F%8C%E5%90%91%E9%93%BE%E8%A1%A8.png" alt="" /></p>
+<h4 id="user-content-linkedlist">LinkedList<a href="#linkedlist" aria-label="Link to heading 'LinkedList'" data-heading-content="LinkedList" class="anchor"></a></h4>
 <pre><code class="language-java">package com.ganto;
 
 import java.util.LinkedList;
@@ -4517,7 +4442,7 @@ for(int i = 0; i &lt; list.size(); i++) {
 }
 
 </code></pre>
-<h2><a href="#vector" aria-hidden="true" class="anchor" id="user-content-vector"></a>Vector</h2>
+<h2 id="user-content-vector">Vector<a href="#vector" aria-label="Link to heading 'Vector'" data-heading-content="Vector" class="anchor"></a></h2>
 <ul>
 <li>底层也是一个数组</li>
 <li>初始化容量：10</li>
@@ -4584,7 +4509,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#hashset集合" aria-hidden="true" class="anchor" id="user-content-hashset集合"></a>HashSet集合</h2>
+<h2 id="user-content-hashset集合">HashSet集合<a href="#hashset集合" aria-label="Link to heading 'HashSet集合'" data-heading-content="HashSet集合" class="anchor"></a></h2>
 <ul>
 <li>存储时顺序和取出的顺序不同</li>
 <li>不可重复</li>
@@ -4610,7 +4535,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#treeset集合" aria-hidden="true" class="anchor" id="user-content-treeset集合"></a>TreeSet集合</h2>
+<h2 id="user-content-treeset集合">TreeSet集合<a href="#treeset集合" aria-label="Link to heading 'TreeSet集合'" data-heading-content="TreeSet集合" class="anchor"></a></h2>
 <ul>
 <li>TreeSet集合底层实际上是一个TreeMap</li>
 <li>TreeMap集合底层是一个二叉树</li>
@@ -4654,7 +4579,7 @@ public class Main {
 </code></pre>
 <p>自定义类型，TreeSet则无法排序，中文也不支持排序</p>
 <p>需要指定规则</p>
-<h2><a href="#map接口" aria-hidden="true" class="anchor" id="user-content-map接口"></a>Map接口</h2>
+<h2 id="user-content-map接口">Map接口<a href="#map接口" aria-label="Link to heading 'Map接口'" data-heading-content="Map接口" class="anchor"></a></h2>
 <p>java.util.Map接口:</p>
 <ul>
 <li>Map和Collection没有继承关系</li>
@@ -4681,7 +4606,7 @@ public class Main {
 </ul>
 </li>
 </ul>
-<h3><a href="#常用方法" aria-hidden="true" class="anchor" id="user-content-常用方法"></a>常用方法</h3>
+<h3 id="user-content-常用方法">常用方法<a href="#常用方法" aria-label="Link to heading '常用方法'" data-heading-content="常用方法" class="anchor"></a></h3>
 <pre><code class="language-java">package com.ganto;
 
 import java.util.Collection;
@@ -4719,7 +4644,7 @@ public class Main {
 }
 
 </code></pre>
-<h3><a href="#map集合的遍历" aria-hidden="true" class="anchor" id="user-content-map集合的遍历"></a>Map集合的遍历</h3>
+<h3 id="user-content-map集合的遍历">Map集合的遍历<a href="#map集合的遍历" aria-label="Link to heading 'Map集合的遍历'" data-heading-content="Map集合的遍历" class="anchor"></a></h3>
 <p>第一种方式：获取所有的key，通过遍历key，来遍历value</p>
 <pre><code class="language-java">package com.ganto;
 
@@ -4787,7 +4712,7 @@ public class Main {
 }
 
 </code></pre>
-<h3><a href="#哈希表数据结构" aria-hidden="true" class="anchor" id="user-content-哈希表数据结构"></a>哈希表数据结构</h3>
+<h3 id="user-content-哈希表数据结构">哈希表数据结构<a href="#哈希表数据结构" aria-label="Link to heading '哈希表数据结构'" data-heading-content="哈希表数据结构" class="anchor"></a></h3>
 <p>HashMap集合：</p>
 <ul>
 <li>HashMap结合底层使哈希表/散列表的数据结构</li>
@@ -4799,7 +4724,7 @@ public class Main {
 </ul>
 </li>
 </ul>
-<h3><a href="#hashmap" aria-hidden="true" class="anchor" id="user-content-hashmap"></a>HashMap</h3>
+<h3 id="user-content-hashmap">HashMap<a href="#hashmap" aria-label="Link to heading 'HashMap'" data-heading-content="HashMap" class="anchor"></a></h3>
 <p>HashMap集合key部分允许为null，但是HashMap集合的key为null的值只能有一个</p>
 <pre><code class="language-java">package com.ganto;
 
@@ -4817,14 +4742,14 @@ public class Main {
 }
 
 </code></pre>
-<h3><a href="#hashtable" aria-hidden="true" class="anchor" id="user-content-hashtable"></a>Hashtable</h3>
+<h3 id="user-content-hashtable">Hashtable<a href="#hashtable" aria-label="Link to heading 'Hashtable'" data-heading-content="Hashtable" class="anchor"></a></h3>
 <p>Hashtable的key和value都不可以为null，否则会报空指针异常</p>
 <p>Hashtable方法都带有synchronized：线程安全的</p>
 <p>线程安全有其它的方案，这个Hashtable对线程的处理导致效率低，使用较少了</p>
 <p>Hashtable和HashMap一样，底层都是哈希表数据结构</p>
 <p>Hashtable的初始化容量是：11，默认加载因子：0.75f</p>
 <p>Hashtable的扩容：原容量 * 2 + 1</p>
-<h3><a href="#properties" aria-hidden="true" class="anchor" id="user-content-properties"></a>Properties</h3>
+<h3 id="user-content-properties">Properties<a href="#properties" aria-label="Link to heading 'Properties'" data-heading-content="Properties" class="anchor"></a></h3>
 <p>目前只需要掌握Properties属性类对象的相关方法即可</p>
 <p>Properties是一个Map集合，继承Hashtable，Properties的key和value都是String类型</p>
 <p>Properties被称为属性类对象</p>
@@ -4848,9 +4773,9 @@ public class Main {
 }
 
 </code></pre>
-<h1><a href="#泛型机制" aria-hidden="true" class="anchor" id="user-content-泛型机制"></a>泛型机制</h1>
+<h1 id="user-content-泛型机制">泛型机制<a href="#泛型机制" aria-label="Link to heading '泛型机制'" data-heading-content="泛型机制" class="anchor"></a></h1>
 <p>JDK5.0之后推出的新特性：泛型</p>
-<h2><a href="#不使用泛型" aria-hidden="true" class="anchor" id="user-content-不使用泛型"></a>不使用泛型</h2>
+<h2 id="user-content-不使用泛型">不使用泛型<a href="#不使用泛型" aria-label="Link to heading '不使用泛型'" data-heading-content="不使用泛型" class="anchor"></a></h2>
 <p>不使用泛型机制，分析程序存在的缺点</p>
 <pre><code class="language-java">package com.ganto;
 
@@ -4901,7 +4826,7 @@ class Bird extends Animal {
 }
 
 </code></pre>
-<h2><a href="#使用泛型" aria-hidden="true" class="anchor" id="user-content-使用泛型"></a>使用泛型</h2>
+<h2 id="user-content-使用泛型">使用泛型<a href="#使用泛型" aria-label="Link to heading '使用泛型'" data-heading-content="使用泛型" class="anchor"></a></h2>
 <pre><code class="language-java">package com.ganto;
 
 import java.util.ArrayList;
@@ -4974,7 +4899,7 @@ class Bird extends Animal {
 <p>大多数业务中，集合中元素的类型是统一的，所以泛型使用的很多</p>
 <p>JDK8之后引入了自动类型推断机制。（又称为钻石表达式）</p>
 <p><code>List&lt;Animal&gt; myList = new ArrayList&lt;&gt;();</code></p>
-<h2><a href="#自定义泛型" aria-hidden="true" class="anchor" id="user-content-自定义泛型"></a>自定义泛型</h2>
+<h2 id="user-content-自定义泛型">自定义泛型<a href="#自定义泛型" aria-label="Link to heading '自定义泛型'" data-heading-content="自定义泛型" class="anchor"></a></h2>
 <pre><code class="language-java">package com.ganto;
 
 public class Main {
@@ -4994,7 +4919,7 @@ class Animal&lt;T&gt; {
 }
 
 </code></pre>
-<h1><a href="#for-each" aria-hidden="true" class="anchor" id="user-content-for-each"></a>for each</h1>
+<h1 id="user-content-for-each">for each<a href="#for-each" aria-label="Link to heading 'for each'" data-heading-content="for each" class="anchor"></a></h1>
 <pre><code class="language-java">package com.ganto;
 
 public class Main {
@@ -5045,15 +4970,15 @@ public class Main {
 
 
 </code></pre>
-<h1><a href="#io流" aria-hidden="true" class="anchor" id="user-content-io流"></a>IO流</h1>
-<p><img src="images%5CJava%5CIO%E6%B5%81.png" alt="" /></p>
+<h1 id="user-content-io流">IO流<a href="#io流" aria-label="Link to heading 'IO流'" data-heading-content="IO流" class="anchor"></a></h1>
+<p><img loading="lazy" src="images%5CJava%5CIO%E6%B5%81.png" alt="" /></p>
 <p>IO流</p>
 <ul>
 <li>I：Input</li>
 <li>O：Output</li>
 <li>通过IO可以完成硬盘文件的读和写</li>
 </ul>
-<h2><a href="#io流的分类" aria-hidden="true" class="anchor" id="user-content-io流的分类"></a>IO流的分类：</h2>
+<h2 id="user-content-io流的分类">IO流的分类：<a href="#io流的分类" aria-label="Link to heading 'IO流的分类：'" data-heading-content="IO流的分类：" class="anchor"></a></h2>
 <p>有多种分类方式：</p>
 <ul>
 <li>
@@ -5094,7 +5019,7 @@ public class Main {
 <p>Java中的IO流都已经写好了，我们程序员不需要关心，我们最主要还是掌握，在Java中已经提供了哪些流，每个流的特点是什么，每个流对象上的常用方法有哪些？</p>
 <p>java中所有的流都是在：java.io.* 这个包下</p>
 <p>java中主要还研究：怎么new流对象，调用流对象的哪个方法是读，哪个方法是写</p>
-<h2><a href="#java-io流四大家族" aria-hidden="true" class="anchor" id="user-content-java-io流四大家族"></a>Java IO流四大家族</h2>
+<h2 id="user-content-java-io流四大家族">Java IO流四大家族<a href="#java-io流四大家族" aria-label="Link to heading 'Java IO流四大家族'" data-heading-content="Java IO流四大家族" class="anchor"></a></h2>
 <p>四大家族的首领<em>都是抽象类</em></p>
 <p>java.io.InputStream // 字节输入流</p>
 <p>java.io.OutputStream // 字节输出流</p>
@@ -5106,32 +5031,32 @@ public class Main {
 <p>所有的输出流都实现了：java.io.Flushable接口，都是可刷新的，都有flush()方法。</p>
 <p>养成一个好习惯，输出流在最终输出之后，一定要记得flush()刷新以下。这个刷新表示将通道/管道当中剩余未输出的数据强行输出完（清空管道），刷新的作用就是清空管道。</p>
 <p>注意：如果没有flush()可能会导致丢失数据。</p>
-<h2><a href="#重要的流" aria-hidden="true" class="anchor" id="user-content-重要的流"></a>重要的流</h2>
+<h2 id="user-content-重要的流">重要的流<a href="#重要的流" aria-label="Link to heading '重要的流'" data-heading-content="重要的流" class="anchor"></a></h2>
 <p>java.io包下需要掌握的流有16个</p>
-<h3><a href="#文件专属" aria-hidden="true" class="anchor" id="user-content-文件专属"></a>文件专属</h3>
+<h3 id="user-content-文件专属">文件专属<a href="#文件专属" aria-label="Link to heading '文件专属'" data-heading-content="文件专属" class="anchor"></a></h3>
 <p>java.io.FileInputStream</p>
 <p>java.io.FileOutputStream</p>
 <p>java.io.FileReader</p>
 <p>java.io.FileWriter</p>
-<h3><a href="#转换流" aria-hidden="true" class="anchor" id="user-content-转换流"></a>转换流</h3>
+<h3 id="user-content-转换流">转换流<a href="#转换流" aria-label="Link to heading '转换流'" data-heading-content="转换流" class="anchor"></a></h3>
 <p>将字节转换成字符</p>
 <p>java.io.InputStreamReader</p>
 <p>java.io.OutputStreamWriter</p>
-<h3><a href="#缓冲流专属" aria-hidden="true" class="anchor" id="user-content-缓冲流专属"></a>缓冲流专属</h3>
+<h3 id="user-content-缓冲流专属">缓冲流专属<a href="#缓冲流专属" aria-label="Link to heading '缓冲流专属'" data-heading-content="缓冲流专属" class="anchor"></a></h3>
 <p>java.io.BufferedReader</p>
 <p>java.io.BufferedWriter</p>
 <p>java.io.BufferedInputStream</p>
 <p>java.io.BufferedOutputStream</p>
-<h3><a href="#数据流专属" aria-hidden="true" class="anchor" id="user-content-数据流专属"></a>数据流专属</h3>
+<h3 id="user-content-数据流专属">数据流专属<a href="#数据流专属" aria-label="Link to heading '数据流专属'" data-heading-content="数据流专属" class="anchor"></a></h3>
 <p>java.io.DataInputStream</p>
 <p>java.io.DataOutputStream</p>
-<h3><a href="#标准输出流" aria-hidden="true" class="anchor" id="user-content-标准输出流"></a>标准输出流</h3>
+<h3 id="user-content-标准输出流">标准输出流<a href="#标准输出流" aria-label="Link to heading '标准输出流'" data-heading-content="标准输出流" class="anchor"></a></h3>
 <p>java.io.PrintWriter</p>
 <p>java.io.PrintStream</p>
-<h3><a href="#对象专属流" aria-hidden="true" class="anchor" id="user-content-对象专属流"></a>对象专属流</h3>
+<h3 id="user-content-对象专属流">对象专属流<a href="#对象专属流" aria-label="Link to heading '对象专属流'" data-heading-content="对象专属流" class="anchor"></a></h3>
 <p>java.io.ObjectInputStream</p>
 <p>java.io.ObjectOutputStream</p>
-<h2><a href="#javaiofileinputstream" aria-hidden="true" class="anchor" id="user-content-javaiofileinputstream"></a>java.io.FileInputStream</h2>
+<h2 id="user-content-javaiofileinputstream">java.io.FileInputStream<a href="#javaiofileinputstream" aria-label="Link to heading 'java.io.FileInputStream'" data-heading-content="java.io.FileInputStream" class="anchor"></a></h2>
 <p>重点掌握</p>
 <ul>
 <li>文件字节输入流，万能的，任何类型的文件都可以采用这个流来读。</li>
@@ -5321,7 +5246,7 @@ public class Main {
 }
 
 </code></pre>
-<h3><a href="#其他常用方法" aria-hidden="true" class="anchor" id="user-content-其他常用方法"></a>其他常用方法</h3>
+<h3 id="user-content-其他常用方法">其他常用方法<a href="#其他常用方法" aria-label="Link to heading '其他常用方法'" data-heading-content="其他常用方法" class="anchor"></a></h3>
 <ul>
 <li>int available() // 返回流当中剩余的没有读到的字符数量</li>
 <li>lolng skip(long n) // 跳过几个字节不读</li>
@@ -5394,7 +5319,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#javaiofileoutputstream" aria-hidden="true" class="anchor" id="user-content-javaiofileoutputstream"></a>java.io.FileOutputStream</h2>
+<h2 id="user-content-javaiofileoutputstream">java.io.FileOutputStream<a href="#javaiofileoutputstream" aria-label="Link to heading 'java.io.FileOutputStream'" data-heading-content="java.io.FileOutputStream" class="anchor"></a></h2>
 <p>重点掌握</p>
 <p>文件字节输出流,负责写</p>
 <p>从内存到硬盘</p>
@@ -5469,7 +5394,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#文件复制" aria-hidden="true" class="anchor" id="user-content-文件复制"></a>文件复制</h2>
+<h2 id="user-content-文件复制">文件复制<a href="#文件复制" aria-label="Link to heading '文件复制'" data-heading-content="文件复制" class="anchor"></a></h2>
 <p>使用FileInputStream + FileOutputStream完成文件的拷贝</p>
 <p>拷贝的过程应该是一边读，一边写</p>
 <p>使用以上的字节流拷贝文件的时候，文件类型随意，什么样的文件都能拷贝</p>
@@ -5521,7 +5446,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#javaiofilereader" aria-hidden="true" class="anchor" id="user-content-javaiofilereader"></a>java.io.FileReader</h2>
+<h2 id="user-content-javaiofilereader">java.io.FileReader<a href="#javaiofilereader" aria-label="Link to heading 'java.io.FileReader'" data-heading-content="java.io.FileReader" class="anchor"></a></h2>
 <p>文件字符输入流，只能读取普通文本</p>
 <p>读取文本内容时，比较方便，快捷</p>
 <pre><code class="language-java">package com.ganto;
@@ -5559,7 +5484,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#javaiofilewriter" aria-hidden="true" class="anchor" id="user-content-javaiofilewriter"></a>java.io.FileWriter</h2>
+<h2 id="user-content-javaiofilewriter">java.io.FileWriter<a href="#javaiofilewriter" aria-label="Link to heading 'java.io.FileWriter'" data-heading-content="java.io.FileWriter" class="anchor"></a></h2>
 <p>文件字符输出流。写</p>
 <p>只能输出普通文本</p>
 <pre><code class="language-java">package com.ganto;
@@ -5593,7 +5518,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#文件复制-1" aria-hidden="true" class="anchor" id="user-content-文件复制-1"></a>文件复制</h2>
+<h2 id="user-content-文件复制-1">文件复制<a href="#文件复制-1" aria-label="Link to heading '文件复制'" data-heading-content="文件复制" class="anchor"></a></h2>
 <pre><code class="language-java">package com.ganto;
 
 import java.io.FileNotFoundException;
@@ -5638,7 +5563,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#javaiobufferedreader" aria-hidden="true" class="anchor" id="user-content-javaiobufferedreader"></a>java.io.BufferedReader</h2>
+<h2 id="user-content-javaiobufferedreader">java.io.BufferedReader<a href="#javaiobufferedreader" aria-label="Link to heading 'java.io.BufferedReader'" data-heading-content="java.io.BufferedReader" class="anchor"></a></h2>
 <p>带有缓冲区的字符输入流</p>
 <p>使用这个流的时候不需要自定义char数组，或者说不需要自定义byte数组，自带缓冲</p>
 <pre><code class="language-java">package com.ganto;
@@ -5706,7 +5631,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#javaiobufferedwriter" aria-hidden="true" class="anchor" id="user-content-javaiobufferedwriter"></a>java.io.BufferedWriter</h2>
+<h2 id="user-content-javaiobufferedwriter">java.io.BufferedWriter<a href="#javaiobufferedwriter" aria-label="Link to heading 'java.io.BufferedWriter'" data-heading-content="java.io.BufferedWriter" class="anchor"></a></h2>
 <p>带有缓冲的字符输出流</p>
 <pre><code class="language-java">package com.ganto;
 
@@ -5745,7 +5670,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#javaiodatainputstream" aria-hidden="true" class="anchor" id="user-content-javaiodatainputstream"></a>java.io.DataInputStream</h2>
+<h2 id="user-content-javaiodatainputstream">java.io.DataInputStream<a href="#javaiodatainputstream" aria-label="Link to heading 'java.io.DataInputStream'" data-heading-content="java.io.DataInputStream" class="anchor"></a></h2>
 <p>数据字节输入流</p>
 <p>DataOutputStream写的文件只能通过DataInputStream去读</p>
 <p>并且读的时候需要提前知道写入的顺序</p>
@@ -5783,7 +5708,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#javaiodataoutputstream" aria-hidden="true" class="anchor" id="user-content-javaiodataoutputstream"></a>java.io.DataOutputStream</h2>
+<h2 id="user-content-javaiodataoutputstream">java.io.DataOutputStream<a href="#javaiodataoutputstream" aria-label="Link to heading 'java.io.DataOutputStream'" data-heading-content="java.io.DataOutputStream" class="anchor"></a></h2>
 <p>数据专属的流</p>
 <p>这个流可以将数据联通数据的类型一并写入文件</p>
 <p>注意：这个文件不是普通文本文档。（用记事本无法正确的浏览）；并且只能通过<code>java.io.DataInputStream</code>读出来</p>
@@ -5823,7 +5748,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#javaioprintstream" aria-hidden="true" class="anchor" id="user-content-javaioprintstream"></a>java.io.PrintStream</h2>
+<h2 id="user-content-javaioprintstream">java.io.PrintStream<a href="#javaioprintstream" aria-label="Link to heading 'java.io.PrintStream'" data-heading-content="java.io.PrintStream" class="anchor"></a></h2>
 <p>重点掌握</p>
 <p>标准的字节输出流，默认输出到控制台</p>
 <pre><code class="language-java">package com.ganto;
@@ -5865,7 +5790,7 @@ public class Main {
 }
 
 </code></pre>
-<h3><a href="#日志工具" aria-hidden="true" class="anchor" id="user-content-日志工具"></a>日志工具</h3>
+<h3 id="user-content-日志工具">日志工具<a href="#日志工具" aria-label="Link to heading '日志工具'" data-heading-content="日志工具" class="anchor"></a></h3>
 <p>Logger.java</p>
 <pre><code class="language-java">package com.ganto;
 
@@ -5914,11 +5839,11 @@ public class LogTest {
 2023-03-01 00:27:01 031：用户尝试进行登录，验证失败
 
 </code></pre>
-<h2><a href="#javaioobjectinputstream" aria-hidden="true" class="anchor" id="user-content-javaioobjectinputstream"></a>java.io.ObjectInputStream</h2>
+<h2 id="user-content-javaioobjectinputstream">java.io.ObjectInputStream<a href="#javaioobjectinputstream" aria-label="Link to heading 'java.io.ObjectInputStream'" data-heading-content="java.io.ObjectInputStream" class="anchor"></a></h2>
 <p>重点掌握</p>
-<h2><a href="#javaioobjectoutputstream" aria-hidden="true" class="anchor" id="user-content-javaioobjectoutputstream"></a>java.io.ObjectOutputStream</h2>
+<h2 id="user-content-javaioobjectoutputstream">java.io.ObjectOutputStream<a href="#javaioobjectoutputstream" aria-label="Link to heading 'java.io.ObjectOutputStream'" data-heading-content="java.io.ObjectOutputStream" class="anchor"></a></h2>
 <p>重点掌握</p>
-<h2><a href="#javaiofile" aria-hidden="true" class="anchor" id="user-content-javaiofile"></a>java.io.File</h2>
+<h2 id="user-content-javaiofile">java.io.File<a href="#javaiofile" aria-label="Link to heading 'java.io.File'" data-heading-content="java.io.File" class="anchor"></a></h2>
 <ul>
 <li>
 <p>File类和四大家族没有关系，所以File类不能完成文件的读和写</p>
@@ -6026,9 +5951,9 @@ public class Main {
 }
 
 </code></pre>
-<h1><a href="#进阶-1" aria-hidden="true" class="anchor" id="user-content-进阶-1"></a>进阶👆</h1>
-<h1><a href="#java中需要注意的点" aria-hidden="true" class="anchor" id="user-content-java中需要注意的点"></a>Java中需要注意的点</h1>
-<h2><a href="#命令行执行java程序" aria-hidden="true" class="anchor" id="user-content-命令行执行java程序"></a>命令行执行Java程序</h2>
+<h1 id="user-content-进阶-1">进阶👆<a href="#进阶-1" aria-label="Link to heading '进阶👆'" data-heading-content="进阶👆" class="anchor"></a></h1>
+<h1 id="user-content-java中需要注意的点">Java中需要注意的点<a href="#java中需要注意的点" aria-label="Link to heading 'Java中需要注意的点'" data-heading-content="Java中需要注意的点" class="anchor"></a></h1>
+<h2 id="user-content-命令行执行java程序">命令行执行Java程序<a href="#命令行执行java程序" aria-label="Link to heading '命令行执行Java程序'" data-heading-content="命令行执行Java程序" class="anchor"></a></h2>
 <p>Hello.java</p>
 <pre><code class="language-java">public class Hello
 {
@@ -6043,17 +5968,17 @@ public class Main {
 java Hello
 
 </code></pre>
-<h2><a href="#java中字符和字符串时两个类型" aria-hidden="true" class="anchor" id="user-content-java中字符和字符串时两个类型"></a>Java中字符和字符串时两个类型</h2>
+<h2 id="user-content-java中字符和字符串时两个类型">Java中字符和字符串时两个类型<a href="#java中字符和字符串时两个类型" aria-label="Link to heading 'Java中字符和字符串时两个类型'" data-heading-content="Java中字符和字符串时两个类型" class="anchor"></a></h2>
 <p>char是字符，string是字符串</p>
-<h2><a href="#常见异常" aria-hidden="true" class="anchor" id="user-content-常见异常"></a>常见异常</h2>
-<h3><a href="#javalangnullpointerexception" aria-hidden="true" class="anchor" id="user-content-javalangnullpointerexception"></a>java.lang.NullPointerException</h3>
+<h2 id="user-content-常见异常">常见异常<a href="#常见异常" aria-label="Link to heading '常见异常'" data-heading-content="常见异常" class="anchor"></a></h2>
+<h3 id="user-content-javalangnullpointerexception">java.lang.NullPointerException<a href="#javalangnullpointerexception" aria-label="Link to heading 'java.lang.NullPointerException'" data-heading-content="java.lang.NullPointerException" class="anchor"></a></h3>
 <p>空指针异常</p>
-<h3><a href="#javalangclasscastexception" aria-hidden="true" class="anchor" id="user-content-javalangclasscastexception"></a>java.lang.ClassCastException</h3>
+<h3 id="user-content-javalangclasscastexception">java.lang.ClassCastException<a href="#javalangclasscastexception" aria-label="Link to heading 'java.lang.ClassCastException'" data-heading-content="java.lang.ClassCastException" class="anchor"></a></h3>
 <p>强制类型转换异常</p>
 <p>使用instanceof运算符可以避免出现，该运算符执行结果类型是布尔类型，结果可能是true/false；(a instanceof Animal)：true表示a这个引用指向的对象是一个Animal类型；false表示a这个引用指向的对象不是一个Animal类型。instanceof运算符语法：<code>引用 instanceof 数据类型</code>。</p>
-<h3><a href="#javalangarrayindexoutofboundsexception" aria-hidden="true" class="anchor" id="user-content-javalangarrayindexoutofboundsexception"></a>java.lang.ArrayIndexOutOfBoundsException</h3>
+<h3 id="user-content-javalangarrayindexoutofboundsexception">java.lang.ArrayIndexOutOfBoundsException<a href="#javalangarrayindexoutofboundsexception" aria-label="Link to heading 'java.lang.ArrayIndexOutOfBoundsException'" data-heading-content="java.lang.ArrayIndexOutOfBoundsException" class="anchor"></a></h3>
 <p>数组下标越界异常</p>
-<h3><a href="#javalangnumberformatexception" aria-hidden="true" class="anchor" id="user-content-javalangnumberformatexception"></a>java.lang.NumberFormatException</h3>
+<h3 id="user-content-javalangnumberformatexception">java.lang.NumberFormatException<a href="#javalangnumberformatexception" aria-label="Link to heading 'java.lang.NumberFormatException'" data-heading-content="java.lang.NumberFormatException" class="anchor"></a></h3>
 <p>数字格式化异常，如下代码会报异常。</p>
 <pre><code class="language-java">package org.example;
 
@@ -6066,7 +5991,7 @@ public class Main {
 }
 
 </code></pre>
-<h2><a href="#面试题" aria-hidden="true" class="anchor" id="user-content-面试题"></a>面试题</h2>
+<h2 id="user-content-面试题">面试题<a href="#面试题" aria-label="Link to heading '面试题'" data-heading-content="面试题" class="anchor"></a></h2>
 <pre><code class="language-java">String s1 = new String(&quot;hello&quot;);
 String s2 = new String(&quot;hello&quot;);
 
@@ -6085,7 +6010,7 @@ public class Main {
 }
 
 </code></pre>
-<h3><a href="#finally面试题" aria-hidden="true" class="anchor" id="user-content-finally面试题"></a>finally面试题</h3>
+<h3 id="user-content-finally面试题">finally面试题<a href="#finally面试题" aria-label="Link to heading 'finally面试题'" data-heading-content="finally面试题" class="anchor"></a></h3>
 <pre><code class="language-java">package org.example;
 
 public class Main {
@@ -6112,25 +6037,24 @@ public class Main {
 <li>java中的有一条这样的规则：方法体中的代码必须遵循自上而下顺序依次逐行执行（亘古不变的语法）</li>
 <li>java中还有一条语法规则：return语法一旦执行，整个方法必须结束（亘古不变的语法）</li>
 </ul>
-
-                </div>
-                <div class="series-nav"><div class="series-nav-actions"><a class="series-nav-btn" href="/series/old-docs/">目录页</a></div><details class="series-nav-details"><summary class="series-nav-summary"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><div class="series-nav-heading"><span class="series-nav-title">Old Docs</span><span class="series-nav-count">共 33 章</span></div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="series-nav-chevron"><path d="m6 9 6 6 6-6"/></svg></summary><div class="series-nav-list"><a class="series-nav-item" href="/post/20250410/"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">Rust 案例 - 计算器</span></a><a class="series-nav-item" href="/post/20250313/"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">Rust镜像源</span></a><a class="series-nav-item" href="/post/20250220-2/"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">Rust所有权</span></a><a class="series-nav-item" href="/post/20250220/"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">JavaScript 高阶函数之 reduce</span></a><a class="series-nav-item" href="/post/20241220/"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">JavaScript中的&quot;事件冒泡&quot;与&quot;事件捕获&quot;</span></a><a class="series-nav-item" href="/post/20240511/"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">今天，学习Web Component</span></a><a class="series-nav-item" href="/post/20240415/"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">Gin中间件上下文中的Set、Get函数的用法</span></a><a class="series-nav-item" href="/post/20240412/"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">React中forwardRef的用法</span></a><a class="series-nav-item" href="/post/20240402/"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">5分钟快速入门Taro</span></a><a class="series-nav-item" href="/post/20240328/"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">React中使用Immer编写简洁的更新逻辑</span></a><a class="series-nav-item" href="/post/20240327/"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">浅谈React中的mutation</span></a><a class="series-nav-item" href="/post/20240326/"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">Go语言高并发编程初探</span></a><a class="series-nav-item" href="/post/20240315/"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">windows终端命令受限</span></a><a class="series-nav-item" href="/post/20240313/"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">TypeScript类型取反</span></a><a class="series-nav-item" href="/post/20240102/"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">实现一个丝滑的暗黑模式切换动画</span></a><a class="series-nav-item" href="/post/20231221-2/"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">Vue3.3+ 新特性 defineOptions</span></a><a class="series-nav-item" href="/post/20231221/"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">Vue3 实验性特性 defineModel</span></a><a class="series-nav-item" href="/post/20231117-3/"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">JavaScript闭包直接修改内部属性</span></a><a class="series-nav-item" href="/post/20231117-2/"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">使用class实现评分</span></a><a class="series-nav-item" href="/post/20231117/"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">函数柯里化</span></a><a class="series-nav-item" href="/post/20230831/"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">自定义Typora主题分享</span></a><a class="series-nav-item" href="/post/20230829/"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">git学习教程</span></a><a class="series-nav-item" href="/post/20230827/"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">博客园自定义主题</span></a><a class="series-nav-item" href="/post/20230816/"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">Golang学习笔记</span></a><a class="series-nav-item active" href="/post/20230301/"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">Java学习笔记</span><span class="series-nav-item-now">本篇</span></a><a class="series-nav-item" href="/post/20230220-6/"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">规范和快捷键</span></a><a class="series-nav-item" href="/post/20230220-5/"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">黑苹果</span></a><a class="series-nav-item" href="/post/20230220-4/"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">防抖函数debounce</span></a><a class="series-nav-item" href="/post/20230220-3/"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">TypeScript学习笔记</span></a><a class="series-nav-item" href="/post/20230220/"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">ES6 标准入门 - 阮一峰</span></a><a class="series-nav-item" href="/post/20230220-2/"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">css常用场景</span></a><a class="series-nav-item" href="/post/20210105/"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">hexo-theme-heri主题开发简记</span></a><a class="series-nav-item" href="/post/20201222/"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">测试文章</span></a></div></details><div class="series-nav-pager"><a class="series-nav-page prev" href="/post/20230816/"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">Golang学习笔记</span></a><a class="series-nav-page next" href="/post/20230220-6/"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">规范和快捷键</span></a></div></div>
-            </article>
-        </main>
-<footer class="footer-content">
-    <div class="copyright">
-        <span>2019-2026 </span>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"/></svg>
-        <span> 干徒 / Ganto</span>
-    </div>
-</footer>
-        </div>
-    </div>
-<script>/* 挂载前清空预渲染内容，避免与 WASM 渲染结果重复 */
-try{document.getElementById('main').innerHTML='';}catch(e){}</script>
+</div></div><div class="series-nav"><div class="series-nav-actions"><a href="/series/old-docs" class="series-nav-btn"><span>目录页</span></a></div><details class="series-nav-details"><summary class="series-nav-summary"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg><div class="series-nav-heading"><span class="series-nav-title">Old Docs</span><span class="series-nav-count">共 33 章</span></div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="series-nav-chevron"><path d="m6 9 6 6 6-6"></path></svg></summary><div class="series-nav-list"><a href="/post/20250410" class="series-nav-item"><span class="series-nav-item-index">1</span><span class="series-nav-item-title">Rust 案例 - 计算器</span></a><a href="/post/20250313" class="series-nav-item"><span class="series-nav-item-index">2</span><span class="series-nav-item-title">Rust镜像源</span></a><a href="/post/20250220-2" class="series-nav-item"><span class="series-nav-item-index">3</span><span class="series-nav-item-title">Rust所有权</span></a><a href="/post/20250220" class="series-nav-item"><span class="series-nav-item-index">4</span><span class="series-nav-item-title">JavaScript 高阶函数之 reduce</span></a><a href="/post/20241220" class="series-nav-item"><span class="series-nav-item-index">5</span><span class="series-nav-item-title">JavaScript中的&#34;事件冒泡&#34;与&#34;事件捕获&#34;</span></a><a href="/post/20240511" class="series-nav-item"><span class="series-nav-item-index">6</span><span class="series-nav-item-title">今天，学习Web Component</span></a><a href="/post/20240415" class="series-nav-item"><span class="series-nav-item-index">7</span><span class="series-nav-item-title">Gin中间件上下文中的Set、Get函数的用法</span></a><a href="/post/20240412" class="series-nav-item"><span class="series-nav-item-index">8</span><span class="series-nav-item-title">React中forwardRef的用法</span></a><a href="/post/20240402" class="series-nav-item"><span class="series-nav-item-index">9</span><span class="series-nav-item-title">5分钟快速入门Taro</span></a><a href="/post/20240328" class="series-nav-item"><span class="series-nav-item-index">10</span><span class="series-nav-item-title">React中使用Immer编写简洁的更新逻辑</span></a><a href="/post/20240327" class="series-nav-item"><span class="series-nav-item-index">11</span><span class="series-nav-item-title">浅谈React中的mutation</span></a><a href="/post/20240326" class="series-nav-item"><span class="series-nav-item-index">12</span><span class="series-nav-item-title">Go语言高并发编程初探</span></a><a href="/post/20240315" class="series-nav-item"><span class="series-nav-item-index">13</span><span class="series-nav-item-title">windows终端命令受限</span></a><a href="/post/20240313" class="series-nav-item"><span class="series-nav-item-index">14</span><span class="series-nav-item-title">TypeScript类型取反</span></a><a href="/post/20240102" class="series-nav-item"><span class="series-nav-item-index">15</span><span class="series-nav-item-title">实现一个丝滑的暗黑模式切换动画</span></a><a href="/post/20231221-2" class="series-nav-item"><span class="series-nav-item-index">16</span><span class="series-nav-item-title">Vue3.3+ 新特性 defineOptions</span></a><a href="/post/20231221" class="series-nav-item"><span class="series-nav-item-index">17</span><span class="series-nav-item-title">Vue3 实验性特性 defineModel</span></a><a href="/post/20231117-3" class="series-nav-item"><span class="series-nav-item-index">18</span><span class="series-nav-item-title">JavaScript闭包直接修改内部属性</span></a><a href="/post/20231117-2" class="series-nav-item"><span class="series-nav-item-index">19</span><span class="series-nav-item-title">使用class实现评分</span></a><a href="/post/20231117" class="series-nav-item"><span class="series-nav-item-index">20</span><span class="series-nav-item-title">函数柯里化</span></a><a href="/post/20230831" class="series-nav-item"><span class="series-nav-item-index">21</span><span class="series-nav-item-title">自定义Typora主题分享</span></a><a href="/post/20230829" class="series-nav-item"><span class="series-nav-item-index">22</span><span class="series-nav-item-title">git学习教程</span></a><a href="/post/20230827" class="series-nav-item"><span class="series-nav-item-index">23</span><span class="series-nav-item-title">博客园自定义主题</span></a><a href="/post/20230816" class="series-nav-item"><span class="series-nav-item-index">24</span><span class="series-nav-item-title">Golang学习笔记</span></a><a href="/post/20230301" class="series-nav-item active" aria-current="page"><span class="series-nav-item-index">25</span><span class="series-nav-item-title">Java学习笔记</span><span class="series-nav-item-now">本篇</span></a><a href="/post/20230220-6" class="series-nav-item"><span class="series-nav-item-index">26</span><span class="series-nav-item-title">规范和快捷键</span></a><a href="/post/20230220-5" class="series-nav-item"><span class="series-nav-item-index">27</span><span class="series-nav-item-title">黑苹果</span></a><a href="/post/20230220-4" class="series-nav-item"><span class="series-nav-item-index">28</span><span class="series-nav-item-title">防抖函数debounce</span></a><a href="/post/20230220-3" class="series-nav-item"><span class="series-nav-item-index">29</span><span class="series-nav-item-title">TypeScript学习笔记</span></a><a href="/post/20230220" class="series-nav-item"><span class="series-nav-item-index">30</span><span class="series-nav-item-title">ES6 标准入门 - 阮一峰</span></a><a href="/post/20230220-2" class="series-nav-item"><span class="series-nav-item-index">31</span><span class="series-nav-item-title">css常用场景</span></a><a href="/post/20210105" class="series-nav-item"><span class="series-nav-item-index">32</span><span class="series-nav-item-title">hexo-theme-heri主题开发简记</span></a><a href="/post/20201222" class="series-nav-item"><span class="series-nav-item-index">33</span><span class="series-nav-item-title">测试文章</span></a></div></details><div class="series-nav-pager"><a href="/post/20230816" class="series-nav-page prev"><span class="series-nav-page-label">上一篇</span><span class="series-nav-page-title">Golang学习笔记</span></a><a href="/post/20230220-6" class="series-nav-page next"><span class="series-nav-page-label">下一篇</span><span class="series-nav-page-title">规范和快捷键</span></a></div></div><div class="blog-tags"><span class="blog-tag"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5"></path></svg>Old</span></div><div class="details-sentinel" style="height:1px;"></div><div class="markov-section"><div class="markov-header"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"></path><polyline points="12 12 18 12 18 6"></polyline></svg><span>AI 续写</span><span class="markov-badge">马尔可夫链</span></div><p class="markov-desc">基于本文内容训练的 tri-gram 语言模型，自动生成下文片段。</p><div class="markov-actions"><button class="markov-btn">生成续写</button></div></div></article></div></main><nav class="floating-toolbar" aria-label="页面工具栏"><button class="tool-btn" type="button" aria-label="后退"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.75 19.5 8.25 12l7.5-7.5"></path></svg></button><a href="/" class="tool-btn" aria-label="首页"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"></path></svg></a><a href="/series/old-docs" class="tool-btn" aria-label="系列目录"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"></path></svg></a><button class="tool-btn" type="button" aria-label="宽屏模式"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8m-8 18h8M4 12h16M4 12l3-3m-3 3l3 3m13-3l-3-3m3 3l-3 3"></path></svg></button><span class="tool-divider"></span><button class="tool-btn" type="button" aria-label="回到顶部"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.5v-15m0 0-6.75 6.75M12 4.5l6.75 6.75"></path></svg></button></nav><footer class="footer-content"><div class="copyright"><span>2019-2026 </span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 512 512" fill="rgb(161, 98, 7)" style="margin: 0 2px; position: relative; top: 2px;"><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM199.4 312.6c-31.2-31.2-31.2-81.9 0-113.1s81.9-31.2 113.1 0c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9c-50-50-131-50-181 0s-50 131 0 181s131 50 181 0c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0c-31.2 31.2-81.9 31.2-113.1 0z"></path></svg><span> 干徒 / Ganto</span></div></footer></div></div>
+<script>/* 把预渲染正文交给 SPA 后清空 #main，避免重复渲染 */
+try{
+  var main=document.getElementById('main');
+  var content=main?main.querySelector('.blog-content'):null;
+  if(content){
+    var t=document.createElement('template');
+    t.id='prerender-content';
+    t.setAttribute('data-slug', "20230301");
+    t.innerHTML=content.innerHTML;
+    document.body.appendChild(t);
+  }
+  if(main) main.innerHTML='';
+}catch(e){}
+</script>
 <script type="module">
-import init, * as bindings from '/web-rs-ed78e9ed78fe0ba6.js';
-const wasm = await init({ module_or_path: '/web-rs-ed78e9ed78fe0ba6_bg.wasm' });
+import init, * as bindings from '/web-rs-4b7fc77d2e4f841a.js';
+const wasm = await init({ module_or_path: '/web-rs-4b7fc77d2e4f841a_bg.wasm' });
 
 
 window.wasmBindings = bindings;
