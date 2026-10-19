@@ -104,7 +104,7 @@ impl CanvasRenderer {
             let display_title = if is_hovered || is_dragging {
                 node.title.clone()
             } else if node.title.chars().count() > 6 {
-                format!("{}…", &node.title.chars().take(5).collect::<String>())
+                format!("{}…", node.title.chars().take(5).collect::<String>())
             } else {
                 node.title.clone()
             };

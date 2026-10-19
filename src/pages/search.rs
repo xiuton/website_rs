@@ -305,7 +305,7 @@ pub fn Search() -> Element {
                                     let _ = window.history().unwrap()
                                         .replace_state_with_url(
                                             &wasm_bindgen::JsValue::NULL, "",
-                                            Some(&format!("/knowledge-graph?highlight={}", &highlight)),
+                                            Some(&format!("/knowledge-graph?highlight={}", highlight)),
                                         );
                                 }
                             }
