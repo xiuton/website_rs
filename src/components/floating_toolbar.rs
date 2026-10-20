@@ -17,6 +17,57 @@ use dioxus::prelude::*;
 /// 文章宽屏阅读状态；工具栏与 BlogPostView 共享。
 pub static BLOG_WIDE_MODE: GlobalSignal<bool> = Signal::global(|| false);
 
+/// 工具栏可见性配置用的页面分类。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ToolbarPage {
+    Home,
+    About,
+    Dev,
+    Tags,
+    Search,
+    Rss,
+    KnowledgeGraph,
+    AiSummary,
+    BlogPost,
+    Series,
+    CircleGenerator,
+    Test,
+    NotFound,
+    Other,
+}
+
+impl ToolbarPage {
+    fn from_route(route: &Route) -> Self {
+        match route {
+            Route::Home => Self::Home,
+            Route::About => Self::About,
+            Route::Dev => Self::Dev,
+            Route::Tags => Self::Tags,
+            Route::Search => Self::Search,
+            Route::Rss => Self::Rss,
+            Route::KnowledgeGraphView => Self::KnowledgeGraph,
+            Route::AiSummaryView => Self::AiSummary,
+            Route::BlogPostView { .. } => Self::BlogPost,
+            Route::SeriesView { .. } => Self::Series,
+            Route::CircleGenerator => Self::CircleGenerator,
+            #[cfg(feature = "dev-pages")]
+            Route::Test => Self::Test,
+            Route::NotFound { .. } => Self::NotFound,
+            _ => Self::Other,
+        }
+    }
+}
+
+/// 在这里配置不显示悬浮工具栏的页面。
+///
+/// - 图谱页有完整的画布/缩放控件，不需要再叠加全局工具栏
+/// - 测试页是组件测试场，工具栏没有实际用途
+const HIDE_TOOLBAR_ON: &[ToolbarPage] = &[ToolbarPage::KnowledgeGraph, ToolbarPage::Test, ToolbarPage::CircleGenerator];
+
+fn should_show_toolbar(route: &Route) -> bool {
+    !HIDE_TOOLBAR_ON.contains(&ToolbarPage::from_route(route))
+}
+
 #[derive(Clone, Debug, PartialEq, serde::Deserialize)]
 struct TocEntry {
     id: String,
@@ -125,6 +176,11 @@ pub fn FloatingToolbar() -> Element {
     let mut toc_items = use_signal(Vec::<TocEntry>::new);
     let mut toc_active = use_signal(|| None::<String>);
     let toc_entries = toc_items.read().clone();
+
+    // 所有 hooks 都必须在提前返回之前执行
+    if !should_show_toolbar(&route) {
+        return rsx! {};
+    }
 
     rsx! {
         if post.is_some() && toc_open() {
@@ -296,5 +352,18 @@ pub fn FloatingToolbar() -> Element {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn toolbar_is_hidden_on_configured_pages() {
+        assert!(!should_show_toolbar(&Route::KnowledgeGraphView));
+        assert!(!should_show_toolbar(&Route::Test));
+        assert!(should_show_toolbar(&Route::Home));
+        assert!(should_show_toolbar(&Route::BlogPostView { slug: "demo".into() }));
     }
 }
