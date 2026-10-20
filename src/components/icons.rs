@@ -154,6 +154,24 @@ pub fn ScrollTopIcon() -> Element {
 }
 
 #[component]
+pub fn ScrollBottomIcon() -> Element {
+    rsx! {
+        svg {
+            xmlns: "http://www.w3.org/2000/svg",
+            view_box: "0 0 24 24",
+            width: "24",
+            height: "24",
+            fill: "none",
+            stroke: "currentColor",
+            stroke_width: "2",
+            stroke_linecap: "round",
+            stroke_linejoin: "round",
+            path { d: "M12 4.5v15m0 0-6.75-6.75M12 19.5l6.75-6.75" }
+        }
+    }
+}
+
+#[component]
 pub fn ChevronLeftIcon() -> Element {
     rsx! {
         svg {

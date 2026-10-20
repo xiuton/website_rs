@@ -238,6 +238,12 @@
 
     &:has(.wide-mode) {
       max-width: 1200px;
+      // 宽屏时工具栏固定在右侧，预留安全带避免覆盖正文
+      padding-right: 4rem;
+
+      @include mobile {
+        padding-right: 0;
+      }
     }
 
     .main-content {
@@ -3347,6 +3353,14 @@ html.dark::view-transition-new(root) {
     }
 }
 
+// 点击目录面板外部关闭
+.toc-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1150;
+  background: transparent;
+}
+
 // ============================================================
 // 全局悬浮工具栏（文章、首页、搜索、系列等共用）
 // ============================================================
@@ -3355,7 +3369,7 @@ html.dark::view-transition-new(root) {
   right: max(1rem, calc((100vw - 700px) / 2 - 3rem));
   top: 50%;
   transform: translateY(-50%);
-  z-index: 1100;
+  z-index: 1200;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
@@ -3437,7 +3451,7 @@ html.dark::view-transition-new(root) {
     position: absolute;
     top: 0;
     right: calc(100% + 0.65rem);
-    width: min(18rem, 32vw);
+    width: min(22rem, calc(100vw - 4rem));
     max-height: min(62vh, 34rem);
     display: flex;
     flex-direction: column;
@@ -3446,7 +3460,7 @@ html.dark::view-transition-new(root) {
     border: 1px solid var(--border-default);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
-    z-index: 1200;
+    z-index: 1201;
   }
 
   .toc-panel-header {

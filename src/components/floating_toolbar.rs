@@ -7,7 +7,7 @@
 //! 宽屏状态用 `GlobalSignal` 共享，文章页只负责读取 class，不再自己渲染工具栏。
 
 use crate::components::icons::{
-    BackArrowIcon, BookmarkIcon, HomeIcon, ScrollTopIcon, SearchIcon, TocIcon, WideModeIcon,
+    BackArrowIcon, BookmarkIcon, HomeIcon, ScrollBottomIcon, ScrollTopIcon, SearchIcon, TocIcon, WideModeIcon,
 };
 use crate::routes::Route;
 use crate::utils::storage;
@@ -51,6 +51,19 @@ fn scroll_to_top() {
     if let Some(window) = web_sys::window() {
         window.scroll_to_with_x_and_y(0.0, 0.0);
     }
+}
+
+fn scroll_to_bottom() {
+    let Some(window) = web_sys::window() else {
+        return;
+    };
+    let Some(document) = window.document() else {
+        return;
+    };
+
+    let root_height = document.document_element().map(|element| element.scroll_height()).unwrap_or(0);
+    let body_height = document.body().map(|body| body.scroll_height()).unwrap_or(0);
+    window.scroll_to_with_x_and_y(0.0, root_height.max(body_height) as f64);
 }
 
 fn go_back() {
@@ -114,6 +127,13 @@ pub fn FloatingToolbar() -> Element {
     let toc_entries = toc_items.read().clone();
 
     rsx! {
+        if post.is_some() && toc_open() {
+            div {
+                class: "toc-backdrop",
+                aria_hidden: "true",
+                onclick: move |_| toc_open.set(false),
+            }
+        }
         nav {
             class: if post.is_some() && wide { "floating-toolbar wide" } else { "floating-toolbar" },
             aria_label: "页面工具栏",
@@ -222,6 +242,14 @@ pub fn FloatingToolbar() -> Element {
                 aria_label: "回到顶部",
                 onclick: move |_| scroll_to_top(),
                 ScrollTopIcon {}
+            }
+
+            button {
+                class: "tool-btn",
+                r#type: "button",
+                aria_label: "回到底部",
+                onclick: move |_| scroll_to_bottom(),
+                ScrollBottomIcon {}
             }
 
             if post.is_some() && toc_open() {
