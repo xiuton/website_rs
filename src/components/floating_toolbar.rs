@@ -6,7 +6,9 @@
 //!
 //! 宽屏状态用 `GlobalSignal` 共享，文章页只负责读取 class，不再自己渲染工具栏。
 
-use crate::components::icons::{BackArrowIcon, BookmarkIcon, HomeIcon, ScrollTopIcon, SearchIcon, WideModeIcon};
+use crate::components::icons::{
+    BackArrowIcon, BookmarkIcon, HomeIcon, ScrollTopIcon, SearchIcon, TocIcon, WideModeIcon,
+};
 use crate::routes::Route;
 use crate::utils::storage;
 use crate::BLOG_POSTS;
@@ -14,6 +16,36 @@ use dioxus::prelude::*;
 
 /// 文章宽屏阅读状态；工具栏与 BlogPostView 共享。
 pub static BLOG_WIDE_MODE: GlobalSignal<bool> = Signal::global(|| false);
+
+#[derive(Clone, Debug, PartialEq, serde::Deserialize)]
+struct TocEntry {
+    id: String,
+    text: String,
+    level: u8,
+}
+
+/// 从正文 DOM 读取 h2/h3，生成目录。
+fn read_toc() -> Vec<TocEntry> {
+    let script = r#"
+        JSON.stringify(
+            [...document.querySelectorAll('.blog-content h2[id], .blog-content h3[id]')].map(h => ({
+                id: h.id,
+                text: (h.dataset.headingContent || h.textContent || '').trim(),
+                level: Number(h.tagName.slice(1))
+            }))
+        )
+    "#;
+    let raw = js_sys::eval(script)
+        .ok()
+        .and_then(|value| value.as_string())
+        .unwrap_or_default();
+    serde_json::from_str(&raw).unwrap_or_default()
+}
+
+fn scroll_to_id(id: &str) {
+    let script = format!("document.getElementById({id:?})?.scrollIntoView({{behavior:'smooth',block:'start'}});");
+    let _ = js_sys::eval(&script);
+}
 
 fn scroll_to_top() {
     if let Some(window) = web_sys::window() {
@@ -76,6 +108,10 @@ pub fn FloatingToolbar() -> Element {
     });
 
     let wide = BLOG_WIDE_MODE();
+    let mut toc_open = use_signal(|| false);
+    let mut toc_items = use_signal(Vec::<TocEntry>::new);
+    let mut toc_active = use_signal(|| None::<String>);
+    let toc_entries = toc_items.read().clone();
 
     rsx! {
         nav {
@@ -98,8 +134,19 @@ pub fn FloatingToolbar() -> Element {
                 }
             }
 
-            // 文章页：宽屏阅读 + 系列目录
+            // 文章页：目录 + 宽屏阅读 + 系列目录
             if let Some(post) = post {
+                button {
+                    class: if toc_open() { "tool-btn active" } else { "tool-btn" },
+                    r#type: "button",
+                    aria_label: "文章目录",
+                    onclick: move |_| {
+                        let items = read_toc();
+                        toc_items.set(items);
+                        toc_open.set(!toc_open());
+                    },
+                    TocIcon {}
+                }
                 if !post.series.is_empty() {
                     if let Some(slug) = series_slug.clone() {
                         Link {
@@ -175,6 +222,50 @@ pub fn FloatingToolbar() -> Element {
                 aria_label: "回到顶部",
                 onclick: move |_| scroll_to_top(),
                 ScrollTopIcon {}
+            }
+
+            if post.is_some() && toc_open() {
+                aside {
+                    class: "toc-panel",
+                    aria_label: "文章标题目录",
+                    div { class: "toc-panel-header",
+                        span { "文章目录" }
+                        button {
+                            class: "toc-close",
+                            r#type: "button",
+                            aria_label: "关闭目录",
+                            onclick: move |_| toc_open.set(false),
+                            "✕"
+                        }
+                    }
+                    if toc_entries.is_empty() {
+                        p { class: "toc-empty", "本文暂无标题目录" }
+                    } else {
+                        nav { class: "toc-list", aria_label: "文章标题导航",
+                            {toc_entries.iter().map(|item| {
+                                let item_id = item.id.clone();
+                                let active = toc_active() == Some(item_id.clone());
+                                rsx! {
+                                    button {
+                                        key: "{item.id}",
+                                        class: if active {
+                                            "toc-item toc-level-{item.level} active"
+                                        } else {
+                                            "toc-item toc-level-{item.level}"
+                                        },
+                                        r#type: "button",
+                                        aria_label: item.text.clone(),
+                                        onclick: move |_| {
+                                            scroll_to_id(&item_id);
+                                            toc_active.set(Some(item_id.clone()));
+                                        },
+                                        "{item.text}"
+                                    }
+                                }
+                            })}
+                        }
+                    }
+                }
             }
         }
     }

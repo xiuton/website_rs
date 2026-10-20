@@ -3432,6 +3432,101 @@ html.dark::view-transition-new(root) {
     margin: 0.2rem auto;
   }
 
+  // 文章标题目录：桌面端从工具栏左侧展开，移动端从底部弹出
+  .toc-panel {
+    position: absolute;
+    top: 0;
+    right: calc(100% + 0.65rem);
+    width: min(18rem, 32vw);
+    max-height: min(62vh, 34rem);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    z-index: 1200;
+  }
+
+  .toc-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.7rem 0.85rem;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  .toc-close {
+    width: 1.5rem;
+    height: 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    font-size: 0.8rem;
+
+    &:hover {
+      background: var(--accent-soft);
+      color: var(--accent-text);
+    }
+  }
+
+  .toc-list {
+    overflow-y: auto;
+    padding: 0.35rem;
+    scrollbar-width: thin;
+  }
+
+  .toc-item {
+    display: block;
+    width: 100%;
+    padding: 0.4rem 0.55rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+
+    &.toc-level-3 {
+      padding-left: 1.25rem;
+      color: var(--text-tertiary);
+      font-size: 0.74rem;
+    }
+
+    &:hover {
+      background: var(--accent-soft);
+      color: var(--accent-text);
+    }
+
+    &.active {
+      background: var(--accent-soft);
+      color: var(--accent-text);
+      font-weight: 600;
+    }
+  }
+
+  .toc-empty {
+    padding: 1.2rem 0.9rem;
+    color: var(--text-tertiary);
+    font-size: 0.78rem;
+    text-align: center;
+  }
+
   @include mobile {
     right: 1rem;
     left: 1rem;
@@ -3466,6 +3561,16 @@ html.dark::view-transition-new(root) {
       width: 1px;
       height: 1rem;
       margin: auto 0.2rem;
+    }
+
+    .toc-panel {
+      position: fixed;
+      top: auto;
+      right: 1rem;
+      left: 1rem;
+      bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+      width: auto;
+      max-height: 50vh;
     }
   }
 }

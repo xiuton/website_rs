@@ -296,3 +296,22 @@ pub fn CloseIcon() -> Element {
         }
     }
 }
+
+#[component]
+pub fn TocIcon() -> Element {
+    rsx! {
+        svg {
+            xmlns: "http://www.w3.org/2000/svg",
+            view_box: "0 0 24 24",
+            width: "24",
+            height: "24",
+            fill: "none",
+            stroke: "currentColor",
+            stroke_width: "2",
+            stroke_linecap: "round",
+            stroke_linejoin: "round",
+            path { d: "M8 6h12M8 12h12M8 18h12" }
+            path { d: "M4 6h.01M4 12h.01M4 18h.01" }
+        }
+    }
+}
