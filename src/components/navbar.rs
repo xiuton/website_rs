@@ -11,6 +11,9 @@ use wasm_bindgen::JsCast;
 static SUB_MENU_OPEN: GlobalSignal<bool> = Signal::global(|| false);
 static SUB_MENU_LEFT: GlobalSignal<f64> = Signal::global(|| 0.0);
 
+/// 桌面端鼠标拖拽导航条滚动（触摸端保留原生滚动）。
+const NAVBAR_DRAG_JS: &str = include_str!("../utils/navbar_drag.js");
+
 type ClickListener = (web_sys::Document, Closure<dyn FnMut(web_sys::Event)>);
 type ScrollListener = (web_sys::Window, Closure<dyn FnMut()>);
 
@@ -133,11 +136,15 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
     };
 
     use_effect(move || {
+        let window = web_sys::window().expect("Failed to get window");
+        let document = window.document().expect("Failed to get document");
+
+        // 绑定鼠标拖拽（脚本内部会等待 .navbar-links 出现，且幂等）
+        let _ = js_sys::eval(NAVBAR_DRAG_JS);
+
         if scroll_listener.borrow().is_some() {
             return;
         }
-        let window = web_sys::window().expect("Failed to get window");
-        let document = window.document().expect("Failed to get document");
 
         let window_for_closure = window.clone();
         let was_stuck = std::cell::Cell::new(false);

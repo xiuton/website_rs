@@ -27,14 +27,12 @@
 
     #main .app .navbar-sticky-wrap .navbar-links {
       width: 100%;
+      flex-wrap: nowrap;
+      justify-content: flex-start;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
-      flex-wrap: nowrap;
       scrollbar-width: none;
-
-      &::-webkit-scrollbar {
-        display: none;
-      }
+      -ms-overflow-style: none;
 
       .nav-link {
         padding: 0.25rem 0.5rem;
@@ -52,7 +50,7 @@
       }
 
       .theme-toggle {
-        margin-left: auto;
+        margin-left: 0;
       }
     }
 
