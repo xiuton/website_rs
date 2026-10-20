@@ -844,6 +844,12 @@ pre code.hljs {
 }
 #main .app:has(.wide-mode) {
   max-width: 1200px;
+  padding-right: 4rem;
+}
+@media (max-width: 768px) {
+  #main .app:has(.wide-mode) {
+    padding-right: 0;
+  }
 }
 #main .app .main-content {
   transition: background 0.3s, color 0.3s;
@@ -3555,12 +3561,19 @@ html.dark::view-transition-new(root) {
   margin-left: auto;
 }
 
+.toc-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1150;
+  background: transparent;
+}
+
 .floating-toolbar {
   position: fixed;
   right: max(1rem, (100vw - 700px) / 2 - 3rem);
   top: 50%;
   transform: translateY(-50%);
-  z-index: 1100;
+  z-index: 1200;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
@@ -3629,6 +3642,90 @@ html.dark::view-transition-new(root) {
   background: var(--border-subtle);
   margin: 0.2rem auto;
 }
+.floating-toolbar .toc-panel {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 0.65rem);
+  width: min(22rem, 100vw - 4rem);
+  max-height: min(62vh, 34rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 1201;
+}
+.floating-toolbar .toc-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.floating-toolbar .toc-close {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.floating-toolbar .toc-close:hover {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.floating-toolbar .toc-list {
+  overflow-y: auto;
+  padding: 0.35rem;
+  scrollbar-width: thin;
+}
+.floating-toolbar .toc-item {
+  display: block;
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.floating-toolbar .toc-item.toc-level-3 {
+  padding-left: 1.25rem;
+  color: var(--text-tertiary);
+  font-size: 0.74rem;
+}
+.floating-toolbar .toc-item:hover {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.floating-toolbar .toc-item.active {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+.floating-toolbar .toc-empty {
+  padding: 1.2rem 0.9rem;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  text-align: center;
+}
 @media (max-width: 768px) {
   .floating-toolbar {
     right: 1rem;
@@ -3660,6 +3757,15 @@ html.dark::view-transition-new(root) {
     width: 1px;
     height: 1rem;
     margin: auto 0.2rem;
+  }
+  .floating-toolbar .toc-panel {
+    position: fixed;
+    top: auto;
+    right: 1rem;
+    left: 1rem;
+    bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+    width: auto;
+    max-height: 50vh;
   }
 }
 
