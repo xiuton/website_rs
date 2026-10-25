@@ -7,10 +7,11 @@
 //! 宽屏状态用 `GlobalSignal` 共享，文章页只负责读取 class，不再自己渲染工具栏。
 
 use crate::components::icons::{
-    BackArrowIcon, BookmarkIcon, HomeIcon, ScrollBottomIcon, ScrollTopIcon, SearchIcon, TocIcon, WideModeIcon,
+    BackArrowIcon, BookmarkIcon, HomeIcon, MoonIcon, ScrollBottomIcon, ScrollTopIcon, SearchIcon, SunIcon, TocIcon,
+    WideModeIcon,
 };
 use crate::routes::Route;
-use crate::utils::storage;
+use crate::utils::{dark_mode, storage};
 use crate::BLOG_POSTS;
 use dioxus::prelude::*;
 
@@ -142,6 +143,7 @@ pub fn FloatingToolbar() -> Element {
     let is_search = matches!(&route, Route::Search);
     let is_tags = matches!(&route, Route::Tags);
     let is_series = matches!(&route, Route::SeriesView { .. });
+    let mut is_dark = dark_mode::use_dark_mode();
 
     let post = match &route {
         Route::BlogPostView { slug } => BLOG_POSTS.iter().find(|post| post.slug == slug.trim_end_matches('/')),
@@ -291,6 +293,21 @@ pub fn FloatingToolbar() -> Element {
 
             if !is_home {
                 span { class: "tool-divider" }
+            }
+            button {
+                class: "tool-btn theme-toggle",
+                r#type: "button",
+                aria_label: if is_dark() {
+                    "切换到浅色模式"
+                } else {
+                    "切换到深色模式"
+                },
+                onclick: move |event: Event<MouseData>| dark_mode::toggle_theme(&mut is_dark, &event),
+                if is_dark() {
+                    SunIcon {}
+                } else {
+                    MoonIcon {}
+                }
             }
             button {
                 class: "tool-btn",

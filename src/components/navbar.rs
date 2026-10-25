@@ -63,53 +63,9 @@ fn toggle_submenu() {
 }
 
 #[component]
-pub fn Navbar(is_dark: Signal<bool>) -> Element {
+pub fn Navbar() -> Element {
     // 顶部导航只放公共链接；操场/测试等开发页收进「开发」二级菜单
     let nav_items = crate::nav::PUBLIC_NAV_LINKS;
-
-    let onclick = move |e: Event<MouseData>| {
-        let window = web_sys::window().expect("Failed to get window");
-        let document = window.document().expect("Failed to get document");
-        let html = document.document_element().expect("Failed to get document element");
-        let coords = e.client_coordinates();
-        let x = coords.x;
-        let y = coords.y;
-        let width = window
-            .inner_width()
-            .expect("Failed to get inner width")
-            .as_f64()
-            .expect("Failed to convert width to f64");
-        let height = window
-            .inner_height()
-            .expect("Failed to get inner height")
-            .as_f64()
-            .expect("Failed to convert height to f64");
-        let end_radius = ((x.max(width - x)).powi(2) + (y.max(height - y)).powi(2)).sqrt();
-        html.set_attribute("style", &format!("--x: {}px; --y: {}px; --r: {}px", x, y, end_radius))
-            .expect("Failed to set style attribute");
-        let supports_transition = js_sys::eval("Boolean(document.startViewTransition)")
-            .expect("Failed to eval startViewTransition")
-            .as_bool()
-            .unwrap_or(false);
-        if supports_transition {
-            let _ = js_sys::eval(
-                "document.startViewTransition(() => { document.documentElement.classList.toggle('dark'); })",
-            );
-        } else {
-            let class = html.class_name();
-            if class.contains("dark") {
-                html.set_attribute("class", "").expect("Failed to remove dark class");
-            } else {
-                html.set_attribute("class", "dark").expect("Failed to set dark class");
-            }
-        }
-        is_dark.set(!is_dark());
-        if let Some(window) = web_sys::window() {
-            if let Some(storage) = window.local_storage().ok().flatten() {
-                let _ = storage.set_item("theme", if is_dark() { "dark" } else { "light" });
-            }
-        }
-    };
 
     let route = use_route::<Route>();
 
@@ -308,36 +264,6 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                     title: "RSS 订阅",
                     to: Route::Rss,
                     RssIcon {}
-                }
-                button {
-                    class: "nav-icon-btn theme-toggle",
-                    onclick: onclick,
-                    {match is_dark() {
-                        true => rsx! {
-                            svg {
-                                xmlns: "http://www.w3.org/2000/svg",
-                                view_box: "0 0 1024 1024",
-                                path {
-                                    fill: "currentColor",
-                                    d: "M512 704a192 192 0 1 0 0-384 192 192 0 0 0 0 384m0 64a256 256 0 1 1 0-512 256 256 0 0 1 0 512m0-704a32 32 0 0 1 32 32v64a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32m0 768a32 32 0 0 1 32 32v64a32 32 0 1 1-64 0v-64a32 32 0 0 1 32-32M195.2 195.2a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 1 1-45.248 45.248L195.2 240.448a32 32 0 0 1 0-45.248zm543.104 543.104a32 32 0 0 1 45.248 0l45.248 45.248a32 32 0 0 1-45.248 45.248l-45.248-45.248a32 32 0 0 1 0-45.248M64 512a32 32 0 0 1 32-32h64a32 32 0 0 1 0 64H96a32 32 0 0 1-32-32m768 0a32 32 0 0 1 32-32h64a32 32 0 1 1 0 64h-64a32 32 0 0 1-32-32M195.2 828.8a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248L240.448 828.8a32 32 0 0 1-45.248 0zm543.104-543.104a32 32 0 0 1 0-45.248l45.248-45.248a32 32 0 0 1 45.248 45.248l-45.248 45.248a32 32 0 0 1-45.248 0"
-                                }
-                            }
-                        },
-                        false => rsx! {
-                            svg {
-                                xmlns: "http://www.w3.org/2000/svg",
-                                fill: "none",
-                                view_box: "0 0 24 24",
-                                stroke_width: "2",
-                                stroke: "currentColor",
-                                path {
-                                    stroke_linecap: "round",
-                                    stroke_linejoin: "round",
-                                    d: "M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"
-                                }
-                            }
-                        }
-                    }}
                 }
             }
             if SUB_MENU_OPEN() {

@@ -1,11 +1,10 @@
 use super::{FloatingToolbar, Footer, Navbar};
 use crate::routes::Route;
-use crate::utils::{dark_mode, title};
+use crate::utils::title;
 use dioxus::prelude::*;
 
 #[component]
 pub fn Layout() -> Element {
-    let is_dark = dark_mode::use_dark_mode();
     let route = use_route::<Route>();
     let is_wide = matches!(route, Route::KnowledgeGraphView);
     let app_class = if is_wide { "app app-standalone" } else { "app" };
@@ -21,7 +20,7 @@ pub fn Layout() -> Element {
 
     rsx! {
         div { class: "{app_class}",
-            Navbar { is_dark: is_dark }
+            Navbar {}
             main { class: "main-content", id: "main-content",
                 Outlet::<Route> {}
             }
