@@ -16,19 +16,56 @@ const NAVBAR_DRAG_JS: &str = include_str!("../utils/navbar_drag.js");
 
 type ClickListener = (web_sys::Document, Closure<dyn FnMut(web_sys::Event)>);
 type ScrollListener = (web_sys::Window, Closure<dyn FnMut()>);
+type KeyListener = (web_sys::Document, Closure<dyn FnMut(web_sys::KeyboardEvent)>);
+
+fn close_submenu() {
+    *SUB_MENU_OPEN.write() = false;
+}
+
+/// 「开发」分区包含开发首页及其二级菜单页面。
+fn is_dev_section(route: &Route) -> bool {
+    match route {
+        Route::Dev | Route::CircleGenerator => true,
+        #[cfg(feature = "dev-pages")]
+        Route::Playground | Route::Test => true,
+        _ => false,
+    }
+}
+
+/// 打开/关闭「开发」二级菜单；桌面端按触发按钮位置定位，移动端由 CSS 改成底部面板。
+fn toggle_submenu() {
+    let will_open = !SUB_MENU_OPEN();
+    if will_open {
+        if let Some(window) = web_sys::window() {
+            let Some(document) = window.document() else {
+                return;
+            };
+            let item = document.query_selector(".nav-item-with-sub").ok().flatten();
+            let wrap = document.query_selector(".navbar-sticky-wrap").ok().flatten();
+            if let (Some(item), Some(wrap)) = (item, wrap) {
+                let item_rect = item.get_bounding_client_rect();
+                let wrap_rect = wrap.get_bounding_client_rect();
+                let is_mobile = window.inner_width().ok().and_then(|width| width.as_f64()).unwrap_or(1024.0) <= 768.0;
+                let panel_width = if is_mobile { 220.0 } else { 190.0 };
+                let item_left = item_rect.left() - wrap_rect.left();
+                let item_right = item_rect.right() - wrap_rect.left();
+                // 右侧放不下时改为右对齐触发项，避免贴边或溢出
+                let left = if item_left + panel_width <= wrap_rect.width() - 8.0 {
+                    item_left.max(8.0)
+                } else {
+                    (item_right - panel_width).max(8.0)
+                };
+                *SUB_MENU_LEFT.write() = left;
+            }
+        }
+    }
+    *SUB_MENU_OPEN.write() = will_open;
+}
 
 #[component]
 pub fn Navbar(is_dark: Signal<bool>) -> Element {
-    // 链接列表来自 nav.rs（与预渲染页共用），dev-pages 专属项按 feature 追加
-    let nav_links = {
-        // 未启用 dev-pages 时 `links` 不会再被修改，`mut` 看似多余
-        #[allow(unused_mut)]
-        let mut links = crate::nav::PUBLIC_NAV_LINKS.to_vec();
-        #[cfg(feature = "dev-pages")]
-        links.extend_from_slice(crate::nav::DEV_ONLY_NAV_LINKS);
-        links
-    };
-    let nav_items = &nav_links[..];
+    // 顶部导航只放公共链接；操场/测试等开发页收进「开发」二级菜单
+    let nav_items = crate::nav::PUBLIC_NAV_LINKS;
 
     let onclick = move |e: Event<MouseData>| {
         let window = web_sys::window().expect("Failed to get window");
@@ -79,15 +116,20 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
     // 监听器在组件卸载时显式移除，避免跨布局导航后继续停留在 document/window 上。
     let click_listener: Rc<RefCell<Option<ClickListener>>> = use_hook(|| Rc::new(RefCell::new(None)));
     let scroll_listener: Rc<RefCell<Option<ScrollListener>>> = use_hook(|| Rc::new(RefCell::new(None)));
+    let key_listener: Rc<RefCell<Option<KeyListener>>> = use_hook(|| Rc::new(RefCell::new(None)));
     {
         let click_listener = click_listener.clone();
         let scroll_listener = scroll_listener.clone();
+        let key_listener = key_listener.clone();
         use_drop(move || {
             if let Some((document, closure)) = click_listener.borrow_mut().take() {
                 let _ = document.remove_event_listener_with_callback("click", closure.as_ref().unchecked_ref());
             }
             if let Some((window, closure)) = scroll_listener.borrow_mut().take() {
                 let _ = window.remove_event_listener_with_callback("scroll", closure.as_ref().unchecked_ref());
+            }
+            if let Some((document, closure)) = key_listener.borrow_mut().take() {
+                let _ = document.remove_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref());
             }
         });
     }
@@ -109,14 +151,24 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                 if el.closest(".nav-sub-trigger").ok().flatten().is_none()
                     && el.closest(".nav-submenu-popup").ok().flatten().is_none()
                 {
-                    *SUB_MENU_OPEN.write() = false;
+                    close_submenu();
                 }
             }
         });
         document
             .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
             .unwrap();
-        *click_listener.borrow_mut() = Some((document, closure));
+        *click_listener.borrow_mut() = Some((document.clone(), closure));
+
+        let key_closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::KeyboardEvent| {
+            if event.key() == "Escape" {
+                close_submenu();
+            }
+        });
+        document
+            .add_event_listener_with_callback("keydown", key_closure.as_ref().unchecked_ref())
+            .unwrap();
+        *key_listener.borrow_mut() = Some((document, key_closure));
     });
 
     let is_active = move |href: &str| match href {
@@ -126,12 +178,8 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
         "/search" => matches!(route, Route::Search),
         "/knowledge-graph" => matches!(route, Route::KnowledgeGraphView),
         "/ai-summary" => matches!(route, Route::AiSummaryView),
-        "/dev" => matches!(route, Route::Dev),
+        "/dev" => is_dev_section(&route),
         "/rss" => matches!(route, Route::Rss),
-        #[cfg(feature = "dev-pages")]
-        "/playground" => matches!(route, Route::Playground),
-        #[cfg(feature = "dev-pages")]
-        "/test" => matches!(route, Route::Test),
         _ => false,
     };
 
@@ -149,6 +197,9 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
         let window_for_closure = window.clone();
         let was_stuck = std::cell::Cell::new(false);
         let scroll_closure = Closure::<dyn FnMut()>::new(move || {
+            if SUB_MENU_OPEN() {
+                close_submenu();
+            }
             if let Some(wrap) = document.query_selector(".navbar-sticky-wrap").ok().flatten() {
                 let rect = wrap.get_bounding_client_rect();
                 let scroll_top = window_for_closure.scroll_y().unwrap_or(0.0);
@@ -209,23 +260,21 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                                     { *label }
                                 }
                                 button {
-                                    class: "nav-sub-trigger",
+                                    class: if active {
+                                        "nav-sub-trigger nav-active"
+                                    } else {
+                                        "nav-sub-trigger"
+                                    },
+                                    r#type: "button",
+                                    aria_label: "打开开发菜单",
+                                    aria_haspopup: "menu",
+                                    aria_expanded: if SUB_MENU_OPEN() { "true" } else { "false" },
+                                    aria_controls: "nav-submenu",
                                     onclick: move |e: Event<MouseData>| {
                                         e.stop_propagation();
-                                        let will_open = !SUB_MENU_OPEN();
-                                        if will_open {
-                                            let win = web_sys::window().unwrap();
-                                            let doc = win.document().unwrap();
-                                            if let Some(item) = doc.query_selector(".nav-item-with-sub").ok().flatten() {
-                                                if let Some(wrap) = doc.query_selector(".navbar-sticky-wrap").ok().flatten() {
-                                                    let wrap_rect = wrap.get_bounding_client_rect();
-                                                    let item_rect = item.get_bounding_client_rect();
-                                                    *SUB_MENU_LEFT.write() = item_rect.left() - wrap_rect.left();
-                                                }
-                                            }
-                                        }
-                                        *SUB_MENU_OPEN.write() = will_open;
+                                        toggle_submenu();
                                     },
+                                    span { class: "nav-sub-trigger-label", { *label } }
                                     svg {
                                         width: "10",
                                         height: "10",
@@ -292,16 +341,47 @@ pub fn Navbar(is_dark: Signal<bool>) -> Element {
                 }
             }
             if SUB_MENU_OPEN() {
-                div {
-                    class: "nav-submenu-popup",
-                    style: format!("left:{}px", SUB_MENU_LEFT()),
-                    Link {
-                        to: Route::CircleGenerator,
-                        class: "nav-sub-link",
-                        onclick: move |_| *SUB_MENU_OPEN.write() = false,
-                        "圆形生成器"
-                    }
-                }
+                NavSubmenu { left: SUB_MENU_LEFT() }
+            }
+        }
+    }
+}
+
+fn submenu_link(route: Route, title: &'static str, description: &'static str, extra_class: &'static str) -> Element {
+    rsx! {
+        Link {
+            to: route,
+            class: "nav-sub-link {extra_class}",
+            role: "menuitem",
+            onclick: move |_| close_submenu(),
+            span { class: "nav-sub-link-title", {title} }
+            span { class: "nav-sub-link-desc", {description} }
+        }
+    }
+}
+
+#[component]
+fn NavSubmenu(left: f64) -> Element {
+    // 桌面端一级「开发」可点击，移动端一级项是菜单按钮，因此仅移动端保留「开发首页」
+    let mut items = vec![submenu_link(Route::Dev, "开发首页", "开发工具与实验页面", "nav-sub-link-dev-home")];
+
+    #[cfg(feature = "dev-pages")]
+    {
+        items.push(submenu_link(Route::Playground, "操场", "交互实验与示例", ""));
+        items.push(submenu_link(Route::Test, "测试", "组件与页面测试", ""));
+    }
+
+    items.push(submenu_link(Route::CircleGenerator, "圆形生成器", "参数化生成圆形图案", ""));
+
+    rsx! {
+        div {
+            id: "nav-submenu",
+            class: "nav-submenu-popup",
+            role: "menu",
+            aria_label: "开发工具",
+            style: format!("--submenu-left:{left}px"),
+            div { class: "nav-submenu-list",
+                {items.into_iter()}
             }
         }
     }

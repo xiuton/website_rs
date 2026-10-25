@@ -84,9 +84,6 @@ pub const PUBLIC_NAV_LINKS: &[(&str, &str)] = &[
     ("/dev", "开发"),
 ];
 
-/// 仅在 `dev-pages` feature 下存在的导航链接。
-pub const DEV_ONLY_NAV_LINKS: &[(&str, &str)] = &[("/playground", "操场"), ("/test", "测试")];
-
 #[cfg(test)]
 mod tests {
     use super::*;
