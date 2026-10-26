@@ -34,7 +34,6 @@ enum ToolbarPage {
     CircleGenerator,
     Test,
     NotFound,
-    Other,
 }
 
 impl ToolbarPage {
@@ -52,9 +51,10 @@ impl ToolbarPage {
             Route::SeriesView { .. } => Self::Series,
             Route::CircleGenerator => Self::CircleGenerator,
             #[cfg(feature = "dev-pages")]
+            Route::Playground => Self::Dev,
+            #[cfg(feature = "dev-pages")]
             Route::Test => Self::Test,
             Route::NotFound { .. } => Self::NotFound,
-            _ => Self::Other,
         }
     }
 }
